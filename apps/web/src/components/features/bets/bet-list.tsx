@@ -1,63 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { BetCard, type BetCardProps } from './bet-card';
-
-/* ------------------------------------------------------------------ */
-/*  Mock data                                                          */
-/* ------------------------------------------------------------------ */
-
-const MOCK_BETS: BetCardProps[] = [
-  {
-    id: '1',
-    maker: 'axiome1qz3f5xr7yn0d5kwmjx9m4yehsqq72rch3mqdv',
-    amount: 100,
-    side: 'heads',
-    createdAt: new Date(Date.now() - 2 * 60_000),
-  },
-  {
-    id: '2',
-    maker: 'axiome1v4e5cc4hpf5rgzc3d8ntg0k7t3hrwlmfkaqdzv',
-    amount: 50,
-    side: 'tails',
-    createdAt: new Date(Date.now() - 8 * 60_000),
-  },
-  {
-    id: '3',
-    maker: 'axiome1pjf0s2klwgyqe9rdcwxn20g3kzq5au6yaxtxya',
-    amount: 1000,
-    side: 'heads',
-    createdAt: new Date(Date.now() - 15 * 60_000),
-  },
-  {
-    id: '4',
-    maker: 'axiome1mk8933ds3fh8a5v9pmnnzrq4jlh73jw4nr9c8v',
-    amount: 250,
-    side: 'tails',
-    createdAt: new Date(Date.now() - 22 * 60_000),
-  },
-  {
-    id: '5',
-    maker: 'axiome1t6aqvnf0aqze7xqvxr2gxksc4c9rjw2kylnz6m',
-    amount: 25,
-    side: 'heads',
-    createdAt: new Date(Date.now() - 45 * 60_000),
-  },
-  {
-    id: '6',
-    maker: 'axiome1dxe2n8gq3rv74hxs3yz3mnnqafkr8c7v5qf2wz',
-    amount: 500,
-    side: 'tails',
-    createdAt: new Date(Date.now() - 60 * 60_000),
-    revealDeadline: new Date(Date.now() + 3 * 60_000),
-  },
-];
-
-const MOCK_USER_BALANCE = 420;
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+import { useGetBets, useAcceptBet, type Bet } from '@coinflip/api-client';
+import { BetCard } from './bet-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
 
@@ -70,26 +16,59 @@ const AMOUNT_FILTERS: { value: AmountFilter; label: string; min: number; max: nu
 
 export function BetList() {
   const [amountFilter, setAmountFilter] = useState<AmountFilter>('all');
-  const [onlyAffordable, setOnlyAffordable] = useState(false);
+
+  const { data, isLoading, error } = useGetBets({ status: 'open', limit: 50 });
+  const acceptMutation = useAcceptBet();
+
+  const bets = data?.data ?? [];
 
   const filteredBets = useMemo(() => {
     const range = AMOUNT_FILTERS.find((f) => f.value === amountFilter)!;
-    return MOCK_BETS.filter((bet) => {
-      if (bet.amount < range.min || bet.amount > range.max) return false;
-      if (onlyAffordable && bet.amount > MOCK_USER_BALANCE) return false;
-      return true;
+    return bets.filter((bet) => {
+      const amount = Number(bet.amount);
+      return amount >= range.min && amount <= range.max;
     });
-  }, [amountFilter, onlyAffordable]);
+  }, [bets, amountFilter]);
 
   const handleAccept = (id: string) => {
-    console.log('Accept bet:', id);
+    acceptMutation.mutate(
+      { betId: Number(id), data: { guess: 'heads' as const } },
+      {
+        onSuccess: () => {
+          console.log('Bet accepted:', id);
+        },
+      },
+    );
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-48 rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-danger)] py-16">
+        <span className="text-4xl">⚠️</span>
+        <p className="text-lg font-medium text-[var(--color-danger)]">
+          Failed to load bets
+        </p>
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Make sure the API server is running on port 3001
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
-        {/* Amount range */}
         <div className="flex gap-1.5">
           {AMOUNT_FILTERS.map((filter) => (
             <button
@@ -106,26 +85,6 @@ export function BetList() {
             </button>
           ))}
         </div>
-
-        {/* Affordable toggle */}
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={onlyAffordable}
-            onClick={() => setOnlyAffordable((prev) => !prev)}
-            className={`relative h-5 w-9 rounded-full transition-colors ${
-              onlyAffordable ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
-            }`}
-          >
-            <span
-              className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-                onlyAffordable ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          Only bets I can cover
-        </label>
       </div>
 
       {/* Bet Grid */}
@@ -134,8 +93,13 @@ export function BetList() {
           {filteredBets.map((bet) => (
             <BetCard
               key={bet.id}
-              {...bet}
-              canAccept={bet.amount <= MOCK_USER_BALANCE && !bet.revealDeadline}
+              id={String(bet.id)}
+              maker={bet.maker}
+              amount={Number(bet.amount)}
+              side={bet.acceptor_guess === 'tails' ? 'tails' : 'heads'}
+              createdAt={new Date(bet.created_at)}
+              revealDeadline={bet.reveal_deadline ? new Date(bet.reveal_deadline) : undefined}
+              canAccept={bet.status === 'open'}
               onAccept={handleAccept}
             />
           ))}

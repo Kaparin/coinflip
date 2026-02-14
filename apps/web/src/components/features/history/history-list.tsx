@@ -1,84 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface HistoryEntry {
-  id: string;
-  amount: number;
-  role: 'creator' | 'acceptor';
-  result: 'win' | 'loss';
-  commission: number;
-  payout: number;
-  opponent: string;
-  txHash: string;
-  completedAt: Date;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Mock data                                                          */
-/* ------------------------------------------------------------------ */
-
-const MOCK_HISTORY: HistoryEntry[] = [
-  {
-    id: '1',
-    amount: 100,
-    role: 'creator',
-    result: 'win',
-    commission: 20,
-    payout: 180,
-    opponent: 'axiome1v4e5cc4hpf5rgzc3d8ntg0k7t3hrwlmfkaqdzv',
-    txHash: 'A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2',
-    completedAt: new Date(Date.now() - 10 * 60_000),
-  },
-  {
-    id: '2',
-    amount: 50,
-    role: 'acceptor',
-    result: 'loss',
-    commission: 0,
-    payout: 0,
-    opponent: 'axiome1pjf0s2klwgyqe9rdcwxn20g3kzq5au6yaxtxya',
-    txHash: 'B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B200',
-    completedAt: new Date(Date.now() - 30 * 60_000),
-  },
-  {
-    id: '3',
-    amount: 250,
-    role: 'creator',
-    result: 'win',
-    commission: 50,
-    payout: 450,
-    opponent: 'axiome1mk8933ds3fh8a5v9pmnnzrq4jlh73jw4nr9c8v',
-    txHash: 'C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B20044',
-    completedAt: new Date(Date.now() - 2 * 3600_000),
-  },
-  {
-    id: '4',
-    amount: 500,
-    role: 'acceptor',
-    result: 'win',
-    commission: 100,
-    payout: 900,
-    opponent: 'axiome1dxe2n8gq3rv74hxs3yz3mnnqafkr8c7v5qf2wz',
-    txHash: 'D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2003355',
-    completedAt: new Date(Date.now() - 5 * 3600_000),
-  },
-  {
-    id: '5',
-    amount: 25,
-    role: 'creator',
-    result: 'loss',
-    commission: 0,
-    payout: 0,
-    opponent: 'axiome1t6aqvnf0aqze7xqvxr2gxksc4c9rjw2kylnz6m',
-    txHash: 'E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B200334455',
-    completedAt: new Date(Date.now() - 24 * 3600_000),
-  },
-];
+import { useState, useMemo } from 'react';
+import { useGetBetHistory, type Bet } from '@coinflip/api-client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -93,8 +17,8 @@ function truncateTxHash(hash: string): string {
   return `${hash.slice(0, 8)}...${hash.slice(-8)}`;
 }
 
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+function formatTimeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -103,7 +27,6 @@ function formatTimeAgo(date: Date): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-// Placeholder explorer URL
 const EXPLORER_BASE = 'https://explorer.axiome.pro/tx';
 
 /* ------------------------------------------------------------------ */
@@ -112,19 +35,50 @@ const EXPLORER_BASE = 'https://explorer.axiome.pro/tx';
 
 type ResultFilter = 'all' | 'win' | 'loss';
 
+function getResult(bet: Bet, userAddress: string): 'win' | 'loss' | 'pending' {
+  if (!bet.winner) return 'pending';
+  return bet.winner === userAddress ? 'win' : 'loss';
+}
+
 export function HistoryList() {
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all');
 
+  const { data, isLoading } = useGetBetHistory({ limit: 50 });
+  const bets = data?.data ?? [];
+
+  // TODO: Replace with actual connected user address
+  const userAddress = '';
+
+  const enrichedBets = useMemo(
+    () =>
+      bets.map((bet) => ({
+        ...bet,
+        result: getResult(bet, userAddress),
+        role: (bet.maker === userAddress ? 'creator' : 'acceptor') as 'creator' | 'acceptor',
+      })),
+    [bets, userAddress],
+  );
+
   const filtered = resultFilter === 'all'
-    ? MOCK_HISTORY
-    : MOCK_HISTORY.filter((entry) => entry.result === resultFilter);
+    ? enrichedBets
+    : enrichedBets.filter((entry) => entry.result === resultFilter);
 
   const stats = {
-    total: MOCK_HISTORY.length,
-    wins: MOCK_HISTORY.filter((e) => e.result === 'win').length,
-    losses: MOCK_HISTORY.filter((e) => e.result === 'loss').length,
-    totalPayout: MOCK_HISTORY.reduce((sum, e) => sum + e.payout, 0),
+    total: enrichedBets.length,
+    wins: enrichedBets.filter((e) => e.result === 'win').length,
+    losses: enrichedBets.filter((e) => e.result === 'loss').length,
+    totalPayout: enrichedBets.reduce((sum, e) => sum + Number(e.payout_amount ?? 0), 0),
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -172,11 +126,10 @@ export function HistoryList() {
           <thead>
             <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
               <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Amount</th>
-              <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Role</th>
+              <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Status</th>
               <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Result</th>
               <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Payout</th>
-              <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Commission</th>
-              <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Opponent</th>
+              <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Maker</th>
               <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">Tx</th>
               <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">When</th>
             </tr>
@@ -187,73 +140,63 @@ export function HistoryList() {
                 key={entry.id}
                 className="border-b border-[var(--color-border)] last:border-b-0 transition-colors hover:bg-[var(--color-surface-hover)]"
               >
-                {/* Amount */}
                 <td className="px-4 py-3 font-bold tabular-nums">
-                  {entry.amount.toLocaleString()} LAUNCH
+                  {Number(entry.amount).toLocaleString()} LAUNCH
                 </td>
 
-                {/* Role */}
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-md px-2 py-0.5 text-xs font-medium ${
-                      entry.role === 'creator'
-                        ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                      entry.status === 'revealed'
+                        ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
                         : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
                     }`}
                   >
-                    {entry.role === 'creator' ? 'Creator' : 'Acceptor'}
+                    {entry.status}
                   </span>
                 </td>
 
-                {/* Result */}
                 <td className="px-4 py-3">
                   <span
                     className={`font-bold ${
                       entry.result === 'win'
                         ? 'text-[var(--color-success)]'
-                        : 'text-[var(--color-danger)]'
+                        : entry.result === 'loss'
+                          ? 'text-[var(--color-danger)]'
+                          : 'text-[var(--color-text-secondary)]'
                     }`}
                   >
-                    {entry.result === 'win' ? 'Win' : 'Loss'}
+                    {entry.result === 'win' ? 'Win' : entry.result === 'loss' ? 'Loss' : 'Pending'}
                   </span>
                 </td>
 
-                {/* Payout */}
                 <td className="px-4 py-3 tabular-nums">
-                  {entry.payout > 0 ? (
+                  {entry.payout_amount && Number(entry.payout_amount) > 0 ? (
                     <span className="text-[var(--color-success)]">
-                      +{entry.payout.toLocaleString()}
+                      +{Number(entry.payout_amount).toLocaleString()}
                     </span>
                   ) : (
                     <span className="text-[var(--color-text-secondary)]">—</span>
                   )}
                 </td>
 
-                {/* Commission */}
-                <td className="px-4 py-3 tabular-nums text-[var(--color-text-secondary)]">
-                  {entry.commission > 0 ? `-${entry.commission.toLocaleString()}` : '—'}
-                </td>
-
-                {/* Opponent */}
                 <td className="px-4 py-3 font-mono text-xs text-[var(--color-text-secondary)]">
-                  {truncateAddress(entry.opponent)}
+                  {truncateAddress(entry.maker)}
                 </td>
 
-                {/* Tx Hash */}
                 <td className="px-4 py-3">
                   <a
-                    href={`${EXPLORER_BASE}/${entry.txHash}`}
+                    href={`${EXPLORER_BASE}/${entry.txhash_create}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-mono text-xs text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)] hover:underline"
                   >
-                    {truncateTxHash(entry.txHash)}
+                    {truncateTxHash(entry.txhash_create)}
                   </a>
                 </td>
 
-                {/* When */}
                 <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">
-                  {formatTimeAgo(entry.completedAt)}
+                  {formatTimeAgo(entry.created_at)}
                 </td>
               </tr>
             ))}

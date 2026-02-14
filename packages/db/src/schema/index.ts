@@ -1,6 +1,6 @@
-export { users } from './users.js';
-export { sessions } from './sessions.js';
-export { vaultBalances } from './vault-balances.js';
-export { bets } from './bets.js';
-export { txEvents } from './tx-events.js';
-export { treasuryLedger } from './treasury-ledger.js';
+export { users } from './users';
+export { sessions } from './sessions';
+export { vaultBalances } from './vault-balances';
+export { bets } from './bets';
+export { txEvents } from './tx-events';
+export { treasuryLedger } from './treasury-ledger';

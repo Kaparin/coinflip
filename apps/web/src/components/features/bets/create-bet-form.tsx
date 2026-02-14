@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useCreateBet } from '@coinflip/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const PRESET_AMOUNTS = [10, 25, 50, 100, 250, 500, 1000] as const;
 
@@ -24,9 +26,19 @@ function generateSecret(): string {
 export function CreateBetForm() {
   const [amount, setAmount] = useState<string>('');
   const [side, setSide] = useState<Side>('heads');
-  const [isCreating, setIsCreating] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [commitment, setCommitment] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  const createBet = useCreateBet({
+    mutation: {
+      onSuccess: () => {
+        // Invalidate bets list to refresh
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+      },
+    },
+  });
 
   const parsedAmount = Number(amount);
   const isValidAmount = parsedAmount >= 10 && Number.isFinite(parsedAmount);
@@ -46,25 +58,19 @@ export function CreateBetForm() {
   const handleCreateBet = useCallback(async () => {
     if (!isValidAmount) return;
 
-    setIsCreating(true);
-    try {
-      const newSecret = generateSecret();
-      const newCommitment = await generateCommitment(side, newSecret);
+    const newSecret = generateSecret();
+    const newCommitment = await generateCommitment(side, newSecret);
 
-      setSecret(newSecret);
-      setCommitment(newCommitment);
+    setSecret(newSecret);
+    setCommitment(newCommitment);
 
-      // TODO: Send to API — for now just log
-      console.log('Bet created:', {
-        amount: parsedAmount,
-        side,
+    createBet.mutate({
+      data: {
+        amount: String(parsedAmount),
         commitment: newCommitment,
-        secret: newSecret,
-      });
-    } finally {
-      setIsCreating(false);
-    }
-  }, [isValidAmount, parsedAmount, side]);
+      },
+    });
+  }, [isValidAmount, parsedAmount, side, createBet]);
 
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
@@ -151,12 +157,21 @@ export function CreateBetForm() {
       {/* Create Button */}
       <button
         type="button"
-        disabled={!isValidAmount || isCreating}
+        disabled={!isValidAmount || createBet.isPending}
         onClick={handleCreateBet}
         className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-base font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {isCreating ? 'Creating...' : `Flip for ${isValidAmount ? Number(parsedAmount).toLocaleString() : '—'} LAUNCH`}
+        {createBet.isPending ? 'Creating...' : `Flip for ${isValidAmount ? Number(parsedAmount).toLocaleString() : '—'} LAUNCH`}
       </button>
+
+      {/* Error display */}
+      {createBet.isError && (
+        <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger)]/10 p-4">
+          <p className="text-sm text-[var(--color-danger)]">
+            Failed to create bet. Please try again.
+          </p>
+        </div>
+      )}
 
       {/* Commitment Info (shown after creation) */}
       {commitment && secret && (
