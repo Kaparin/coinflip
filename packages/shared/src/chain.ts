@@ -1,25 +1,50 @@
 /**
  * Axiome Chain configuration.
  * All chain-specific constants live here — shared between API and frontend.
+ *
+ * Official docs: https://docs.axiomeinfo.org/developer-documentation/useful-links
+ * Node source:   https://github.com/axiome-pro/axm-node
+ * Explorer:      https://axiomechain.org
+ *
+ * Axiome Chain is built on Cosmos SDK v0.50.3 + CosmWasm (wasmd v0.50.0).
  */
 
-/** Axiome Chain bech32 address prefix */
-export const AXIOME_PREFIX = 'axiome';
+/** Axiome Chain bech32 address prefix (confirmed from on-chain explorer) */
+export const AXIOME_PREFIX = 'axm';
 
 /** Default Chain ID for Axiome mainnet */
 export const DEFAULT_CHAIN_ID = 'axiome-2';
 
-/** Default RPC endpoint */
+/**
+ * Default RPC endpoint (Tendermint/CometBFT RPC).
+ * Used by CosmJS StargateClient.connect() and SigningStargateClient.
+ */
 export const DEFAULT_RPC_URL = 'https://rpc.axiome.pro';
 
-/** Default REST (LCD) endpoint */
-export const DEFAULT_REST_URL = 'https://rest.axiome.pro';
+/**
+ * Default REST (LCD) endpoint — public gRPC REST gateway.
+ * Official: https://api-chain.axiomechain.org
+ * Used by the indexer for block/tx queries.
+ */
+export const DEFAULT_REST_URL = 'https://api-chain.axiomechain.org';
+
+/**
+ * Swagger docs for the node REST API.
+ * http://api-docs.axiomeinfo.org:1317/swagger/
+ */
+export const NODE_SWAGGER_URL = 'http://api-docs.axiomeinfo.org:1317/swagger/';
 
 /** Default gas price for Axiome */
-export const DEFAULT_GAS_PRICE = '0.025uaxiome';
+export const DEFAULT_GAS_PRICE = '0.025uaxm';
 
-/** Fee denom */
-export const FEE_DENOM = 'uaxiome';
+/** Fee/staking denom (micro-AXM) */
+export const FEE_DENOM = 'uaxm';
+
+/** Display denom */
+export const DISPLAY_DENOM = 'AXM';
+
+/** Coin decimals (1 AXM = 10^6 uaxm) */
+export const COIN_DECIMALS = 6;
 
 /** CW20 token denom label */
 export const LAUNCH_TOKEN_LABEL = 'LAUNCH';
@@ -87,16 +112,16 @@ export function getAxiomeChainConfig(overrides?: {
     },
     currencies: [
       {
-        coinDenom: 'AXIOME',
+        coinDenom: DISPLAY_DENOM,
         coinMinimalDenom: FEE_DENOM,
-        coinDecimals: 6,
+        coinDecimals: COIN_DECIMALS,
       },
     ],
     feeCurrencies: [
       {
-        coinDenom: 'AXIOME',
+        coinDenom: DISPLAY_DENOM,
         coinMinimalDenom: FEE_DENOM,
-        coinDecimals: 6,
+        coinDecimals: COIN_DECIMALS,
         gasPriceStep: {
           low: 0.01,
           average: 0.025,
@@ -105,9 +130,9 @@ export function getAxiomeChainConfig(overrides?: {
       },
     ],
     stakeCurrency: {
-      coinDenom: 'AXIOME',
+      coinDenom: DISPLAY_DENOM,
       coinMinimalDenom: FEE_DENOM,
-      coinDecimals: 6,
+      coinDecimals: COIN_DECIMALS,
     },
   };
 }

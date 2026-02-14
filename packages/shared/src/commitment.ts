@@ -5,7 +5,7 @@
  * Commitment formula:
  *   SHA256("coinflip_v1" || maker_address || side || secret)
  *
- * - maker_address: bech32 Axiome address (e.g. axiome1abc...)
+ * - maker_address: bech32 Axiome address (e.g. axm1abc...)
  * - side: "heads" or "tails"
  * - secret: 32 random bytes as 64 hex chars
  */

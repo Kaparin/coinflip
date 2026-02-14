@@ -98,23 +98,23 @@ describe('formatBetResponse', () => {
     });
 
     const addressMap = new Map([
-      ['user_maker_123', 'axiome1maker...'],
-      ['user_accept_456', 'axiome1accept...'],
+      ['user_maker_123', 'axm1maker...'],
+      ['user_accept_456', 'axm1accept...'],
     ]);
 
     const result = formatBetResponse(row, addressMap);
 
-    expect(result.maker).toBe('axiome1maker...');
-    expect(result.acceptor).toBe('axiome1accept...');
-    expect(result.winner).toBe('axiome1maker...');
+    expect(result.maker).toBe('axm1maker...');
+    expect(result.acceptor).toBe('axm1accept...');
+    expect(result.winner).toBe('axm1maker...');
   });
 });
 
 describe('shortAddress', () => {
   it('truncates long addresses', () => {
-    const addr = 'axiome1abc123456789def0ghijklmnopqrstuvwxyz';
+    const addr = 'axm1abc123456789def0ghijklmnopqrstuvwxyz';
     const short = shortAddress(addr);
-    expect(short).toMatch(/^axiome1abc\.\.\.uvwxyz$/);
+    expect(short).toMatch(/^axm1abc123\.\.\.uvwxyz$/);
     expect(short.length).toBeLessThan(addr.length);
   });
 

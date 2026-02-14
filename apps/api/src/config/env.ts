@@ -7,7 +7,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5433/coinflip'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   AXIOME_RPC_URL: z.string().default('https://rpc.axiome.pro'),
-  AXIOME_REST_URL: z.string().default('https://rest.axiome.pro'),
+  AXIOME_REST_URL: z.string().default('https://api-chain.axiomechain.org'),
   AXIOME_CHAIN_ID: z.string().default('axiome-2'),
   COINFLIP_CONTRACT_ADDR: z.string().default(''),
   LAUNCH_CW20_ADDR: z.string().default(''),

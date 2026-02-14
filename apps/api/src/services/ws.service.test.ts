@@ -67,10 +67,10 @@ describe('WsService', () => {
     const ws1 = createMockWs();
     const ws2 = createMockWs();
 
-    const id1 = wsService.addClient(ws1, 'axiome1maker');
-    const id2 = wsService.addClient(ws2, 'axiome1other');
+    const id1 = wsService.addClient(ws1, 'axm1maker');
+    const id2 = wsService.addClient(ws2, 'axm1other');
 
-    wsService.sendToAddress('axiome1maker', { type: 'balance', data: { amount: '500' } });
+    wsService.sendToAddress('axm1maker', { type: 'balance', data: { amount: '500' } });
 
     expect(ws1.send).toHaveBeenCalledOnce();
     expect(ws2.send).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('WsService', () => {
     const ws = createMockWs();
     const id = wsService.addClient(ws);
 
-    wsService.emitBetAccepted({ id: 1, acceptor: 'axiome1...' });
+    wsService.emitBetAccepted({ id: 1, acceptor: 'axm1...' });
 
     const sent = JSON.parse(ws.send.mock.calls[0]![0] as string);
     expect(sent.type).toBe('bet_accepted');
@@ -120,10 +120,10 @@ describe('WsService', () => {
     const wsMaker = createMockWs();
     const wsOther = createMockWs();
 
-    const id1 = wsService.addClient(wsMaker, 'axiome1maker');
-    const id2 = wsService.addClient(wsOther, 'axiome1other');
+    const id1 = wsService.addClient(wsMaker, 'axm1maker');
+    const id2 = wsService.addClient(wsOther, 'axm1other');
 
-    wsService.emitBalanceUpdated('axiome1maker', { available: '1000', locked: '200' });
+    wsService.emitBalanceUpdated('axm1maker', { available: '1000', locked: '200' });
 
     expect(wsMaker.send).toHaveBeenCalledOnce();
     expect(wsOther.send).not.toHaveBeenCalled();

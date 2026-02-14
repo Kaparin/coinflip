@@ -8,7 +8,7 @@ import {
 } from './commitment.service.js';
 
 describe('Commitment Service', () => {
-  const MAKER_ADDRESS = 'axiome1qz3f5xr7yn0d5kwmjx9m4yehsqq72rch3mqdv';
+  const MAKER_ADDRESS = 'axm1qz3f5xr7yn0d5kwmjx9m4yehsqq72rch3mqdv';
 
   describe('generateSecret', () => {
     it('generates a 64-character hex string', () => {
@@ -76,7 +76,7 @@ describe('Commitment Service', () => {
     it('produces different output for different addresses', () => {
       const secret = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
       const c1 = computeCommitment(MAKER_ADDRESS, 'heads', secret);
-      const c2 = computeCommitment('axiome1v4e5cc4hpf5rgzc3d8ntg0k7t3hrwlmfkaqdzv', 'heads', secret);
+      const c2 = computeCommitment('axm1v4e5cc4hpf5rgzc3d8ntg0k7t3hrwlmfkaqdzv', 'heads', secret);
       expect(c1).not.toBe(c2);
     });
 
@@ -120,7 +120,7 @@ describe('Commitment Service', () => {
       const secret = generateSecret();
       const commitment = computeCommitment(MAKER_ADDRESS, 'heads', secret);
       expect(
-        verifyReveal(commitment, 'axiome1wrongaddress', 'heads', secret),
+        verifyReveal(commitment, 'axm1wrongaddress', 'heads', secret),
       ).toBe(false);
     });
 

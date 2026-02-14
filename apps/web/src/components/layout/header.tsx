@@ -9,7 +9,7 @@ import { StatusChips } from '@/components/features/auth/status-chips';
 
 const MOCK_STATE = {
   connected: true,
-  address: 'axiome1qz3f5xr7yn0d5kwmjx9m4yehsqq72rch3mqdv',
+  address: 'axm1qz3f5xr7yn0d5kwmjx9m4yehsqq72rch3mqdv',
   vaultBalance: 3_200,
   oneClickEnabled: true,
   gasSponsored: true,

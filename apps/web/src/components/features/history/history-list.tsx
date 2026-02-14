@@ -27,7 +27,7 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-const EXPLORER_BASE = 'https://explorer.axiome.pro/tx';
+const EXPLORER_BASE = 'https://axiomechain.org/tx';
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */

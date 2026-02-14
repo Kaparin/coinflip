@@ -7,15 +7,18 @@ import { STORAGE_KEYS } from '@/lib/constants';
  * Wallet connection state for Axiome Chain.
  *
  * For now, uses a simplified "address-based" connection model:
- * - User provides their axiome1... address
+ * - User provides their axm1... address
  * - Backend creates a session
  *
  * Future: integrate with Axiome Connect (axiomesign:// deeplinks)
  * or Keplr wallet for full signing capabilities.
+ *
+ * Note: Axiome Chain uses "axm" bech32 prefix (addresses: axm1abc...).
+ * See: https://axiomechain.org
  */
 
 export interface WalletState {
-  /** Connected Axiome address (axiome1...) */
+  /** Connected Axiome address (axm1...) */
   address: string | null;
   /** Whether the wallet is connected */
   isConnected: boolean;
@@ -25,7 +28,7 @@ export interface WalletState {
   connect: (address: string) => void;
   /** Disconnect wallet */
   disconnect: () => void;
-  /** Short display address (axiome1abc...xyz) */
+  /** Short display address (axm1abc...xyz) */
   shortAddress: string | null;
 }
 
@@ -37,14 +40,14 @@ export function useWallet(): WalletState {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const stored = sessionStorage.getItem(STORAGE_KEYS.CONNECTED_ADDRESS);
-    if (stored && stored.startsWith('axiome1')) {
+    if (stored && stored.startsWith('axm1')) {
       setAddress(stored);
     }
   }, []);
 
   const connect = useCallback((addr: string) => {
-    if (!addr.startsWith('axiome1')) {
-      throw new Error('Invalid Axiome address: must start with axiome1');
+    if (!addr.startsWith('axm1')) {
+      throw new Error('Invalid Axiome address: must start with axm1');
     }
 
     setIsConnecting(true);

@@ -13,9 +13,11 @@
  *
  * Axiome Chain specifics:
  *   - Chain ID: axiome-2
- *   - Address prefix: axiome
- *   - wasmd v0.50.0, cosmwasm_1_4
+ *   - Address prefix: axm (addresses: axm1...)
+ *   - Cosmos SDK v0.50.3, wasmd v0.50.0, cosmwasm_1_4
  *   - CW20 LAUNCH token for vault operations
+ *   - REST gateway: https://api-chain.axiomechain.org
+ *   - Node source: https://github.com/axiome-pro/axm-node
  */
 
 import { DirectSecp256k1HdWallet, Registry } from '@cosmjs/proto-signing';

@@ -129,7 +129,7 @@ describe('Vault API (mocked)', () => {
 
   it('GET /api/v1/vault/balance with auth returns balance', async () => {
     const res = await app.request('/api/v1/vault/balance', {
-      headers: { 'x-wallet-address': 'axiome1testuser' },
+      headers: { 'x-wallet-address': 'axm1testuser' },
     });
     expect(res.status).toBe(200);
 
@@ -146,11 +146,11 @@ describe('Users API (mocked)', () => {
 
   it('GET /api/v1/users/me with auth returns user profile', async () => {
     const res = await app.request('/api/v1/users/me', {
-      headers: { 'x-wallet-address': 'axiome1testuser' },
+      headers: { 'x-wallet-address': 'axm1testuser' },
     });
     expect(res.status).toBe(200);
 
     const body = await res.json() as { data: { address: string } };
-    expect(body.data.address).toBe('axiome1testuser');
+    expect(body.data.address).toBe('axm1testuser');
   });
 });
