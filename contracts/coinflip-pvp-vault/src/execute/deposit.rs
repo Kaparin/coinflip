@@ -1,9 +1,9 @@
-use cosmwasm_std::{from_json, DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{from_json, DepsMut, Env, MessageInfo, Response};
 use cw20::Cw20ReceiveMsg;
 
 use crate::error::ContractError;
 use crate::msg::ReceiveMsg;
-use crate::state::{VaultBalance, CONFIG, VAULT_BALANCES};
+use crate::state::{CONFIG, VAULT_BALANCES};
 
 pub fn execute_receive(
     deps: DepsMut,

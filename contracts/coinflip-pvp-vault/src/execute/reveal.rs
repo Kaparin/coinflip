@@ -62,12 +62,6 @@ pub fn execute_reveal(
     } else {
         bet.acceptor.clone().unwrap()
     };
-    let loser = if maker_wins {
-        bet.acceptor.clone().unwrap()
-    } else {
-        bet.maker.clone()
-    };
-
     // Compute payouts
     let pot = bet.amount * Uint128::new(2);
     let commission = pot * Uint128::from(config.commission_bps) / Uint128::new(10_000);
