@@ -3,31 +3,18 @@
 import { useState, useCallback } from 'react';
 import { useCreateBet } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCommitment } from '@/hooks/use-commitment';
+import { useWallet } from '@/hooks/use-wallet';
 
 const PRESET_AMOUNTS = [10, 25, 50, 100, 250, 500, 1000] as const;
 
 type Side = 'heads' | 'tails';
 
-async function generateCommitment(side: Side, secret: string): Promise<string> {
-  const message = `${side}:${secret}`;
-  const encoded = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function generateSecret(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 export function CreateBetForm() {
   const [amount, setAmount] = useState<string>('');
   const [side, setSide] = useState<Side>('heads');
-  const [secret, setSecret] = useState<string | null>(null);
-  const [commitment, setCommitment] = useState<string | null>(null);
+  const { address } = useWallet();
+  const { secret, commitment, generate: generateCommitment } = useCommitment();
 
   const queryClient = useQueryClient();
   const createBet = useCreateBet({
@@ -56,21 +43,24 @@ export function CreateBetForm() {
   );
 
   const handleCreateBet = useCallback(async () => {
-    if (!isValidAmount) return;
+    if (!isValidAmount || !address) return;
 
-    const newSecret = generateSecret();
-    const newCommitment = await generateCommitment(side, newSecret);
+    // Generate commitment using proper Axiome formula:
+    // SHA256("coinflip_v1" || maker_address || side || secret)
+    await generateCommitment(address, side);
+  }, [isValidAmount, address, side, generateCommitment]);
 
-    setSecret(newSecret);
-    setCommitment(newCommitment);
+  // When commitment is ready, submit the bet
+  const handleSubmitBet = useCallback(() => {
+    if (!commitment) return;
 
     createBet.mutate({
       data: {
         amount: String(parsedAmount),
-        commitment: newCommitment,
+        commitment,
       },
     });
-  }, [isValidAmount, parsedAmount, side, createBet]);
+  }, [commitment, parsedAmount, createBet]);
 
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
@@ -155,14 +145,27 @@ export function CreateBetForm() {
       </div>
 
       {/* Create Button */}
-      <button
-        type="button"
-        disabled={!isValidAmount || createBet.isPending}
-        onClick={handleCreateBet}
-        className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-base font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {createBet.isPending ? 'Creating...' : `Flip for ${isValidAmount ? Number(parsedAmount).toLocaleString() : '—'} LAUNCH`}
-      </button>
+      {!commitment ? (
+        <button
+          type="button"
+          disabled={!isValidAmount || !address}
+          onClick={handleCreateBet}
+          className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-base font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {!address
+            ? 'Connect wallet first'
+            : `Flip for ${isValidAmount ? Number(parsedAmount).toLocaleString() : '—'} LAUNCH`}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={createBet.isPending}
+          onClick={handleSubmitBet}
+          className="w-full rounded-xl bg-[var(--color-success)] px-6 py-3.5 text-base font-bold transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {createBet.isPending ? 'Submitting...' : 'Confirm & Submit Bet'}
+        </button>
+      )}
 
       {/* Error display */}
       {createBet.isError && (
