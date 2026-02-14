@@ -14,8 +14,9 @@ import { vaultService } from '../services/vault.service.js';
 import { wsService } from '../services/ws.service.js';
 import { formatBetResponse } from '../lib/format.js';
 import { Errors } from '../lib/errors.js';
+import type { AppEnv } from '../types.js';
 
-export const betsRouter = new Hono();
+export const betsRouter = new Hono<AppEnv>();
 
 // GET /api/v1/bets — List open bets (public, no auth)
 betsRouter.get('/', zValidator('query', BetListQuerySchema), async (c) => {
@@ -37,7 +38,7 @@ betsRouter.get('/', zValidator('query', BetListQuerySchema), async (c) => {
 
 // GET /api/v1/bets/history — Bet history (auth required)
 betsRouter.get('/history', authMiddleware, zValidator('query', BetHistoryQuerySchema), async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const { cursor, limit } = c.req.valid('query');
 
   const result = await betService.getUserBetHistory({
@@ -65,7 +66,7 @@ betsRouter.get('/:betId', async (c) => {
 
 // POST /api/v1/bets — Create bet (auth required)
 betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema), async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const { amount, commitment } = c.req.valid('json');
 
   // Validate min bet
@@ -110,7 +111,7 @@ betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema),
 
 // POST /api/v1/bets/:betId/accept — Accept bet (auth required)
 betsRouter.post('/:betId/accept', authMiddleware, zValidator('json', AcceptBetRequestSchema), async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const betId = BigInt(c.req.param('betId'));
   const { guess } = c.req.valid('json');
 
@@ -147,7 +148,7 @@ betsRouter.post('/:betId/accept', authMiddleware, zValidator('json', AcceptBetRe
 
 // POST /api/v1/bets/:betId/reveal — Reveal (auth required)
 betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealRequestSchema), async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const betId = BigInt(c.req.param('betId'));
   const { side, secret } = c.req.valid('json');
 
@@ -179,7 +180,7 @@ betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealReque
 
 // POST /api/v1/bets/:betId/cancel — Cancel (auth required)
 betsRouter.post('/:betId/cancel', authMiddleware, async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const betId = BigInt(c.req.param('betId'));
 
   const existing = await betService.getBetById(betId);
@@ -201,7 +202,7 @@ betsRouter.post('/:betId/cancel', authMiddleware, async (c) => {
 
 // POST /api/v1/bets/:betId/claim-timeout — Claim timeout (auth required)
 betsRouter.post('/:betId/claim-timeout', authMiddleware, async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const betId = BigInt(c.req.param('betId'));
 
   const existing = await betService.getBetById(betId);

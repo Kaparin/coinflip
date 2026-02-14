@@ -2,11 +2,11 @@
 
 import { type InputHTMLAttributes, forwardRef, useId, type ReactNode } from 'react';
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label?: string;
   error?: string;
-  prefix?: ReactNode;
-  suffix?: ReactNode;
+  startAdornment?: ReactNode;
+  endAdornment?: ReactNode;
   wrapperClassName?: string;
 }
 
@@ -15,8 +15,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     {
       label,
       error,
-      prefix,
-      suffix,
+      startAdornment,
+      endAdornment,
       className = '',
       wrapperClassName = '',
       id: externalId,
@@ -47,9 +47,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               : 'border-[var(--color-border)]',
           ].join(' ')}
         >
-          {prefix && (
+          {startAdornment && (
             <span className="flex shrink-0 items-center pl-3 text-sm text-[var(--color-text-secondary)]">
-              {prefix}
+              {startAdornment}
             </span>
           )}
 
@@ -60,8 +60,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'w-full bg-transparent px-3 py-2 text-sm text-[var(--color-text)]',
               'placeholder:text-[var(--color-text-secondary)]/50',
               'outline-none',
-              prefix ? 'pl-1.5' : '',
-              suffix ? 'pr-1.5' : '',
+              startAdornment ? 'pl-1.5' : '',
+              endAdornment ? 'pr-1.5' : '',
               className,
             ].join(' ')}
             aria-invalid={error ? true : undefined}
@@ -69,9 +69,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
 
-          {suffix && (
+          {endAdornment && (
             <span className="flex shrink-0 items-center pr-3 text-sm text-[var(--color-text-secondary)]">
-              {suffix}
+              {endAdornment}
             </span>
           )}
         </div>

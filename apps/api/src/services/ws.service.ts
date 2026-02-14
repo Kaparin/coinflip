@@ -1,8 +1,8 @@
-import type { ServerWebSocket } from 'ws';
+import type { WebSocket } from 'ws';
 import { logger } from '../lib/logger.js';
 
 type WsClient = {
-  ws: ServerWebSocket<unknown> | { send: (data: string) => void; readyState: number };
+  ws: WebSocket | { send: (data: string) => void; readyState: number };
   address?: string; // wallet address if authenticated
 };
 

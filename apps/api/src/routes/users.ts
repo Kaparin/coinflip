@@ -4,12 +4,13 @@ import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { Errors } from '../lib/errors.js';
+import type { AppEnv } from '../types.js';
 
-export const usersRouter = new Hono();
+export const usersRouter = new Hono<AppEnv>();
 
 // GET /api/v1/users/me — Current user profile (auth required)
 usersRouter.get('/me', authMiddleware, async (c) => {
-  const user = c.get('user') as { id: string; address: string; profileNickname: string | null; avatarUrl: string | null };
+  const user = c.get('user');
   const session = await userService.getActiveSession(user.id);
   const balance = await vaultService.getBalance(user.id);
 

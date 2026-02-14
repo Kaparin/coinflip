@@ -8,8 +8,9 @@ import { usersRouter } from './routes/users.js';
 import { authRouter } from './routes/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { env } from './config/env.js';
+import type { AppEnv } from './types.js';
 
-export const app = new Hono();
+export const app = new Hono<AppEnv>();
 
 // ---- Global middleware ----
 app.use('*', requestId());

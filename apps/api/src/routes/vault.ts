@@ -3,19 +3,20 @@ import { zValidator } from '@hono/zod-validator';
 import { DepositRequestSchema, WithdrawRequestSchema } from '@coinflip/shared/schemas';
 import { authMiddleware } from '../middleware/auth.js';
 import { vaultService } from '../services/vault.service.js';
+import type { AppEnv } from '../types.js';
 
-export const vaultRouter = new Hono();
+export const vaultRouter = new Hono<AppEnv>();
 
 // GET /api/v1/vault/balance — Get balance (auth required)
 vaultRouter.get('/balance', authMiddleware, async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const balance = await vaultService.getBalance(user.id);
   return c.json({ data: balance });
 });
 
 // POST /api/v1/vault/deposit — Generate Axiome Connect deposit payload
 vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSchema), async (c) => {
-  const address = c.get('address') as string;
+  const address = c.get('address');
   const { amount } = c.req.valid('json');
 
   // Generate Axiome Connect payload for CW20 Send to CoinFlip contract
@@ -46,7 +47,7 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
 
 // POST /api/v1/vault/withdraw — Withdraw from vault (via relayer)
 vaultRouter.post('/withdraw', authMiddleware, zValidator('json', WithdrawRequestSchema), async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const { amount } = c.req.valid('json');
 
   const balance = await vaultService.getBalance(user.id);

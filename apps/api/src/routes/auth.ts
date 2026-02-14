@@ -5,8 +5,9 @@ import { ConnectRequestSchema } from '@coinflip/shared/schemas';
 import { userService } from '../services/user.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
+import type { AppEnv } from '../types.js';
 
-export const authRouter = new Hono();
+export const authRouter = new Hono<AppEnv>();
 
 // POST /api/v1/auth/connect — Connect wallet and register session
 authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) => {
@@ -49,7 +50,7 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
 
 // GET /api/v1/auth/grants — Check authz + feegrant status
 authRouter.get('/grants', authMiddleware, async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user');
   const session = await userService.getActiveSession(user.id);
 
   // TODO: Query chain for actual authz grants and feegrant allowance
