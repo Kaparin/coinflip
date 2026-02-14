@@ -13,6 +13,17 @@
 export const AXIOME_PREFIX = 'axm';
 
 /**
+ * BIP-44 coin type for Axiome Chain.
+ * Standard Cosmos uses 118, but Axiome uses 546.
+ * HD path: m/44'/546'/0'/0/0
+ * Confirmed by deriving known address from mnemonic.
+ */
+export const AXIOME_COIN_TYPE = 546;
+
+/** Full BIP-44 HD derivation path for Axiome */
+export const AXIOME_HD_PATH = "m/44'/546'/0'/0/0";
+
+/**
  * Default Chain ID for Axiome mainnet.
  * Confirmed from live validator node: "network":"axiome-1"
  */

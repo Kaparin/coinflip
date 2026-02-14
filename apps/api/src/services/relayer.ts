@@ -25,7 +25,8 @@ import { SigningStargateClient, GasPrice, StdFee } from '@cosmjs/stargate';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 import { MsgExec } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
 import { toUtf8 } from '@cosmjs/encoding';
-import { AXIOME_PREFIX, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT, GAS_ADJUSTMENT } from '@coinflip/shared/chain';
+import { stringToPath } from '@cosmjs/crypto';
+import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT, GAS_ADJUSTMENT } from '@coinflip/shared/chain';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { SequenceManager } from './sequence-manager.js';
@@ -92,9 +93,10 @@ export class RelayerService {
     }
 
     try {
-      // Create wallet from mnemonic with Axiome prefix
+      // Create wallet from mnemonic with Axiome prefix and coin type 546
       this.wallet = await DirectSecp256k1HdWallet.fromMnemonic(env.RELAYER_MNEMONIC, {
         prefix: AXIOME_PREFIX,
+        hdPaths: [stringToPath(AXIOME_HD_PATH)],
       });
 
       const [account] = await this.wallet.getAccounts();
