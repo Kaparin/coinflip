@@ -1,0 +1,44 @@
+---
+description: Security model, threat mitigations, and anti-fraud controls
+alwaysApply: true
+---
+
+# Security & Anti-Fraud
+
+## Key threats and mitigations
+1. **Over-broad authz grants** → Use ContractExecutionAuthorization with strict contract addr + AcceptedMessageKeysFilter
+2. **Feegrant abuse** → AllowedMsgAllowance restricting to MsgExec only
+3. **Commitment manipulation** → SHA256 commitment hash verified on-chain
+4. **Griefing via non-reveal** → 5-minute timeout, acceptor claims by default
+5. **Double-accept race** → Contract rejects second accept (atomicity)
+6. **Indexer/API spoofing** → Always show tx hashes + explorer links, chain is source of truth
+7. **Malformed MsgExec payloads** → Strict server-side JSON schema validation, never relay arbitrary user JSON
+
+## Anti-fraud controls (3 layers)
+### Contract layer (hard security)
+- Max open bets per wallet = 10
+- Daily amount cap = 10,000 LAUNCH/day
+- No self-accept
+- Timeout forfeiture
+
+### Relayer layer (soft security)
+- IP rate limit: 30 req/min
+- Per-wallet rate limit: 10 tx/min
+- Pre-check caps before submitting tx
+- Reject spam patterns (repeated create/cancel)
+
+### UI layer
+- Disable actions when insufficient balance
+- Show countdown timers for reveal deadlines
+
+## Operational security
+- Rotate relayer keys periodically
+- Treasury in multisig if possible
+- Monitor feegrant spend spikes
+- Alerts: tx success rate, sequence mismatch rate, unresolved bets near timeout
+- DB: daily snapshots + WAL archiving
+- Emergency admin pause in contract (optional)
+
+## On-chain randomness warning
+NEVER use block hash for randomness — validators can influence outcomes.
+Always use commit-reveal among participants or external randomness beacon.

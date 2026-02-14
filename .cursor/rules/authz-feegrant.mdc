@@ -1,0 +1,44 @@
+---
+description: Authz and Feegrant configuration for delegated 1-click execution
+alwaysApply: true
+---
+
+# Authz & Feegrant — Delegated Execution
+
+## Why
+Cosmos x/authz lets a granter allow a grantee to execute specific message types on their behalf.
+x/feegrant lets a granter pay for gas fees under an allowance.
+Together they enable "1-click" gameplay without repeated wallet signing.
+
+## Authz grant specification
+- Message: `cosmos.authz.v1beta1.MsgGrant` (signed by USER as granter)
+- Authorization type: `cosmwasm.wasm.v1.ContractExecutionAuthorization`
+- grants[0].contract = COINFLIP_CONTRACT_ADDR (single contract only!)
+- grants[0].limit = CombinedLimit (calls_remaining high, e.g. 10000 for 30 days)
+- grants[0].filter = AcceptedMessageKeysFilter with keys:
+  deposit, withdraw, create_bet, accept_bet, reveal, claim_timeout, cancel_bet
+- Expiration: now + 30 days
+
+## CRITICAL SAFETY
+- NEVER use GenericAuthorization on MsgExecuteContract (rug risk!)
+- NEVER use AllowAllMessagesFilter (medium risk)
+- ALWAYS use ContractExecutionAuthorization + AcceptedMessageKeysFilter (low risk, best)
+
+## Feegrant configuration
+- Message: `cosmos.feegrant.v1beta1.MsgGrantAllowance` from Treasury to Relayer
+- Type: AllowedMsgAllowance wrapping PeriodicAllowance
+- Period: 24h, with daily spend limit
+- Allowed messages: `/cosmos.authz.v1beta1.MsgExec` only
+- Note: filtered fee grants incur extra validation gas (10 gas per filtered message)
+
+## Gameplay transaction structure
+- Relayer sends: `cosmos.authz.v1beta1.MsgExec`
+  - grantee = relayer_address
+  - msgs[0] = MsgExecuteContract(sender=USER → CoinFlip contract)
+- Tx signer: relayer
+- Tx fee payer: Treasury via feegranter field
+
+## Axiome Connect limitation
+- Axiome Connect supports `type: "cosmwasm_execute"` (base64, axiomesign:// prefix)
+- MsgGrant / MsgGrantAllowance NOT confirmed in Axiome Connect
+- Fallback: wallet-based signing for onboarding messages

@@ -1,0 +1,82 @@
+---
+description: CosmWasm smart contract conventions for CoinFlip
+globs: contracts/**/*.rs
+alwaysApply: false
+---
+
+# CoinFlip Smart Contract (Rust / CosmWasm)
+
+## Contract name
+`coinflip_pvp_vault` — located in `contracts/coinflip-pvp-vault/`
+
+## Target compatibility
+CosmWasm 1.4 (cosmwasm_1_4 feature). Axiome Chain uses wasmd v0.50.0.
+
+## Project structure
+```
+contracts/coinflip-pvp-vault/
+├── src/
+│   ├── lib.rs
+│   ├── contract.rs        # Entry points (instantiate, execute, query)
+│   ├── msg.rs             # InstantiateMsg, ExecuteMsg, QueryMsg
+│   ├── state.rs           # Storage (Config, VaultBalance, Bet)
+│   ├── error.rs           # ContractError enum
+│   ├── execute/           # Execute handlers per message
+│   │   ├── mod.rs
+│   │   ├── deposit.rs
+│   │   ├── withdraw.rs
+│   │   ├── create_bet.rs
+│   │   ├── cancel_bet.rs
+│   │   ├── accept_bet.rs
+│   │   ├── reveal.rs
+│   │   └── claim_timeout.rs
+│   └── query.rs           # Query handlers
+├── Cargo.toml
+└── schema/                # JSON schema (auto-generated)
+```
+
+## Contract state
+- **Config**: admin, token_denom_or_cw20, treasury, commission_bps (1000=10%), min_bet, reveal_timeout_secs, max_open_per_user, max_daily_amount_per_user
+- **Vault balances**: `balances[(Addr)] = { available: Uint128, locked: Uint128 }`
+- **Bets**: `bets[(u64)] = Bet` with full lifecycle fields
+
+## Bet state machine
+States: OPEN -> ACCEPTED -> REVEALED | TIMEOUT_CLAIMED; OPEN -> CANCELED
+- `create_bet` -> OPEN (lock maker funds)
+- `cancel_bet` -> CANCELED (only OPEN, only maker, unlock funds)
+- `accept_bet` -> ACCEPTED (only OPEN, acceptor != maker, lock acceptor funds)
+- `reveal` -> REVEALED (only ACCEPTED, only maker, within timeout)
+- `claim_timeout` -> TIMEOUT_CLAIMED (only ACCEPTED, past timeout, by acceptor)
+
+## Commit-reveal protocol
+- Commitment: `SHA256("coinflip_v1" || maker_addr || maker_side || secret)`
+- Secret: 32 random bytes, generated client-side
+- On reveal: contract recomputes hash, compares to stored commitment
+- Winner: if acceptor_guess == revealed_side -> acceptor wins, else maker wins
+
+## Payout math
+- pot = 2 * stake
+- commission = pot * commission_bps / 10_000
+- winner_payout = pot - commission
+- commission goes to treasury
+
+## Events (stable schema for indexers)
+- `coinflip.bet_created` (bet_id, maker, amount)
+- `coinflip.bet_canceled` (bet_id)
+- `coinflip.bet_accepted` (bet_id, acceptor, guess)
+- `coinflip.bet_revealed` (bet_id, side, winner)
+- `coinflip.bet_timeout_claimed` (bet_id, winner)
+- `coinflip.commission_paid` (bet_id, treasury, amount)
+
+## Error codes (ContractError enum)
+InsufficientAvailableBalance, BetNotFound, InvalidStateTransition, Unauthorized,
+TooManyOpenBets, BetAmountBelowMinimum, CommitmentMismatch, RevealTimeoutExpired,
+RevealNotYetExpired, DailyLimitExceeded, SelfAcceptNotAllowed
+
+## Rust conventions
+- Use `cosmwasm-std`, `cw-storage-plus`, `cw2`, `cw20`
+- Use `thiserror` for error definitions
+- All public functions return `Result<Response, ContractError>`
+- Use `#[cfg_attr(not(feature = "library"), entry_point)]` pattern
+- Unit tests in each module, integration tests via `cw-multi-test`
+- Compile with `cargo run-script optimize` for deployment

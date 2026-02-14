@@ -1,0 +1,102 @@
+---
+description: OpenAPI spec, Swagger UI, Orval codegen, and contract-first API design
+alwaysApply: true
+---
+
+# API Design — Contract-First with OpenAPI + Zod
+
+## Philosophy: Single source of truth
+Zod schemas define validation, TypeScript types, AND OpenAPI documentation simultaneously.
+Never duplicate types or validation logic — derive everything from Zod schemas.
+
+## Pipeline
+```
+Zod schemas (packages/shared or tooling/openapi)
+  → zod-openapi (generates OpenAPI 3.1 JSON/YAML)
+    → Swagger UI (interactive API docs, served at /docs or /swagger)
+    → Orval (generates typed API client + React Query hooks for frontend)
+```
+
+## Swagger UI
+- Serve Swagger UI at `GET /docs` (or `/swagger`) from Hono backend
+- Use `@hono/swagger-ui` middleware for seamless integration
+- All endpoints must be documented: params, request body, responses, errors, auth
+- Include example values in Zod schemas via `.meta({ example: ... })`
+
+## Zod schema conventions
+```typescript
+import { z } from 'zod';
+import { extendZodWithOpenApi } from 'zod-openapi';
+
+extendZodWithOpenApi(z);
+
+// Every schema gets .meta() with OpenAPI metadata
+export const CreateBetSchema = z.object({
+  amount: z.string().meta({ description: 'Bet amount in LAUNCH', example: '100' }),
+  side: z.enum(['heads', 'tails']).meta({ description: 'Chosen side' }),
+  commitment: z.string().meta({ description: 'SHA256 commitment hash (hex)' }),
+}).meta({ id: 'CreateBetRequest' });
+
+// Derive types from schemas — NEVER define types separately
+export type CreateBetRequest = z.infer<typeof CreateBetSchema>;
+```
+
+## Orval code generation
+- Config in `packages/api-client/orval.config.ts`
+- Input: OpenAPI spec from `tooling/openapi/openapi.json`
+- Output: typed fetch client + React Query hooks (TanStack Query v5)
+- Regenerate on spec change: `pnpm --filter api-client generate`
+- Generated code goes to `packages/api-client/src/generated/`
+- NEVER manually edit generated files
+
+## API endpoint conventions
+- RESTful resource naming: `/api/v1/bets`, `/api/v1/vault`, `/api/v1/users`
+- Use proper HTTP methods: GET (read), POST (create), PUT (update), DELETE
+- Consistent error response format:
+```json
+{
+  "error": {
+    "code": "INSUFFICIENT_BALANCE",
+    "message": "Not enough available balance",
+    "details": {}
+  }
+}
+```
+- All responses wrapped: `{ "data": ... }` for success, `{ "error": ... }` for errors
+- Pagination: cursor-based for lists (`?cursor=xxx&limit=20`)
+- Versioning: URL prefix `/api/v1/`
+
+## API endpoints (from PRD)
+
+### Bets
+- `POST /api/v1/bets` — create bet (relayer submits MsgExec)
+- `POST /api/v1/bets/:id/accept` — accept bet
+- `POST /api/v1/bets/:id/reveal` — reveal commitment
+- `POST /api/v1/bets/:id/cancel` — cancel open bet
+- `POST /api/v1/bets/:id/claim-timeout` — claim after timeout
+- `GET /api/v1/bets` — list open bets (filterable, paginated)
+- `GET /api/v1/bets/:id` — get bet details
+- `GET /api/v1/bets/history` — user bet history
+
+### Vault
+- `GET /api/v1/vault/balance` — get user vault balance
+- `POST /api/v1/vault/deposit` — initiate deposit (returns Axiome Connect payload)
+- `POST /api/v1/vault/withdraw` — withdraw from vault
+
+### Users
+- `GET /api/v1/users/me` — current user profile + session info
+- `GET /api/v1/users/:address` — public profile
+- `GET /api/v1/leaderboard` — top players
+
+### Auth / Onboarding
+- `POST /api/v1/auth/connect` — register session after wallet connect
+- `GET /api/v1/auth/grants` — check authz + feegrant status
+- `POST /api/v1/auth/onboard` — initiate 1-click onboarding flow
+
+### WebSocket
+- `ws://host/ws` — real-time stream: new bets, acceptances, reveals, timeouts
+
+## Testing endpoints
+- Swagger UI at `/docs` allows interactive testing of all endpoints
+- Use Orval-generated MSW (Mock Service Worker) handlers for frontend unit tests
+- Backend integration tests use Hono's built-in test client (`app.request()`)

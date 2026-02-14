@@ -1,0 +1,80 @@
+---
+description: Backend service conventions — Hono API, Relayer, Indexer
+globs: apps/api/**/*.ts, packages/db/**/*.ts
+alwaysApply: false
+---
+
+# Backend Services (Hono / TypeScript)
+
+## Framework: Hono
+- Lightweight, Web API-first, excellent built-in TypeScript support
+- Built-in validation middleware with Zod (`@hono/zod-validator`)
+- Swagger UI via `@hono/swagger-ui`
+- Runs on Node.js 22 LTS
+
+## Project structure (apps/api/)
+```
+apps/api/
+├── src/
+│   ├── index.ts              # Hono app entry + server start
+│   ├── routes/
+│   │   ├── bets.ts           # /api/v1/bets routes
+│   │   ├── vault.ts          # /api/v1/vault routes
+│   │   ├── users.ts          # /api/v1/users routes
+│   │   ├── auth.ts           # /api/v1/auth routes
+│   │   └── ws.ts             # WebSocket handler
+│   ├── services/
+│   │   ├── relayer.ts        # MsgExec signing + submission
+│   │   ├── indexer.ts        # Block event parsing
+│   │   ├── sequence-manager.ts # Cosmos tx nonce management
+│   │   └── commitment.ts     # Commit-reveal helpers
+│   ├── middleware/
+│   │   ├── auth.ts           # Session/wallet auth middleware
+│   │   ├── rate-limit.ts     # Per-IP + per-wallet rate limiting
+│   │   └── error-handler.ts  # Global error handler
+│   ├── db/                   # Database queries (uses packages/db)
+│   ├── queue/                # BullMQ job definitions
+│   └── config/               # Environment config (type-safe)
+├── package.json
+└── tsconfig.json
+```
+
+## Relayer service (critical path)
+- Maintains hot key for relayer account (grantee)
+- Submits MsgExec transactions on behalf of users via CosmJS SigningStargateClient
+- Attaches feegranter=treasury for gas sponsorship
+- Enforces policy: rate limits, daily per-user LAUNCH cap, max open bets
+- Sequence manager:
+  - Read accountNumber + sequence once at startup
+  - Reserve sequences in memory per outgoing tx
+  - Retry on sequence mismatch by refreshing from chain
+  - Internal queue — txs broadcast in order with bounded parallelism
+
+## Indexer
+- Parses chain tx logs/events by polling blocks or subscribing to CometBFT events
+- Axiome exposes public gRPC REST gateway
+- Writes to PostgreSQL via Drizzle ORM
+
+## Database: PostgreSQL + Drizzle ORM
+- Schema defined in `packages/db/` as Drizzle schema (type-safe, zero overhead)
+- Migrations via `drizzle-kit`
+- Tables: users, sessions, vault_balances, bets, tx_events, treasury_ledger
+
+## Cache & Queues
+- Redis for caching (balances, open bets list) + BullMQ for relayer tx queue
+- Queue jobs: submitTx, indexBlock, revealTimeout, cleanupExpiredGrants
+
+## Validation
+- All input validated with Zod schemas (shared from packages/shared)
+- Hono middleware `zValidator('json', schema)` for automatic request validation
+- Validation errors return 422 with structured error body
+
+## Logging
+- pino for structured JSON logging
+- Log levels: error, warn, info, debug
+- Always log: tx hashes, wallet addresses (truncated), bet IDs, error codes
+
+## Environment config
+- Use `@t3-oss/env-core` or plain Zod for type-safe env parsing
+- All secrets via environment variables, NEVER hardcoded
+- `.env.example` in repo root with all required vars documented

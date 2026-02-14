@@ -1,0 +1,28 @@
+{
+  "name": "coinflip",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "generate:api": "pnpm --filter api-client generate",
+    "generate:openapi": "pnpm --filter openapi generate",
+    "db:migrate": "pnpm --filter db migrate",
+    "db:push": "pnpm --filter db push",
+    "db:studio": "pnpm --filter db studio"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.6.4"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@coinflip/openapi",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx src/generate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coinflip/shared": "workspace:*",
+    "zod": "^3.24.2",
+    "zod-openapi": "^4.2.3"
+  },
+  "devDependencies": {
+    "@coinflip/tsconfig": "workspace:*",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

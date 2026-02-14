@@ -1,0 +1,66 @@
+---
+description: PvP CoinFlip dApp on Axiome — project overview and architecture
+alwaysApply: true
+---
+
+# PvP CoinFlip dApp on Axiome Chain
+
+## What is this project
+A peer-to-peer (PvP) CoinFlip (Heads/Tails) decentralized application on Axiome Chain v2.x.
+Two players wager equal amounts of LAUNCH (CW20 token) on Heads/Tails outcome.
+Winner receives (2 * stake - 10% commission); 10% goes to platform treasury.
+
+## Core UX goal
+"1-click" gameplay via delegated execution (Authz) + sponsored fees (Feegrant).
+After initial authorization ceremony in Axiome Wallet, user can create/accept/cancel/reveal bets
+from the website without repeated wallet prompts.
+
+## Monorepo structure (pnpm + Turborepo)
+```
+coinflip/
+├── apps/
+│   ├── web/                  # Next.js 15 frontend (App Router)
+│   └── api/                  # Hono backend (REST + WebSocket)
+├── contracts/
+│   └── coinflip-pvp-vault/   # CosmWasm smart contract (Rust)
+├── packages/
+│   ├── api-client/           # Generated API client (Orval from OpenAPI spec)
+│   ├── shared/               # Shared types, constants, utils
+│   ├── db/                   # Drizzle ORM schema + migrations (PostgreSQL)
+│   ├── tsconfig/             # Shared TypeScript configs
+│   └── eslint-config/        # Shared ESLint configs
+├── tooling/
+│   └── openapi/              # OpenAPI spec (Zod schemas → OpenAPI → Swagger UI)
+├── turbo.json
+├── pnpm-workspace.yaml
+├── package.json
+└── .env.example
+```
+
+## Tech stack (2026 best practices)
+- **Package manager**: pnpm (content-addressable storage, strict deps, workspaces)
+- **Monorepo orchestrator**: Turborepo (incremental builds, caching, parallel tasks)
+- **Smart contract**: Rust + CosmWasm 1.4 (cosmwasm_1_4 feature)
+- **Backend**: Hono (TypeScript, lightweight, Web API-first, excellent TS support)
+- **Frontend**: Next.js 15 (App Router, React 19, Turbopack, Server Components)
+- **Database**: PostgreSQL via Drizzle ORM (type-safe, zero-overhead)
+- **Cache/Queues**: Redis + BullMQ
+- **API contract**: Zod schemas → zod-openapi → OpenAPI 3.1 spec → Swagger UI
+- **API client codegen**: Orval (generates typed React Query hooks from OpenAPI)
+- **Validation**: Zod (single source of truth for types + validation + OpenAPI)
+- **Blockchain SDK**: CosmJS (SigningStargateClient for relayer, read-only queries)
+- **Observability**: Prometheus + Grafana, structured logging (pino)
+- **Node.js**: LTS 22.x
+- **TypeScript**: strict mode, project references across monorepo
+
+## Key parameters (defaults)
+- Reveal timeout: 5 minutes
+- Max open bets per wallet: 10
+- Minimum bet size: 10 LAUNCH
+- Authz grant duration: 30 days
+- Daily spend/call limit: 10,000 LAUNCH/day
+- Commission: 10% of total pot
+
+## Token model
+LAUNCH (CW20) with contract-custodied vault balance model.
+Users deposit LAUNCH into CoinFlip contract once, then bets only move internal balances.

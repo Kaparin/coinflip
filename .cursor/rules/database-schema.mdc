@@ -1,0 +1,55 @@
+---
+description: PostgreSQL database schema via Drizzle ORM
+globs: packages/db/**/*.ts
+alwaysApply: false
+---
+
+# Database Schema (PostgreSQL + Drizzle ORM)
+
+Chain is the source of truth; DB is for performance, pagination, analytics.
+
+## ORM: Drizzle
+- Schema defined in TypeScript (`packages/db/src/schema/`)
+- Migrations via `drizzle-kit` (`pnpm --filter db migrate`)
+- Type-safe queries, zero overhead
+- One schema file per table for clarity
+
+## Tables
+
+### users
+- id (uuid PK), address (text unique), created_at, profile_nickname, avatar_url, referrer_address
+
+### sessions
+- id (uuid PK), user_id (FK), created_at, expires_at
+- authz_enabled (bool), fee_sponsored (bool), authz_expiration_time (timestamptz)
+- limits_json (jsonb)
+
+### vault_balances
+- user_id (FK PK), available (numeric), locked (numeric), updated_at, source_height (bigint)
+
+### bets
+- bet_id (bigint PK), maker_user_id (FK), acceptor_user_id (FK nullable)
+- amount (numeric), status (text), commitment (bytea), acceptor_guess (text nullable)
+- created_height, accepted_height, resolved_height
+- created_time, accepted_time, resolved_time
+- winner_user_id (FK nullable), commission_amount (numeric nullable)
+- txhash_create (text), txhash_accept (text nullable), txhash_resolve (text nullable)
+
+### tx_events
+- id (uuid PK), txhash (text), height (bigint), event_type (text), attributes (jsonb), created_at
+
+### treasury_ledger
+- id (uuid PK), txhash (text), amount (numeric), denom (text), source (text), created_at
+
+## Indexes (important for performance)
+- bets: status, maker_user_id, acceptor_user_id, created_time
+- tx_events: txhash, event_type, height
+- vault_balances: user_id
+
+## Relations
+- USERS 1--* SESSIONS
+- USERS 1--1 VAULT_BALANCES
+- USERS 1--* BETS (as maker)
+- USERS 1--* BETS (as acceptor)
+- BETS 1--* TX_EVENTS
+- TX_EVENTS *--1 TREASURY_LEDGER

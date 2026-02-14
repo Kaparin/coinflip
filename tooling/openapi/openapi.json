@@ -1,0 +1,1216 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CoinFlip PvP dApp API",
+    "version": "1.0.0",
+    "description": "API for the PvP CoinFlip decentralized application on Axiome Chain. Enables creating, accepting, revealing, and resolving Heads/Tails bets with LAUNCH tokens."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local development"
+    },
+    {
+      "url": "https://api.coinflip.example.com",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/api/v1/bets": {
+      "get": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "List open bets",
+        "operationId": "getBets",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "accepted",
+                "revealed",
+                "canceled",
+                "timeout_claimed"
+              ]
+            }
+          },
+          {
+            "name": "min_amount",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_amount",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of bets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Bet"
+                      }
+                    },
+                    "cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Create a new bet",
+        "operationId": "createBet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bet created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/history": {
+      "get": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Get bet history",
+        "operationId": "getBetHistory",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated bet history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Bet"
+                      }
+                    },
+                    "cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/{betId}": {
+      "get": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Get bet details",
+        "operationId": "getBetById",
+        "parameters": [
+          {
+            "name": "betId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bet details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bet not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/{betId}/accept": {
+      "post": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Accept an open bet",
+        "operationId": "acceptBet",
+        "parameters": [
+          {
+            "name": "betId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptBetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bet accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/{betId}/reveal": {
+      "post": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Reveal commitment for accepted bet",
+        "operationId": "revealBet",
+        "parameters": [
+          {
+            "name": "betId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bet revealed and resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/{betId}/cancel": {
+      "post": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Cancel an open bet",
+        "operationId": "cancelBet",
+        "parameters": [
+          {
+            "name": "betId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bet canceled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bets/{betId}/claim-timeout": {
+      "post": {
+        "tags": [
+          "Bets"
+        ],
+        "summary": "Claim timeout on unrevealed bet",
+        "operationId": "claimTimeout",
+        "parameters": [
+          {
+            "name": "betId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeout claimed, acceptor wins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Bet"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vault/balance": {
+      "get": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Get current vault balance",
+        "operationId": "getVaultBalance",
+        "responses": {
+          "200": {
+            "description": "Vault balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VaultBalance"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vault/deposit": {
+      "post": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Initiate deposit (returns Axiome Connect payload)",
+        "operationId": "depositToVault",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepositRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deposit payload for Axiome Connect"
+          }
+        }
+      }
+    },
+    "/api/v1/vault/withdraw": {
+      "post": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Withdraw LAUNCH from vault",
+        "operationId": "withdrawFromVault",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdraw initiated"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get current user profile",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfile"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{address}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get public user profile",
+        "operationId": "getUserByAddress",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfile"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/leaderboard": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get leaderboard",
+        "operationId": "getLeaderboard",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LeaderboardEntry"
+                      }
+                    },
+                    "cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/connect": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Connect wallet and register session",
+        "operationId": "connectWallet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/grants": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Check authz and feegrant status",
+        "operationId": "getGrantStatus",
+        "responses": {
+          "200": {
+            "description": "Grant status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/GrantStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Bet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Unique bet identifier",
+            "example": 42
+          },
+          "maker": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Axiome wallet address",
+            "example": "axm1abc123..."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Token amount as string",
+            "example": "100"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "accepted",
+              "revealed",
+              "canceled",
+              "timeout_claimed"
+            ],
+            "description": "Current bet status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Bet creation time (ISO 8601)"
+          },
+          "txhash_create": {
+            "type": "string",
+            "description": "Transaction hash",
+            "example": "A1B2C3D4E5F6..."
+          },
+          "acceptor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Acceptor address (null if OPEN)",
+            "example": "axm1abc123..."
+          },
+          "acceptor_guess": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "heads",
+              "tails",
+              null
+            ],
+            "description": "Acceptor guess (null if OPEN)"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "txhash_accept": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Transaction hash",
+            "example": "A1B2C3D4E5F6..."
+          },
+          "reveal_side": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "heads",
+              "tails",
+              null
+            ],
+            "description": "Maker revealed side"
+          },
+          "winner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Winner address",
+            "example": "axm1abc123..."
+          },
+          "payout_amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d+$",
+            "description": "Winner payout (after commission)",
+            "example": "100"
+          },
+          "commission_amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d+$",
+            "description": "Token amount as string",
+            "example": "100"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "txhash_resolve": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Transaction hash",
+            "example": "A1B2C3D4E5F6..."
+          },
+          "reveal_deadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Deadline for maker to reveal (accepted_at + 5min)"
+          }
+        },
+        "required": [
+          "id",
+          "maker",
+          "amount",
+          "status",
+          "created_at",
+          "txhash_create",
+          "acceptor",
+          "acceptor_guess",
+          "accepted_at",
+          "txhash_accept",
+          "reveal_side",
+          "winner",
+          "payout_amount",
+          "commission_amount",
+          "resolved_at",
+          "txhash_resolve",
+          "reveal_deadline"
+        ]
+      },
+      "CreateBetRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Bet amount in LAUNCH tokens",
+            "example": "100"
+          },
+          "commitment": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "SHA256 commitment hash (64 hex chars)"
+          }
+        },
+        "required": [
+          "amount",
+          "commitment"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable error code",
+                "example": "INSUFFICIENT_BALANCE"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Additional error details"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "AcceptBetRequest": {
+        "type": "object",
+        "properties": {
+          "guess": {
+            "type": "string",
+            "enum": [
+              "heads",
+              "tails"
+            ],
+            "description": "Acceptor guess: heads or tails"
+          }
+        },
+        "required": [
+          "guess"
+        ]
+      },
+      "RevealRequest": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "heads",
+              "tails"
+            ],
+            "description": "Maker original chosen side"
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Original secret (64 hex chars = 32 bytes)"
+          }
+        },
+        "required": [
+          "side",
+          "secret"
+        ]
+      },
+      "VaultBalance": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Available balance (not locked)",
+            "example": "1500"
+          },
+          "locked": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Locked in active bets",
+            "example": "300"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Total vault balance",
+            "example": "1800"
+          }
+        },
+        "required": [
+          "available",
+          "locked",
+          "total"
+        ]
+      },
+      "DepositRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Amount of LAUNCH to deposit",
+            "example": "500"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "WithdrawRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Amount of LAUNCH to withdraw",
+            "example": "200"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Axiome wallet address",
+            "example": "axm1abc123..."
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display name"
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Avatar image URL"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_bets": {
+                "type": "integer",
+                "description": "Total bets placed",
+                "example": 42
+              },
+              "wins": {
+                "type": "integer",
+                "description": "Total wins",
+                "example": 25
+              },
+              "losses": {
+                "type": "integer",
+                "description": "Total losses",
+                "example": 17
+              },
+              "total_wagered": {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Total LAUNCH wagered",
+                "example": "5000"
+              },
+              "total_won": {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Total LAUNCH won",
+                "example": "3200"
+              }
+            },
+            "required": [
+              "total_bets",
+              "wins",
+              "losses",
+              "total_wagered",
+              "total_won"
+            ]
+          },
+          "authz_enabled": {
+            "type": "boolean",
+            "description": "1-click mode active"
+          },
+          "authz_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Authz grant expiration"
+          },
+          "fee_sponsored": {
+            "type": "boolean",
+            "description": "Gas sponsorship active"
+          }
+        },
+        "required": [
+          "address",
+          "nickname",
+          "avatar_url",
+          "stats",
+          "authz_enabled",
+          "authz_expires_at",
+          "fee_sponsored"
+        ]
+      },
+      "LeaderboardEntry": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "example": 1
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Axiome wallet address",
+            "example": "axm1abc123..."
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wins": {
+            "type": "integer"
+          },
+          "total_wagered": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Token amount as string",
+            "example": "100"
+          },
+          "win_rate": {
+            "type": "number",
+            "description": "Win rate 0-1",
+            "example": 0.65
+          }
+        },
+        "required": [
+          "rank",
+          "address",
+          "nickname",
+          "wins",
+          "total_wagered",
+          "win_rate"
+        ]
+      },
+      "ConnectRequest": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User wallet address",
+            "example": "axm1abc123..."
+          },
+          "signature": {
+            "type": "string",
+            "description": "Signed message proving ownership"
+          },
+          "message": {
+            "type": "string",
+            "description": "Original signed message"
+          }
+        },
+        "required": [
+          "address",
+          "signature",
+          "message"
+        ]
+      },
+      "GrantStatus": {
+        "type": "object",
+        "properties": {
+          "authz_granted": {
+            "type": "boolean",
+            "description": "Authz grant exists and is valid"
+          },
+          "authz_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "authz_calls_remaining": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "fee_grant_active": {
+            "type": "boolean",
+            "description": "Feegrant is active"
+          },
+          "fee_grant_daily_remaining": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Remaining daily fee allowance"
+          }
+        },
+        "required": [
+          "authz_granted",
+          "authz_expires_at",
+          "authz_calls_remaining",
+          "fee_grant_active",
+          "fee_grant_daily_remaining"
+        ]
+      }
+    }
+  }
+}
