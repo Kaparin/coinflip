@@ -13,7 +13,7 @@ export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3001/ws'
 export const EXPLORER_URL = process.env.NEXT_PUBLIC_EXPLORER_URL ?? 'https://axiomechain.org';
 
 /** Chain ID override */
-export const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID ?? 'axiome-2';
+export const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID ?? 'axiome-1';
 
 /** Axiome Connect protocol prefix */
 export const AXIOME_CONNECT_PREFIX = 'axiomesign://';

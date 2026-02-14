@@ -12,7 +12,7 @@
  * Fee payer: Treasury (via feegranter field)
  *
  * Axiome Chain specifics:
- *   - Chain ID: axiome-2
+ *   - Chain ID: axiome-1
  *   - Address prefix: axm (addresses: axm1...)
  *   - Cosmos SDK v0.50.3, wasmd v0.50.0, cosmwasm_1_4
  *   - CW20 LAUNCH token for vault operations

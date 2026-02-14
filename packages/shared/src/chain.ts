@@ -12,21 +12,29 @@
 /** Axiome Chain bech32 address prefix (confirmed from on-chain explorer) */
 export const AXIOME_PREFIX = 'axm';
 
-/** Default Chain ID for Axiome mainnet */
-export const DEFAULT_CHAIN_ID = 'axiome-2';
+/**
+ * Default Chain ID for Axiome mainnet.
+ * Confirmed from live validator node: "network":"axiome-1"
+ */
+export const DEFAULT_CHAIN_ID = 'axiome-1';
 
 /**
- * Default RPC endpoint (Tendermint/CometBFT RPC).
+ * Default RPC endpoint (Tendermint/CometBFT RPC, port 26657).
  * Used by CosmJS StargateClient.connect() and SigningStargateClient.
+ *
+ * Validator node RPC: http://49.13.3.227:26657
+ * Public gateway (if available): https://api-chain.axiomechain.org
  */
-export const DEFAULT_RPC_URL = 'https://rpc.axiome.pro';
+export const DEFAULT_RPC_URL = 'http://49.13.3.227:26657';
 
 /**
- * Default REST (LCD) endpoint — public gRPC REST gateway.
- * Official: https://api-chain.axiomechain.org
+ * Default REST (LCD) endpoint (Cosmos REST API, port 1317).
  * Used by the indexer for block/tx queries.
+ *
+ * Validator node REST: http://49.13.3.227:1317
+ * Public gateway: https://api-chain.axiomechain.org
  */
-export const DEFAULT_REST_URL = 'https://api-chain.axiomechain.org';
+export const DEFAULT_REST_URL = 'http://49.13.3.227:1317';
 
 /**
  * Swagger docs for the node REST API.
