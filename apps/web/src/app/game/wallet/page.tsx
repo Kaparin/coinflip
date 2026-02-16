@@ -59,7 +59,7 @@ export default function WalletPage() {
               className="rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[10px] font-medium hover:bg-[var(--color-surface-hover)] transition-colors">
               {copied ? t('common.copied') : t('common.copy')}
             </button>
-            <a href={`${EXPLORER_URL}/account/${address}`} target="_blank" rel="noopener noreferrer"
+            <a href={`${EXPLORER_URL}/address/${address}`} target="_blank" rel="noopener noreferrer"
               className="rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[10px] font-medium hover:bg-[var(--color-surface-hover)] transition-colors">
               {t('common.explorer')}
             </a>

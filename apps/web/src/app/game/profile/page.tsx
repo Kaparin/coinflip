@@ -133,7 +133,7 @@ ${t('profile.randomCodeComment7')}`}</pre>
           <div className="space-y-2">
             {COINFLIP_CONTRACT && (
               <a
-                href={`${EXPLORER_URL}/account/${COINFLIP_CONTRACT}`}
+                href={`${EXPLORER_URL}/address/${COINFLIP_CONTRACT}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
@@ -152,7 +152,7 @@ ${t('profile.randomCodeComment7')}`}</pre>
             )}
             {LAUNCH_CW20_CONTRACT && (
               <a
-                href={`${EXPLORER_URL}/account/${LAUNCH_CW20_CONTRACT}`}
+                href={`${EXPLORER_URL}/address/${LAUNCH_CW20_CONTRACT}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/5 group"
@@ -885,7 +885,7 @@ export default function ProfilePage() {
               <span>{copied ? t('common.copied') : t('header.copyAddress')}</span>
             </button>
 
-            <a href={`${EXPLORER_URL}/account/${wallet.address}`} target="_blank" rel="noopener noreferrer"
+            <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
               className="w-full flex items-center gap-3 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
               <ExternalLink size={20} className="text-[var(--color-text-secondary)]" />
               <span>{t('header.viewInExplorer')}</span>
