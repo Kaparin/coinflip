@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
+import { Crown, Flame, Zap, Coins } from 'lucide-react';
 import { LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 
@@ -101,7 +102,7 @@ function getTier(humanAmount: number): {
   border: string;
   glow: string;
   gradient: string;
-  icon: string;
+  icon: ReactNode;
   tier: string;
 } {
   if (humanAmount >= 500) {
@@ -109,7 +110,7 @@ function getTier(humanAmount: number): {
       border: 'border-amber-400/40',
       glow: 'shadow-[0_0_24px_rgba(251,191,36,0.12)]',
       gradient: 'from-amber-500/8 via-transparent to-yellow-500/5',
-      icon: '💎',
+      icon: <Crown size={26} className="text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />,
       tier: 'legendary',
     };
   }
@@ -118,7 +119,7 @@ function getTier(humanAmount: number): {
       border: 'border-purple-400/30',
       glow: 'shadow-[0_0_18px_rgba(168,85,247,0.1)]',
       gradient: 'from-purple-500/8 via-transparent to-indigo-500/5',
-      icon: '/logo-coin.png',
+      icon: <Flame size={26} className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]" />,
       tier: 'epic',
     };
   }
@@ -127,7 +128,7 @@ function getTier(humanAmount: number): {
       border: 'border-sky-400/20',
       glow: 'shadow-[0_0_12px_rgba(56,189,248,0.08)]',
       gradient: 'from-sky-500/5 via-transparent to-cyan-500/3',
-      icon: '⚡',
+      icon: <Zap size={24} className="text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.4)]" />,
       tier: 'rare',
     };
   }
@@ -135,7 +136,7 @@ function getTier(humanAmount: number): {
     border: 'border-[var(--color-border)]',
     glow: '',
     gradient: 'from-white/[0.02] via-transparent to-white/[0.01]',
-    icon: '🪙',
+    icon: <Coins size={22} className="text-zinc-400" />,
     tier: 'common',
   };
 }
@@ -214,11 +215,7 @@ export function BetCard({
 
         {/* Amount row */}
         <div className="flex items-center gap-2.5 mb-3">
-          {tier.icon.startsWith('/') ? (
-            <Image src={tier.icon} alt="" width={28} height={28} className="object-contain drop-shadow-sm" />
-          ) : (
-            <span className="text-2xl leading-none drop-shadow-sm">{tier.icon}</span>
-          )}
+          <span className="flex items-center justify-center shrink-0">{tier.icon}</span>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
