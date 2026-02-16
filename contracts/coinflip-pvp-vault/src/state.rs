@@ -16,7 +16,7 @@ pub struct Config {
     pub commission_bps: u16,
     pub min_bet: Uint128,
     pub reveal_timeout_secs: u64,
-    pub max_open_per_user: u8,
+    pub max_open_per_user: u16,
     pub max_daily_amount_per_user: Uint128,
     /// How long an open bet lives before it can be canceled by anyone (seconds).
     /// 0 = no expiration. Default: 43200 (12 hours).
@@ -79,7 +79,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const NEXT_BET_ID: Item<u64> = Item::new("next_bet_id");
 pub const VAULT_BALANCES: Map<&Addr, VaultBalance> = Map::new("vault_balances");
 pub const BETS: Map<u64, Bet> = Map::new("bets");
-pub const USER_OPEN_BET_COUNT: Map<&Addr, u8> = Map::new("user_open_bet_count");
+pub const USER_OPEN_BET_COUNT: Map<&Addr, u16> = Map::new("user_open_bet_count");
 
 /// Daily usage tracking: (address, day_bucket) -> amount_used
 pub const DAILY_USAGE: Map<(&Addr, u64), Uint128> = Map::new("daily_usage");

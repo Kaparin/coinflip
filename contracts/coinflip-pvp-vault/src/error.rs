@@ -22,7 +22,7 @@ pub enum ContractError {
     },
 
     #[error("Too many open bets: max {max}")]
-    TooManyOpenBets { max: u8 },
+    TooManyOpenBets { max: u16 },
 
     #[error("Bet amount below minimum: {min}")]
     BetAmountBelowMinimum { min: String },

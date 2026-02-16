@@ -40,8 +40,14 @@ export const REVEAL_TIMEOUT_SECS = 300;
 /** Open bet TTL in seconds (12 hours) — open bets auto-cancel after this */
 export const OPEN_BET_TTL_SECS = 12 * 60 * 60; // 43200 seconds = 12 hours
 
-/** Maximum open bets per wallet (matches contract config) */
-export const MAX_OPEN_BETS_PER_USER = 50;
+/** Maximum open bets per wallet (matches contract config: 255, will be 1000 after migration) */
+export const MAX_OPEN_BETS_PER_USER = 255;
+
+/** Maximum bets in a single batch request */
+export const MAX_BATCH_SIZE = 20;
+
+/** Minimum bets in a batch request */
+export const MIN_BATCH_SIZE = 2;
 
 /** Minimum bet size in micro-LAUNCH (on-chain). 1 LAUNCH = 1,000,000 micro */
 export const MIN_BET_AMOUNT = '1000000'; // = 1 LAUNCH

@@ -103,7 +103,7 @@ fn execute_update_config(
     commission_bps: Option<u16>,
     min_bet: Option<cosmwasm_std::Uint128>,
     reveal_timeout_secs: Option<u64>,
-    max_open_per_user: Option<u8>,
+    max_open_per_user: Option<u16>,
     max_daily_amount_per_user: Option<cosmwasm_std::Uint128>,
     bet_ttl_secs: Option<u64>,
 ) -> Result<Response, ContractError> {
@@ -199,7 +199,8 @@ pub fn migrate(
 ) -> Result<Response, ContractError> {
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // Re-save config so new fields (bet_ttl_secs) are persisted with their serde defaults.
+    // Re-save config so new fields / wider types are persisted.
+    // v0.2→v0.3: max_open_per_user widened from u8 to u16.
     let config = CONFIG.load(deps.storage)?;
     CONFIG.save(deps.storage, &config)?;
 
@@ -207,6 +208,7 @@ pub fn migrate(
         .add_attribute("action", "migrate")
         .add_attribute("from_version", version.to_string())
         .add_attribute("to_version", CONTRACT_VERSION)
+        .add_attribute("max_open_per_user", config.max_open_per_user.to_string())
         .add_attribute("bet_ttl_secs", config.bet_ttl_secs.to_string()))
 }
 

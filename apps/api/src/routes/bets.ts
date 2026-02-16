@@ -3,12 +3,13 @@ import { randomBytes } from 'node:crypto';
 import { zValidator } from '@hono/zod-validator';
 import {
   CreateBetRequestSchema,
+  BatchCreateBetsRequestSchema,
   AcceptBetRequestSchema,
   RevealRequestSchema,
   BetListQuerySchema,
   BetHistoryQuerySchema,
 } from '@coinflip/shared/schemas';
-import { MIN_BET_AMOUNT, MAX_OPEN_BETS_PER_USER } from '@coinflip/shared/constants';
+import { MIN_BET_AMOUNT, MAX_OPEN_BETS_PER_USER, MAX_BATCH_SIZE } from '@coinflip/shared/constants';
 import { authMiddleware } from '../middleware/auth.js';
 import { betService } from '../services/bet.service.js';
 import { vaultService } from '../services/vault.service.js';
@@ -298,6 +299,158 @@ betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema),
       locked: (BigInt(updatedBalance.locked) + pendingAmount).toString(),
     },
     message: 'Bet submitted to blockchain. You will be notified when confirmed.',
+  }, 202);
+});
+
+// ─── Batch helpers ────────────────────────────────────────────
+
+/** Generate a cryptographically random integer in [min, max] (inclusive, BigInt) */
+function randomBigIntInRange(min: bigint, max: bigint): bigint {
+  if (min === max) return min;
+  const range = max - min + 1n;
+  const bytesNeeded = Math.ceil(Number(range.toString(2).length) / 8) + 1;
+  const maxValid = (1n << BigInt(bytesNeeded * 8)) - ((1n << BigInt(bytesNeeded * 8)) % range);
+  let result: bigint;
+  do {
+    const bytes = randomBytes(bytesNeeded);
+    result = bytes.reduce((acc, byte) => (acc << 8n) | BigInt(byte), 0n);
+  } while (result >= maxValid);
+  return min + (result % range);
+}
+
+// POST /api/v1/bets/batch — Batch create bets (auth required)
+// Supports two modes:
+//   mode="fixed"  → all bets have the same amount
+//   mode="random" → each bet gets a random amount between min_amount and max_amount
+// Returns 202 with list of pending tx hashes.
+betsRouter.post('/batch', authMiddleware, zValidator('json', BatchCreateBetsRequestSchema), async (c) => {
+  const user = c.get('user');
+  const address = c.get('address');
+  const body = c.req.valid('json');
+  const { mode, count } = body;
+
+  const { generateSecret, computeCommitment } = await import('@coinflip/shared/commitment');
+
+  // Build list of amounts
+  const amounts: string[] = [];
+  if (mode === 'fixed') {
+    const amt = body.amount!;
+    if (BigInt(amt) < BigInt(MIN_BET_AMOUNT)) {
+      throw Errors.belowMinBet(MIN_BET_AMOUNT);
+    }
+    for (let i = 0; i < count; i++) amounts.push(amt);
+  } else {
+    const minAmt = BigInt(body.min_amount!);
+    const maxAmt = BigInt(body.max_amount!);
+    if (minAmt < BigInt(MIN_BET_AMOUNT)) {
+      throw Errors.belowMinBet(MIN_BET_AMOUNT);
+    }
+    for (let i = 0; i < count; i++) {
+      amounts.push(randomBigIntInRange(minAmt, maxAmt).toString());
+    }
+  }
+
+  // Calculate total required balance
+  const totalRequired = amounts.reduce((sum, a) => sum + BigInt(a), 0n);
+
+  // Pre-flight checks
+  if (!relayerService.isReady()) throw Errors.relayerNotReady();
+
+  const balance = await vaultService.getBalance(user.id);
+  if (BigInt(balance.available) < totalRequired) {
+    throw Errors.insufficientBalance(totalRequired.toString(), balance.available);
+  }
+
+  // Check open bets count
+  const pendingCount = getPendingBetCount(user.id);
+  const dbCount = await betService.getOpenBetCountForUser(user.id);
+  const totalOpenPending = dbCount + pendingCount;
+  if (totalOpenPending + count > MAX_OPEN_BETS_PER_USER) {
+    throw new AppError(
+      'TOO_MANY_OPEN_BETS',
+      `Batch would exceed max open bets (${MAX_OPEN_BETS_PER_USER}). Currently ${totalOpenPending} open, trying to add ${count}.`,
+      400,
+    );
+  }
+
+  // Lock ALL funds upfront atomically
+  const locked = await vaultService.lockFunds(user.id, totalRequired.toString());
+  if (!locked) {
+    throw Errors.insufficientBalance(totalRequired.toString(), '0');
+  }
+
+  // Submit each bet sequentially via relayer (async broadcast mode)
+  const results: Array<{ index: number; amount: string; tx_hash?: string; error?: string }> = [];
+  let successCount = 0;
+  let lockedSoFar = 0n;
+
+  for (let i = 0; i < amounts.length; i++) {
+    const amount = amounts[i]!;
+    const makerSide: 'heads' | 'tails' = secureCoinFlip();
+    const makerSecret = generateSecret();
+    const commitment = computeCommitment(address, makerSide, makerSecret);
+
+    try {
+      const relayResult = await relayerService.relayCreateBet(address, amount, commitment, true);
+
+      if (!relayResult.success) {
+        results.push({ index: i, amount, error: relayResult.rawLog || relayResult.error || 'Relay failed' });
+        continue;
+      }
+
+      // Track pending bet + pending lock
+      const lockId = addPendingLock(address, amount);
+      incrementPendingBetCount(user.id);
+
+      // Fire background task to resolve bet_id
+      const commitmentBase64 = Buffer.from(commitment, 'hex').toString('base64');
+      resolveCreateBetInBackground({
+        txHash: relayResult.txHash!,
+        commitment,
+        commitmentBase64,
+        makerUserId: user.id,
+        amount,
+        address,
+        makerSide,
+        makerSecret,
+        pendingLockId: lockId,
+      });
+
+      results.push({ index: i, amount, tx_hash: relayResult.txHash });
+      successCount++;
+      lockedSoFar += BigInt(amount);
+    } catch (err: any) {
+      logger.error({ err, index: i, amount }, 'Batch create: bet relay failed');
+      results.push({ index: i, amount, error: err.message || 'Unexpected error' });
+    }
+  }
+
+  // Unlock the portion of funds that wasn't successfully submitted
+  const unlockedAmount = totalRequired - lockedSoFar;
+  if (unlockedAmount > 0n) {
+    await vaultService.unlockFunds(user.id, unlockedAmount.toString()).catch(err =>
+      logger.warn({ err }, 'Batch: failed to unlock remainder'));
+  }
+
+  invalidateBalanceCache(address);
+
+  logger.info({
+    address,
+    mode,
+    count,
+    successCount,
+    failedCount: count - successCount,
+    totalAmount: lockedSoFar.toString(),
+  }, 'Batch create completed');
+
+  return c.json({
+    data: {
+      submitted: successCount,
+      failed: count - successCount,
+      total_amount: lockedSoFar.toString(),
+      bets: results,
+    },
+    message: `${successCount}/${count} bets submitted to blockchain.`,
   }, 202);
 });
 

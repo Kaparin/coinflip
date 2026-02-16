@@ -1,5 +1,6 @@
 export {
   CreateBetRequestSchema,
+  BatchCreateBetsRequestSchema,
   AcceptBetRequestSchema,
   RevealRequestSchema,
   CancelBetRequestSchema,

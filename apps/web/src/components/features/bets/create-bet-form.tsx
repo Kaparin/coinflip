@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useCreateBet, useGetVaultBalance, getGetVaultBalanceQueryKey, createBet as createBetApi } from '@coinflip/api-client';
+import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
@@ -15,6 +16,7 @@ import {
   BET_PRESET_LABELS,
   COMMISSION_BPS,
   MAX_OPEN_BETS_PER_USER,
+  MAX_BATCH_SIZE,
   toMicroLaunch,
   fromMicroLaunch,
 } from '@coinflip/shared/constants';
@@ -167,109 +169,106 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
 
   // ─── Batch mode ───
   const [batchCount, setBatchCount] = useState('');
-  const [batchState, setBatchState] = useState<{
-    active: boolean;
-    total: number;
-    done: number;
-    errors: number;
-  } | null>(null);
-  const batchAbortRef = useRef(false);
+  const [batchMode, setBatchMode] = useState<'fixed' | 'random'>('fixed');
+  const [batchMinAmount, setBatchMinAmount] = useState('');
+  const [batchMaxAmount, setBatchMaxAmount] = useState('');
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
 
   const parsedBatchCount = parseInt(batchCount) || 0;
-  const maxBatchCount = Math.min(
+
+  // For fixed mode: reuse selected amount; for random mode: use max_amount for worst-case balance check
+  const parsedBatchMin = parseFloat(batchMinAmount) || 0;
+  const parsedBatchMax = parseFloat(batchMaxAmount) || 0;
+
+  const batchFixedTotal = parsedAmount * parsedBatchCount;
+  const batchRandomMaxTotal = parsedBatchMax * parsedBatchCount; // worst-case
+
+  const maxBatchCountFixed = Math.min(
+    MAX_BATCH_SIZE,
     remainingSlots,
     availableHuman > 0 && parsedAmount > 0 ? Math.floor(availableHuman / parsedAmount) : 0,
   );
-  const isValidBatch = parsedBatchCount >= 2 && parsedBatchCount <= maxBatchCount && parsedAmount >= 1 && canCreateBet;
-  const batchTotalCost = parsedAmount * parsedBatchCount;
+  const maxBatchCountRandom = Math.min(
+    MAX_BATCH_SIZE,
+    remainingSlots,
+    availableHuman > 0 && parsedBatchMax > 0 ? Math.floor(availableHuman / parsedBatchMax) : 0,
+  );
+  const maxBatchCount = batchMode === 'fixed' ? maxBatchCountFixed : maxBatchCountRandom;
+
+  const isValidBatchFixed = batchMode === 'fixed'
+    && parsedBatchCount >= 2 && parsedBatchCount <= maxBatchCount
+    && parsedAmount >= 1 && canCreateBet && batchFixedTotal <= availableHuman;
+  const isValidBatchRandom = batchMode === 'random'
+    && parsedBatchCount >= 2 && parsedBatchCount <= maxBatchCount
+    && parsedBatchMin >= 1 && parsedBatchMax >= parsedBatchMin
+    && batchRandomMaxTotal <= availableHuman && canCreateBet;
+  const isValidBatch = batchMode === 'fixed' ? isValidBatchFixed : isValidBatchRandom;
 
   const handleBatchConfirm = useCallback(async () => {
-    if (!isValidBatch || batchState?.active) return;
+    if (!isValidBatch || batchSubmitting) return;
+    setBatchSubmitting(true);
+
     const count = parsedBatchCount;
-    const microAmount = toMicroLaunch(parsedAmount);
-    batchAbortRef.current = false;
-    setBatchState({ active: true, total: count, done: 0, errors: 0 });
+    const totalEstimate = batchMode === 'fixed'
+      ? toMicroLaunch(parsedAmount * count)
+      : toMicroLaunch(parsedBatchMax * count); // worst-case lock
 
-    // Add individual deductions for each bet upfront (tracks both amount AND bet count)
-    const deductionIds: string[] = [];
-    for (let i = 0; i < count; i++) {
-      deductionIds.push(addDeduction(microAmount, true));
-    }
+    // Add a single large deduction for the batch
+    const deductionId = addDeduction(totalEstimate, true);
 
-    let done = 0;
-    let errors = 0;
+    try {
+      const data = batchMode === 'fixed'
+        ? { mode: 'fixed' as const, count, amount: toMicroLaunch(parsedAmount) }
+        : { mode: 'random' as const, count, min_amount: toMicroLaunch(parsedBatchMin), max_amount: toMicroLaunch(parsedBatchMax) };
 
-    for (let i = 0; i < count; i++) {
-      if (batchAbortRef.current) break;
-      try {
-        const response = await createBetApi({ amount: microAmount });
-        done++;
-        const txHash = (response as any)?.tx_hash ?? '';
-        onBetSubmitted?.({ txHash, amount: microAmount, maker: address ?? '' });
-      } catch {
-        errors++;
-        // Remove deduction for failed bet immediately
-        const failedId = deductionIds[i];
-        if (failedId) removeDeduction(failedId);
+      const response = await customFetch<any>({
+        url: '/api/v1/bets/batch',
+        method: 'POST',
+        data,
+      });
+
+      const result = response as any;
+      const submitted = result?.data?.submitted ?? 0;
+      const failed = result?.data?.failed ?? 0;
+      const totalAmount = result?.data?.total_amount ?? '0';
+
+      // Remove optimistic deduction and replace with actual
+      removeDeduction(deductionId);
+
+      // Update local submitted counter
+      setLocalSubmitted(prev => prev + submitted);
+
+      // Refetch
+      const vaultKey = getGetVaultBalanceQueryKey();
+      queryClient.invalidateQueries({ queryKey: vaultKey });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: vaultKey });
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
+      }, 8000);
+
+      if (failed === 0) {
+        addToast('success', t('wager.batchSuccess', { done: submitted }));
+      } else {
+        addToast('warning', t('wager.batchPartial', { done: submitted, errors: failed }));
       }
-      setBatchState({ active: true, total: count, done: done + errors, errors });
-      // Wait 3.5s between requests (relayer cooldown)
-      if (done + errors < count && !batchAbortRef.current) {
-        await new Promise(r => setTimeout(r, 3500));
+
+      // Notify parent for each bet
+      const bets = result?.data?.bets ?? [];
+      for (const bet of bets) {
+        if (bet.tx_hash) {
+          onBetSubmitted?.({ txHash: bet.tx_hash, amount: bet.amount, maker: address ?? '' });
+        }
       }
+    } catch (err: unknown) {
+      removeDeduction(deductionId);
+      const msg = err instanceof Error ? err.message : 'Batch creation failed';
+      addToast('error', msg);
+    } finally {
+      setBatchSubmitting(false);
+      setBatchCount('');
     }
-
-    // Remove remaining deductions for successful bets + update cache atomically
-    const vaultKey = getGetVaultBalanceQueryKey();
-    const actualMicro = BigInt(microAmount) * BigInt(done);
-
-    // Update cache BEFORE removing deductions (atomic swap like single-bet flow)
-    queryClient.setQueryData(vaultKey, (old: any) => {
-      if (!old?.data) return old;
-      const oldAvailable = BigInt(old.data.available ?? '0');
-      const oldLocked = BigInt(old.data.locked ?? '0');
-      const newAvailable = oldAvailable - actualMicro;
-      return {
-        ...old,
-        data: {
-          ...old.data,
-          available: String(newAvailable < 0n ? 0n : newAvailable),
-          locked: String(oldLocked + actualMicro),
-        },
-      };
-    });
-
-    // Now remove successful deductions (cache already reflects locks)
-    for (let i = 0; i < done; i++) {
-      const id = deductionIds[i];
-      if (id) removeDeduction(id);
-    }
-    // Remove deductions for aborted bets (if stopped early)
-    for (let i = done + errors; i < count; i++) {
-      const id = deductionIds[i];
-      if (id) removeDeduction(id);
-    }
-
-    // Increment local submitted counter for all successfully submitted bets
-    setLocalSubmitted(prev => prev + done);
-
-    setBatchState(null);
-    setBatchCount('');
-    // Refetch vault balance IMMEDIATELY (server returns fresh open_bets_count)
-    queryClient.invalidateQueries({ queryKey: vaultKey });
-    queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
-    setTimeout(() => queryClient.invalidateQueries({ queryKey: vaultKey }), 5000);
-
-    if (errors === 0) {
-      addToast('success', t('wager.batchSuccess', { done }));
-    } else {
-      addToast('warning', t('wager.batchPartial', { done, errors }));
-    }
-  }, [isValidBatch, parsedBatchCount, parsedAmount, batchState, addDeduction, removeDeduction, address, onBetSubmitted, queryClient, addToast]);
-
-  const handleBatchStop = useCallback(() => {
-    batchAbortRef.current = true;
-  }, []);
+  }, [isValidBatch, parsedBatchCount, parsedAmount, batchMode, parsedBatchMin, parsedBatchMax, batchSubmitting, addDeduction, removeDeduction, address, onBetSubmitted, queryClient, addToast, t]);
 
   // On mobile, show compact summary when collapsed
   const mobileIsCollapsed = mobileCollapsed && phase === 'pick';
@@ -458,7 +457,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           )}
 
           {/* Create Button */}
-          <button type="button" disabled={!isValidAmount || !isConnected || (!oneClickEnabled && isConnected) || !canCreateBet || !!batchState?.active}
+          <button type="button" disabled={!isValidAmount || !isConnected || (!oneClickEnabled && isConnected) || !canCreateBet || batchSubmitting}
             onClick={isConnected ? handleConfirm : connect}
             className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40 btn-press">
             {!isConnected
@@ -473,69 +472,114 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           </button>
 
           {/* ─── Batch Mode ─── */}
-          {isConnected && oneClickEnabled && parsedAmount >= 1 && (
+          {isConnected && oneClickEnabled && (
             <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-2 tracking-wide">
-                {t('wager.batchCreate')}
-              </p>
-
-              {batchState ? (
-                /* Progress UI */
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium">
-                      {t('wager.creating', { done: batchState.done, total: batchState.total })}
-                      {batchState.errors > 0 && (
-                        <span className="text-[var(--color-danger)] ml-1">{t('wager.errorsCount', { errors: batchState.errors })}</span>
-                      )}
-                    </span>
-                    <button type="button" onClick={handleBatchStop}
-                      className="text-[10px] font-bold text-[var(--color-danger)] hover:underline">
-                      {t('common.stop')}
-                    </button>
-                  </div>
-                  <div className="h-2 rounded-full bg-[var(--color-surface)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[var(--color-primary)] transition-all duration-300"
-                      style={{ width: `${(batchState.done / batchState.total) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-[var(--color-text-secondary)] mt-1.5 text-center">
-                    {t('wager.timeRemaining', { seconds: Math.ceil((batchState.total - batchState.done) * 3.5) })}
-                  </p>
-                </div>
-              ) : (
-                /* Input UI */
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder={t('wager.countPlaceholder')}
-                        value={batchCount}
-                        onChange={(e) => setBatchCount(e.target.value.replace(/\D/g, ''))}
-                        className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-12 text-xs focus:border-[var(--color-primary)] focus:outline-none"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-text-secondary)]">{t('wager.pcs')}</span>
-                    </div>
-                    {parsedBatchCount > 0 && (
-                      <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
-                        {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchTotalCost.toLocaleString() })} <span className="inline-flex items-center gap-1.5 font-bold"><LaunchTokenIcon size={48} /></span>
-                        {parsedBatchCount > maxBatchCount && maxBatchCount > 0 && (
-                          <span className="text-[var(--color-danger)] ml-1">{t('wager.batchMax', { max: maxBatchCount })}</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] tracking-wide">
+                  {t('wager.batchCreate')}
+                </p>
+                {/* Mode toggle */}
+                <div className="flex rounded-lg bg-[var(--color-surface)] p-0.5 text-[10px] font-bold">
                   <button
                     type="button"
-                    disabled={!isValidBatch}
-                    onClick={handleBatchConfirm}
-                    className="shrink-0 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={() => setBatchMode('fixed')}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${batchMode === 'fixed' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}
                   >
-                    {t('wager.createBatchBtn', { count: parsedBatchCount > 1 ? parsedBatchCount : '' })}
+                    {t('wager.batchModeFixed')}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchMode('random')}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${batchMode === 'random' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}
+                  >
+                    {t('wager.batchModeRandom')}
+                  </button>
+                </div>
+              </div>
+
+              {batchSubmitting ? (
+                /* Submitting spinner */
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
+                  <span className="text-xs font-medium">{t('wager.creating', { total: parsedBatchCount })}</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Random mode: min/max amount inputs */}
+                  {batchMode === 'random' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={t('wager.minAmount')}
+                          value={batchMinAmount}
+                          onChange={(e) => setBatchMinAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={32} /></span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={t('wager.maxAmount')}
+                          value={batchMaxAmount}
+                          onChange={(e) => setBatchMaxAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={32} /></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Count + Submit */}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder={t('wager.countPlaceholder')}
+                          value={batchCount}
+                          onChange={(e) => setBatchCount(e.target.value.replace(/\D/g, ''))}
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-12 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-text-secondary)]">
+                          {t('wager.pcs')} (2-{Math.min(MAX_BATCH_SIZE, maxBatchCount || MAX_BATCH_SIZE)})
+                        </span>
+                      </div>
+                      {parsedBatchCount > 0 && batchMode === 'fixed' && parsedAmount > 0 && (
+                        <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
+                          {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchFixedTotal.toLocaleString() })} <LaunchTokenIcon size={32} />
+                          {parsedBatchCount > maxBatchCount && maxBatchCount > 0 && (
+                            <span className="text-[var(--color-danger)] ml-1">{t('wager.batchMax', { max: maxBatchCount })}</span>
+                          )}
+                        </p>
+                      )}
+                      {parsedBatchCount > 0 && batchMode === 'random' && parsedBatchMax > 0 && (
+                        <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
+                          {t('wager.batchRandomCalc', {
+                            count: parsedBatchCount,
+                            min: parsedBatchMin.toLocaleString(),
+                            max: parsedBatchMax.toLocaleString(),
+                            total: batchRandomMaxTotal.toLocaleString(),
+                          })} <LaunchTokenIcon size={32} />
+                          {batchRandomMaxTotal > availableHuman && (
+                            <span className="text-[var(--color-danger)] ml-1">{t('wager.batchRandomMax', { available: availableHuman.toLocaleString() })}</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!isValidBatch}
+                      onClick={handleBatchConfirm}
+                      className="shrink-0 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {t('wager.createBatchBtn', { count: parsedBatchCount > 1 ? parsedBatchCount : '' })}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
