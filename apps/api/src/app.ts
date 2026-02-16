@@ -16,10 +16,18 @@ export const app = new Hono<AppEnv>();
 
 // ---- Global middleware ----
 app.use('*', requestId());
+
+// Support multiple origins via comma-separated CORS_ORIGIN env var
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
 app.use(
   '*',
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin) => {
+      if (allowedOrigins.includes(origin)) return origin;
+      // Allow if single origin configured (backwards compat)
+      if (allowedOrigins.length === 1) return allowedOrigins[0];
+      return null;
+    },
     credentials: true,
   }),
 );
