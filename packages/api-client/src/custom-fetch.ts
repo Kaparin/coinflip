@@ -1,6 +1,5 @@
-const API_BASE_URL = typeof window !== 'undefined'
-  ? ((window as unknown as Record<string, unknown>).__API_URL__ as string | undefined) ?? 'http://localhost:3001'
-  : process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Next.js inlines NEXT_PUBLIC_* at build time — works on both client and server
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 /**
  * Custom fetch adapter for Orval-generated API client.
