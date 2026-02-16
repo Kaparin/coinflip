@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { LaunchTokenIcon } from '@/components/ui';
+import { usePathname } from 'next/navigation';
+import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useGetVaultBalance } from '@coinflip/api-client';
@@ -14,7 +15,8 @@ import { ADMIN_ADDRESS, EXPLORER_URL } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 
 export function Header() {
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
+  const pathname = usePathname();
   const wallet = useWalletContext();
   const { data: grantData } = useGrantStatus();
   const { data: balanceData } = useGetVaultBalance({
@@ -83,9 +85,10 @@ export function Header() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="hidden items-center gap-3 md:flex">
             {wallet.isConnected && (
               <>
+                {/* Balance display */}
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-1.5" title={t('header.vaultTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
@@ -98,6 +101,36 @@ export function Header() {
                     </div>
                   )}
                 </div>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-[var(--color-border)]" />
+
+                {/* Desktop page links */}
+                <nav className="flex items-center gap-1">
+                  <Link href="/game"
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      pathname === '/game'
+                        ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                    }`}>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+                    </svg>
+                    {t('nav.play')}
+                  </Link>
+                  <Link href="/game/profile"
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      pathname?.startsWith('/game/profile')
+                        ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                    }`}>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                    {t('nav.profile')}
+                  </Link>
+                </nav>
+
                 <StatusChips
                   oneClickEnabled={oneClickEnabled}
                   gasSponsored={gasSponsored}
@@ -120,8 +153,8 @@ export function Header() {
             {wallet.isConnected ? (
               <div className="relative" ref={dropdownRef}>
                 <button type="button" onClick={() => setWalletDropdownOpen(!walletDropdownOpen)}
-                  className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
-                  <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
+                  className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
+                  {wallet.address && <UserAvatar address={wallet.address} size={24} />}
                   <span className="font-mono text-xs">{wallet.shortAddress}</span>
                   <svg className={`h-3 w-3 text-[var(--color-text-secondary)] transition-transform ${walletDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -130,14 +163,27 @@ export function Header() {
 
                 {/* Wallet dropdown */}
                 {walletDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden animate-fade-in z-50">
-                    {/* Address display */}
+                  <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden animate-fade-in z-50">
+                    {/* Profile header */}
                     <div className="px-4 py-3 border-b border-[var(--color-border)]">
-                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-1">{t('header.connectedWallet')}</p>
-                      <p className="text-xs font-mono break-all leading-relaxed">{wallet.address}</p>
+                      <div className="flex items-center gap-3">
+                        {wallet.address && <UserAvatar address={wallet.address} size={36} />}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-mono break-all leading-relaxed">{wallet.address}</p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="py-1">
+                    {/* Navigation links */}
+                    <div className="py-1 border-b border-[var(--color-border)]">
+                      <Link href="/game/profile" onClick={() => setWalletDropdownOpen(false)}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]">
+                        <svg className="h-4 w-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                        </svg>
+                        <span>{t('nav.profile')}</span>
+                      </Link>
+
                       {/* Copy address */}
                       <button type="button" onClick={handleCopyAddress}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]">
@@ -169,8 +215,27 @@ export function Header() {
                       )}
                     </div>
 
-                    <div className="border-t border-[var(--color-border)] py-1">
-                      {/* Disconnect */}
+                    {/* Language switcher */}
+                    <div className="px-4 py-2.5 border-b border-[var(--color-border)]">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
+                        </svg>
+                        <div className="flex flex-1 rounded-lg bg-[var(--color-bg)] p-0.5 text-[10px] font-bold">
+                          <button type="button" onClick={() => setLocale('en')}
+                            className={`flex-1 rounded-md px-2.5 py-1.5 transition-colors ${locale === 'en' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            EN
+                          </button>
+                          <button type="button" onClick={() => setLocale('ru')}
+                            className={`flex-1 rounded-md px-2.5 py-1.5 transition-colors ${locale === 'ru' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            RU
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Disconnect / Forget */}
+                    <div className="py-1">
                       <button type="button" onClick={handleDisconnect}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-xs text-[var(--color-warning)] transition-colors hover:bg-[var(--color-surface-hover)]">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -179,7 +244,6 @@ export function Header() {
                         <span>{t('header.disconnect')}</span>
                       </button>
 
-                      {/* Forget wallet */}
                       <button type="button" onClick={handleForgetWallet}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-xs text-[var(--color-danger)] transition-colors hover:bg-[var(--color-surface-hover)]">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
