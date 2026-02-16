@@ -176,9 +176,10 @@ export class ReferralService {
     userId: string,
     referrerAddress: string,
   ): Promise<{ success: boolean; reason?: string }> {
+    const normalized = referrerAddress.trim().toLowerCase();
     // Find referrer user by address
     const referrer = await this.db.query.users.findFirst({
-      where: eq(users.address, referrerAddress.trim()),
+      where: eq(users.address, normalized),
     });
     if (!referrer) {
       return { success: false, reason: 'USER_NOT_FOUND' };
@@ -241,10 +242,11 @@ export class ReferralService {
     newReferrerAddress: string,
   ): Promise<{ success: boolean; reason?: string; cost?: string }> {
     const tag = 'referral:change-branch';
+    const normalized = newReferrerAddress.trim().toLowerCase();
 
     // Find new referrer
     const newReferrer = await this.db.query.users.findFirst({
-      where: eq(users.address, newReferrerAddress.trim()),
+      where: eq(users.address, normalized),
     });
     if (!newReferrer) {
       return { success: false, reason: 'USER_NOT_FOUND' };
