@@ -27,6 +27,10 @@ const envSchema = z.object({
   RELAYER_ADDRESS: z.string().default(''),
   TREASURY_ADDRESS: z.string().default(''),
   ADMIN_ADDRESSES: z.string().default(''),
+  /** Enable background sweep (auto-reveal, auto-cancel, orphan cleanup). Default: true in prod, false in dev. */
+  ENABLE_BACKGROUND_SWEEP: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
+  /** Enable chain indexer (event polling). Default: true in prod, false in dev. */
+  ENABLE_INDEXER: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
 });
 
 export const env = envSchema.parse(process.env);

@@ -22,18 +22,29 @@ async function initServices() {
     logger.warn({ err }, 'Relayer service failed to initialize — chain operations disabled');
   }
 
-  try {
-    // Initialize indexer (chain event polling)
-    const db = getDb();
-    await indexerService.init(db);
-    indexerService.start(3000); // Poll every 3 seconds
-    logger.info('Indexer service started');
-  } catch (err) {
-    logger.warn({ err }, 'Indexer service failed to initialize — event sync disabled');
+  const enableIndexer = env.ENABLE_INDEXER === 'true';
+  const enableSweep = env.ENABLE_BACKGROUND_SWEEP === 'true';
+
+  if (enableIndexer) {
+    try {
+      // Initialize indexer (chain event polling)
+      const db = getDb();
+      await indexerService.init(db);
+      indexerService.start(3000); // Poll every 3 seconds
+      logger.info('Indexer service started');
+    } catch (err) {
+      logger.warn({ err }, 'Indexer service failed to initialize — event sync disabled');
+    }
+  } else {
+    logger.info('Indexer disabled (ENABLE_INDEXER != "true"). Set ENABLE_INDEXER=true to enable.');
   }
 
-  // Start background sweep (auto-reveal + auto-claim-timeout, every 30s)
-  startBackgroundSweep();
+  if (enableSweep) {
+    // Start background sweep (auto-reveal + auto-claim-timeout, every 30s)
+    startBackgroundSweep();
+  } else {
+    logger.info('Background sweep disabled (ENABLE_BACKGROUND_SWEEP != "true"). Set ENABLE_BACKGROUND_SWEEP=true to enable.');
+  }
 }
 
 const server = serve({
