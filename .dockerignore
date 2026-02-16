@@ -26,8 +26,11 @@ out/
 # Rust / CosmWasm contracts (not needed for API)
 contracts/
 
-# Frontend (not needed for API Docker image)
-apps/web/
+# Frontend source (not needed for API, but keep package.json for pnpm)
+apps/web/src/
+apps/web/.next/
+apps/web/public/
+apps/web/node_modules/
 
 # OS files
 .DS_Store
