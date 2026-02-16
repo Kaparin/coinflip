@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Check, X, Info, AlertTriangle } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -39,44 +40,28 @@ const typeConfig: Record<
   { icon: ReactNode; border: string; bg: string; text: string; progress: string }
 > = {
   success: {
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-      </svg>
-    ),
+    icon: <Check size={16} strokeWidth={2.5} />,
     border: 'border-l-[var(--color-success)]',
     bg: 'bg-[var(--color-success)]/10',
     text: 'text-[var(--color-success)]',
     progress: 'bg-[var(--color-success)]',
   },
   error: {
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    ),
+    icon: <X size={16} strokeWidth={2.5} />,
     border: 'border-l-[var(--color-danger)]',
     bg: 'bg-[var(--color-danger)]/10',
     text: 'text-[var(--color-danger)]',
     progress: 'bg-[var(--color-danger)]',
   },
   info: {
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-      </svg>
-    ),
+    icon: <Info size={16} strokeWidth={2.5} />,
     border: 'border-l-[var(--color-primary)]',
     bg: 'bg-[var(--color-primary)]/10',
     text: 'text-[var(--color-primary)]',
     progress: 'bg-[var(--color-primary)]',
   },
   warning: {
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-      </svg>
-    ),
+    icon: <AlertTriangle size={16} strokeWidth={2.5} />,
     border: 'border-l-[var(--color-warning)]',
     bg: 'bg-[var(--color-warning)]/10',
     text: 'text-[var(--color-warning)]',
@@ -210,9 +195,7 @@ function ToastItem({
         className="shrink-0 rounded p-0.5 text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text)] cursor-pointer"
         aria-label="Dismiss notification"
       >
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
+        <X size={14} />
       </button>
 
       {/* Progress bar */}

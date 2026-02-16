@@ -8,6 +8,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
+import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { LaunchTokenIcon } from '@/components/ui';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { useTranslation } from '@/lib/i18n';
@@ -290,12 +291,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
               </span>
             )}
           </div>
-          <svg
-            className={`h-4 w-4 text-[var(--color-text-secondary)] transition-transform duration-200 ${!mobileIsCollapsed ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
+          <ChevronDown size={16} className={`text-[var(--color-text-secondary)] transition-transform duration-200 ${!mobileIsCollapsed ? 'rotate-180' : ''}`} />
         </button>
 
         {/* Collapsed: show quick-create button inline */}
@@ -306,7 +302,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
               onClick={handleConfirm}
               className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] btn-press"
             >
-              {t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={48} />
+              {t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={18} />
             </button>
           </div>
         )}
@@ -318,9 +314,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
       {isConnected && !oneClickEnabled && grantStatus !== undefined && (
         <div className="mb-4 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 p-3">
           <div className="flex items-start gap-2">
-            <svg className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
+            <AlertTriangle size={20} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-bold text-[var(--color-warning)] mb-1">{t('wager.oneClickRequired')}</p>
               <p className="text-xs text-[var(--color-text-secondary)] mb-2">
@@ -345,7 +339,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           </div>
           <p className="text-base font-bold">{t('wager.betSubmitted')}</p>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {parsedAmount.toLocaleString()} <LaunchTokenIcon size={48} />
+            {parsedAmount.toLocaleString()} <LaunchTokenIcon size={18} />
           </p>
           <p className="text-xs text-[var(--color-text-secondary)] animate-pulse">
             {t('common.confirming')}
@@ -357,12 +351,12 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           <div className="rounded-xl bg-[var(--color-bg)] p-4 space-y-2.5">
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.wagerLabel')}</span>
-              <span className="flex items-center gap-1.5 font-bold">{parsedAmount.toLocaleString()} <LaunchTokenIcon size={48} /></span>
+              <span className="flex items-center gap-1.5 font-bold">{parsedAmount.toLocaleString()} <LaunchTokenIcon size={18} /></span>
             </div>
             <div className="border-t border-[var(--color-border)]" />
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.ifYouWin')}</span>
-              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={48} /></span>
+              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={18} /></span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.commission')}</span>
@@ -429,7 +423,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                 }}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={48} /></span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
             </div>
             {parsedAmount > 0 && parsedAmount < 1 && (
               <p className="mt-1 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
@@ -467,7 +461,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                 : !canCreateBet
                   ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
                   : isValidAmount
-                    ? <><span>{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} </span><LaunchTokenIcon size={48} /></>
+                    ? <><span>{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} </span><LaunchTokenIcon size={18} /></>
                     : t('wager.enterAmount')}
           </button>
 
@@ -517,7 +511,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                           onChange={(e) => setBatchMinAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={32} /></span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={14} /></span>
                       </div>
                       <div className="relative">
                         <input
@@ -528,7 +522,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                           onChange={(e) => setBatchMaxAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={32} /></span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={14} /></span>
                       </div>
                     </div>
                   )}
@@ -551,7 +545,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                       </div>
                       {parsedBatchCount > 0 && batchMode === 'fixed' && parsedAmount > 0 && (
                         <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
-                          {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchFixedTotal.toLocaleString() })} <LaunchTokenIcon size={32} />
+                          {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchFixedTotal.toLocaleString() })} <LaunchTokenIcon size={14} />
                           {parsedBatchCount > maxBatchCount && maxBatchCount > 0 && (
                             <span className="text-[var(--color-danger)] ml-1">{t('wager.batchMax', { max: maxBatchCount })}</span>
                           )}
@@ -564,7 +558,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                             min: parsedBatchMin.toLocaleString(),
                             max: parsedBatchMax.toLocaleString(),
                             total: batchRandomMaxTotal.toLocaleString(),
-                          })} <LaunchTokenIcon size={32} />
+                          })} <LaunchTokenIcon size={14} />
                           {batchRandomMaxTotal > availableHuman && (
                             <span className="text-[var(--color-danger)] ml-1">{t('wager.batchRandomMax', { available: availableHuman.toLocaleString() })}</span>
                           )}

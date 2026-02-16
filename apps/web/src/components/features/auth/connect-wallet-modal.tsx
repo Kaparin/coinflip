@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { Modal } from '@/components/ui/modal';
+import { Lock, ShieldCheck, Shield, CheckCircle, ChevronDown, UserPlus } from 'lucide-react';
+import { getCapturedRefCode, registerByAddress } from '@/hooks/use-referral';
 
 interface ConnectWalletModalProps {
   open: boolean;
@@ -32,27 +34,50 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
   const [derivedAddress, setDerivedAddress] = useState('');
   const [localError, setLocalError] = useState('');
 
+  // "Who invited you?" state
+  const [inviterOpen, setInviterOpen] = useState(false);
+  const [inviterAddr, setInviterAddr] = useState('');
+  const [inviterStatus, setInviterStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
+  const [inviterError, setInviterError] = useState('');
+  const hasRefCode = typeof window !== 'undefined' && !!getCapturedRefCode();
+
   const mnemonicRef = useRef<HTMLTextAreaElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
 
-  // Reset state when modal opens
+  // Track whether a connect/unlock operation is in flight to prevent step resets
+  const isInFlightRef = useRef(false);
+
+  // Reset state when modal opens (only reacts to `open` changing to true)
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
+      // Modal just opened
       setMnemonic('');
       setPin('');
       setPinConfirm('');
       setLocalError('');
       setDerivedAddress('');
-      // If has saved wallet, go to unlock; otherwise import
+      setInviterOpen(false);
+      setInviterAddr('');
+      setInviterStatus('idle');
+      setInviterError('');
+      isInFlightRef.current = false;
       setStep(hasSaved ? 'unlock' : 'import');
     }
+    prevOpenRef.current = open;
   }, [open, hasSaved]);
 
   // When wallet becomes connected during unlock/confirm, transition to success
   useEffect(() => {
     if (open && isConnected && !isConnecting && (step === 'unlock' || step === 'confirm')) {
+      isInFlightRef.current = false;
       setStep('success');
-      // Clear sensitive data from memory
+
+      // Register inviter by address if user entered one (and no ref code from URL)
+      if (inviterAddr.trim() && !hasRefCode) {
+        registerByAddress(inviterAddr.trim()).catch(() => {});
+      }
+
       setMnemonic('');
       setPin('');
       setPinConfirm('');
@@ -102,6 +127,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
 
   /** Confirm and connect — the useEffect above handles success/close */
   const handleConfirmConnect = useCallback(async () => {
+    isInFlightRef.current = true;
     await connectWithMnemonic(mnemonic, pin, rememberMe);
   }, [mnemonic, pin, rememberMe, connectWithMnemonic]);
 
@@ -112,8 +138,9 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       return;
     }
     setLocalError('');
+    isInFlightRef.current = true;
     await unlockWithPin(pin);
-  }, [pin, unlockWithPin]);
+  }, [pin, unlockWithPin, t]);
 
   /** Handle forget and switch to import */
   const handleForgetAndImport = useCallback(() => {
@@ -141,9 +168,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
 
             {/* Security badge */}
             <div className="flex items-center gap-2 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 px-3 py-2">
-              <svg className="h-4 w-4 text-[var(--color-success)] shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
+              <Lock size={16} className="text-[var(--color-success)] shrink-0" />
               <span className="text-[10px] text-[var(--color-success)]">
                 {t('auth.clientSideOnly')}
               </span>
@@ -210,6 +235,49 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
               </span>
             </label>
 
+            {/* "Who invited you?" collapsible — only shown when no ref code captured */}
+            {!hasRefCode && (
+              <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setInviterOpen((v) => !v)}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/10 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <UserPlus size={14} />
+                    {t('auth.whoInvited')}
+                  </span>
+                  <ChevronDown size={14} className={`transition-transform ${inviterOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {inviterOpen && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-[var(--color-border)]">
+                    <p className="text-[10px] text-[var(--color-text-secondary)] pt-2">
+                      {t('auth.whoInvitedHint')}
+                    </p>
+                    <input
+                      type="text"
+                      value={inviterAddr}
+                      onChange={(e) => {
+                        setInviterAddr(e.target.value);
+                        setInviterStatus('idle');
+                        setInviterError('');
+                      }}
+                      placeholder="axm1..."
+                      spellCheck={false}
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-[var(--color-primary)] focus:outline-none"
+                    />
+                    <p className="text-[9px] text-[var(--color-text-secondary)]">
+                      {t('auth.inviterOptional')}
+                    </p>
+                    {inviterError && (
+                      <p className="text-[10px] text-[var(--color-danger)]">{inviterError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {(localError || error) && (
               <p className="text-xs text-[var(--color-danger)]">{localError || error}</p>
             )}
@@ -236,77 +304,121 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
         {/* ==== CONFIRM ADDRESS ==== */}
         {step === 'confirm' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold">{t('auth.confirmAddress')}</h2>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              {t('auth.confirmAddressDesc')}
-            </p>
+            {isConnecting ? (
+              /* Connecting overlay */
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="relative flex h-16 w-16 items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
+                  <Lock size={20} className="text-[var(--color-primary)]" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-bold">{t('common.connecting')}</p>
+                  <p className="text-[11px] text-[var(--color-text-secondary)]">
+                    {t('auth.encryptingAndSaving')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 w-full">
+                  <Shield size={14} className="text-amber-500 shrink-0" />
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                    {t('auth.doNotClose')}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold">{t('auth.confirmAddress')}</h2>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {t('auth.confirmAddressDesc')}
+                </p>
 
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
-              <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.yourAddress')}</p>
-              <p className="text-sm font-mono font-bold break-all">{derivedAddress}</p>
-            </div>
+                <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
+                  <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.yourAddress')}</p>
+                  <p className="text-sm font-mono font-bold break-all">{derivedAddress}</p>
+                </div>
 
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setStep('import')}
-                className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold">
-                {t('common.back')}
-              </button>
-              <button type="button" disabled={isConnecting} onClick={handleConfirmConnect}
-                className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold disabled:opacity-40">
-                {isConnecting ? t('common.connecting') : t('auth.connect')}
-              </button>
-            </div>
-            {error && <p className="text-xs text-[var(--color-danger)] text-center">{error}</p>}
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setStep('import')}
+                    className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold">
+                    {t('common.back')}
+                  </button>
+                  <button type="button" disabled={isConnecting} onClick={handleConfirmConnect}
+                    className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold disabled:opacity-40">
+                    {t('auth.connect')}
+                  </button>
+                </div>
+                {error && <p className="text-xs text-[var(--color-danger)] text-center">{error}</p>}
+              </>
+            )}
           </div>
         )}
 
         {/* ==== UNLOCK SAVED ==== */}
         {step === 'unlock' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold">{t('auth.welcomeBack')}</h2>
+            {isConnecting ? (
+              /* Unlocking overlay */
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="relative flex h-16 w-16 items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
+                  <Lock size={20} className="text-[var(--color-primary)]" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-bold">{t('auth.unlocking')}</p>
+                  <p className="text-[11px] text-[var(--color-text-secondary)]">
+                    {t('auth.encryptingAndSaving')}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold">{t('auth.welcomeBack')}</h2>
 
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
-              <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.savedWallet')}</p>
-              <p className="text-sm font-mono font-bold">
-                {savedAddress ? `${savedAddress.slice(0, 12)}...${savedAddress.slice(-6)}` : '...'}
-              </p>
-            </div>
+                <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
+                  <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.savedWallet')}</p>
+                  <p className="text-sm font-mono font-bold">
+                    {savedAddress ? `${savedAddress.slice(0, 12)}...${savedAddress.slice(-6)}` : '...'}
+                  </p>
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                {t('auth.enterPinToUnlock')}
-              </label>
-              <input
-                ref={pinRef}
-                type="password"
-                inputMode="numeric"
-                value={pin}
-                onChange={(e) => { setPin(e.target.value); setLocalError(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-                placeholder={t('auth.yourPin')}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                    {t('auth.enterPinToUnlock')}
+                  </label>
+                  <input
+                    ref={pinRef}
+                    type="password"
+                    inputMode="numeric"
+                    value={pin}
+                    onChange={(e) => { setPin(e.target.value); setLocalError(''); }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                    placeholder={t('auth.yourPin')}
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                </div>
 
-            {(localError || error) && (
-              <p className="text-xs text-[var(--color-danger)]">{localError || error}</p>
+                {(localError || error) && (
+                  <p className="text-xs text-[var(--color-danger)]">{localError || error}</p>
+                )}
+
+                <button type="button" disabled={pin.length < 4} onClick={handleUnlock}
+                  className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold disabled:opacity-40">
+                  {t('auth.unlock')}
+                </button>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button type="button" onClick={handleForgetAndImport}
+                    className="text-[10px] text-[var(--color-danger)] hover:underline">
+                    {t('auth.forgetThisWallet')}
+                  </button>
+                  <button type="button" onClick={() => setStep('import')}
+                    className="text-[10px] text-[var(--color-text-secondary)] hover:underline">
+                    {t('auth.useDifferentWallet')}
+                  </button>
+                </div>
+              </>
             )}
-
-            <button type="button" disabled={pin.length < 4 || isConnecting} onClick={handleUnlock}
-              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold disabled:opacity-40">
-              {isConnecting ? t('auth.unlocking') : t('auth.unlock')}
-            </button>
-
-            <div className="flex items-center justify-between pt-1">
-              <button type="button" onClick={handleForgetAndImport}
-                className="text-[10px] text-[var(--color-danger)] hover:underline">
-                {t('auth.forgetThisWallet')}
-              </button>
-              <button type="button" onClick={() => setStep('import')}
-                className="text-[10px] text-[var(--color-text-secondary)] hover:underline">
-                {t('auth.useDifferentWallet')}
-              </button>
-            </div>
           </div>
         )}
 
@@ -316,9 +428,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
             {/* Header */}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-success)]/15">
-                <svg className="h-4 w-4 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
+                <ShieldCheck size={16} className="text-[var(--color-success)]" />
               </div>
               <h2 className="text-lg font-bold">{t('auth.securityAuditTitle')}</h2>
             </div>
@@ -503,9 +613,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
         {step === 'success' && (
           <div className="flex flex-col items-center gap-3 py-6">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success)]/15">
-              <svg className="h-7 w-7 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <CheckCircle size={28} className="text-[var(--color-success)]" />
             </div>
             <p className="text-base font-bold">{t('auth.walletConnected')}</p>
             <p className="text-xs text-[var(--color-text-secondary)]">{t('auth.readyToPlay')}</p>

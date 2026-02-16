@@ -29,6 +29,60 @@ referralRouter.post('/register', authMiddleware, zValidator('json', RegisterSche
   return c.json({ data: { registered: true } });
 });
 
+// POST /api/v1/referral/register-by-address — Register referral by wallet address
+const RegisterByAddressSchema = z.object({ address: z.string().min(1).max(100) });
+
+referralRouter.post('/register-by-address', authMiddleware, zValidator('json', RegisterByAddressSchema), async (c) => {
+  const userId = c.get('user').id;
+  const { address } = c.req.valid('json');
+  const result = await referralService.registerByAddress(userId, address);
+
+  if (!result.success) {
+    const messages: Record<string, string> = {
+      USER_NOT_FOUND: 'User with this address not found in the system',
+      SELF_REFERRAL: 'Cannot refer yourself',
+      ALREADY_HAS_REFERRER: 'You already have a referrer',
+    };
+    return c.json({
+      error: { code: result.reason, message: messages[result.reason!] ?? 'Failed to register' },
+    }, 400);
+  }
+  return c.json({ data: { registered: true } });
+});
+
+// GET /api/v1/referral/has-referrer — Check if current user has a referrer
+referralRouter.get('/has-referrer', authMiddleware, async (c) => {
+  const userId = c.get('user').id;
+  const hasRef = await referralService.hasReferrer(userId);
+  const current = hasRef ? await referralService.getCurrentReferrer(userId) : null;
+  return c.json({ data: { has_referrer: hasRef, referrer: current } });
+});
+
+// POST /api/v1/referral/change-branch — Change referral branch (paid: 1000 LAUNCH)
+const ChangeBranchSchema = z.object({ address: z.string().min(1).max(100) });
+
+referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeBranchSchema), async (c) => {
+  const userId = c.get('user').id;
+  const walletAddress = c.get('address');
+  const { address: newReferrerAddr } = c.req.valid('json');
+  const result = await referralService.changeBranch(userId, newReferrerAddr);
+
+  if (!result.success) {
+    const messages: Record<string, string> = {
+      USER_NOT_FOUND: 'User with this address not found in the system',
+      SELF_REFERRAL: 'Cannot refer yourself',
+      WOULD_CREATE_CYCLE: 'This change would create a circular referral chain',
+      INSUFFICIENT_BALANCE: 'Insufficient balance. You need 1,000 LAUNCH to change branch.',
+    };
+    return c.json({
+      error: { code: result.reason, message: messages[result.reason!] ?? 'Failed to change branch' },
+    }, 400);
+  }
+
+  invalidateBalanceCache(walletAddress);
+  return c.json({ data: { changed: true, cost: result.cost } });
+});
+
 // GET /api/v1/referral/stats — Get referral stats
 referralRouter.get('/stats', authMiddleware, async (c) => {
   const userId = c.get('user').id;

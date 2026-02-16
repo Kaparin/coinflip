@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import {
   fromMicroLaunch,
+  formatLaunch,
   COMMISSION_BPS,
   LAUNCH_MULTIPLIER,
 } from '@coinflip/shared/constants';
@@ -283,9 +284,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🪙</span>
-                    <span className="text-lg font-bold">{fromMicroLaunch(Number(bet.amount)).toLocaleString()}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-lg font-bold tabular-nums">{formatLaunch(bet.amount)}</span>
+                    <LaunchTokenIcon size={20} />
                   </div>
                   <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold uppercase tracking-wide">
                     {t('bets.sending')}
@@ -353,7 +354,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
               <div className="border-t border-[var(--color-border)]" />
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-secondary)]">{t('wager.ifYouWin')}</span>
-                <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{acceptWinAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={48} /></span>
+                <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{acceptWinAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={16} /></span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-secondary)]">{t('wager.winChance')}</span>

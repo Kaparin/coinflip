@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { CheckCircle, Loader2, Shield } from 'lucide-react';
 import { useGetVaultBalance, useWithdrawFromVault } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -16,6 +17,87 @@ import { useTranslation } from '@/lib/i18n';
 /** Deposit presets in human-readable LAUNCH */
 const DEPOSIT_PRESETS = [100, 500, 1000];
 const DEPOSIT_PRESET_LABELS = ['100', '500', '1K'];
+
+type DepositStep = 'connecting' | 'signing' | 'broadcasting' | 'confirming';
+
+const DEPOSIT_STEPS: DepositStep[] = ['connecting', 'signing', 'broadcasting', 'confirming'];
+
+function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: DepositStep; elapsedSec: number }) {
+  const { t } = useTranslation();
+  const stepLabels: Record<DepositStep, string> = {
+    connecting: t('balance.depositStep1'),
+    signing: t('balance.depositStep2'),
+    broadcasting: t('balance.depositStep3'),
+    confirming: t('balance.depositStep4'),
+  };
+  const currentIdx = DEPOSIT_STEPS.indexOf(currentStep);
+
+  return (
+    <div className="py-2 space-y-5">
+      {/* Animated spinner */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
+          <LaunchTokenIcon size={24} />
+        </div>
+        <h3 className="text-base font-bold">{t('balance.depositInProgress')}</h3>
+      </div>
+
+      {/* Step list */}
+      <div className="space-y-2.5">
+        {DEPOSIT_STEPS.map((step, idx) => {
+          const isActive = idx === currentIdx;
+          const isDone = idx < currentIdx;
+          const isPending = idx > currentIdx;
+
+          return (
+            <div key={step} className="flex items-center gap-3">
+              {/* Step indicator */}
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
+                isDone ? 'bg-[var(--color-success)] text-white'
+                  : isActive ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-border)]/30 text-[var(--color-text-secondary)]'
+              }`}>
+                {isDone ? (
+                  <CheckCircle size={14} />
+                ) : isActive ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  idx + 1
+                )}
+              </div>
+              {/* Label */}
+              <span className={`text-sm transition-colors duration-300 ${
+                isDone ? 'text-[var(--color-success)] font-medium'
+                  : isActive ? 'text-[var(--color-text)] font-semibold'
+                  : 'text-[var(--color-text-secondary)]'
+              }`}>
+                {stepLabels[step]}
+                {isActive && <span className="inline-block ml-1 animate-pulse">...</span>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Warning + timer */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+          <Shield size={14} className="text-amber-500 shrink-0" />
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            {t('balance.depositDoNotClose')}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] text-[var(--color-text-secondary)]">
+            {t('balance.depositEstimate')} · {elapsedSec}s
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BalanceDisplay() {
   const { t } = useTranslation();
@@ -35,8 +117,11 @@ export function BalanceDisplay() {
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [depositStatus, setDepositStatus] = useState<'idle' | 'signing' | 'broadcasting' | 'success' | 'error'>('idle');
+  const [depositStep, setDepositStep] = useState<DepositStep>('connecting');
   const [depositError, setDepositError] = useState('');
   const [depositTxHash, setDepositTxHash] = useState('');
+  const [depositElapsed, setDepositElapsed] = useState(0);
+  const depositTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'success'>('idle');
 
@@ -79,6 +164,24 @@ export function BalanceDisplay() {
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
+  // Elapsed time counter for deposit progress
+  useEffect(() => {
+    if (depositStatus === 'signing' || depositStatus === 'broadcasting') {
+      setDepositElapsed(0);
+      depositTimerRef.current = setInterval(() => {
+        setDepositElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (depositTimerRef.current) {
+        clearInterval(depositTimerRef.current);
+        depositTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (depositTimerRef.current) clearInterval(depositTimerRef.current);
+    };
+  }, [depositStatus]);
+
   // --- Deposit via Web Wallet (client-side signing) ---
   const handleDeposit = useCallback(async () => {
     if (!address || !depositAmount) return;
@@ -94,9 +197,22 @@ export function BalanceDisplay() {
 
     try {
       setDepositStatus('signing');
+      setDepositStep('connecting');
       setDepositError('');
 
+      // Simulate sub-step progression: connecting → signing → broadcasting → confirming
+      // signDeposit does: connect to RPC → sign → broadcast → wait for inclusion
+      setDepositStep('signing');
+
+      // Small delay to show "signing" step before the actual heavy operation
+      await new Promise((r) => setTimeout(r, 300));
+      setDepositStep('broadcasting');
+
       const result = await signDeposit(wallet, address, parsedHuman);
+
+      setDepositStep('confirming');
+      // Brief pause to show confirming step
+      await new Promise((r) => setTimeout(r, 800));
 
       setDepositTxHash(result.txHash);
       setDepositStatus('success');
@@ -110,14 +226,16 @@ export function BalanceDisplay() {
       setDepositError(err instanceof Error ? err.message : t('balance.depositFailed'));
       setDepositStatus('error');
     }
-  }, [address, depositAmount, getWallet, refetch, queryClient]);
+  }, [address, depositAmount, getWallet, refetch, queryClient, t]);
 
   const resetDeposit = () => {
     setShowDeposit(false);
     setDepositAmount('');
     setDepositStatus('idle');
+    setDepositStep('connecting');
     setDepositError('');
     setDepositTxHash('');
+    setDepositElapsed(0);
   };
 
   const handleWithdraw = () => {
@@ -154,7 +272,7 @@ export function BalanceDisplay() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalance')}</p>
-                    <p className="flex items-center gap-1.5 text-sm font-bold tabular-nums">{fmtNum(walletBalanceHuman)} <LaunchTokenIcon size={48} /></p>
+                    <p className="flex items-center gap-1.5 text-sm font-bold tabular-nums">{fmtNum(walletBalanceHuman)} <LaunchTokenIcon size={18} /></p>
                   </div>
                   <button type="button" onClick={() => { setDepositAmount(String(Math.floor(walletBalanceHuman))); setShowDeposit(true); }}
                     className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-[var(--color-primary-hover)]">
@@ -170,15 +288,15 @@ export function BalanceDisplay() {
             <div className="grid gap-2 grid-cols-3 mb-3">
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.available')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)} <LaunchTokenIcon size={48} /></p>
+                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)} <LaunchTokenIcon size={18} /></p>
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.inBets')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-warning)]">{fmtNum(lockedHuman)} <LaunchTokenIcon size={48} /></p>
+                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-warning)]">{fmtNum(lockedHuman)} <LaunchTokenIcon size={18} /></p>
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.total')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{fmtNum(totalHuman)} <LaunchTokenIcon size={48} /></p>
+                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{fmtNum(totalHuman)} <LaunchTokenIcon size={18} /></p>
               </div>
             </div>
 
@@ -198,23 +316,23 @@ export function BalanceDisplay() {
 
       {/* ===== Deposit Modal ===== */}
       {showDeposit && (
-        <Modal open onClose={resetDeposit}>
+        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit}>
           <div className="p-5 max-w-sm w-full">
             {depositStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
                 <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-[var(--color-success)]/15 animate-bounce-in mb-3">
-                  <svg className="h-7 w-7 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <CheckCircle size={28} className="text-[var(--color-success)]" />
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={48} />
+                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={18} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4 break-all font-mono">TX: {depositTxHash.slice(0, 16)}...</p>
                 <button type="button" onClick={resetDeposit}
                   className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">{t('common.done')}</button>
               </div>
+            ) : depositStatus === 'signing' || depositStatus === 'broadcasting' ? (
+              <DepositProgressOverlay currentStep={depositStep} elapsedSec={depositElapsed} />
             ) : (
               <>
                 <h3 className="text-lg font-bold mb-1">{t('balance.depositTitle')}</h3>
@@ -237,7 +355,7 @@ export function BalanceDisplay() {
                   <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={48} /></span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
                 </div>
 
                 {depositError && <p className="text-xs text-[var(--color-danger)] mb-3">{depositError}</p>}
@@ -246,9 +364,9 @@ export function BalanceDisplay() {
                   <button type="button" onClick={resetDeposit}
                     className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold">{t('common.cancel')}</button>
                   <button type="button" onClick={handleDeposit}
-                    disabled={!depositAmount || parseFloat(depositAmount) <= 0 || depositStatus === 'signing' || depositStatus === 'broadcasting'}
+                    disabled={!depositAmount || parseFloat(depositAmount) <= 0}
                     className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold disabled:opacity-40">
-                    {depositStatus === 'signing' ? t('balance.signing') : depositStatus === 'broadcasting' ? t('balance.broadcasting') : t('common.deposit')}
+                    {t('common.deposit')}
                   </button>
                 </div>
               </>
@@ -264,13 +382,11 @@ export function BalanceDisplay() {
             {withdrawStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
                 <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-[var(--color-success)]/15 animate-bounce-in mb-3">
-                  <svg className="h-7 w-7 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <CheckCircle size={28} className="text-[var(--color-success)]" />
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  -{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={48} />
+                  -{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={18} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}
@@ -282,7 +398,7 @@ export function BalanceDisplay() {
               <>
                 <h3 className="text-lg font-bold mb-1">{t('balance.withdrawTitle')}</h3>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-1">
-                  {t('balance.withdrawAvailable', { amount: fmtNum(availableHuman) })} <span className="inline-flex items-center gap-1.5"><LaunchTokenIcon size={48} /></span>
+                  {t('balance.withdrawAvailable', { amount: fmtNum(availableHuman) })} <span className="inline-flex items-center gap-1.5"><LaunchTokenIcon size={18} /></span>
                 </p>
 
                 <div className="flex gap-2 mt-3 mb-3">
@@ -299,7 +415,7 @@ export function BalanceDisplay() {
                   <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={48} /></span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
                 </div>
 
                 <div className="flex gap-2">

@@ -494,10 +494,10 @@ CMD ["node", "apps/web/.next/standalone/server.js"]
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name coinflip.example.com;
+    server_name coinflip.axiome-launch.com;
     
-    ssl_certificate /etc/letsencrypt/live/coinflip.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/coinflip.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/coinflip.axiome-launch.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/coinflip.axiome-launch.com/privkey.pem;
     
     # Frontend
     location / {
@@ -544,7 +544,7 @@ server {
 ### Phase 3: Безопасность
 
 #### 3.1 CORS
-- Ограничить `CORS_ORIGIN` до `https://coinflip.example.com`
+- Ограничить `CORS_ORIGIN` до `https://coinflip.axiome-launch.com`
 - Убрать wildcard `*`
 
 #### 3.2 Rate Limiting (Nginx уровень)
@@ -564,7 +564,7 @@ add_header X-Frame-Options DENY;
 add_header X-Content-Type-Options nosniff;
 add_header X-XSS-Protection "1; mode=block";
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-add_header Content-Security-Policy "default-src 'self'; connect-src 'self' wss://coinflip.example.com";
+add_header Content-Security-Policy "default-src 'self'; connect-src 'self' wss://coinflip.axiome-launch.com";
 ```
 
 #### 3.4 Переменные окружения
@@ -697,11 +697,11 @@ REDIS_URL=redis://redis:6379
 # ---- API ----
 API_PORT=3001
 API_HOST=0.0.0.0
-CORS_ORIGIN=https://coinflip.example.com
+CORS_ORIGIN=https://coinflip.axiome-launch.com
 
 # ---- Frontend ----
-NEXT_PUBLIC_API_URL=https://coinflip.example.com
-NEXT_PUBLIC_WS_URL=wss://coinflip.example.com/ws
+NEXT_PUBLIC_API_URL=https://coinflip.axiome-launch.com
+NEXT_PUBLIC_WS_URL=wss://coinflip.axiome-launch.com/ws
 NEXT_PUBLIC_EXPLORER_URL=https://axiomechain.org
 NEXT_PUBLIC_CHAIN_ID=axiome-1
 NEXT_PUBLIC_ADMIN_ADDRESS=axm1p9g8yads5u6aer0hxze7gze36jklljrvxlnczz

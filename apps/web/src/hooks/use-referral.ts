@@ -94,6 +94,67 @@ export async function registerCapturedRef(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Register referral by wallet address (instead of code).
+ * Used in "Who invited you?" field during registration.
+ */
+export async function registerByAddress(address: string): Promise<{ ok: boolean; reason?: string }> {
+  const walletAddress = getWalletAddress();
+  try {
+    const res = await fetch(`${API_URL}/api/v1/referral/register-by-address`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+      },
+      body: JSON.stringify({ address }),
+    });
+    if (res.ok) return { ok: true };
+    const json = await res.json().catch(() => null);
+    return { ok: false, reason: json?.error?.code ?? 'UNKNOWN' };
+  } catch {
+    return { ok: false, reason: 'NETWORK_ERROR' };
+  }
+}
+
+/**
+ * Check if current user already has a referrer.
+ */
+export async function checkHasReferrer(): Promise<{
+  has_referrer: boolean;
+  referrer: { address: string; nickname: string | null } | null;
+}> {
+  const data = await apiFetch<{
+    has_referrer: boolean;
+    referrer: { address: string; nickname: string | null } | null;
+  }>('/api/v1/referral/has-referrer');
+  return data ?? { has_referrer: false, referrer: null };
+}
+
+/**
+ * Change referral branch (paid: 1000 LAUNCH).
+ */
+export async function changeBranch(address: string): Promise<{ ok: boolean; reason?: string }> {
+  const walletAddress = getWalletAddress();
+  try {
+    const res = await fetch(`${API_URL}/api/v1/referral/change-branch`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+      },
+      body: JSON.stringify({ address }),
+    });
+    if (res.ok) return { ok: true };
+    const json = await res.json().catch(() => null);
+    return { ok: false, reason: json?.error?.code ?? 'UNKNOWN' };
+  } catch {
+    return { ok: false, reason: 'NETWORK_ERROR' };
+  }
+}
+
 export function useReferral(isConnected: boolean) {
   const [code, setCode] = useState<string | null>(null);
   const [stats, setStats] = useState<ReferralStats | null>(null);

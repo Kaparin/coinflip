@@ -15,6 +15,7 @@ export const BetResponseSchema = z
   .object({
     id: BetIdSchema,
     maker: AddressSchema,
+    maker_nickname: z.string().nullable().openapi({ description: 'Maker display nickname' }),
     amount: AmountSchema,
     status: BetStatusSchema,
     created_at: z.string().datetime().openapi({ description: 'Bet creation time (ISO 8601)' }),
@@ -22,6 +23,7 @@ export const BetResponseSchema = z
 
     // Populated when ACCEPTED+
     acceptor: AddressSchema.nullable().openapi({ description: 'Acceptor address (null if OPEN)' }),
+    acceptor_nickname: z.string().nullable().openapi({ description: 'Acceptor display nickname' }),
     acceptor_guess: SideSchema.nullable().openapi({ description: 'Acceptor guess (null if OPEN)' }),
     accepted_at: z.string().datetime().nullable(),
     txhash_accept: TxHashSchema.nullable(),
@@ -29,6 +31,7 @@ export const BetResponseSchema = z
     // Populated when REVEALED
     reveal_side: SideSchema.nullable().openapi({ description: 'Maker revealed side' }),
     winner: AddressSchema.nullable().openapi({ description: 'Winner address' }),
+    winner_nickname: z.string().nullable().openapi({ description: 'Winner display nickname' }),
     payout_amount: AmountSchema.nullable().openapi({ description: 'Winner payout (after commission)' }),
     commission_amount: AmountSchema.nullable(),
     resolved_at: z.string().datetime().nullable(),
@@ -37,6 +40,9 @@ export const BetResponseSchema = z
     // Timeouts
     reveal_deadline: z.string().datetime().nullable().openapi({
       description: 'Deadline for maker to reveal (accepted_at + 5min)',
+    }),
+    expires_at: z.string().datetime().nullable().openapi({
+      description: 'When open bet expires (created_at + TTL)',
     }),
   })
   .openapi({ ref: 'Bet' });

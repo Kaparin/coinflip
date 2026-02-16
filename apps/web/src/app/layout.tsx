@@ -2,9 +2,26 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://coinflip.axiome-launch.com';
+const TITLE = 'CoinFlip — PvP Heads or Tails on Axiome';
+const DESCRIPTION = 'Wager LAUNCH tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.';
+
 export const metadata: Metadata = {
-  title: 'CoinFlip — PvP Heads or Tails on Axiome',
-  description: 'Wager LAUNCH tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.',
+  title: TITLE,
+  description: DESCRIPTION,
+  metadataBase: new URL(APP_URL),
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: APP_URL,
+    siteName: 'CoinFlip',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 /** Prevent iOS auto-zoom on input focus (minimum-scale=1, maximum-scale=1) */

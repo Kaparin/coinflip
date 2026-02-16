@@ -29,6 +29,11 @@ import type {
 
 import { customFetch } from '../custom-fetch';
 /**
+ * Maker display nickname
+ */
+export type BetMakerNickname = string | null;
+
+/**
  * Current bet status
  */
 export type BetStatus = typeof BetStatus[keyof typeof BetStatus];
@@ -49,6 +54,11 @@ export const BetStatus = {
  * @minLength 1
  */
 export type BetAcceptor = string | null;
+
+/**
+ * Acceptor display nickname
+ */
+export type BetAcceptorNickname = string | null;
 
 /**
  * Acceptor guess (null if OPEN)
@@ -74,6 +84,11 @@ export type BetRevealSide = 'heads' | 'tails' | null;
 export type BetWinner = string | null;
 
 /**
+ * Winner display nickname
+ */
+export type BetWinnerNickname = string | null;
+
+/**
  * Winner payout (after commission)
  * @pattern ^\d+$
  */
@@ -97,6 +112,11 @@ export type BetTxhashResolve = string | null;
  */
 export type BetRevealDeadline = string | null;
 
+/**
+ * When open bet expires (created_at + TTL)
+ */
+export type BetExpiresAt = string | null;
+
 export interface Bet {
   /**
    * Unique bet identifier
@@ -107,6 +127,8 @@ export interface Bet {
    * @minLength 1
    */
   maker: string;
+  /** Maker display nickname */
+  maker_nickname: BetMakerNickname;
   /**
    * Token amount as string
    * @pattern ^\d+$
@@ -123,6 +145,8 @@ export interface Bet {
    * @minLength 1
    */
   acceptor: BetAcceptor;
+  /** Acceptor display nickname */
+  acceptor_nickname: BetAcceptorNickname;
   /** Acceptor guess (null if OPEN) */
   acceptor_guess: BetAcceptorGuess;
   accepted_at: BetAcceptedAt;
@@ -135,6 +159,8 @@ export interface Bet {
    * @minLength 1
    */
   winner: BetWinner;
+  /** Winner display nickname */
+  winner_nickname: BetWinnerNickname;
   /**
    * Winner payout (after commission)
    * @pattern ^\d+$
@@ -150,6 +176,8 @@ export interface Bet {
   txhash_resolve: BetTxhashResolve;
   /** Deadline for maker to reveal (accepted_at + 5min) */
   reveal_deadline: BetRevealDeadline;
+  /** When open bet expires (created_at + TTL) */
+  expires_at: BetExpiresAt;
 }
 
 export interface CreateBetRequest {

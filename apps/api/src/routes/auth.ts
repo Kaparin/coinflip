@@ -3,6 +3,7 @@ import { setCookie } from 'hono/cookie';
 import { zValidator } from '@hono/zod-validator';
 import { ConnectRequestSchema } from '@coinflip/shared/schemas';
 import { userService } from '../services/user.service.js';
+import { referralService } from '../services/referral.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
@@ -28,6 +29,16 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
     feeSponsored: false,
     expiresAt,
   });
+
+  // Auto-assign to admin referrer if user has no referral link.
+  // Delayed by 5s to give the frontend time to register a real referral code first
+  // (the frontend calls POST /referral/register right after connect).
+  // Runs in background — doesn't block the response.
+  setTimeout(() => {
+    referralService.autoAssignDefaultReferrer(user.id).catch((err) => {
+      logger.warn({ err, userId: user.id }, 'Failed to auto-assign default referrer');
+    });
+  }, 5000);
 
   // Set session cookie
   setCookie(c, 'wallet_address', address, {

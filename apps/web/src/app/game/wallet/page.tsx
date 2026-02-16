@@ -1,5 +1,6 @@
 'use client';
 
+import { Wallet } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
@@ -30,9 +31,7 @@ export default function WalletPage() {
     return (
       <div className="max-w-lg mx-auto px-4 py-12 text-center pb-24 md:pb-6">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
-          <svg className="h-12 w-12 mx-auto mb-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h5.25A2.25 2.25 0 0121 6v6zm0 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 6" />
-          </svg>
+          <Wallet size={48} strokeWidth={1} className="mx-auto mb-4 text-[var(--color-text-secondary)]" />
           <h2 className="text-lg font-bold mb-2">{t('walletPage.connectTitle')}</h2>
           <p className="text-sm text-[var(--color-text-secondary)] mb-6">
             {t('walletPage.connectDesc')}

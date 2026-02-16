@@ -11,7 +11,7 @@
       "description": "Local development"
     },
     {
-      "url": "https://api.coinflip.example.com",
+      "url": "https://coinflip.axiome-launch.com/api",
       "description": "Production"
     }
   ],
@@ -722,6 +722,13 @@
             "description": "Axiome wallet address",
             "example": "axm1abc123..."
           },
+          "maker_nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Maker display nickname"
+          },
           "amount": {
             "type": "string",
             "pattern": "^\\d+$",
@@ -758,6 +765,13 @@
             "minLength": 1,
             "description": "Acceptor address (null if OPEN)",
             "example": "axm1abc123..."
+          },
+          "acceptor_nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Acceptor display nickname"
           },
           "acceptor_guess": {
             "type": [
@@ -807,6 +821,13 @@
             "description": "Winner address",
             "example": "axm1abc123..."
           },
+          "winner_nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Winner display nickname"
+          },
           "payout_amount": {
             "type": [
               "string",
@@ -847,26 +868,38 @@
             ],
             "format": "date-time",
             "description": "Deadline for maker to reveal (accepted_at + 5min)"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When open bet expires (created_at + TTL)"
           }
         },
         "required": [
           "id",
           "maker",
+          "maker_nickname",
           "amount",
           "status",
           "created_at",
           "txhash_create",
           "acceptor",
+          "acceptor_nickname",
           "acceptor_guess",
           "accepted_at",
           "txhash_accept",
           "reveal_side",
           "winner",
+          "winner_nickname",
           "payout_amount",
           "commission_amount",
           "resolved_at",
           "txhash_resolve",
-          "reveal_deadline"
+          "reveal_deadline",
+          "expires_at"
         ]
       },
       "CreateBetRequest": {

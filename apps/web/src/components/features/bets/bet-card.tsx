@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
-import { Crown, Flame, Zap, Coins } from 'lucide-react';
+import { Crown, Flame, Zap, Coins, Clock } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 
@@ -221,7 +221,7 @@ export function BetCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-              <LaunchTokenIcon size={48} />
+              <LaunchTokenIcon size={22} />
             </div>
           </div>
         </div>
@@ -239,9 +239,7 @@ export function BetCard({
               expiryCountdown.urgency === 'warning' ? 'text-amber-400 font-medium' :
               'opacity-60'
             }`}>
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
+              <Clock size={12} />
               {expiryCountdown.formatted}
             </span>
           ) : status === 'open' && expiryCountdown.isExpired ? (
@@ -257,7 +255,7 @@ export function BetCard({
             <span className="text-[10px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
             <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              <LaunchTokenIcon size={48} />
+              <LaunchTokenIcon size={16} />
             </span>
           </div>
         </div>

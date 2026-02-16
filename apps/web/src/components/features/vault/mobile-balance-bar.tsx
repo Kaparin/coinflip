@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useGetVaultBalance } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
@@ -53,12 +54,7 @@ export function MobileBalanceBar() {
           </div>
           <span className="text-[9px] text-[var(--color-text-secondary)]">L</span>
         </div>
-        <svg
-          className={`h-4 w-4 text-[var(--color-text-secondary)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-        </svg>
+        <ChevronDown size={16} className={`text-[var(--color-text-secondary)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Expanded: full BalanceDisplay */}

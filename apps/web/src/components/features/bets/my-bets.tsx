@@ -7,7 +7,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { BetCard } from './bet-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { fromMicroLaunch } from '@coinflip/shared/constants';
+import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import type { PendingBet } from '@/hooks/use-pending-bets';
@@ -177,7 +177,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 className="rounded-2xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-4 animate-pulse"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="flex items-center gap-1.5 text-lg font-bold">{fromMicroLaunch(Number(bet.amount)).toLocaleString()} <LaunchTokenIcon size={48} /></span>
+                  <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={20} /></span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
                     {t('myBets.submitting')}
                   </span>

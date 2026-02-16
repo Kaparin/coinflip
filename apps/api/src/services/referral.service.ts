@@ -9,7 +9,11 @@ import {
 } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
+import { env } from '../config/env.js';
 import { randomBytes } from 'node:crypto';
+
+/** Cost to change referral branch, in micro-LAUNCH (1000 LAUNCH = 1_000_000_000 micro) */
+const CHANGE_BRANCH_COST_MICRO = '1000000000';
 
 /**
  * Referral reward percentages from the TOTAL POT (2 × bet amount).
@@ -100,6 +104,250 @@ export class ReferralService {
     } catch {
       return false; // Unique constraint violation
     }
+  }
+
+  /**
+   * Auto-assign a user to the default referrer (admin) if they have no referrer yet.
+   * Called after wallet connect when the user didn't come via a referral link.
+   *
+   * The admin address is taken from ADMIN_ADDRESSES env var (first address).
+   * If the admin has no referral code yet, one is created automatically.
+   *
+   * Skips silently if:
+   * - No admin address configured
+   * - User IS the admin
+   * - User already has a referrer
+   */
+  async autoAssignDefaultReferrer(userId: string): Promise<void> {
+    const tag = 'referral:auto-assign';
+
+    // Get admin address (first one from comma-separated list)
+    const adminAddr = env.ADMIN_ADDRESSES.split(',').map(a => a.trim()).filter(Boolean)[0];
+    if (!adminAddr) return;
+
+    // Check if user already has a referrer
+    const existingRef = await this.db.query.referrals.findFirst({
+      where: eq(referrals.userId, userId),
+    });
+    if (existingRef) return; // Already has a referrer
+
+    // Find admin user
+    const adminUser = await this.db.query.users.findFirst({
+      where: eq(users.address, adminAddr),
+    });
+    if (!adminUser) {
+      logger.warn({ adminAddr }, `${tag} — admin user not found in DB`);
+      return;
+    }
+
+    // Don't self-refer
+    if (adminUser.id === userId) return;
+
+    // Get or create admin's referral code
+    const adminCode = await this.getOrCreateCode(adminUser.id);
+
+    // Register the referral
+    try {
+      await this.db.insert(referrals).values({
+        userId,
+        referrerUserId: adminUser.id,
+        code: adminCode,
+      });
+
+      // Update legacy referrer address field
+      await this.db
+        .update(users)
+        .set({ referrerAddress: adminAddr })
+        .where(eq(users.id, userId));
+
+      logger.info({ userId, adminId: adminUser.id, code: adminCode }, `${tag} — user auto-assigned to admin`);
+    } catch {
+      // Unique constraint — user already has a referrer (race condition), which is fine
+    }
+  }
+
+  /**
+   * Register a referral by referrer wallet address (instead of code).
+   * Used when user manually enters "who invited you" during registration.
+   *
+   * Returns: { success: true } | { success: false, reason: string }
+   */
+  async registerByAddress(
+    userId: string,
+    referrerAddress: string,
+  ): Promise<{ success: boolean; reason?: string }> {
+    // Find referrer user by address
+    const referrer = await this.db.query.users.findFirst({
+      where: eq(users.address, referrerAddress.trim()),
+    });
+    if (!referrer) {
+      return { success: false, reason: 'USER_NOT_FOUND' };
+    }
+
+    // Prevent self-referral
+    if (referrer.id === userId) {
+      return { success: false, reason: 'SELF_REFERRAL' };
+    }
+
+    // Check if user already has a referrer
+    const existing = await this.db.query.referrals.findFirst({
+      where: eq(referrals.userId, userId),
+    });
+    if (existing) {
+      return { success: false, reason: 'ALREADY_HAS_REFERRER' };
+    }
+
+    // Get or create referrer's code
+    const code = await this.getOrCreateCode(referrer.id);
+
+    try {
+      await this.db.insert(referrals).values({
+        userId,
+        referrerUserId: referrer.id,
+        code,
+      });
+
+      await this.db
+        .update(users)
+        .set({ referrerAddress: referrer.address })
+        .where(eq(users.id, userId));
+
+      logger.info({ userId, referrerId: referrer.id, address: referrerAddress }, 'Referral registered by address');
+      return { success: true };
+    } catch {
+      return { success: false, reason: 'ALREADY_HAS_REFERRER' };
+    }
+  }
+
+  /**
+   * Check if a user already has a referrer.
+   */
+  async hasReferrer(userId: string): Promise<boolean> {
+    const existing = await this.db.query.referrals.findFirst({
+      where: eq(referrals.userId, userId),
+    });
+    return !!existing;
+  }
+
+  /**
+   * Change referral branch (paid feature).
+   * Costs CHANGE_BRANCH_COST_MICRO from user's available vault balance.
+   * The funds go to the treasury (platform revenue).
+   *
+   * Returns: { success: true } | { success: false, reason: string }
+   */
+  async changeBranch(
+    userId: string,
+    newReferrerAddress: string,
+  ): Promise<{ success: boolean; reason?: string; cost?: string }> {
+    const tag = 'referral:change-branch';
+
+    // Find new referrer
+    const newReferrer = await this.db.query.users.findFirst({
+      where: eq(users.address, newReferrerAddress.trim()),
+    });
+    if (!newReferrer) {
+      return { success: false, reason: 'USER_NOT_FOUND' };
+    }
+
+    if (newReferrer.id === userId) {
+      return { success: false, reason: 'SELF_REFERRAL' };
+    }
+
+    // Check for cycles: walk up the chain from newReferrer to see if userId appears
+    // (would create a cycle: A → B → ... → A)
+    let cursor = newReferrer.id;
+    const visited = new Set<string>([userId]);
+    for (let i = 0; i < 20; i++) {
+      const ref = await this.db.query.referrals.findFirst({
+        where: eq(referrals.userId, cursor),
+      });
+      if (!ref) break;
+      if (visited.has(ref.referrerUserId)) {
+        return { success: false, reason: 'WOULD_CREATE_CYCLE' };
+      }
+      visited.add(ref.referrerUserId);
+      cursor = ref.referrerUserId;
+    }
+
+    // Deduct cost from available balance (atomic)
+    const deductResult = await this.db
+      .update(vaultBalances)
+      .set({
+        available: sql`${vaultBalances.available}::numeric - ${CHANGE_BRANCH_COST_MICRO}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(vaultBalances.userId, userId),
+          sql`${vaultBalances.available}::numeric >= ${CHANGE_BRANCH_COST_MICRO}::numeric`,
+        ),
+      )
+      .returning();
+
+    if (deductResult.length === 0) {
+      return { success: false, reason: 'INSUFFICIENT_BALANCE' };
+    }
+
+    // Credit treasury
+    const treasuryAddr = env.TREASURY_ADDRESS;
+    if (treasuryAddr) {
+      const treasuryUser = await this.db.query.users.findFirst({
+        where: eq(users.address, treasuryAddr),
+      });
+      if (treasuryUser) {
+        await this.db
+          .update(vaultBalances)
+          .set({
+            available: sql`${vaultBalances.available}::numeric + ${CHANGE_BRANCH_COST_MICRO}::numeric`,
+            updatedAt: new Date(),
+          })
+          .where(eq(vaultBalances.userId, treasuryUser.id));
+      }
+    }
+
+    // Get or create new referrer's code
+    const newCode = await this.getOrCreateCode(newReferrer.id);
+
+    // Delete existing referral (if any)
+    await this.db.delete(referrals).where(eq(referrals.userId, userId));
+
+    // Insert new referral
+    await this.db.insert(referrals).values({
+      userId,
+      referrerUserId: newReferrer.id,
+      code: newCode,
+    });
+
+    // Update legacy field
+    await this.db
+      .update(users)
+      .set({ referrerAddress: newReferrer.address })
+      .where(eq(users.id, userId));
+
+    logger.info(
+      { userId, newReferrerId: newReferrer.id, address: newReferrerAddress, cost: CHANGE_BRANCH_COST_MICRO },
+      `${tag} — branch changed`,
+    );
+
+    return { success: true, cost: CHANGE_BRANCH_COST_MICRO };
+  }
+
+  /**
+   * Get user's current referrer info (address + nickname).
+   */
+  async getCurrentReferrer(userId: string): Promise<{ address: string; nickname: string | null } | null> {
+    const ref = await this.db.query.referrals.findFirst({
+      where: eq(referrals.userId, userId),
+    });
+    if (!ref) return null;
+
+    const referrer = await this.db.query.users.findFirst({
+      where: eq(users.id, ref.referrerUserId),
+    });
+    if (!referrer) return null;
+
+    return { address: referrer.address, nickname: referrer.profileNickname };
   }
 
   /**
