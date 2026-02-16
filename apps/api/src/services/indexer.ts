@@ -18,6 +18,7 @@ import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { wsService } from './ws.service.js';
 import { eventService } from './event.service.js';
+import { referralService } from './referral.service.js';
 import type { Database } from '@coinflip/db';
 import type { WsEventType } from '@coinflip/shared/types';
 
@@ -455,6 +456,9 @@ export class IndexerService {
             })
             .where(eq(bets.betId, BigInt(betId)));
 
+          // Distribute referral rewards (idempotent — safe if already called by background task)
+          await this.distributeReferralRewardsForBet(BigInt(betId));
+
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
         }
@@ -498,6 +502,10 @@ export class IndexerService {
               ...(winnerUserId ? { winnerUserId } : {}),
             })
             .where(eq(bets.betId, BigInt(betId)));
+
+          // Distribute referral rewards (idempotent — safe if already called by background task)
+          await this.distributeReferralRewardsForBet(BigInt(betId));
+
           break;
         }
       }
@@ -673,6 +681,11 @@ export class IndexerService {
             .set(updateData)
             .where(eq(bets.betId, bet.betId));
 
+          // If bet was resolved (revealed/timeout_claimed), distribute referral rewards
+          if (mappedStatus === 'revealed' || mappedStatus === 'timeout_claimed') {
+            await this.distributeReferralRewardsForBet(bet.betId);
+          }
+
           synced++;
           logger.info(
             { betId: bet.betId.toString(), dbStatus: bet.status, chainStatus: chainBet.status },
@@ -686,6 +699,37 @@ export class IndexerService {
       logger.info({ total: pendingBets.length, synced }, 'Full bet sync complete');
     } catch (err) {
       logger.error({ err }, 'Failed to run full bet sync');
+    }
+  }
+
+  /**
+   * Distribute referral rewards for a resolved bet.
+   * Looks up maker/acceptor from DB, then delegates to referralService.
+   * Idempotent — referralService.distributeRewards checks for existing rewards.
+   */
+  private async distributeReferralRewardsForBet(betId: bigint): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      const { bets } = await import('@coinflip/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const [bet] = await this.db
+        .select({
+          amount: bets.amount,
+          makerUserId: bets.makerUserId,
+          acceptorUserId: bets.acceptorUserId,
+        })
+        .from(bets)
+        .where(eq(bets.betId, betId))
+        .limit(1);
+
+      if (!bet || !bet.acceptorUserId) return;
+
+      const totalPot = BigInt(bet.amount) * 2n;
+      await referralService.distributeRewards(betId, totalPot, bet.makerUserId, bet.acceptorUserId);
+    } catch (err) {
+      logger.warn({ err, betId: betId.toString() }, 'Indexer: referral reward distribution failed');
     }
   }
 

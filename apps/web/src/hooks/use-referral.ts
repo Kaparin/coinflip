@@ -21,11 +21,21 @@ interface RewardEntry {
   createdAt: string;
 }
 
+function getWalletAddress(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('coinflip_connected_address');
+}
+
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T | null> {
   try {
+    const walletAddress = getWalletAddress();
     const res = await fetch(`${API_URL}${path}`, {
       credentials: 'include',
       ...opts,
+      headers: {
+        ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        ...opts?.headers,
+      },
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -66,10 +76,14 @@ export async function registerCapturedRef(): Promise<boolean> {
   const code = getCapturedRefCode();
   if (!code) return false;
 
+  const walletAddress = getWalletAddress();
   const res = await fetch(`${API_URL}/api/v1/referral/register`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+    },
     body: JSON.stringify({ code }),
   });
 
@@ -112,9 +126,13 @@ export function useReferral(isConnected: boolean) {
   const claim = useCallback(async () => {
     setClaiming(true);
     try {
+      const walletAddress = getWalletAddress();
       const res = await fetch(`${API_URL}/api/v1/referral/claim`, {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        },
       });
       if (res.ok) {
         await fetchStats();

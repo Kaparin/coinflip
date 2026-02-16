@@ -1,10 +1,11 @@
-import { eq, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import {
   referralCodes,
   referrals,
   referralRewards,
   referralBalances,
   users,
+  vaultBalances,
 } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
@@ -104,9 +105,11 @@ export class ReferralService {
   /**
    * Walk up the referral chain (max 3 levels) starting from a player.
    * Returns an array of { userId, level } for each referrer in the chain.
+   * Includes cycle detection to prevent infinite loops.
    */
   async getReferralChain(playerUserId: string): Promise<Array<{ userId: string; level: number }>> {
     const chain: Array<{ userId: string; level: number }> = [];
+    const visited = new Set<string>([playerUserId]);
     let currentUserId = playerUserId;
 
     for (let level = 1; level <= MAX_REFERRAL_DEPTH; level++) {
@@ -115,6 +118,13 @@ export class ReferralService {
       });
       if (!ref) break;
 
+      // Cycle detection: if we've already visited this referrer, stop
+      if (visited.has(ref.referrerUserId)) {
+        logger.warn({ playerUserId, cycle: ref.referrerUserId }, 'Referral chain cycle detected — stopping');
+        break;
+      }
+
+      visited.add(ref.referrerUserId);
       chain.push({ userId: ref.referrerUserId, level });
       currentUserId = ref.referrerUserId;
     }
@@ -125,6 +135,9 @@ export class ReferralService {
   /**
    * Distribute referral rewards for a resolved bet.
    * Called once per bet resolution, processes BOTH players (maker + acceptor).
+   *
+   * IDEMPOTENT: checks if rewards already exist for this betId before inserting.
+   * Safe to call multiple times (from both indexer and background tasks).
    *
    * @param betId - The resolved bet ID
    * @param totalPot - Total pot in micro LAUNCH (2 × bet amount)
@@ -138,6 +151,20 @@ export class ReferralService {
     acceptorUserId: string,
   ): Promise<void> {
     const tag = 'referral:distribute';
+    const betIdStr = betId.toString();
+
+    // ─── Idempotency guard: skip if rewards already distributed for this bet ───
+    const existingRewards = await this.db
+      .select({ id: referralRewards.id })
+      .from(referralRewards)
+      .where(eq(referralRewards.betId, betIdStr))
+      .limit(1);
+
+    if (existingRewards.length > 0) {
+      logger.debug({ betId: betIdStr }, `${tag} — rewards already distributed, skipping (idempotent)`);
+      return;
+    }
+
     const players = [makerUserId, acceptorUserId];
 
     // Deduplicate referrers — a referrer who invited both players should only earn once per bet per level
@@ -170,12 +197,12 @@ export class ReferralService {
         await this.db.insert(referralRewards).values({
           recipientUserId: referrerId,
           fromPlayerUserId: fromPlayer,
-          betId: betId.toString(),
+          betId: betIdStr,
           amount: amount.toString(),
           level,
         });
 
-        // Upsert referral balance
+        // Upsert referral balance (on insert: set initial values; on conflict: increment)
         await this.db
           .insert(referralBalances)
           .values({
@@ -193,11 +220,11 @@ export class ReferralService {
           });
 
         logger.info(
-          { referrerId, amount: amount.toString(), level, betId: betId.toString(), fromPlayer },
+          { referrerId, amount: amount.toString(), level, betId: betIdStr, fromPlayer },
           `${tag} — reward credited`,
         );
       } catch (err) {
-        logger.error({ err, referrerId, betId: betId.toString(), level }, `${tag} — failed to credit reward`);
+        logger.error({ err, referrerId, betId: betIdStr, level }, `${tag} — failed to credit reward`);
       }
     }
   }
@@ -217,6 +244,7 @@ export class ReferralService {
 
   /**
    * Claim referral rewards: move unclaimed balance to vault available balance.
+   * Uses atomic CAS (compare-and-swap) to prevent double-claims.
    * Returns the claimed amount, or null if nothing to claim.
    */
   async claimRewards(userId: string): Promise<string | null> {
@@ -228,21 +256,45 @@ export class ReferralService {
 
     const amount = balance.unclaimed;
 
-    // Zero out unclaimed
-    await this.db
+    // Atomic CAS: only zero out if unclaimed still matches (prevents double-claim race)
+    const updated = await this.db
       .update(referralBalances)
       .set({ unclaimed: '0', updatedAt: new Date() })
-      .where(eq(referralBalances.userId, userId));
+      .where(
+        and(
+          eq(referralBalances.userId, userId),
+          sql`${referralBalances.unclaimed}::numeric = ${amount}::numeric`,
+        ),
+      )
+      .returning();
+
+    if (updated.length === 0) {
+      logger.warn({ userId, amount }, 'Referral claim CAS failed — concurrent claim detected');
+      return null;
+    }
 
     // Credit to vault available balance
-    const { vaultBalances } = await import('@coinflip/db/schema');
-    await this.db
+    const vaultUpdated = await this.db
       .update(vaultBalances)
       .set({
         available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
         updatedAt: new Date(),
       })
-      .where(eq(vaultBalances.userId, userId));
+      .where(eq(vaultBalances.userId, userId))
+      .returning();
+
+    if (vaultUpdated.length === 0) {
+      // Vault row doesn't exist — rollback the claim
+      logger.error({ userId, amount }, 'Referral claim: vault balance row not found — rolling back');
+      await this.db
+        .update(referralBalances)
+        .set({
+          unclaimed: sql`${referralBalances.unclaimed}::numeric + ${amount}::numeric`,
+          updatedAt: new Date(),
+        })
+        .where(eq(referralBalances.userId, userId));
+      return null;
+    }
 
     logger.info({ userId, amount }, 'Referral rewards claimed to vault');
     return amount;

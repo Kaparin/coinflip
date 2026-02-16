@@ -50,6 +50,7 @@ export const referralRewards = pgTable(
   (table) => [
     index('ref_rewards_recipient_idx').on(table.recipientUserId),
     index('ref_rewards_bet_idx').on(table.betId),
+    index('ref_rewards_from_player_idx').on(table.fromPlayerUserId),
   ],
 );
 
