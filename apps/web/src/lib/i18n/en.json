@@ -21,7 +21,8 @@
     "confirming": "Confirming on blockchain...",
     "error": "Error",
     "success": "Success",
-    "stop": "Stop"
+    "stop": "Stop",
+    "save": "Save"
   },
   "header": {
     "vault": "Vault:",
@@ -304,7 +305,13 @@
     "disconnectDesc": "Lock session but keep wallet data",
     "forgetWalletBtn": "Forget Wallet",
     "forgetWalletDesc": "Remove all wallet data from this device",
-    "version": "CoinFlip v0.2.0"
+    "version": "CoinFlip v0.2.0",
+    "setNickname": "Set nickname",
+    "enterNickname": "Enter nickname...",
+    "nicknameLengthError": "Nickname must be 2-20 characters",
+    "nicknameSaved": "Nickname saved!",
+    "nicknameError": "Failed to save nickname",
+    "important4": "Minimum bet amount is 10 LAUNCH."
   },
   "landing": {
     "tagline": "PvP Coin Flip on Axiome Chain. Provably fair. 50/50 chance. Winner takes 90%.",

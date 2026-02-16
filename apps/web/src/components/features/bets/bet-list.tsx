@@ -312,6 +312,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
                 key={bet.id}
                 id={String(bet.id)}
                 maker={bet.maker}
+                makerNickname={(bet as any).maker_nickname}
                 amount={Number(bet.amount)}
                 status={bet.status}
                 createdAt={new Date(bet.created_at)}

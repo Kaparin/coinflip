@@ -349,8 +349,8 @@ export class BetService {
       );
   }
 
-  /** Build a map of userId -> address for a list of bets */
-  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, string>> {
+  /** Build a map of userId -> { address, nickname } for a list of bets */
+  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, { address: string; nickname: string | null }>> {
     const userIds = new Set<string>();
     for (const bet of betRows) {
       userIds.add(bet.makerUserId);
@@ -361,13 +361,13 @@ export class BetService {
     if (userIds.size === 0) return new Map();
 
     const userRows = await this.db
-      .select({ id: users.id, address: users.address })
+      .select({ id: users.id, address: users.address, nickname: users.profileNickname })
       .from(users)
       .where(inArray(users.id, [...userIds]));
 
-    const map = new Map<string, string>();
+    const map = new Map<string, { address: string; nickname: string | null }>();
     for (const u of userRows) {
-      map.set(u.id, u.address);
+      map.set(u.id, { address: u.address, nickname: u.nickname });
     }
     return map;
   }

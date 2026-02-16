@@ -41,6 +41,16 @@ export class UserService {
     });
   }
 
+  async updateNickname(userId: string, nickname: string) {
+    const sanitized = nickname.trim().replace(/\s+/g, ' ');
+    const [updated] = await this.db
+      .update(users)
+      .set({ profileNickname: sanitized })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   async createSession(userId: string, options: {
     authzEnabled: boolean;
     feeSponsored: boolean;

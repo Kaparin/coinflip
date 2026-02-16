@@ -21,7 +21,8 @@
     "confirming": "Подтверждение на блокчейне...",
     "error": "Ошибка",
     "success": "Успешно",
-    "stop": "Остановить"
+    "stop": "Остановить",
+    "save": "Сохранить"
   },
   "header": {
     "vault": "Баланс:",
@@ -304,7 +305,13 @@
     "disconnectDesc": "Заблокировать сессию, сохранив данные кошелька",
     "forgetWalletBtn": "Забыть кошелёк",
     "forgetWalletDesc": "Удалить все данные кошелька с этого устройства",
-    "version": "CoinFlip v0.2.0"
+    "version": "CoinFlip v0.2.0",
+    "setNickname": "Задать никнейм",
+    "enterNickname": "Введите никнейм...",
+    "nicknameLengthError": "Никнейм должен быть от 2 до 20 символов",
+    "nicknameSaved": "Никнейм сохранён!",
+    "nicknameError": "Не удалось сохранить никнейм",
+    "important4": "Минимальная ставка — 10 LAUNCH."
   },
   "landing": {
     "tagline": "PvP Coin Flip на блокчейне Axiome. Честно. 50/50. Победитель забирает 90%.",

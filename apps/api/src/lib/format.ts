@@ -1,8 +1,10 @@
 import type { BetRow } from '../services/bet.service.js';
 import { REVEAL_TIMEOUT_SECS, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 
+type UserInfo = { address: string; nickname: string | null };
+
 /** Format a DB bet row into the API response shape */
-export function formatBetResponse(bet: BetRow, addressMap?: Map<string, string>) {
+export function formatBetResponse(bet: BetRow, addressMap?: Map<string, UserInfo>) {
   const revealDeadline = bet.acceptedTime
     ? new Date(bet.acceptedTime.getTime() + REVEAL_TIMEOUT_SECS * 1000).toISOString()
     : null;
@@ -12,25 +14,28 @@ export function formatBetResponse(bet: BetRow, addressMap?: Map<string, string>)
     ? new Date(bet.createdTime.getTime() + OPEN_BET_TTL_SECS * 1000).toISOString()
     : null;
 
+  const makerInfo = addressMap?.get(bet.makerUserId);
+  const acceptorInfo = bet.acceptorUserId ? addressMap?.get(bet.acceptorUserId) : null;
+  const winnerInfo = bet.winnerUserId ? addressMap?.get(bet.winnerUserId) : null;
+
   return {
     id: Number(bet.betId),
-    maker: addressMap?.get(bet.makerUserId) ?? bet.makerUserId,
+    maker: makerInfo?.address ?? bet.makerUserId,
+    maker_nickname: makerInfo?.nickname ?? null,
     amount: bet.amount,
     status: bet.status,
     created_at: bet.createdTime.toISOString(),
     txhash_create: bet.txhashCreate,
 
-    acceptor: bet.acceptorUserId
-      ? (addressMap?.get(bet.acceptorUserId) ?? bet.acceptorUserId)
-      : null,
+    acceptor: acceptorInfo?.address ?? (bet.acceptorUserId ? bet.acceptorUserId : null),
+    acceptor_nickname: acceptorInfo?.nickname ?? null,
     acceptor_guess: bet.acceptorGuess,
     accepted_at: bet.acceptedTime?.toISOString() ?? null,
     txhash_accept: bet.txhashAccept,
 
     reveal_side: null,
-    winner: bet.winnerUserId
-      ? (addressMap?.get(bet.winnerUserId) ?? bet.winnerUserId)
-      : null,
+    winner: winnerInfo?.address ?? (bet.winnerUserId ? bet.winnerUserId : null),
+    winner_nickname: winnerInfo?.nickname ?? null,
     payout_amount: bet.payoutAmount,
     commission_amount: bet.commissionAmount,
     resolved_at: bet.resolvedTime?.toISOString() ?? null,

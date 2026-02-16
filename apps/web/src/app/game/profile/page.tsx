@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useWalletContext } from '@/contexts/wallet-context';
+import { useGetCurrentUser } from '@coinflip/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { useReferral } from '@/hooks/use-referral';
+import { UserAvatar } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
+import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -497,10 +502,86 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   );
 }
 
+function NicknameEditor({ currentNickname, address }: { currentNickname: string | null; address: string }) {
+  const { t } = useTranslation();
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentNickname ?? '');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = useCallback(() => {
+    setValue(currentNickname ?? '');
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [currentNickname]);
+
+  const handleSave = useCallback(async () => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      addToast('warning', t('profile.nicknameLengthError'));
+      return;
+    }
+    setSaving(true);
+    try {
+      await customFetch({ url: '/api/v1/users/me', method: 'PATCH', data: { nickname: trimmed } });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
+      addToast('success', t('profile.nicknameSaved'));
+      setEditing(false);
+    } catch {
+      addToast('error', t('profile.nicknameError'));
+    } finally {
+      setSaving(false);
+    }
+  }, [value, addToast, queryClient, t]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') setEditing(false);
+  }, [handleSave]);
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          maxLength={20}
+          placeholder={t('profile.enterNickname')}
+          className="h-8 flex-1 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-bg)] px-2.5 text-sm font-medium outline-none focus:border-[var(--color-primary)] transition-colors"
+        />
+        <button type="button" onClick={handleSave} disabled={saving}
+          className="h-8 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-bold text-white disabled:opacity-50 transition-opacity">
+          {saving ? '...' : t('common.save')}
+        </button>
+        <button type="button" onClick={() => setEditing(false)}
+          className="h-8 rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]">
+          {t('common.cancel')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={startEditing}
+      className="group flex items-center gap-1.5 text-sm font-bold hover:text-[var(--color-primary)] transition-colors">
+      <span>{currentNickname || t('profile.setNickname')}</span>
+      <svg className="h-3.5 w-3.5 text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)] transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+      </svg>
+    </button>
+  );
+}
+
 export default function ProfilePage() {
   const wallet = useWalletContext();
   const { t, locale, setLocale } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const { data: profileData } = useGetCurrentUser({ query: { enabled: wallet.isConnected } });
 
   const isAdmin =
     wallet.isConnected &&
@@ -604,20 +685,20 @@ export default function ProfilePage() {
     <div className="max-w-lg mx-auto px-4 py-4 space-y-3 pb-24 md:pb-6">
       {/* Profile card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-        <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]">
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-bg)]">
-              <Image src="/logo.png" alt="CoinFlip" width={28} height={28} className="object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
-              />
-              <span className="hidden text-lg font-black text-[var(--color-primary)]">CF</span>
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]">
+            <div className="rounded-full overflow-hidden bg-[var(--color-bg)]">
+              {wallet.address && <UserAvatar address={wallet.address} size={56} />}
             </div>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">{wallet.shortAddress}</p>
-            <div className="flex items-center gap-1.5">
+            <NicknameEditor
+              currentNickname={(profileData as any)?.data?.nickname ?? null}
+              address={wallet.address ?? ''}
+            />
+            <div className="flex items-center gap-1.5 mt-0.5">
               <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
-              <span className="text-[10px] text-[var(--color-text-secondary)]">{t('profile.connected')}</span>
+              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">{wallet.shortAddress}</span>
             </div>
           </div>
           {isAdmin && (

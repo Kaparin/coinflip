@@ -32,6 +32,30 @@ usersRouter.get('/me', authMiddleware, async (c) => {
   });
 });
 
+// PATCH /api/v1/users/me — Update current user profile (nickname)
+const UpdateProfileSchema = z.object({
+  nickname: z
+    .string()
+    .min(2, 'Nickname must be at least 2 characters')
+    .max(20, 'Nickname must be at most 20 characters')
+    .regex(/^[a-zA-Z0-9а-яА-ЯёЁ ]+$/, 'Nickname can only contain letters, numbers, and spaces'),
+});
+
+usersRouter.patch('/me', authMiddleware, zValidator('json', UpdateProfileSchema), async (c) => {
+  const user = c.get('user');
+  const { nickname } = c.req.valid('json');
+
+  const updated = await userService.updateNickname(user.id, nickname);
+  if (!updated) throw Errors.userNotFound();
+
+  return c.json({
+    data: {
+      address: updated.address,
+      nickname: updated.profileNickname,
+    },
+  });
+});
+
 // GET /api/v1/users/leaderboard — Public leaderboard
 const LeaderboardQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),

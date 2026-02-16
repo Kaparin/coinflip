@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/generated/index.ts"
+    ".": "./src/generated/index.ts",
+    "./custom-fetch": "./src/custom-fetch.ts"
   },
   "scripts": {
     "generate": "orval",

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useLeaderboard, type LeaderboardEntry } from '@/hooks/use-leaderboard';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 
 type SortBy = 'wins' | 'wagered' | 'win_rate';
@@ -56,16 +56,19 @@ function LeaderboardRow({
       </div>
 
       {/* Player info */}
-      <div className="min-w-0">
-        <p className="text-sm font-medium truncate">
-          {entry.nickname || shortAddr(entry.address)}
-          {isCurrentUser && (
-            <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>
-          )}
-        </p>
-        <p className="text-[10px] text-[var(--color-text-secondary)]">
-          {t('leaderboard.betsCount', { count: entry.total_bets })}
-        </p>
+      <div className="flex items-center gap-2 min-w-0">
+        <UserAvatar address={entry.address} size={28} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">
+            {entry.nickname || shortAddr(entry.address)}
+            {isCurrentUser && (
+              <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>
+            )}
+          </p>
+          <p className="text-[10px] text-[var(--color-text-secondary)]">
+            {t('leaderboard.betsCount', { count: entry.total_bets })}
+          </p>
+        </div>
       </div>
 
       {/* Main stat */}

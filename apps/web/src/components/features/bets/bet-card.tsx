@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
 import { Crown, Flame, Zap, Coins } from 'lucide-react';
-import { LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 
 export interface BetCardProps {
   id: string;
   maker: string;
+  /** Maker display name (nickname) */
+  makerNickname?: string | null;
   /** Amount in micro-LAUNCH (raw from API) */
   amount: number;
   status: string;
@@ -152,7 +154,7 @@ const STATUS_CONFIG: Record<string, { textKey: string; color: string; bgClass: s
 };
 
 export function BetCard({
-  id, maker, amount, status, createdAt,
+  id, maker, makerNickname, amount, status, createdAt,
   revealDeadline, expiresAt, acceptedAt, winner, acceptor,
   isMine = false, isAcceptor = false, index = 0, pendingBetId, pendingAction,
   isAccepting: isAcceptingProp = false,
@@ -226,7 +228,10 @@ export function BetCard({
 
         {/* Middle: Maker + Timer */}
         <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)] mb-3">
-          <span className="font-mono opacity-60">{truncAddr(maker)}</span>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <UserAvatar address={maker} size={18} />
+            <span className="font-mono opacity-80 truncate">{makerNickname || truncAddr(maker)}</span>
+          </span>
           {/* Open bets: show expiry countdown; others: show time ago */}
           {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
             <span className={`flex items-center gap-1 font-mono tabular-nums ${
