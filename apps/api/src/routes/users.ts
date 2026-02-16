@@ -38,7 +38,7 @@ const UpdateProfileSchema = z.object({
     .string()
     .min(2, 'Nickname must be at least 2 characters')
     .max(20, 'Nickname must be at most 20 characters')
-    .regex(/^[a-zA-Z0-9а-яА-ЯёЁ ]+$/, 'Nickname can only contain letters, numbers, and spaces'),
+    .regex(/^[a-zA-Z0-9а-яА-ЯёЁ _\-\.]+$/, 'Nickname can only contain letters, numbers, spaces, underscores, hyphens, and dots'),
 });
 
 usersRouter.patch('/me', authMiddleware, zValidator('json', UpdateProfileSchema), async (c) => {
