@@ -133,7 +133,7 @@ ${t('profile.randomCodeComment7')}`}</pre>
           <div className="space-y-2">
             {COINFLIP_CONTRACT && (
               <a
-                href={`${EXPLORER_URL}/address/${COINFLIP_CONTRACT}`}
+                href={`https://axiomechain.pro/contract/${COINFLIP_CONTRACT}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
@@ -152,7 +152,7 @@ ${t('profile.randomCodeComment7')}`}</pre>
             )}
             {LAUNCH_CW20_CONTRACT && (
               <a
-                href={`${EXPLORER_URL}/address/${LAUNCH_CW20_CONTRACT}`}
+                href={`https://axiomechain.pro/contract/${LAUNCH_CW20_CONTRACT}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/5 group"
