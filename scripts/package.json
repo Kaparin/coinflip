@@ -1,0 +1,23 @@
+{
+  "name": "@coinflip/scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "tsx deploy-contract.ts",
+    "verify": "tsx verify-contract.ts"
+  },
+  "dependencies": {
+    "@cosmjs/cosmwasm-stargate": "^0.38.1",
+    "@cosmjs/crypto": "^0.38.1",
+    "@cosmjs/encoding": "^0.38.1",
+    "@cosmjs/proto-signing": "^0.38.1",
+    "@cosmjs/stargate": "^0.38.1",
+    "cosmjs-types": "^0.11.0",
+    "dotenv": "^16.4.7",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

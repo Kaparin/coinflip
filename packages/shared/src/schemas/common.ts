@@ -52,7 +52,7 @@ export const SideSchema = z
   .openapi({ description: 'Coin side: heads or tails' });
 
 export const BetStatusSchema = z
-  .enum(['open', 'accepted', 'revealed', 'canceled', 'timeout_claimed'])
+  .enum(['open', 'accepting', 'accepted', 'revealed', 'canceled', 'timeout_claimed'])
   .openapi({ description: 'Current bet status' });
 
 export const CursorQuerySchema = z.object({

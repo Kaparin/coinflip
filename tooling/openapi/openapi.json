@@ -31,6 +31,7 @@
               "type": "string",
               "enum": [
                 "open",
+                "accepting",
                 "accepted",
                 "revealed",
                 "canceled",
@@ -731,6 +732,7 @@
             "type": "string",
             "enum": [
               "open",
+              "accepting",
               "accepted",
               "revealed",
               "canceled",
@@ -875,17 +877,10 @@
             "pattern": "^\\d+$",
             "description": "Bet amount in LAUNCH tokens",
             "example": "100"
-          },
-          "commitment": {
-            "type": "string",
-            "minLength": 64,
-            "maxLength": 64,
-            "description": "SHA256 commitment hash (64 hex chars)"
           }
         },
         "required": [
-          "amount",
-          "commitment"
+          "amount"
         ]
       },
       "ErrorResponse": {
@@ -1166,9 +1161,7 @@
           }
         },
         "required": [
-          "address",
-          "signature",
-          "message"
+          "address"
         ]
       },
       "GrantStatus": {

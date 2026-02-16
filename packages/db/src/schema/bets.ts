@@ -12,6 +12,8 @@ export const bets = pgTable(
     amount: numeric('amount', { precision: 38, scale: 0 }).notNull(),
     status: text('status').notNull().default('open'),
     commitment: text('commitment').notNull(),
+    makerSide: text('maker_side'),       // 'heads' or 'tails' — stored server-side for auto-reveal
+    makerSecret: text('maker_secret'),   // 64 hex chars — stored server-side for auto-reveal
     acceptorGuess: text('acceptor_guess'),
 
     createdHeight: bigint('created_height', { mode: 'bigint' }),

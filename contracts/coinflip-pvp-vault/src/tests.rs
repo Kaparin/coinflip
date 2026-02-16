@@ -685,3 +685,266 @@ fn test_full_game_flow_timeout_claim() {
     let maker_bal = query_vault_balance(&deps, &env, MAKER);
     assert_eq!(maker_bal.available, Uint128::new(800));
 }
+
+// ============================================================
+// UpdateConfig
+// ============================================================
+
+#[test]
+fn test_update_config_admin_success() {
+    let (mut deps, env) = setup_contract();
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+
+    let res = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: Some("new_treasury".to_string()),
+            commission_bps: Some(500),
+            min_bet: Some(Uint128::new(100)),
+            reveal_timeout_secs: Some(600),
+            max_open_per_user: Some(20),
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap();
+    assert!(res.attributes.iter().any(|a| a.key == "action" && a.value == "update_config"));
+
+    let config = query_config(&deps, &env);
+    assert_eq!(config.treasury.as_str(), "new_treasury");
+    assert_eq!(config.commission_bps, 500);
+    assert_eq!(config.min_bet, Uint128::new(100));
+    assert_eq!(config.reveal_timeout_secs, 600);
+    assert_eq!(config.max_open_per_user, 20);
+    // unchanged
+    assert_eq!(config.max_daily_amount_per_user, Uint128::new(10_000));
+}
+
+#[test]
+fn test_update_config_non_admin_rejected() {
+    let (mut deps, env) = setup_contract();
+    let info = cosmwasm_std::testing::mock_info(MAKER, &[]);
+
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: Some(200),
+            min_bet: None,
+            reveal_timeout_secs: None,
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::Unauthorized));
+}
+
+#[test]
+fn test_update_config_commission_too_high() {
+    let (mut deps, env) = setup_contract();
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: Some(6000), // > 50%
+            min_bet: None,
+            reveal_timeout_secs: None,
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::InvalidCommission { .. }));
+}
+
+#[test]
+fn test_update_config_timeout_invalid() {
+    let (mut deps, env) = setup_contract();
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+
+    // Too short
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info.clone(),
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: None,
+            min_bet: None,
+            reveal_timeout_secs: Some(10), // < 60
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::InvalidTimeout { .. }));
+
+    // Too long
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: None,
+            min_bet: None,
+            reveal_timeout_secs: Some(100000), // > 86400
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::InvalidTimeout { .. }));
+}
+
+// ============================================================
+// TransferAdmin / AcceptAdmin
+// ============================================================
+
+#[test]
+fn test_transfer_admin_success() {
+    let (mut deps, env) = setup_contract();
+
+    // Step 1: current admin proposes new admin
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+    let res = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::TransferAdmin {
+            new_admin: MAKER.to_string(),
+        },
+    ).unwrap();
+    assert!(res.attributes.iter().any(|a| a.key == "action" && a.value == "transfer_admin"));
+
+    // Config still shows old admin
+    let config = query_config(&deps, &env);
+    assert_eq!(config.admin.as_str(), ADMIN);
+
+    // Step 2: new admin accepts
+    let info = cosmwasm_std::testing::mock_info(MAKER, &[]);
+    let res = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::AcceptAdmin {},
+    ).unwrap();
+    assert!(res.attributes.iter().any(|a| a.key == "action" && a.value == "accept_admin"));
+
+    // Config now shows new admin
+    let config = query_config(&deps, &env);
+    assert_eq!(config.admin.as_str(), MAKER);
+}
+
+#[test]
+fn test_transfer_admin_non_admin_rejected() {
+    let (mut deps, env) = setup_contract();
+
+    let info = cosmwasm_std::testing::mock_info(MAKER, &[]);
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::TransferAdmin {
+            new_admin: MAKER.to_string(),
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::Unauthorized));
+}
+
+#[test]
+fn test_accept_admin_wrong_user_rejected() {
+    let (mut deps, env) = setup_contract();
+
+    // Admin proposes MAKER
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+    crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::TransferAdmin {
+            new_admin: MAKER.to_string(),
+        },
+    ).unwrap();
+
+    // ACCEPTOR tries to accept — should fail
+    let info = cosmwasm_std::testing::mock_info(ACCEPTOR, &[]);
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::AcceptAdmin {},
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::Unauthorized));
+}
+
+#[test]
+fn test_accept_admin_without_proposal_rejected() {
+    let (mut deps, env) = setup_contract();
+
+    // No TransferAdmin was called — AcceptAdmin should fail
+    let info = cosmwasm_std::testing::mock_info(MAKER, &[]);
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::AcceptAdmin {},
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::Unauthorized));
+}
+
+#[test]
+fn test_new_admin_can_update_config() {
+    let (mut deps, env) = setup_contract();
+
+    // Transfer admin to MAKER
+    let info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+    crate::contract::execute(
+        deps.as_mut(), env.clone(), info,
+        crate::msg::ExecuteMsg::TransferAdmin { new_admin: MAKER.to_string() },
+    ).unwrap();
+    let info = cosmwasm_std::testing::mock_info(MAKER, &[]);
+    crate::contract::execute(
+        deps.as_mut(), env.clone(), info.clone(),
+        crate::msg::ExecuteMsg::AcceptAdmin {},
+    ).unwrap();
+
+    // New admin (MAKER) can update config
+    crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: Some(200),
+            min_bet: None,
+            reveal_timeout_secs: None,
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap();
+
+    let config = query_config(&deps, &env);
+    assert_eq!(config.commission_bps, 200);
+    assert_eq!(config.admin.as_str(), MAKER);
+
+    // Old admin can no longer update
+    let old_admin_info = cosmwasm_std::testing::mock_info(ADMIN, &[]);
+    let err = crate::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        old_admin_info,
+        crate::msg::ExecuteMsg::UpdateConfig {
+            treasury: None,
+            commission_bps: Some(300),
+            min_bet: None,
+            reveal_timeout_secs: None,
+            max_open_per_user: None,
+            max_daily_amount_per_user: None,
+        },
+    ).unwrap_err();
+    assert!(matches!(err, ContractError::Unauthorized));
+}

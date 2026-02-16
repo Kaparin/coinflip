@@ -30,3 +30,8 @@ export {
 } from './common.js';
 
 export { ConnectRequestSchema, GrantStatusResponseSchema } from './auth.js';
+
+export {
+  TreasuryWithdrawRequestSchema,
+  TreasuryLedgerQuerySchema,
+} from './admin.js';

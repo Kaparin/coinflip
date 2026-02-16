@@ -1,13 +1,50 @@
+// ---- Token Decimals ----
+
+/**
+ * LAUNCH CW20 token has 6 decimals.
+ * 1 LAUNCH (human) = 1,000,000 micro-LAUNCH (on-chain).
+ * All contract/API values are in micro-LAUNCH.
+ * UI displays in LAUNCH (human-readable).
+ */
+export const LAUNCH_DECIMALS = 6;
+export const LAUNCH_MULTIPLIER = 10 ** LAUNCH_DECIMALS; // 1_000_000
+
+/** Convert human-readable LAUNCH to micro-LAUNCH (on-chain) */
+export function toMicroLaunch(human: number | string): string {
+  const n = typeof human === 'string' ? parseFloat(human) : human;
+  return Math.round(n * LAUNCH_MULTIPLIER).toString();
+}
+
+/** Convert micro-LAUNCH (on-chain) to human-readable LAUNCH */
+export function fromMicroLaunch(micro: string | number | bigint): number {
+  const n = typeof micro === 'bigint' ? Number(micro) : Number(micro);
+  return n / LAUNCH_MULTIPLIER;
+}
+
+/** Format human-readable LAUNCH for display (e.g. 1,234.56) */
+export function formatLaunch(micro: string | number | bigint): string {
+  const human = fromMicroLaunch(micro);
+  if (human >= 1_000_000) return `${(human / 1_000_000).toFixed(human % 1_000_000 === 0 ? 0 : 2)}M`;
+  if (human >= 1_000) {
+    // Show up to 2 decimals, strip trailing zeros
+    return human.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+  return human.toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
 // ---- Game Parameters (must match smart contract defaults) ----
 
-/** Reveal timeout in seconds (5 minutes) */
+/** Reveal timeout in seconds (5 minutes) — time for maker to reveal after acceptance */
 export const REVEAL_TIMEOUT_SECS = 300;
 
-/** Maximum open bets per wallet */
-export const MAX_OPEN_BETS_PER_USER = 10;
+/** Open bet TTL in seconds (12 hours) — open bets auto-cancel after this */
+export const OPEN_BET_TTL_SECS = 12 * 60 * 60; // 43200 seconds = 12 hours
 
-/** Minimum bet size in LAUNCH (smallest unit) */
-export const MIN_BET_AMOUNT = '10';
+/** Maximum open bets per wallet (matches contract config) */
+export const MAX_OPEN_BETS_PER_USER = 50;
+
+/** Minimum bet size in micro-LAUNCH (on-chain). 1 LAUNCH = 1,000,000 micro */
+export const MIN_BET_AMOUNT = '1000000'; // = 1 LAUNCH
 
 /** Commission in basis points (1000 = 10%) */
 export const COMMISSION_BPS = 1000;
@@ -15,11 +52,13 @@ export const COMMISSION_BPS = 1000;
 /** Authz grant duration in days */
 export const AUTHZ_GRANT_DURATION_DAYS = 30;
 
-/** Daily max amount in play per wallet */
-export const MAX_DAILY_AMOUNT = '10000';
+/** Daily max amount in play per wallet (micro-LAUNCH) */
+export const MAX_DAILY_AMOUNT = '1000000000000'; // = 1,000,000 LAUNCH
 
 // ---- Preset bet amounts ----
-export const BET_PRESETS = ['10', '25', '50', '100', '250', '500', '1000'] as const;
+// Values are in HUMAN-READABLE LAUNCH. Frontend converts to micro for API.
+export const BET_PRESETS = [1, 5, 10, 50, 100, 500] as const;
+export const BET_PRESET_LABELS = ['1', '5', '10', '50', '100', '500'] as const;
 
 // ---- Commitment prefix ----
 export const COMMITMENT_PREFIX = 'coinflip_v1';

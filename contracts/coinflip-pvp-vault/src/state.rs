@@ -2,6 +2,12 @@ use cosmwasm_std::{Addr, Binary, Uint128};
 use cw_storage_plus::{Item, Map};
 use cosmwasm_schema::cw_serde;
 
+/// Default bet TTL: 12 hours = 43200 seconds.
+/// Used by serde when loading old Config from storage that lacks this field.
+pub fn default_bet_ttl_secs() -> u64 {
+    43200
+}
+
 #[cw_serde]
 pub struct Config {
     pub admin: Addr,
@@ -12,6 +18,10 @@ pub struct Config {
     pub reveal_timeout_secs: u64,
     pub max_open_per_user: u8,
     pub max_daily_amount_per_user: Uint128,
+    /// How long an open bet lives before it can be canceled by anyone (seconds).
+    /// 0 = no expiration. Default: 43200 (12 hours).
+    #[serde(default = "default_bet_ttl_secs")]
+    pub bet_ttl_secs: u64,
 }
 
 #[cw_serde]
@@ -73,3 +83,6 @@ pub const USER_OPEN_BET_COUNT: Map<&Addr, u8> = Map::new("user_open_bet_count");
 
 /// Daily usage tracking: (address, day_bucket) -> amount_used
 pub const DAILY_USAGE: Map<(&Addr, u64), Uint128> = Map::new("daily_usage");
+
+/// Pending admin for 2-step ownership transfer
+pub const PENDING_ADMIN: Item<Addr> = Item::new("pending_admin");

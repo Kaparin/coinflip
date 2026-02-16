@@ -36,8 +36,9 @@ pnpm-debug.log*
 # Test coverage
 coverage/
 
-# Generated (regenerated via scripts)
-packages/api-client/src/generated/
+# Generated files (committed for deployment — Vercel needs them)
+# Regenerate with: pnpm generate:api
+# packages/api-client/src/generated/
 
 # Database
 *.sqlite

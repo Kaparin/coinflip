@@ -1,14 +1,15 @@
 import type { ErrorHandler } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
 
 export const errorHandler: ErrorHandler = (err, c) => {
   // Our structured AppError
   if (err instanceof AppError) {
-    logger.warn({ code: err.code, message: err.message, path: c.req.path }, 'App error');
+    logger.warn({ code: err.code, message: err.message, status: err.status, path: c.req.path }, 'App error');
     return c.json(
       { error: { code: err.code, message: err.message, details: err.details } },
-      err.status as 400,
+      err.status as ContentfulStatusCode,
     );
   }
 

@@ -8,7 +8,8 @@
     "./schemas": "./src/schemas/index.ts",
     "./constants": "./src/constants.ts",
     "./types": "./src/types/index.ts",
-    "./chain": "./src/chain.ts"
+    "./chain": "./src/chain.ts",
+    "./commitment": "./src/commitment.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

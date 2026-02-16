@@ -1,0 +1,43 @@
+# Dependencies (reinstalled in Docker)
+node_modules/
+.pnpm-store/
+
+# Build outputs (rebuilt in Docker)
+dist/
+.next/
+.turbo/
+out/
+
+# Environment files (secrets injected via platform)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Rust / CosmWasm contracts (not needed for API)
+contracts/
+
+# Frontend (not needed for API Docker image)
+apps/web/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+
+# WASM binaries
+*.wasm

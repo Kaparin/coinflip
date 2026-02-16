@@ -1,155 +1,366 @@
+'use client';
+
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
+import { LaunchTokenIcon } from '@/components/ui';
+import { useTranslation } from '@/lib/i18n';
 
 export interface BetCardProps {
   id: string;
   maker: string;
+  /** Amount in micro-LAUNCH (raw from API) */
   amount: number;
-  side: 'heads' | 'tails';
+  status: string;
   createdAt: Date;
-  /** If the bet has been accepted, this is the reveal deadline */
-  revealDeadline?: Date;
-  /** Whether the current user can accept this bet */
-  canAccept?: boolean;
+  /** ISO datetime — reveal deadline (only when status=accepted) */
+  revealDeadline?: string | null;
+  /** ISO datetime — when the open bet expires (auto-cancel) */
+  expiresAt?: string | null;
+  /** ISO datetime — when the bet was accepted */
+  acceptedAt?: string | null;
+  /** Winner address (when resolved) */
+  winner?: string | null;
+  /** Acceptor address */
+  acceptor?: string | null;
+  isMine?: boolean;
+  /** Whether the current user is the acceptor of this bet */
+  isAcceptor?: boolean;
+  /** Index in the list for stagger animation (0-based) */
+  index?: number;
+  /** ID of the bet currently being acted upon (for loading states) */
+  pendingBetId?: string | null;
+  /** Which action is pending */
+  pendingAction?: 'cancel' | 'accept' | null;
+  /** This bet was recently accepted by current user, show processing UI */
+  isAccepting?: boolean;
   onAccept?: (id: string) => void;
+  onCancel?: (id: string) => void;
 }
 
-function truncateAddress(address: string): string {
-  if (address.length <= 16) return address;
-  return `${address.slice(0, 10)}...${address.slice(-6)}`;
+/** Live countdown hook — updates every second */
+function useCountdown(targetDate: Date | null): {
+  remaining: number;
+  formatted: string;
+  isExpired: boolean;
+  urgency: 'normal' | 'warning' | 'critical';
+} {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!targetDate) return;
+    // Update every second when < 1 hour, every 10s otherwise
+    const remaining = Math.max(0, targetDate.getTime() - Date.now());
+    const ms = remaining < 3600_000 ? 1000 : 10_000;
+    const interval = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(interval);
+  }, [targetDate]);
+
+  if (!targetDate) return { remaining: 0, formatted: '--:--', isExpired: false, urgency: 'normal' };
+
+  const remaining = Math.max(0, Math.floor((targetDate.getTime() - now) / 1000));
+  const isExpired = remaining <= 0;
+
+  // Format: hours:mm:ss for >1h, mm:ss for <1h
+  let formatted: string;
+  if (remaining >= 3600) {
+    const hrs = Math.floor(remaining / 3600);
+    const mins = Math.floor((remaining % 3600) / 60);
+    formatted = `${hrs}h ${mins}m`;
+  } else {
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    formatted = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // Urgency thresholds
+  const urgency = remaining <= 30 ? 'critical'
+    : remaining <= 300 ? 'warning'  // 5 minutes
+    : 'normal';
+
+  return { remaining, formatted, isExpired, urgency };
+}
+
+function truncAddr(address: string): string {
+  if (address.length <= 14) return address;
+  return `${address.slice(0, 8)}...${address.slice(-4)}`;
 }
 
 function timeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
-function CountdownTimer({ deadline }: { deadline: Date }) {
-  const [remaining, setRemaining] = useState(() =>
-    Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 1000)),
-  );
-
-  useEffect(() => {
-    if (remaining <= 0) return;
-    const timer = setInterval(() => {
-      const next = Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 1000));
-      setRemaining(next);
-      if (next <= 0) clearInterval(timer);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [deadline, remaining]);
-
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-  const isUrgent = remaining <= 60;
-
-  return (
-    <div
-      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${
-        isUrgent
-          ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
-          : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
-      }`}
-    >
-      <svg
-        className="h-3.5 w-3.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={2}
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"
-        />
-      </svg>
-      {minutes}:{seconds.toString().padStart(2, '0')}
-    </div>
-  );
+/** Tier-based styles for bet value ranges */
+function getTier(humanAmount: number): {
+  border: string;
+  glow: string;
+  gradient: string;
+  icon: string;
+  tier: string;
+} {
+  if (humanAmount >= 500) {
+    return {
+      border: 'border-amber-400/40',
+      glow: 'shadow-[0_0_24px_rgba(251,191,36,0.12)]',
+      gradient: 'from-amber-500/8 via-transparent to-yellow-500/5',
+      icon: '💎',
+      tier: 'legendary',
+    };
+  }
+  if (humanAmount >= 100) {
+    return {
+      border: 'border-purple-400/30',
+      glow: 'shadow-[0_0_18px_rgba(168,85,247,0.1)]',
+      gradient: 'from-purple-500/8 via-transparent to-indigo-500/5',
+      icon: '/logo.png',
+      tier: 'epic',
+    };
+  }
+  if (humanAmount >= 10) {
+    return {
+      border: 'border-sky-400/20',
+      glow: 'shadow-[0_0_12px_rgba(56,189,248,0.08)]',
+      gradient: 'from-sky-500/5 via-transparent to-cyan-500/3',
+      icon: '⚡',
+      tier: 'rare',
+    };
+  }
+  return {
+    border: 'border-[var(--color-border)]',
+    glow: '',
+    gradient: 'from-white/[0.02] via-transparent to-white/[0.01]',
+    icon: '🪙',
+    tier: 'common',
+  };
 }
+
+const STATUS_CONFIG: Record<string, { textKey: string; color: string; bgClass: string }> = {
+  open: { textKey: 'bets.waiting', color: 'var(--color-success)', bgClass: 'bg-emerald-500/10 text-emerald-400' },
+  accepting: { textKey: 'bets.accepting', color: 'var(--color-primary)', bgClass: 'bg-indigo-500/10 text-indigo-400' },
+  accepted: { textKey: 'bets.deciding', color: 'var(--color-warning)', bgClass: 'bg-amber-500/10 text-amber-400' },
+  revealed: { textKey: 'bets.completed', color: 'var(--color-primary)', bgClass: 'bg-indigo-500/10 text-indigo-400' },
+  canceling: { textKey: 'bets.canceling', color: 'var(--color-text-secondary)', bgClass: 'bg-zinc-500/10 text-zinc-400' },
+  canceled: { textKey: 'bets.canceled', color: 'var(--color-text-secondary)', bgClass: 'bg-zinc-500/10 text-zinc-400' },
+  timeout_claimed: { textKey: 'bets.timeout', color: 'var(--color-danger)', bgClass: 'bg-red-500/10 text-red-400' },
+};
 
 export function BetCard({
-  id,
-  maker,
-  amount,
-  side,
-  createdAt,
-  revealDeadline,
-  canAccept = true,
-  onAccept,
+  id, maker, amount, status, createdAt,
+  revealDeadline, expiresAt, acceptedAt, winner, acceptor,
+  isMine = false, isAcceptor = false, index = 0, pendingBetId, pendingAction,
+  isAccepting: isAcceptingProp = false,
+  onAccept, onCancel,
 }: BetCardProps) {
-  const isHighValue = amount >= 500;
+  const { t } = useTranslation();
+  const humanAmount = fromMicroLaunch(amount);
+  const tier = getTier(humanAmount);
+  const statusInfo = STATUS_CONFIG[status] ?? { textKey: status, color: 'var(--color-text-secondary)', bgClass: 'bg-zinc-500/10 text-zinc-400' };
+  const winAmount = humanAmount * 2 * (1 - COMMISSION_BPS / 10000);
+
+  // Live countdown for accepted bets (reveal deadline)
+  const deadlineDate = revealDeadline ? new Date(revealDeadline) : null;
+  const countdown = useCountdown(status === 'accepted' ? deadlineDate : null);
+
+  // Live countdown for open bets (expiration)
+  const expiryDate = expiresAt ? new Date(expiresAt) : null;
+  const expiryCountdown = useCountdown(status === 'open' ? expiryDate : null);
+  const isExpiringSoon = expiryCountdown.remaining > 0 && expiryCountdown.remaining <= 30;
+
+  const isThisPending = pendingBetId === id;
+  const isCanceling = isThisPending && pendingAction === 'cancel';
+  const isAcceptingLocal = isThisPending && pendingAction === 'accept';
+  const isAnyPending = !!pendingBetId;
+  const showAcceptingState = isAcceptingLocal || isAcceptingProp;
+
+  const staggerClass = index < 10 ? `stagger-${index + 1}` : '';
 
   return (
     <div
-      className={`group relative rounded-2xl border bg-[var(--color-surface)] p-5 transition-all hover:bg-[var(--color-surface-hover)] ${
-        isHighValue
-          ? 'border-[var(--color-warning)]/40 shadow-[0_0_20px_rgba(245,158,11,0.08)]'
-          : 'border-[var(--color-border)]'
-      }`}
+      className={`
+        group relative overflow-hidden rounded-2xl border bg-gradient-to-br
+        ${tier.gradient} ${tier.border} ${tier.glow}
+        bg-[var(--color-surface)] p-4 card-hover animate-fade-up ${staggerClass}
+        transition-all duration-300
+      `}
     >
-      {/* High-value badge */}
-      {isHighValue && (
-        <div className="absolute -top-2.5 right-4 rounded-full bg-[var(--color-warning)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
-          High Stake
-        </div>
-      )}
+      {/* Ambient glow on hover */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/0 to-[var(--color-primary)]/0 group-hover:from-[var(--color-primary)]/[0.03] group-hover:to-transparent transition-all duration-500 pointer-events-none" />
 
-      {/* Header: side + time */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{side === 'heads' ? '👑' : '🪙'}</span>
-          <span className="text-sm font-semibold capitalize text-[var(--color-text)]">
-            {side}
+      {/* Subtle noise texture overlay */}
+      <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
+
+      <div className="relative z-10">
+        {/* Top row: Role tag + Status */}
+        <div className="flex items-center justify-between mb-2">
+          {(isMine || isAcceptor) ? (
+            <span className={`inline-flex rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white ${
+              isMine
+                ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-500'
+            }`}>
+              {isMine ? t('bets.yourBet') : t('bets.youAccepted')}
+            </span>
+          ) : <span />}
+          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusInfo.bgClass}`}>
+            {t(statusInfo.textKey)}
           </span>
         </div>
-        {revealDeadline ? (
-          <CountdownTimer deadline={revealDeadline} />
-        ) : (
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            {timeAgo(createdAt)}
-          </span>
+
+        {/* Amount row */}
+        <div className="flex items-center gap-2.5 mb-3">
+          {tier.icon.startsWith('/') ? (
+            <Image src={tier.icon} alt="" width={28} height={28} className="object-contain drop-shadow-sm" />
+          ) : (
+            <span className="text-2xl leading-none drop-shadow-sm">{tier.icon}</span>
+          )}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
+              <LaunchTokenIcon size={48} />
+            </div>
+          </div>
+        </div>
+
+        {/* Middle: Maker + Timer */}
+        <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)] mb-3">
+          <span className="font-mono opacity-60">{truncAddr(maker)}</span>
+          {/* Open bets: show expiry countdown; others: show time ago */}
+          {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
+            <span className={`flex items-center gap-1 font-mono tabular-nums ${
+              expiryCountdown.urgency === 'critical' ? 'text-red-400 animate-pulse font-bold' :
+              expiryCountdown.urgency === 'warning' ? 'text-amber-400 font-medium' :
+              'opacity-60'
+            }`}>
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              {expiryCountdown.formatted}
+            </span>
+          ) : status === 'open' && expiryCountdown.isExpired ? (
+            <span className="text-red-400 font-bold text-[10px]">{t('bets.expired')}</span>
+          ) : (
+            <span className="opacity-60">{timeAgo(createdAt)} ago</span>
+          )}
+        </div>
+
+        {/* Win info bar */}
+        <div className="relative rounded-xl bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10 px-3 py-2 mb-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
+            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-400 tabular-nums">
+              +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+              <LaunchTokenIcon size={48} />
+            </span>
+          </div>
+        </div>
+
+        {/* Canceling state */}
+        {status === 'canceling' && (
+          <div className="rounded-xl bg-zinc-500/10 px-3 py-2.5 text-center text-xs text-zinc-400">
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400/30 border-t-zinc-400" />
+              {t('bets.canceling')}
+            </span>
+          </div>
+        )}
+
+        {/* Accept button — accepting state */}
+        {status === 'open' && !isMine && showAcceptingState && (
+          <div className="rounded-xl bg-indigo-500/10 px-3 py-2.5 text-center text-xs text-indigo-400">
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400/30 border-t-indigo-400" />
+              {t('bets.accepting')}
+            </span>
+          </div>
+        )}
+
+        {/* Accept button — disabled if expired or expiring within 30s */}
+        {status === 'open' && !isMine && onAccept && !showAcceptingState && (
+          isExpiringSoon || expiryCountdown.isExpired ? (
+            <div className="w-full rounded-xl bg-zinc-500/10 border border-zinc-500/20 px-4 py-2.5 text-center text-xs text-zinc-400">
+              {expiryCountdown.isExpired ? t('bets.betExpired') : t('bets.expiringSoon')}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onAccept(id)}
+              disabled={isAnyPending}
+              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              {t('bets.acceptFlip')}
+            </button>
+          )
+        )}
+
+        {/* Cancel button */}
+        {status === 'open' && isMine && onCancel && (
+          <button
+            type="button"
+            onClick={() => onCancel(id)}
+            disabled={isAnyPending}
+            className="w-full rounded-xl border border-zinc-700/50 px-4 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+          >
+            {isCanceling ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                {t('bets.canceling')}
+              </span>
+            ) : t('bets.cancelBet')}
+          </button>
+        )}
+
+        {/* Processing states */}
+        {status === 'accepting' && (
+          <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/10 px-3 py-2.5 text-center text-xs text-indigo-400">
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400/30 border-t-indigo-400" />
+              {t('common.confirming')}
+            </span>
+          </div>
+        )}
+
+        {status === 'accepted' && (
+          <div className={`rounded-xl border px-3 py-2.5 text-xs ${
+            countdown.urgency === 'critical'
+              ? 'bg-red-500/10 border-red-500/20 text-red-400'
+              : countdown.urgency === 'warning'
+                ? 'bg-amber-500/10 border-amber-500/15 text-amber-400'
+                : 'bg-amber-500/10 border-amber-500/10 text-amber-400'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                {t('bets.determiningWinner')}
+              </span>
+              {deadlineDate && (
+                <span className={`font-mono font-bold tabular-nums ${
+                  countdown.urgency === 'critical' ? 'text-red-400 animate-pulse' : ''
+                }`}>
+                  {countdown.formatted}
+                </span>
+              )}
+            </div>
+            {/* Progress bar */}
+            {deadlineDate && countdown.remaining > 0 && (
+              <div className="mt-2 h-1 rounded-full bg-black/20 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+                    countdown.urgency === 'critical' ? 'bg-red-500' :
+                    countdown.urgency === 'warning' ? 'bg-amber-500' : 'bg-amber-400'
+                  }`}
+                  style={{ width: `${Math.min(100, (countdown.remaining / 300) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
-
-      {/* Amount */}
-      <div className="mb-3">
-        <span className="text-2xl font-bold tabular-nums text-[var(--color-text)]">
-          {amount.toLocaleString()}
-        </span>
-        <span className="ml-1.5 text-sm text-[var(--color-text-secondary)]">LAUNCH</span>
-      </div>
-
-      {/* Maker */}
-      <div className="mb-4 text-xs text-[var(--color-text-secondary)]">
-        by{' '}
-        <span className="font-mono text-[var(--color-text)]">
-          {truncateAddress(maker)}
-        </span>
-      </div>
-
-      {/* Accept Button */}
-      {!revealDeadline && (
-        <button
-          type="button"
-          disabled={!canAccept}
-          onClick={() => onAccept?.(id)}
-          className="w-full rounded-xl bg-[var(--color-success)] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-success)]/80 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Accept &amp; Flip
-        </button>
-      )}
-
-      {revealDeadline && (
-        <div className="rounded-xl bg-[var(--color-bg)] px-4 py-2.5 text-center text-sm font-medium text-[var(--color-text-secondary)]">
-          Waiting for reveal...
-        </div>
-      )}
     </div>
   );
 }

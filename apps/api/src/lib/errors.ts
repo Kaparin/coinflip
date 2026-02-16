@@ -32,4 +32,19 @@ export const Errors = {
     new AppError('USER_NOT_FOUND', 'User not found', 404),
   validationError: (message: string) =>
     new AppError('VALIDATION_ERROR', message, 422),
+  relayerNotReady: () =>
+    new AppError('RELAYER_NOT_READY', 'Chain relay service is not available. Try again later.', 503),
+  forbidden: () =>
+    new AppError('FORBIDDEN', 'Admin access required', 403),
+  chainTxFailed: (txHash: string, rawLog?: string) =>
+    new AppError('CHAIN_TX_FAILED', `Chain transaction failed: ${rawLog ?? 'unknown error'}`, 422, { txHash, rawLog }),
+  chainTimeout: (txHash?: string) =>
+    new AppError('CHAIN_TX_TIMEOUT', 'Transaction was submitted but not yet confirmed. Please wait and check your balance.', 504, { txHash }),
+  actionInProgress: (estimatedWaitSec = 10) =>
+    new AppError(
+      'ACTION_IN_PROGRESS',
+      'Your previous action is still processing. Please wait a few seconds and try again.',
+      429,
+      { retry_after_seconds: estimatedWaitSec },
+    ),
 } as const;

@@ -19,20 +19,22 @@ pub fn execute_cancel_bet(
         });
     }
 
-    // Only maker can cancel
+    // Only maker can cancel (server auto-cancels expired bets via authz as maker)
     if bet.maker != info.sender {
         return Err(ContractError::Unauthorized);
     }
 
-    // Unlock funds
-    let mut balance = VAULT_BALANCES.load(deps.storage, &info.sender)?;
+    // Unlock funds back to maker
+    let mut balance = VAULT_BALANCES.load(deps.storage, &bet.maker)?;
     balance.locked -= bet.amount;
     balance.available += bet.amount;
-    VAULT_BALANCES.save(deps.storage, &info.sender, &balance)?;
+    VAULT_BALANCES.save(deps.storage, &bet.maker, &balance)?;
 
-    // Decrement open bets count
-    let open_count = USER_OPEN_BET_COUNT.load(deps.storage, &info.sender)?;
-    USER_OPEN_BET_COUNT.save(deps.storage, &info.sender, &open_count.saturating_sub(1))?;
+    // Decrement maker's open bets count
+    let open_count = USER_OPEN_BET_COUNT
+        .may_load(deps.storage, &bet.maker)?
+        .unwrap_or(0);
+    USER_OPEN_BET_COUNT.save(deps.storage, &bet.maker, &open_count.saturating_sub(1))?;
 
     // Update bet status
     bet.status = BetStatus::Canceled;

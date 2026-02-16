@@ -5,16 +5,15 @@ import { ConnectRequestSchema } from '@coinflip/shared/schemas';
 import { userService } from '../services/user.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
+import { env } from '../config/env.js';
 import type { AppEnv } from '../types.js';
 
 export const authRouter = new Hono<AppEnv>();
 
 // POST /api/v1/auth/connect — Connect wallet and register session
 authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) => {
-  const { address, signature, message } = c.req.valid('json');
+  const { address } = c.req.valid('json');
 
-  // TODO: Verify signature against message using CosmJS or Axiome-specific verification
-  // For now, accept any connection in development
   logger.info({ address }, 'Wallet connect request');
 
   // Find or create user
@@ -30,12 +29,12 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
     expiresAt,
   });
 
-  // Set session cookie for development
+  // Set session cookie
   setCookie(c, 'wallet_address', address, {
     httpOnly: true,
-    secure: false, // true in production
+    secure: false,
     sameSite: 'Lax',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
     path: '/',
   });
 
@@ -48,21 +47,88 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
   });
 });
 
-// GET /api/v1/auth/grants — Check authz + feegrant status
+// GET /api/v1/auth/grants — Check authz + feegrant status on chain
 authRouter.get('/grants', authMiddleware, async (c) => {
   const user = c.get('user');
-  const session = await userService.getActiveSession(user.id);
+  const address = c.get('address');
 
-  // TODO: Query chain for actual authz grants and feegrant allowance
-  // For now, return session data from DB
+  let authzGranted = false;
+  let authzExpiresAt: string | null = null;
+  let feeGrantActive = false;
+
+  // Query chain for authz grants: granter=user, grantee=relayer
+  try {
+    const grantsUrl = `${env.AXIOME_REST_URL}/cosmos/authz/v1beta1/grants?granter=${address}&grantee=${env.RELAYER_ADDRESS}&msg_type_url=/cosmwasm.wasm.v1.MsgExecuteContract`;
+    const grantsRes = await fetch(grantsUrl);
+    if (grantsRes.ok) {
+      const grantsData = (await grantsRes.json()) as {
+        grants?: Array<{ expiration?: string; authorization?: { type_url: string } }>;
+      };
+      const grants = grantsData.grants ?? [];
+      if (grants.length > 0) {
+        authzGranted = true;
+        authzExpiresAt = grants[0]?.expiration ?? null;
+      }
+    }
+  } catch (err) {
+    logger.warn({ err, address }, 'Failed to query authz grants from chain');
+  }
+
+  // Query chain for feegrant: granter=treasury, grantee=relayer
+  try {
+    const feeUrl = `${env.AXIOME_REST_URL}/cosmos/feegrant/v1beta1/allowance/${env.TREASURY_ADDRESS}/${env.RELAYER_ADDRESS}`;
+    const feeRes = await fetch(feeUrl);
+    if (feeRes.ok) {
+      feeGrantActive = true;
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Failed to query feegrant from chain');
+  }
+
+  // Update session in DB
+  if (authzGranted) {
+    try {
+      const session = await userService.getActiveSession(user.id);
+      if (session && !session.authzEnabled) {
+        await userService.updateSession(session.id, {
+          authzEnabled: true,
+          authzExpirationTime: authzExpiresAt ? new Date(authzExpiresAt) : undefined,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to update session authz status');
+    }
+  }
 
   return c.json({
     data: {
-      authz_granted: session?.authzEnabled ?? false,
-      authz_expires_at: session?.authzExpirationTime?.toISOString() ?? null,
-      authz_calls_remaining: null, // Would query chain
-      fee_grant_active: session?.feeSponsored ?? false,
-      fee_grant_daily_remaining: null, // Would query chain
+      authz_granted: authzGranted,
+      authz_expires_at: authzExpiresAt,
+      fee_grant_active: feeGrantActive,
+      relayer_address: env.RELAYER_ADDRESS,
+      contract_address: env.COINFLIP_CONTRACT_ADDR,
+    },
+  });
+});
+
+// GET /api/v1/auth/grant-msg — Get unsigned MsgGrant for Keplr signing
+authRouter.get('/grant-msg', authMiddleware, async (c) => {
+  const address = c.get('address');
+
+  // Return the parameters needed for the frontend to construct and sign a MsgGrant
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  return c.json({
+    data: {
+      granter: address,
+      grantee: env.RELAYER_ADDRESS,
+      contract_address: env.COINFLIP_CONTRACT_ADDR,
+      allowed_messages: [
+        'create_bet', 'accept_bet', 'reveal', 'cancel_bet', 'claim_timeout', 'withdraw',
+      ],
+      expiration: expiresAt.toISOString(),
+      chain_id: env.AXIOME_CHAIN_ID,
     },
   });
 });

@@ -48,7 +48,7 @@ const document = createDocument({
         summary: 'List open bets',
         operationId: 'getBets',
         parameters: [
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['open', 'accepted', 'revealed', 'canceled', 'timeout_claimed'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['open', 'accepting', 'accepted', 'revealed', 'canceled', 'timeout_claimed'] } },
           { name: 'min_amount', in: 'query', schema: { type: 'string' } },
           { name: 'max_amount', in: 'query', schema: { type: 'string' } },
           { name: 'cursor', in: 'query', schema: { type: 'string' } },

@@ -33,10 +33,16 @@ export const customFetch = async <T>(
     }
   }
 
+  // Inject wallet address from sessionStorage for auth
+  const walletAddress = typeof window !== 'undefined'
+    ? sessionStorage.getItem('coinflip_connected_address')
+    : null;
+
   const fetchOptions: RequestInit = {
     method: config.method,
     headers: {
       'Content-Type': 'application/json',
+      ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
       ...config.headers,
     },
     credentials: 'include',

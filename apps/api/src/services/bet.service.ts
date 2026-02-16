@@ -1,9 +1,26 @@
-import { eq, desc, and, sql, lt, gt, isNull } from 'drizzle-orm';
+import { eq, desc, and, sql, lt, gt, isNull, inArray } from 'drizzle-orm';
 import { bets, users } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
 export type BetRow = typeof bets.$inferSelect;
+
+/** Valid bet status transitions */
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  open:             ['accepting', 'canceling', 'canceled'],
+  accepting:        ['accepted', 'open'],    // accepted on success, open on revert
+  canceling:        ['canceled', 'open'],     // canceled on success, open on revert
+  accepted:         ['revealed', 'timeout_claimed'],
+  revealed:         [],                       // terminal
+  canceled:         [],                       // terminal
+  timeout_claimed:  [],                       // terminal
+};
+
+function isValidTransition(from: string, to: string): boolean {
+  const allowed = VALID_TRANSITIONS[from];
+  if (!allowed) return true; // Unknown status — allow (for chain sync)
+  return allowed.includes(to);
+}
 
 export class BetService {
   private db = getDb();
@@ -14,6 +31,8 @@ export class BetService {
     amount: string;
     commitment: string;
     txhashCreate: string;
+    makerSide?: string;
+    makerSecret?: string;
   }) {
     const [bet] = await this.db
       .insert(bets)
@@ -24,6 +43,8 @@ export class BetService {
         status: 'open',
         commitment: params.commitment,
         txhashCreate: params.txhashCreate,
+        makerSide: params.makerSide ?? null,
+        makerSecret: params.makerSecret ?? null,
       })
       .returning();
 
@@ -90,21 +111,118 @@ export class BetService {
     return bet;
   }
 
+  /**
+   * Atomically mark a bet as "accepting" — ONLY succeeds if status is currently "open".
+   * Uses WHERE status = 'open' to prevent double-accept race condition.
+   * Returns the updated bet, or null if another player already claimed it.
+   */
+  async markAccepting(params: {
+    betId: bigint;
+    acceptorUserId: string;
+    acceptorGuess: string;
+  }) {
+    const result = await this.db
+      .update(bets)
+      .set({
+        status: 'accepting',
+        acceptorUserId: params.acceptorUserId,
+        acceptorGuess: params.acceptorGuess,
+      })
+      .where(
+        and(
+          eq(bets.betId, params.betId),
+          eq(bets.status, 'open'),
+        ),
+      )
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ betId: params.betId.toString(), acceptor: params.acceptorUserId }, 'markAccepting failed — bet no longer open (race condition)');
+      return null;
+    }
+
+    logger.info({ betId: params.betId.toString(), acceptor: params.acceptorUserId }, 'Bet marked as accepting');
+    return result[0]!;
+  }
+
+  /**
+   * Revert a bet from "accepting" back to "open" — clears acceptor fields.
+   * Called when the chain tx fails.
+   */
+  async revertAccepting(betId: bigint) {
+    const [bet] = await this.db
+      .update(bets)
+      .set({
+        status: 'open',
+        acceptorUserId: null,
+        acceptorGuess: null,
+        resolvedTime: null,
+      })
+      .where(eq(bets.betId, betId))
+      .returning();
+
+    logger.info({ betId: betId.toString() }, 'Bet reverted from accepting to open');
+    return bet;
+  }
+
+  /**
+   * Update bet status. Validates allowed transitions to prevent invalid state changes.
+   * Chain sync can bypass validation via `force` parameter.
+   */
+  async updateBetStatus(betId: bigint, status: string, force = false) {
+    if (!force) {
+      const current = await this.getBetById(betId);
+      if (current && !isValidTransition(current.status, status)) {
+        logger.warn({ betId: betId.toString(), from: current.status, to: status }, 'Invalid status transition blocked');
+        return current; // Return unchanged
+      }
+    }
+
+    const [bet] = await this.db
+      .update(bets)
+      .set({
+        status,
+        resolvedTime: new Date(),
+      })
+      .where(eq(bets.betId, betId))
+      .returning();
+
+    logger.info({ betId: betId.toString(), status }, 'Bet status synced from chain');
+    return bet;
+  }
+
+  /**
+   * Atomically mark a bet as "canceling" ONLY if its current status is "open".
+   * Returns the updated bet, or null if the bet was no longer open (race condition).
+   */
+  async markCanceling(betId: bigint): Promise<BetRow | null> {
+    const result = await this.db
+      .update(bets)
+      .set({ status: 'canceling' })
+      .where(and(eq(bets.betId, betId), eq(bets.status, 'open')))
+      .returning();
+
+    if (result.length === 0) return null;
+    logger.info({ betId: betId.toString() }, 'Bet marked as canceling (atomic)');
+    return result[0]!;
+  }
+
   async getBetById(betId: bigint) {
     return this.db.query.bets.findFirst({
       where: eq(bets.betId, betId),
     });
   }
 
-  async getOpenBets(params: { cursor?: string; limit: number; minAmount?: string; maxAmount?: string }) {
+  async getOpenBets(params: { cursor?: string; limit: number; minAmount?: string; maxAmount?: string; status?: string }) {
     const limit = Math.min(params.limit, 100);
+    const statusFilter = params.status ?? 'open';
 
     let query = this.db
       .select()
       .from(bets)
       .where(
         and(
-          eq(bets.status, 'open'),
+          eq(bets.status, statusFilter),
           params.cursor ? lt(bets.createdTime, new Date(params.cursor)) : undefined,
           params.minAmount ? sql`${bets.amount}::numeric >= ${params.minAmount}::numeric` : undefined,
           params.maxAmount ? sql`${bets.amount}::numeric <= ${params.maxAmount}::numeric` : undefined,
@@ -148,11 +266,15 @@ export class BetService {
     return { data, cursor: nextCursor, has_more: hasMore };
   }
 
+  /**
+   * Count bets that are effectively "open" on chain for this user.
+   * Includes: 'open' (definitely on chain), 'canceling' (cancel tx not confirmed yet — still open on chain).
+   */
   async getOpenBetCountForUser(userId: string): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(bets)
-      .where(and(eq(bets.makerUserId, userId), eq(bets.status, 'open')));
+      .where(and(eq(bets.makerUserId, userId), inArray(bets.status, ['open', 'canceling'])));
 
     return result[0]?.count ?? 0;
   }
@@ -168,6 +290,86 @@ export class BetService {
           lt(bets.acceptedTime, deadline),
         ),
       );
+  }
+
+  /** Get user address by userId */
+  async getUserAddress(userId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ address: users.address })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row?.address ?? null;
+  }
+
+  /** Get accepted bets that have stored secrets (need auto-reveal) */
+  async getAcceptedBetsWithSecrets(): Promise<BetRow[]> {
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        and(
+          eq(bets.status, 'accepted'),
+          sql`${bets.makerSecret} IS NOT NULL`,
+          sql`${bets.makerSide} IS NOT NULL`,
+        ),
+      );
+  }
+
+  /** Get accepted bets that have timed out (reveal deadline passed) */
+  async getTimedOutAcceptedBets(): Promise<BetRow[]> {
+    // reveal_timeout is typically 300s (5 min) from accepted_time
+    // Also catch old bets where acceptedTime is NULL (legacy) but are old enough
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        and(
+          eq(bets.status, 'accepted'),
+          sql`(
+            (${bets.acceptedTime} IS NOT NULL AND ${bets.acceptedTime} < NOW() - INTERVAL '5 minutes')
+            OR
+            (${bets.acceptedTime} IS NULL AND ${bets.createdTime} < NOW() - INTERVAL '10 minutes')
+          )`,
+        ),
+      );
+  }
+
+  /** Get open bets that have expired (older than OPEN_BET_TTL_SECS) */
+  async getExpiredOpenBets(): Promise<BetRow[]> {
+    // OPEN_BET_TTL_SECS = 43200 (12 hours)
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        and(
+          inArray(bets.status, ['open', 'canceling']),
+          sql`${bets.createdTime} < NOW() - INTERVAL '12 hours'`,
+        ),
+      );
+  }
+
+  /** Build a map of userId -> address for a list of bets */
+  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, string>> {
+    const userIds = new Set<string>();
+    for (const bet of betRows) {
+      userIds.add(bet.makerUserId);
+      if (bet.acceptorUserId) userIds.add(bet.acceptorUserId);
+      if (bet.winnerUserId) userIds.add(bet.winnerUserId);
+    }
+
+    if (userIds.size === 0) return new Map();
+
+    const userRows = await this.db
+      .select({ id: users.id, address: users.address })
+      .from(users)
+      .where(inArray(users.id, [...userIds]));
+
+    const map = new Map<string, string>();
+    for (const u of userRows) {
+      map.set(u.id, u.address);
+    }
+    return map;
   }
 }
 

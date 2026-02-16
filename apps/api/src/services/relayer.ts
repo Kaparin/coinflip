@@ -11,22 +11,20 @@
  *   }
  * Fee payer: Treasury (via feegranter field)
  *
- * Axiome Chain specifics:
- *   - Chain ID: axiome-1
- *   - Address prefix: axm (addresses: axm1...)
- *   - Cosmos SDK v0.50.3, wasmd v0.50.0, cosmwasm_1_4
- *   - CW20 LAUNCH token for vault operations
- *   - REST gateway: https://api-chain.axiomechain.org
- *   - Node source: https://github.com/axiome-pro/axm-node
+ * Sequence management:
+ *   Uses explicit sign() + broadcastTx() with signerData to control
+ *   the account sequence locally. This avoids the overhead of reconnecting
+ *   the client for every transaction and eliminates stale-sequence races.
  */
 
 import { DirectSecp256k1HdWallet, Registry } from '@cosmjs/proto-signing';
-import { SigningStargateClient, GasPrice, StdFee } from '@cosmjs/stargate';
+import { SigningStargateClient, GasPrice, StdFee, SignerData } from '@cosmjs/stargate';
+import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 import { MsgExec } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
-import { toUtf8 } from '@cosmjs/encoding';
+import { toUtf8, fromHex, toBase64 } from '@cosmjs/encoding';
 import { stringToPath } from '@cosmjs/crypto';
-import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT, GAS_ADJUSTMENT } from '@coinflip/shared/chain';
+import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT } from '@coinflip/shared/chain';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { SequenceManager } from './sequence-manager.js';
@@ -47,6 +45,9 @@ export interface RelayResult {
   code?: number;
   rawLog?: string;
   error?: string;
+  /** True when tx was broadcast but confirmation timed out (tx may still succeed) */
+  timeout?: boolean;
+  events?: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
 }
 
 /**
@@ -62,6 +63,13 @@ export type ContractAction =
   | { cancel_bet: { bet_id: number } }
   | { claim_timeout: { bet_id: number } };
 
+/** Parse "expected X, got Y" from a sequence mismatch error */
+function parseExpectedSequence(errorMsg: string): number | null {
+  // Cosmos SDK: "account sequence mismatch, expected 42, got 40: incorrect account sequence"
+  const m = errorMsg.match(/expected\s+(\d+)/);
+  return m?.[1] ? parseInt(m[1], 10) : null;
+}
+
 export class RelayerService {
   private client: SigningStargateClient | null = null;
   private wallet: DirectSecp256k1HdWallet | null = null;
@@ -69,12 +77,14 @@ export class RelayerService {
   private relayerAddress: string;
   private contractAddress: string;
   private treasuryAddress: string;
+  private chainId: string;
   private initialized = false;
 
   constructor() {
     this.relayerAddress = env.RELAYER_ADDRESS;
     this.contractAddress = env.COINFLIP_CONTRACT_ADDR;
     this.treasuryAddress = env.TREASURY_ADDRESS;
+    this.chainId = env.AXIOME_CHAIN_ID;
     this.sequenceManager = new SequenceManager(env.AXIOME_RPC_URL, this.relayerAddress);
   }
 
@@ -108,7 +118,7 @@ export class RelayerService {
         this.relayerAddress = account!.address;
       }
 
-      // Create signing client with custom registry
+      // Create signing client — kept persistently (no reconnect per-tx)
       const registry = createRegistry();
       this.client = await SigningStargateClient.connectWithSigner(
         env.AXIOME_RPC_URL,
@@ -119,7 +129,7 @@ export class RelayerService {
         },
       );
 
-      // Initialize sequence manager
+      // Initialize sequence manager (fetches fresh sequence from chain)
       await this.sequenceManager.init();
 
       this.initialized = true;
@@ -127,7 +137,7 @@ export class RelayerService {
         {
           relayer: this.relayerAddress,
           contract: this.contractAddress,
-          chainId: env.AXIOME_CHAIN_ID,
+          chainId: this.chainId,
         },
         'Relayer service initialized',
       );
@@ -145,159 +155,260 @@ export class RelayerService {
   /**
    * Submit a MsgExec transaction on behalf of a user.
    *
-   * @param userAddress - The user's Axiome address (granter)
-   * @param action - The contract execute message to relay
-   * @param memo - Optional tx memo
-   * @returns Relay result with txHash on success
+   * NO GLOBAL QUEUE — transactions are broadcast concurrently.
+   * The SequenceManager mutex ensures each tx gets a unique, sequential sequence.
+   * Cosmos mempool accepts out-of-order sequences from the same sender and orders them.
+   *
+   * @param asyncMode — if true, return immediately after broadcastTxSync
+   *   (skip the 25s poll for block inclusion). The tx is confirmed in the background
+   *   by the caller. This brings response time from ~25s down to ~2s.
    */
   async submitExec(
     userAddress: string,
     action: ContractAction,
     memo = '',
+    asyncMode = false,
   ): Promise<RelayResult> {
     if (!this.isReady()) {
       return { success: false, error: 'Relayer not initialized' };
     }
 
+    return this._submitExecInner(userAddress, action, memo, asyncMode);
+  }
+
+  /** Build the MsgAny + fee for a given user action */
+  private buildTxPayload(userAddress: string, action: ContractAction) {
+    const innerMsg: MsgExecuteContract = {
+      sender: userAddress,
+      contract: this.contractAddress,
+      msg: toUtf8(JSON.stringify(action)),
+      funds: [],
+    };
+    const execMsg: MsgExec = {
+      grantee: this.relayerAddress,
+      msgs: [{
+        typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+        value: MsgExecuteContract.encode(innerMsg).finish(),
+      }],
+    };
+    const msgAny = {
+      typeUrl: '/cosmos.authz.v1beta1.MsgExec',
+      value: execMsg,
+    };
+    const fee: StdFee = {
+      amount: [{ denom: FEE_DENOM, amount: '12500' }],
+      gas: String(DEFAULT_EXEC_GAS_LIMIT),
+      ...(this.treasuryAddress ? { granter: this.treasuryAddress } : {}),
+    };
+    return { msgAny, fee };
+  }
+
+  /**
+   * Internal: sign + broadcast with explicit sequence tracking.
+   * Up to 3 attempts: on sequence mismatch, parse the expected sequence and retry.
+   * With concurrent broadcasts, sequence mismatches are more likely but recoverable.
+   */
+  private async _submitExecInner(
+    userAddress: string,
+    action: ContractAction,
+    memo: string,
+    asyncMode = false,
+  ): Promise<RelayResult> {
     const actionKey = Object.keys(action)[0]!;
     logger.info(
       { user: userAddress, action: actionKey, contract: this.contractAddress },
       'Submitting MsgExec',
     );
 
-    try {
-      // Build the inner MsgExecuteContract (sender = user, executed via authz)
-      const innerMsg: MsgExecuteContract = {
-        sender: userAddress,
-        contract: this.contractAddress,
-        msg: toUtf8(JSON.stringify(action)),
-        funds: [],
-      };
+    const { msgAny, fee } = this.buildTxPayload(userAddress, action);
 
-      // Build MsgExec wrapping the inner message
-      const execMsg: MsgExec = {
-        grantee: this.relayerAddress,
-        msgs: [
-          {
-            typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-            value: MsgExecuteContract.encode(innerMsg).finish(),
-          },
-        ],
-      };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // 1. Get next sequence from our local manager
+        const { accountNumber, sequence } = await this.sequenceManager.getAndIncrement();
+        const signerData: SignerData = {
+          accountNumber,
+          sequence,
+          chainId: this.chainId,
+        };
 
-      const msgAny = {
-        typeUrl: '/cosmos.authz.v1beta1.MsgExec',
-        value: execMsg,
-      };
+        logger.debug(
+          { accountNumber, sequence, attempt, action: actionKey },
+          'Signing tx with explicit signerData',
+        );
 
-      // Fee with feegranter (treasury pays gas)
-      const fee: StdFee = {
-        amount: [{ denom: FEE_DENOM, amount: '12500' }],
-        gas: String(DEFAULT_EXEC_GAS_LIMIT),
-        granter: this.treasuryAddress || undefined,
-      };
+        // 2. Sign with explicit signerData (no chain query needed)
+        const txRaw = await this.client!.sign(
+          this.relayerAddress,
+          [msgAny],
+          fee,
+          memo,
+          signerData,
+        );
+        const txBytes = TxRaw.encode(txRaw).finish();
 
-      // Get sequence
-      const { accountNumber, sequence } = await this.sequenceManager.getNextSequence();
+        // 3. Broadcast SYNC (instant mempool acceptance) + poll for result
+        //    Step 1: broadcastTxSync — returns tx hash instantly if CheckTx passes
+        //    Step 2: poll chain for tx result — wait until tx is in a block (max ~12s)
+        const txHashHex = await this.client!.broadcastTxSync(txBytes);
+        const txHash = typeof txHashHex === 'string'
+          ? txHashHex
+          : Buffer.from(txHashHex).toString('hex').toUpperCase();
 
-      // Sign and broadcast
-      const result = await this.client!.signAndBroadcast(
-        this.relayerAddress,
-        [msgAny],
-        fee,
-        memo,
-      );
+        logger.info(
+          { txHash, action: actionKey, sequence, asyncMode },
+          'Tx in mempool (sync)',
+        );
 
-      if (result.code !== 0) {
-        // Check for sequence mismatch
-        if (
-          result.rawLog?.includes('account sequence mismatch') ||
-          result.rawLog?.includes('incorrect account sequence')
-        ) {
-          logger.warn(
-            { txHash: result.transactionHash, rawLog: result.rawLog },
-            'Sequence mismatch — retrying once',
-          );
-          await this.sequenceManager.handleSequenceMismatch();
+        // In async mode, return immediately — caller handles confirmation in background
+        if (asyncMode) {
+          return { success: true, txHash, code: 0 };
+        }
 
-          // Retry once
-          const retryResult = await this.client!.signAndBroadcast(
-            this.relayerAddress,
-            [msgAny],
-            fee,
-            memo,
-          );
+        // Step 2: Poll for tx inclusion with timeout
+        const pollStartTime = Date.now();
+        const maxPollMs = 25_000; // 25 seconds — covers 3+ Axiome blocks
+        const pollIntervalMs = 2_000;
+        let txResult: { code: number; rawLog: string; height: number; events: unknown[] } | null = null;
 
-          if (retryResult.code !== 0) {
-            logger.error(
-              {
-                code: retryResult.code,
-                rawLog: retryResult.rawLog,
-                txHash: retryResult.transactionHash,
-              },
-              'MsgExec retry failed',
+        while (Date.now() - pollStartTime < maxPollMs) {
+          await new Promise(r => setTimeout(r, pollIntervalMs));
+          try {
+            const txRes = await fetch(
+              `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
             );
-            return {
-              success: false,
-              txHash: retryResult.transactionHash,
-              code: retryResult.code,
-              rawLog: retryResult.rawLog,
-              error: `Tx failed with code ${retryResult.code}`,
-            };
+            if (txRes.ok) {
+              const txData = await txRes.json() as {
+                tx_response?: {
+                  code: number;
+                  raw_log?: string;
+                  height?: string;
+                  events?: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
+                };
+              };
+              if (txData.tx_response) {
+                txResult = {
+                  code: txData.tx_response.code,
+                  rawLog: txData.tx_response.raw_log ?? '',
+                  height: Number(txData.tx_response.height ?? 0),
+                  events: txData.tx_response.events ?? [],
+                };
+                break;
+              }
+            }
+          } catch {
+            // tx not yet indexed — keep polling
+          }
+        }
+
+        if (!txResult) {
+          // Timeout — tx is in mempool but not yet in block
+          logger.warn({ txHash, action: actionKey }, 'Tx poll timeout — tx still in mempool');
+          return { success: true, txHash, code: 0, timeout: true };
+        }
+
+        if (txResult.code !== 0) {
+          const rawLog = txResult.rawLog;
+
+          // Sequence mismatch — retry (allow retries on all attempts except the last)
+          if (
+            attempt < 2 &&
+            (rawLog.includes('account sequence mismatch') ||
+             rawLog.includes('incorrect account sequence'))
+          ) {
+            const expected = parseExpectedSequence(rawLog);
+            if (expected !== null) {
+              await this.sequenceManager.forceSet(expected);
+            } else {
+              await this.sequenceManager.handleSequenceMismatch();
+            }
+            continue;
           }
 
-          logger.info(
-            {
-              txHash: retryResult.transactionHash,
-              height: retryResult.height,
-              action: actionKey,
-            },
-            'MsgExec retry succeeded',
-          );
-
+          logger.error({ code: txResult.code, rawLog, txHash }, 'MsgExec failed on chain');
           return {
-            success: true,
-            txHash: retryResult.transactionHash,
-            height: retryResult.height,
-            code: retryResult.code,
+            success: false,
+            txHash,
+            code: txResult.code,
+            rawLog,
+            error: rawLog || `Tx failed with code ${txResult.code}`,
           };
         }
 
-        logger.error(
-          { code: result.code, rawLog: result.rawLog, txHash: result.transactionHash },
-          'MsgExec failed',
+        // Success
+        logger.info(
+          { txHash, height: txResult.height, action: actionKey, sequence },
+          'MsgExec succeeded',
         );
+
         return {
-          success: false,
-          txHash: result.transactionHash,
-          code: result.code,
-          rawLog: result.rawLog,
-          error: `Tx failed with code ${result.code}`,
+          success: true,
+          txHash,
+          height: txResult.height,
+          code: 0,
+          events: txResult.events as RelayResult['events'],
         };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        logger.error({ err, user: userAddress, action: actionKey, attempt }, 'MsgExec submission error');
+
+        // Sequence mismatch in catch — parse expected, force-set, retry
+        if (
+          attempt < 2 &&
+          (errorMsg.includes('account sequence mismatch') ||
+           errorMsg.includes('incorrect account sequence'))
+        ) {
+          const expected = parseExpectedSequence(errorMsg);
+          if (expected !== null) {
+            logger.warn({ errorMsg, expected }, 'Sequence mismatch (catch) — force-setting and retrying');
+            await this.sequenceManager.forceSet(expected);
+          } else {
+            logger.warn('Sequence mismatch (catch) — refreshing from chain and retrying');
+            await this.sequenceManager.handleSequenceMismatch();
+          }
+          continue;
+        }
+
+        // "tx already exists in cache" — tx was sent before and is pending in mempool
+        if (errorMsg.includes('tx already exists in cache')) {
+          logger.warn(
+            { user: userAddress, action: actionKey },
+            'Tx already in mempool — treating as pending',
+          );
+          return {
+            success: false,
+            timeout: true,
+            error: 'Transaction is already pending in the mempool. Please wait for it to be included.',
+          };
+        }
+
+        // Detect timeout errors
+        if (
+          errorMsg.includes('was submitted but was not yet found on the chain') ||
+          errorMsg.includes('TimeoutError') ||
+          errorMsg.includes('BROADCAST_TIMEOUT') ||
+          (err instanceof Error && err.constructor.name === 'TimeoutError')
+        ) {
+          const txHashMatch = errorMsg.match(/Transaction with ID ([A-F0-9]+)/);
+          const pendingTxHash = txHashMatch?.[1];
+          logger.warn(
+            { txHash: pendingTxHash, user: userAddress, action: actionKey },
+            'MsgExec broadcast timeout — tx may still be included in a future block',
+          );
+          return {
+            success: false,
+            timeout: true,
+            txHash: pendingTxHash,
+            error: 'Transaction was submitted but not yet confirmed. It may still succeed.',
+          };
+        }
+
+        return { success: false, error: errorMsg };
       }
-
-      logger.info(
-        { txHash: result.transactionHash, height: result.height, action: actionKey },
-        'MsgExec succeeded',
-      );
-
-      return {
-        success: true,
-        txHash: result.transactionHash,
-        height: result.height,
-        code: result.code,
-      };
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error({ err, user: userAddress, action: actionKey }, 'MsgExec submission error');
-
-      // Handle sequence mismatch from signing errors
-      if (errorMsg.includes('account sequence mismatch')) {
-        await this.sequenceManager.handleSequenceMismatch();
-      }
-
-      return { success: false, error: errorMsg };
     }
+
+    // Should not reach here, but just in case
+    return { success: false, error: 'Max retry attempts reached' };
   }
 
   // ---- Convenience methods for each contract action ----
@@ -306,41 +417,46 @@ export class RelayerService {
     return this.submitExec(userAddress, { deposit: {} });
   }
 
-  async relayWithdraw(userAddress: string, amount: string): Promise<RelayResult> {
-    return this.submitExec(userAddress, { withdraw: { amount } });
+  async relayWithdraw(userAddress: string, amount: string, asyncMode = false): Promise<RelayResult> {
+    return this.submitExec(userAddress, { withdraw: { amount } }, '', asyncMode);
   }
 
   async relayCreateBet(
     userAddress: string,
     amount: string,
-    commitment: string,
+    commitmentHex: string,
+    asyncMode = false,
   ): Promise<RelayResult> {
-    return this.submitExec(userAddress, { create_bet: { amount, commitment } });
+    const commitmentBase64 = toBase64(fromHex(commitmentHex));
+    return this.submitExec(userAddress, { create_bet: { amount, commitment: commitmentBase64 } }, '', asyncMode);
   }
 
   async relayAcceptBet(
     userAddress: string,
     betId: number,
     guess: 'heads' | 'tails',
+    asyncMode = false,
   ): Promise<RelayResult> {
-    return this.submitExec(userAddress, { accept_bet: { bet_id: betId, guess } });
+    return this.submitExec(userAddress, { accept_bet: { bet_id: betId, guess } }, '', asyncMode);
   }
 
   async relayReveal(
     userAddress: string,
     betId: number,
     side: 'heads' | 'tails',
-    secret: string,
+    secretHex: string,
+    asyncMode = false,
   ): Promise<RelayResult> {
-    return this.submitExec(userAddress, { reveal: { bet_id: betId, side, secret } });
+    const secretBase64 = toBase64(fromHex(secretHex));
+    return this.submitExec(userAddress, { reveal: { bet_id: betId, side, secret: secretBase64 } }, '', asyncMode);
   }
 
-  async relayCancelBet(userAddress: string, betId: number): Promise<RelayResult> {
-    return this.submitExec(userAddress, { cancel_bet: { bet_id: betId } });
+  async relayCancelBet(userAddress: string, betId: number, asyncMode = false): Promise<RelayResult> {
+    return this.submitExec(userAddress, { cancel_bet: { bet_id: betId } }, '', asyncMode);
   }
 
-  async relayClaimTimeout(userAddress: string, betId: number): Promise<RelayResult> {
-    return this.submitExec(userAddress, { claim_timeout: { bet_id: betId } });
+  async relayClaimTimeout(userAddress: string, betId: number, asyncMode = false): Promise<RelayResult> {
+    return this.submitExec(userAddress, { claim_timeout: { bet_id: betId } }, '', asyncMode);
   }
 
   /** Get relayer account balance (for monitoring) */

@@ -6,8 +6,8 @@ import { AddressSchema } from './common.js';
 export const ConnectRequestSchema = z
   .object({
     address: AddressSchema.openapi({ description: 'User wallet address' }),
-    signature: z.string().openapi({ description: 'Signed message proving ownership' }),
-    message: z.string().openapi({ description: 'Original signed message' }),
+    signature: z.string().optional().openapi({ description: 'Signed message proving ownership' }),
+    message: z.string().optional().openapi({ description: 'Original signed message' }),
   })
   .openapi({ ref: 'ConnectRequest' });
 

@@ -6,6 +6,8 @@ import { betsRouter } from './routes/bets.js';
 import { vaultRouter } from './routes/vault.js';
 import { usersRouter } from './routes/users.js';
 import { authRouter } from './routes/auth.js';
+import { adminRouter } from './routes/admin.js';
+import { referralRouter } from './routes/referral.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { env } from './config/env.js';
 import type { AppEnv } from './types.js';
@@ -53,6 +55,8 @@ app.route('/api/v1/bets', betsRouter);
 app.route('/api/v1/vault', vaultRouter);
 app.route('/api/v1/users', usersRouter);
 app.route('/api/v1/auth', authRouter);
+app.route('/api/v1/admin', adminRouter);
+app.route('/api/v1/referral', referralRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

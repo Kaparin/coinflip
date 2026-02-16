@@ -6,8 +6,11 @@
 /** API base URL */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-/** WebSocket URL */
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3001/ws';
+/** WebSocket URL — auto-detect ws:// vs wss:// based on page protocol */
+export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ??
+  (typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? `wss://${window.location.host}/ws`
+    : 'ws://localhost:3001/ws');
 
 /** Explorer base URL for transaction links */
 export const EXPLORER_URL = process.env.NEXT_PUBLIC_EXPLORER_URL ?? 'https://axiomechain.org';
@@ -17,6 +20,13 @@ export const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID ?? 'axiome-1';
 
 /** Axiome Connect protocol prefix */
 export const AXIOME_CONNECT_PREFIX = 'axiomesign://';
+
+/** Contract addresses */
+export const COINFLIP_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_CONTRACT ?? '';
+export const LAUNCH_CW20_CONTRACT = process.env.NEXT_PUBLIC_LAUNCH_CW20 ?? '';
+
+/** Admin wallet address (for showing admin link in UI) */
+export const ADMIN_ADDRESS = process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? '';
 
 /** Local storage keys */
 export const STORAGE_KEYS = {

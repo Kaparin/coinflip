@@ -4,3 +4,4 @@ export { vaultBalances } from './vault-balances';
 export { bets } from './bets';
 export { txEvents } from './tx-events';
 export { treasuryLedger } from './treasury-ledger';
+export { referralCodes, referrals, referralRewards, referralBalances } from './referrals';

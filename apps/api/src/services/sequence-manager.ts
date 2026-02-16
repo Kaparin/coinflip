@@ -3,7 +3,7 @@
  *
  * Manages account number + sequence (nonce) for the relayer account.
  * Prevents sequence mismatch errors by tracking sequences in-memory
- * and retrying with fresh values on mismatch.
+ * with a proper mutex lock for serialized access.
  */
 
 import { StargateClient } from '@cosmjs/stargate';
@@ -14,7 +14,10 @@ export class SequenceManager {
   private sequence: number | null = null;
   private rpcUrl: string;
   private address: string;
-  private lock: Promise<void> = Promise.resolve();
+
+  /** Promise-based mutex: serializes all callers of getAndIncrement / refresh */
+  private _lockResolve: (() => void) | null = null;
+  private _lockQueue: Promise<void> = Promise.resolve();
 
   constructor(rpcUrl: string, address: string) {
     this.rpcUrl = rpcUrl;
@@ -30,7 +33,7 @@ export class SequenceManager {
     );
   }
 
-  /** Refresh account number + sequence from chain */
+  /** Refresh account number + sequence from chain (unguarded — call under lock or from init) */
   async refresh(): Promise<void> {
     const client = await StargateClient.connect(this.rpcUrl);
     try {
@@ -50,15 +53,12 @@ export class SequenceManager {
   }
 
   /**
-   * Reserve the next sequence number for a transaction.
-   * Thread-safe: uses a lock to serialize access.
+   * Get the current sequence AND atomically increment the local counter.
+   * Safe for concurrent callers — uses an internal mutex.
    */
-  async getNextSequence(): Promise<{ accountNumber: number; sequence: number }> {
-    // Chain the lock to serialize concurrent requests
-    const releaseLock = this.acquireLock();
+  async getAndIncrement(): Promise<{ accountNumber: number; sequence: number }> {
+    const release = await this.acquireLock();
     try {
-      await releaseLock;
-
       if (this.accountNumber === null || this.sequence === null) {
         await this.refresh();
       }
@@ -68,7 +68,6 @@ export class SequenceManager {
         sequence: this.sequence!,
       };
 
-      // Increment local sequence for the next tx
       this.sequence!++;
 
       logger.debug(
@@ -78,7 +77,22 @@ export class SequenceManager {
 
       return result;
     } finally {
-      // Lock is released automatically by promise chain
+      release();
+    }
+  }
+
+  /**
+   * Explicitly set the local sequence to a known value.
+   * Used after a sequence mismatch to force the correct value from the error
+   * or after a chain re-query.
+   */
+  async forceSet(seq: number): Promise<void> {
+    const release = await this.acquireLock();
+    try {
+      logger.info({ oldSequence: this.sequence, newSequence: seq }, 'Sequence force-set');
+      this.sequence = seq;
+    } finally {
+      release();
     }
   }
 
@@ -87,22 +101,38 @@ export class SequenceManager {
    * Resets local state and re-fetches from chain.
    */
   async handleSequenceMismatch(): Promise<void> {
-    logger.warn('Sequence mismatch detected, refreshing from chain');
-    await this.refresh();
+    const release = await this.acquireLock();
+    try {
+      logger.warn('Sequence mismatch detected, refreshing from chain');
+      await this.refresh();
+    } finally {
+      release();
+    }
   }
 
-  /** Simple promise-based lock for serialized access */
-  private acquireLock(): Promise<void> {
-    let release: () => void;
-    const prev = this.lock;
-    this.lock = new Promise((resolve) => {
-      release = resolve;
+  /**
+   * Proper promise-based mutex.
+   * Returns a release() function that MUST be called in a finally block.
+   */
+  private acquireLock(): Promise<() => void> {
+    let outerResolve: (release: () => void) => void;
+    const result = new Promise<() => void>((resolve) => {
+      outerResolve = resolve;
     });
-    return prev.then(() => {
-      // Lock acquired; caller's finally block should call nothing
-      // (lock is released when the new promise resolves)
-      setTimeout(() => release(), 0);
+
+    // Chain onto the queue: when the previous holder releases, we proceed
+    const prev = this._lockQueue;
+    let releaseFn: () => void;
+    this._lockQueue = new Promise<void>((resolve) => {
+      releaseFn = resolve;
     });
+
+    prev.then(() => {
+      // We now hold the lock — give the caller the release function
+      outerResolve!(releaseFn!);
+    });
+
+    return result;
   }
 
   /** Get current state (for debugging/health checks) */

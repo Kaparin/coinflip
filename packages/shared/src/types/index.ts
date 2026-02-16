@@ -27,16 +27,21 @@ export type PaginatedResponse<T> = z.infer<ReturnType<typeof PaginatedResponseSc
 };
 
 // ---- Enum types ----
-export type BetStatus = 'open' | 'accepted' | 'revealed' | 'canceled' | 'timeout_claimed';
+export type BetStatus = 'open' | 'accepting' | 'accepted' | 'revealed' | 'canceled' | 'timeout_claimed';
 export type Side = 'heads' | 'tails';
 
 // ---- WebSocket event types ----
 export type WsEventType =
   | 'bet_created'
+  | 'bet_confirmed'
+  | 'bet_accepting'
   | 'bet_accepted'
   | 'bet_revealed'
   | 'bet_canceled'
   | 'bet_timeout_claimed'
+  | 'bet_create_failed'
+  | 'accept_failed'
+  | 'bet_reverted'
   | 'balance_updated';
 
 export type WsEvent = {

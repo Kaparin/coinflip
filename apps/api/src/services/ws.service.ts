@@ -84,6 +84,31 @@ class WsService {
     this.sendToAddress(address, { type: 'balance_updated', data: balance });
   }
 
+  /** Bet confirmed on chain — bet_id resolved, bet is now "open" */
+  emitBetConfirmed(bet: Record<string, unknown>) {
+    this.broadcast({ type: 'bet_confirmed', data: bet });
+  }
+
+  /** Bet is being accepted — removes from Open Bets for all users */
+  emitBetAccepting(bet: Record<string, unknown>) {
+    this.broadcast({ type: 'bet_accepting', data: bet });
+  }
+
+  /** Accept failed — bet reverts to "open" */
+  emitBetReverted(bet: Record<string, unknown>) {
+    this.broadcast({ type: 'bet_reverted', data: bet });
+  }
+
+  /** Bet creation failed on chain (DeliverTx error) */
+  emitBetCreateFailed(address: string, data: Record<string, unknown>) {
+    this.sendToAddress(address, { type: 'bet_create_failed', data });
+  }
+
+  /** Accept bet failed on chain (DeliverTx error) — bet reverted to "open" */
+  emitAcceptFailed(address: string, data: Record<string, unknown>) {
+    this.sendToAddress(address, { type: 'accept_failed', data });
+  }
+
   getClientCount(): number {
     return this.clients.size;
   }

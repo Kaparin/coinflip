@@ -11,6 +11,9 @@ pub struct InstantiateMsg {
     pub reveal_timeout_secs: u64,
     pub max_open_per_user: u8,
     pub max_daily_amount_per_user: Uint128,
+    /// Open bet TTL in seconds (0 = no expiry). Default: 43200 (12h).
+    #[serde(default = "crate::state::default_bet_ttl_secs")]
+    pub bet_ttl_secs: u64,
 }
 
 #[cw_serde]
@@ -46,7 +49,7 @@ pub enum ExecuteMsg {
     /// Claim timeout on unrevealed bet (acceptor only)
     ClaimTimeout { bet_id: u64 },
 
-    /// Admin: update config
+    /// Admin: update config (only provided fields are changed)
     UpdateConfig {
         treasury: Option<String>,
         commission_bps: Option<u16>,
@@ -54,8 +57,19 @@ pub enum ExecuteMsg {
         reveal_timeout_secs: Option<u64>,
         max_open_per_user: Option<u8>,
         max_daily_amount_per_user: Option<Uint128>,
+        bet_ttl_secs: Option<u64>,
     },
+
+    /// Admin: propose a new admin (step 1 of 2-step transfer)
+    TransferAdmin { new_admin: String },
+
+    /// Pending admin: accept ownership (step 2 of 2-step transfer)
+    AcceptAdmin {},
 }
+
+/// Message for contract migration
+#[cw_serde]
+pub struct MigrateMsg {}
 
 #[cw_serde]
 pub enum ReceiveMsg {
@@ -106,6 +120,7 @@ pub struct ConfigResponse {
     pub reveal_timeout_secs: u64,
     pub max_open_per_user: u8,
     pub max_daily_amount_per_user: Uint128,
+    pub bet_ttl_secs: u64,
 }
 
 #[cw_serde]

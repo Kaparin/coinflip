@@ -1,0 +1,281 @@
+'use client';
+
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
+import {
+  deriveWallet,
+  encryptMnemonic,
+  decryptMnemonic,
+  loadStoredWallet,
+  saveWallet,
+  forgetWallet as forgetStoredWallet,
+  hasSavedWallet,
+  validateMnemonicFormat,
+  type StoredWallet,
+} from '@/lib/wallet-core';
+import { API_URL, STORAGE_KEYS } from '@/lib/constants';
+
+// ---- Session persistence keys ----
+const SESSION_WALLET_KEY = 'coinflip_session_wallet';
+const SESSION_PWD_KEY = 'coinflip_session_pwd';
+
+/** Generate a random password for session wallet serialization */
+function generateSessionPassword(): string {
+  const arr = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Save serialized wallet to sessionStorage for persistence across refreshes */
+async function saveSessionWallet(wallet: DirectSecp256k1HdWallet): Promise<void> {
+  try {
+    const pwd = generateSessionPassword();
+    const serialized = await wallet.serialize(pwd);
+    sessionStorage.setItem(SESSION_WALLET_KEY, serialized);
+    sessionStorage.setItem(SESSION_PWD_KEY, pwd);
+  } catch {
+    // Non-fatal: worst case user will need to re-enter PIN on refresh
+  }
+}
+
+/** Restore wallet from sessionStorage */
+async function restoreSessionWallet(): Promise<DirectSecp256k1HdWallet | null> {
+  try {
+    const serialized = sessionStorage.getItem(SESSION_WALLET_KEY);
+    const pwd = sessionStorage.getItem(SESSION_PWD_KEY);
+    if (!serialized || !pwd) return null;
+    return await DirectSecp256k1HdWallet.deserialize(serialized, pwd);
+  } catch {
+    // Corrupted/expired — clean up
+    sessionStorage.removeItem(SESSION_WALLET_KEY);
+    sessionStorage.removeItem(SESSION_PWD_KEY);
+    return null;
+  }
+}
+
+/** Clear session wallet data */
+function clearSessionWallet(): void {
+  sessionStorage.removeItem(SESSION_WALLET_KEY);
+  sessionStorage.removeItem(SESSION_PWD_KEY);
+}
+
+export interface WebWalletState {
+  /** Current axm1... address (null if not connected) */
+  address: string | null;
+  /** Whether wallet is connected and ready to sign */
+  isConnected: boolean;
+  /** Whether we're currently deriving/decrypting */
+  isConnecting: boolean;
+  /** Whether there's a saved wallet in storage */
+  hasSaved: boolean;
+  /** Saved address for display (before unlock) */
+  savedAddress: string | null;
+  /** Short address for compact display */
+  shortAddress: string | null;
+  /** Error message if any */
+  error: string | null;
+
+  /** Connect with a new mnemonic */
+  connectWithMnemonic: (mnemonic: string, pin: string, rememberMe: boolean) => Promise<void>;
+  /** Unlock a saved wallet with PIN */
+  unlockWithPin: (pin: string) => Promise<void>;
+  /** Disconnect (keep saved wallet) */
+  disconnect: () => void;
+  /** Forget wallet completely (remove from storage) */
+  forgetWallet: () => void;
+
+  /** Get the wallet instance for signing (null if not connected) */
+  getWallet: () => DirectSecp256k1HdWallet | null;
+}
+
+export function useWebWallet(): WebWalletState {
+  const [address, setAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [savedAddress, setSavedAddress] = useState<string | null>(null);
+
+  // In-memory wallet (never persisted as-is)
+  const walletRef = useRef<DirectSecp256k1HdWallet | null>(null);
+
+  /** Register session with backend */
+  const registerSession = useCallback(async (addr: string) => {
+    try {
+      await fetch(`${API_URL}/api/v1/auth/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-wallet-address': addr },
+        credentials: 'include',
+        body: JSON.stringify({ address: addr }),
+      });
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  // Check for saved wallet on mount + try to auto-restore session
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const saved = hasSavedWallet();
+    setHasSaved(saved.saved);
+    if (saved.address) setSavedAddress(saved.address);
+
+    // Try to restore wallet from session (persists across page refreshes within same tab)
+    const sessionAddr = sessionStorage.getItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+    if (sessionAddr && sessionAddr.startsWith('axm1')) {
+      setIsConnecting(true);
+      restoreSessionWallet().then(async (wallet) => {
+        if (wallet) {
+          const [account] = await wallet.getAccounts();
+          if (account?.address === sessionAddr) {
+            walletRef.current = wallet;
+            setAddress(sessionAddr);
+            // Re-register session with backend (refresh may have lost cookies)
+            registerSession(sessionAddr);
+          } else {
+            // Address mismatch — clear stale session
+            clearSessionWallet();
+            sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+          }
+        }
+        // If restore failed, user will need to re-enter PIN — hasSaved is true
+        setIsConnecting(false);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Connect with a new mnemonic + PIN */
+  const connectWithMnemonic = useCallback(async (mnemonic: string, pin: string, rememberMe: boolean) => {
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      // Validate format first
+      const validation = validateMnemonicFormat(mnemonic);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      // Derive wallet
+      const { wallet, address: addr } = await deriveWallet(mnemonic);
+      walletRef.current = wallet;
+
+      // Encrypt and save to localStorage
+      const { encrypted, salt, iv } = await encryptMnemonic(mnemonic.trim().toLowerCase(), pin);
+      const storedWallet: StoredWallet = {
+        address: addr,
+        encryptedMnemonic: encrypted,
+        salt,
+        iv,
+        ephemeral: !rememberMe,
+      };
+      saveWallet(storedWallet);
+
+      // Save serialized wallet to sessionStorage for refresh persistence
+      await saveSessionWallet(wallet);
+
+      // Update state
+      setAddress(addr);
+      setHasSaved(true);
+      setSavedAddress(addr);
+      sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
+
+      // Register with backend
+      await registerSession(addr);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to connect wallet';
+      setError(msg);
+      walletRef.current = null;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [registerSession]);
+
+  /** Unlock saved wallet with PIN */
+  const unlockWithPin = useCallback(async (pin: string) => {
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      const stored = loadStoredWallet();
+      if (!stored) {
+        throw new Error('No saved wallet found');
+      }
+
+      // Decrypt mnemonic
+      const mnemonic = await decryptMnemonic(
+        stored.encryptedMnemonic,
+        stored.salt,
+        stored.iv,
+        pin,
+      );
+
+      // Derive wallet from decrypted mnemonic
+      const { wallet, address: addr } = await deriveWallet(mnemonic);
+      walletRef.current = wallet;
+
+      // Verify address matches
+      if (addr !== stored.address) {
+        throw new Error('Address mismatch — wallet data may be corrupted');
+      }
+
+      // Save serialized wallet to sessionStorage for refresh persistence
+      await saveSessionWallet(wallet);
+
+      setAddress(addr);
+      sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
+
+      // Register with backend
+      await registerSession(addr);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
+      setError(msg);
+      walletRef.current = null;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [registerSession]);
+
+  /** Disconnect (keep saved wallet for later unlock) */
+  const disconnect = useCallback(() => {
+    walletRef.current = null;
+    setAddress(null);
+    setError(null);
+    clearSessionWallet();
+    sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+  }, []);
+
+  /** Forget wallet completely */
+  const forgetWallet = useCallback(() => {
+    walletRef.current = null;
+    setAddress(null);
+    setError(null);
+    setHasSaved(false);
+    setSavedAddress(null);
+    forgetStoredWallet();
+    clearSessionWallet();
+    sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+  }, []);
+
+  /** Get wallet for signing */
+  const getWallet = useCallback(() => walletRef.current, []);
+
+  const shortAddress = address
+    ? `${address.slice(0, 10)}...${address.slice(-4)}`
+    : null;
+
+  return {
+    address,
+    isConnected: address !== null && walletRef.current !== null,
+    isConnecting,
+    hasSaved,
+    savedAddress,
+    shortAddress,
+    error,
+    connectWithMnemonic,
+    unlockWithPin,
+    disconnect,
+    forgetWallet,
+    getWallet,
+  };
+}

@@ -1,10 +1,15 @@
 import type { BetRow } from '../services/bet.service.js';
-import { REVEAL_TIMEOUT_SECS } from '@coinflip/shared/constants';
+import { REVEAL_TIMEOUT_SECS, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 
 /** Format a DB bet row into the API response shape */
 export function formatBetResponse(bet: BetRow, addressMap?: Map<string, string>) {
   const revealDeadline = bet.acceptedTime
     ? new Date(bet.acceptedTime.getTime() + REVEAL_TIMEOUT_SECS * 1000).toISOString()
+    : null;
+
+  // Open bets expire after OPEN_BET_TTL_SECS (12 hours)
+  const expiresAt = (bet.status === 'open' || bet.status === 'canceling')
+    ? new Date(bet.createdTime.getTime() + OPEN_BET_TTL_SECS * 1000).toISOString()
     : null;
 
   return {
@@ -22,7 +27,7 @@ export function formatBetResponse(bet: BetRow, addressMap?: Map<string, string>)
     accepted_at: bet.acceptedTime?.toISOString() ?? null,
     txhash_accept: bet.txhashAccept,
 
-    reveal_side: null, // Not stored in DB directly — derive from chain event if needed
+    reveal_side: null,
     winner: bet.winnerUserId
       ? (addressMap?.get(bet.winnerUserId) ?? bet.winnerUserId)
       : null,
@@ -32,6 +37,7 @@ export function formatBetResponse(bet: BetRow, addressMap?: Map<string, string>)
     txhash_resolve: bet.txhashResolve,
 
     reveal_deadline: revealDeadline,
+    expires_at: expiresAt,
   };
 }
 

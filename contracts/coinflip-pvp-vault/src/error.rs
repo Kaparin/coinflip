@@ -44,4 +44,13 @@ pub enum ContractError {
 
     #[error("Invalid CW20 token: expected {expected}")]
     InvalidToken { expected: String },
+
+    #[error("Invalid commission: max {max_bps} bps")]
+    InvalidCommission { max_bps: u16 },
+
+    #[error("Invalid timeout: must be between {min} and {max} seconds")]
+    InvalidTimeout { min: u64, max: u64 },
+
+    #[error("Bet expired: bet {id} expired at timestamp {expired_at}")]
+    BetExpired { id: u64, expired_at: u64 },
 }

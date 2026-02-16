@@ -1,4 +1,4 @@
-use cosmwasm_std::{Deps, Order, StdResult};
+use cosmwasm_std::{Deps, Env, Order, StdResult};
 
 use crate::msg::{BetResponse, BetsResponse, ConfigResponse, VaultBalanceResponse};
 use crate::state::{BetStatus, BETS, CONFIG, VAULT_BALANCES};
@@ -14,6 +14,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         reveal_timeout_secs: config.reveal_timeout_secs,
         max_open_per_user: config.max_open_per_user,
         max_daily_amount_per_user: config.max_daily_amount_per_user,
+        bet_ttl_secs: config.bet_ttl_secs,
     })
 }
 
@@ -35,9 +36,12 @@ pub fn query_bet(deps: Deps, bet_id: u64) -> StdResult<BetResponse> {
 
 pub fn query_open_bets(
     deps: Deps,
+    env: Env,
     start_after: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<BetsResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let now = env.block.time.seconds();
     let limit = limit.unwrap_or(20).min(100) as usize;
     let start = start_after.map(|s| s + 1).unwrap_or(0);
 
@@ -46,6 +50,10 @@ pub fn query_open_bets(
         .filter_map(|item| {
             let (_, bet) = item.ok()?;
             if bet.status == BetStatus::Open {
+                // Skip expired bets
+                if config.bet_ttl_secs > 0 && now > bet.created_at_time + config.bet_ttl_secs {
+                    return None;
+                }
                 Some(bet_to_response(bet))
             } else {
                 None

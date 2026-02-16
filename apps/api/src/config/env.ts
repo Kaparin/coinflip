@@ -1,4 +1,16 @@
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// Load .env from monorepo root (in production, env vars are injected by the platform)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: resolve(__dirname, '../../../../.env') });
+
+// Railway injects PORT; map to API_PORT if not explicitly set
+if (process.env.PORT && !process.env.API_PORT) {
+  process.env.API_PORT = process.env.PORT;
+}
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
@@ -14,6 +26,7 @@ const envSchema = z.object({
   RELAYER_MNEMONIC: z.string().default(''),
   RELAYER_ADDRESS: z.string().default(''),
   TREASURY_ADDRESS: z.string().default(''),
+  ADMIN_ADDRESSES: z.string().default(''),
 });
 
 export const env = envSchema.parse(process.env);

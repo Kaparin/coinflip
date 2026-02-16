@@ -6,10 +6,6 @@ import { AmountSchema, SideSchema, BetIdSchema } from './common.js';
 export const CreateBetRequestSchema = z
   .object({
     amount: AmountSchema.openapi({ description: 'Bet amount in LAUNCH tokens', example: '100' }),
-    commitment: z
-      .string()
-      .length(64)
-      .openapi({ description: 'SHA256 commitment hash (64 hex chars)' }),
   })
   .openapi({ ref: 'CreateBetRequest' });
 
