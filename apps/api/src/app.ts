@@ -22,10 +22,7 @@ const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Bo
 app.use(
   '*',
   cors({
-    origin: (origin) => {
-      if (allowedOrigins.includes(origin)) return origin;
-      return null;
-    },
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
