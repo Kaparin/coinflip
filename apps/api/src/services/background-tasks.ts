@@ -887,10 +887,21 @@ async function cancelOrphanedChainBets(): Promise<void> {
 
       if (processingBets.has(betKey)) continue;
 
+      // Grace period: skip bets created less than 5 minutes ago
+      // (background task may still be saving them to DB)
+      if (chainBet.created_at_time) {
+        const createdAtMs = chainBet.created_at_time > 1e12 ? chainBet.created_at_time : chainBet.created_at_time * 1000;
+        const ageMs = Date.now() - createdAtMs;
+        if (ageMs < 5 * 60 * 1000) {
+          logger.debug({ betId: betKey, ageMs }, `${tag} — skipping recent bet (grace period)`);
+          continue;
+        }
+      }
+
       const dbBet = await betService.getBetById(betId);
       if (dbBet) continue; // Already in DB — will be handled by normal auto-cancel
 
-      // Orphaned bet — not in DB. Cancel it via relayer.
+      // Orphaned bet — not in DB and older than 5min. Cancel it via relayer.
       processingBets.add(betKey);
       try {
         logger.warn({ betId: betKey, maker: chainBet.maker }, `${tag} — found orphaned bet, canceling`);
