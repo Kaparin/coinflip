@@ -11,7 +11,7 @@ pub struct InstantiateMsg {
     pub reveal_timeout_secs: u64,
     pub max_open_per_user: u16,
     pub max_daily_amount_per_user: Uint128,
-    /// Open bet TTL in seconds (0 = no expiry). Default: 43200 (12h).
+    /// Open bet TTL in seconds (0 = no expiry). Default: 10800 (3h).
     #[serde(default = "crate::state::default_bet_ttl_secs")]
     pub bet_ttl_secs: u64,
 }

@@ -751,7 +751,7 @@ export async function autoClaimTimeoutBets(): Promise<void> {
 // ─── Auto-Cancel Expired Open Bets ──────────────────────────────
 
 /**
- * Cancel open bets that have exceeded the 12-hour TTL.
+ * Cancel open bets that have exceeded the 3-hour TTL.
  * Submits cancel_bet via relayer and unlocks maker funds.
  */
 async function autoCancelExpiredBets(): Promise<void> {

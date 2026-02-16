@@ -337,14 +337,14 @@ export class BetService {
 
   /** Get open bets that have expired (older than OPEN_BET_TTL_SECS) */
   async getExpiredOpenBets(): Promise<BetRow[]> {
-    // OPEN_BET_TTL_SECS = 43200 (12 hours)
+    // OPEN_BET_TTL_SECS = 10800 (3 hours)
     return this.db
       .select()
       .from(bets)
       .where(
         and(
           inArray(bets.status, ['open', 'canceling']),
-          sql`${bets.createdTime} < NOW() - INTERVAL '12 hours'`,
+          sql`${bets.createdTime} < NOW() - INTERVAL '3 hours'`,
         ),
       );
   }

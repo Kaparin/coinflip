@@ -301,7 +301,7 @@
     "rulesStep5": "Withdraw funds",
     "rulesStep5Desc": "Your winnings go to the game vault. Withdraw to your wallet anytime.",
     "importantToKnow": "Important to know",
-    "important1": "Each bet has a 12-hour expiration. Unaccepted bets are automatically canceled and funds returned.",
+    "important1": "Each bet has a 3-hour expiration. Unaccepted bets are automatically canceled and funds returned.",
     "important2": "1-Click Play authorization is required to play. It only works with the CoinFlip contract.",
     "important3": "All actions are recorded on the blockchain and can be verified in the explorer.",
     "connected": "Connected",

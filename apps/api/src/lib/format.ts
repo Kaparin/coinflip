@@ -9,7 +9,7 @@ export function formatBetResponse(bet: BetRow, addressMap?: Map<string, UserInfo
     ? new Date(bet.acceptedTime.getTime() + REVEAL_TIMEOUT_SECS * 1000).toISOString()
     : null;
 
-  // Open bets expire after OPEN_BET_TTL_SECS (12 hours)
+  // Open bets expire after OPEN_BET_TTL_SECS (3 hours)
   const expiresAt = (bet.status === 'open' || bet.status === 'canceling')
     ? new Date(bet.createdTime.getTime() + OPEN_BET_TTL_SECS * 1000).toISOString()
     : null;

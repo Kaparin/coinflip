@@ -37,8 +37,8 @@ export function formatLaunch(micro: string | number | bigint): string {
 /** Reveal timeout in seconds (5 minutes) — time for maker to reveal after acceptance */
 export const REVEAL_TIMEOUT_SECS = 300;
 
-/** Open bet TTL in seconds (12 hours) — open bets auto-cancel after this */
-export const OPEN_BET_TTL_SECS = 12 * 60 * 60; // 43200 seconds = 12 hours
+/** Open bet TTL in seconds (3 hours) — open bets auto-cancel after this */
+export const OPEN_BET_TTL_SECS = 3 * 60 * 60; // 10800 seconds = 3 hours
 
 /** Maximum open bets per wallet (matches contract config: 255, will be 1000 after migration) */
 export const MAX_OPEN_BETS_PER_USER = 255;

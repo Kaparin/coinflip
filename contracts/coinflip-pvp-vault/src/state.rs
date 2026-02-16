@@ -2,10 +2,10 @@ use cosmwasm_std::{Addr, Binary, Uint128};
 use cw_storage_plus::{Item, Map};
 use cosmwasm_schema::cw_serde;
 
-/// Default bet TTL: 12 hours = 43200 seconds.
+/// Default bet TTL: 3 hours = 10800 seconds.
 /// Used by serde when loading old Config from storage that lacks this field.
 pub fn default_bet_ttl_secs() -> u64 {
-    43200
+    10800
 }
 
 #[cw_serde]
@@ -19,7 +19,7 @@ pub struct Config {
     pub max_open_per_user: u16,
     pub max_daily_amount_per_user: Uint128,
     /// How long an open bet lives before it can be canceled by anyone (seconds).
-    /// 0 = no expiration. Default: 43200 (12 hours).
+    /// 0 = no expiration. Default: 10800 (3 hours).
     #[serde(default = "default_bet_ttl_secs")]
     pub bet_ttl_secs: u64,
 }

@@ -483,7 +483,7 @@ betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
   if (existing.makerUserId === user.id) throw Errors.selfAccept();
 
   // Reject if bet expires within 30 seconds (prevents accepting about-to-expire bets)
-  const OPEN_BET_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+  const OPEN_BET_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
   const EXPIRY_BUFFER_MS = 30_000; // 30 seconds
   const expiresAtMs = existing.createdTime.getTime() + OPEN_BET_TTL_MS;
   if (Date.now() > expiresAtMs - EXPIRY_BUFFER_MS) {
