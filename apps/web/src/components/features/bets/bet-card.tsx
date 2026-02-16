@@ -118,7 +118,7 @@ function getTier(humanAmount: number): {
       border: 'border-purple-400/30',
       glow: 'shadow-[0_0_18px_rgba(168,85,247,0.1)]',
       gradient: 'from-purple-500/8 via-transparent to-indigo-500/5',
-      icon: '/logo.png',
+      icon: '/logo-coin.png',
       tier: 'epic',
     };
   }
