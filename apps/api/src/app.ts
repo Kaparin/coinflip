@@ -24,8 +24,6 @@ app.use(
   cors({
     origin: (origin) => {
       if (allowedOrigins.includes(origin)) return origin;
-      // Allow if single origin configured (backwards compat)
-      if (allowedOrigins.length === 1) return allowedOrigins[0];
       return null;
     },
     credentials: true,
