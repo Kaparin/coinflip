@@ -43,7 +43,7 @@ function formatFullDate(iso: string): string {
 function TxLink({ hash, label }: { hash: string; label: string }) {
   return (
     <a
-      href={`${EXPLORER_URL}/tx/${hash}`}
+      href={`${EXPLORER_URL}/transactions/${hash}`}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 text-[10px] text-[var(--color-primary)] hover:underline"

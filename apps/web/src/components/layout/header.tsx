@@ -183,7 +183,7 @@ export function Header() {
                       </button>
 
                       {/* View in explorer */}
-                      <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`${EXPLORER_URL}/account/${wallet.address}`} target="_blank" rel="noopener noreferrer"
                         onClick={() => setWalletDropdownOpen(false)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]">
                         <ExternalLink size={16} className="text-[var(--color-text-secondary)]" />
@@ -280,7 +280,7 @@ export function Header() {
 
                   {/* Quick links */}
                   <div className="flex gap-2">
-                    <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`${EXPLORER_URL}/account/${wallet.address}`} target="_blank" rel="noopener noreferrer"
                       onClick={() => setMenuOpen(false)}
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium">
                       <ExternalLink size={14} className="text-[var(--color-text-secondary)]" />
