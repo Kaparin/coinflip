@@ -242,77 +242,75 @@ export function Header() {
             )}
           </div>
 
-          {/* Mobile: 1-Click chip + burger icon */}
+          {/* Mobile: Connect button when disconnected, else 1-Click chip + burger */}
           <div className="flex items-center gap-1.5 md:hidden">
-            {wallet.isConnected && (
-              <StatusChips
-                oneClickEnabled={oneClickEnabled}
-                gasSponsored={gasSponsored}
-                compact
-                onSetupClick={() => setOnboardingOpen(true)}
-              />
+            {wallet.isConnected ? (
+              <>
+                <StatusChips
+                  oneClickEnabled={oneClickEnabled}
+                  gasSponsored={gasSponsored}
+                  compact
+                  onSetupClick={() => setOnboardingOpen(true)}
+                />
+                <button type="button" onClick={() => setMenuOpen(!menuOpen)}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
+                  aria-label={t('header.toggleMenu')}>
+                  {menuOpen ? <X size={20} /> : <Menu size={20} />}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={wallet.connect} disabled={wallet.isConnecting}
+                className="rounded-xl bg-[var(--color-primary)] px-5 py-2 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-50">
+                {wallet.isConnecting ? t('common.connecting') : t('common.connectWallet')}
+              </button>
             )}
-            <button type="button" onClick={() => setMenuOpen(!menuOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
-              aria-label={t('header.toggleMenu')}>
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
           </div>
         </div>
 
-        {/* Mobile dropdown — minimal: address + actions only (balance/wallet moved to /game/wallet) */}
-        {menuOpen && (
+        {/* Mobile dropdown — address + actions (only when connected; Connect is in header when disconnected) */}
+        {menuOpen && wallet.isConnected && (
           <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 md:hidden">
             <div className="flex flex-col gap-2.5">
-              {wallet.isConnected ? (
-                <>
-                  {/* Compact address row */}
-                  <div className="flex items-center justify-between rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-success)]" />
-                      <span className="text-xs font-mono truncate">{wallet.address}</span>
-                    </div>
-                    <button type="button" onClick={handleCopyAddress}
-                      className="shrink-0 ml-2 text-[10px] font-medium text-[var(--color-primary)] hover:underline">
-                      {copied ? t('common.copied') : t('common.copy')}
-                    </button>
-                  </div>
-
-                  {/* Quick links */}
-                  <div className="flex gap-2">
-                    <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium">
-                      <ExternalLink size={14} className="text-[var(--color-text-secondary)]" />
-                      {t('common.explorer')}
-                    </a>
-                    {isAdmin && (
-                      <Link href="/admin" onClick={() => setMenuOpen(false)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-3 py-2 text-xs font-bold text-[var(--color-primary)]">
-                        <ShieldCheck size={14} />
-                        {t('common.admin')}
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Disconnect / Forget */}
-                  <div className="flex gap-2">
-                    <button type="button" onClick={handleDisconnect}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium text-[var(--color-warning)]">
-                      {t('header.disconnect')}
-                    </button>
-                    <button type="button" onClick={handleForgetWallet}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-3 py-2 text-xs font-medium text-[var(--color-danger)]">
-                      {t('header.forgetWallet')}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <button type="button" onClick={() => { wallet.connect(); setMenuOpen(false); }}
-                  className="rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold">
-                  {t('common.connectWallet')}
+              {/* Compact address row */}
+              <div className="flex items-center justify-between rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-success)]" />
+                  <span className="text-xs font-mono truncate">{wallet.address}</span>
+                </div>
+                <button type="button" onClick={handleCopyAddress}
+                  className="shrink-0 ml-2 text-[10px] font-medium text-[var(--color-primary)] hover:underline">
+                  {copied ? t('common.copied') : t('common.copy')}
                 </button>
-              )}
+              </div>
+
+              {/* Quick links */}
+              <div className="flex gap-2">
+                <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium">
+                  <ExternalLink size={14} className="text-[var(--color-text-secondary)]" />
+                  {t('common.explorer')}
+                </a>
+                {isAdmin && (
+                  <Link href="/admin" onClick={() => setMenuOpen(false)}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-3 py-2 text-xs font-bold text-[var(--color-primary)]">
+                    <ShieldCheck size={14} />
+                    {t('common.admin')}
+                  </Link>
+                )}
+              </div>
+
+              {/* Disconnect / Forget */}
+              <div className="flex gap-2">
+                <button type="button" onClick={handleDisconnect}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium text-[var(--color-warning)]">
+                  {t('header.disconnect')}
+                </button>
+                <button type="button" onClick={handleForgetWallet}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-3 py-2 text-xs font-medium text-[var(--color-danger)]">
+                  {t('header.forgetWallet')}
+                </button>
+              </div>
             </div>
           </div>
         )}
