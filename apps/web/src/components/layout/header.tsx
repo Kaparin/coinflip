@@ -81,7 +81,7 @@ export function Header() {
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <Link href="/game" className="flex items-center gap-2.5 group">
             <span className="text-lg font-extrabold tracking-tight">
-              Coin<span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Flip</span>
+              Heads or <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Tails</span>
             </span>
           </Link>
 

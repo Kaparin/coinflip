@@ -30,19 +30,84 @@ type DepositStep = 'connecting' | 'signing' | 'broadcasting' | 'confirming';
 
 const DEPOSIT_STEPS: DepositStep[] = ['connecting', 'signing', 'broadcasting', 'confirming'];
 
-function WithdrawProgressOverlay() {
-  const { t } = useTranslation();
+type WithdrawStep = 'checking' | 'locking' | 'relaying' | 'confirming';
+
+const WITHDRAW_STEPS: WithdrawStep[] = ['checking', 'locking', 'relaying', 'confirming'];
+
+function WithdrawProgressOverlay({ elapsedSec }: { elapsedSec: number }) {
+  const { t, locale } = useTranslation();
+  const isRu = locale === 'ru';
+  const stepLabels: Record<WithdrawStep, string> = {
+    checking: isRu ? 'Проверка баланса' : 'Checking balance',
+    locking: isRu ? 'Блокировка средств' : 'Locking funds',
+    relaying: isRu ? 'Отправка транзакции в блокчейн' : 'Submitting transaction to blockchain',
+    confirming: isRu ? 'Ожидание подтверждения' : 'Waiting for confirmation',
+  };
+
+  // Simulate step progression based on elapsed time
+  let currentStep: WithdrawStep = 'checking';
+  if (elapsedSec >= 2) currentStep = 'locking';
+  if (elapsedSec >= 4) currentStep = 'relaying';
+  if (elapsedSec >= 8) currentStep = 'confirming';
+  const currentIdx = WITHDRAW_STEPS.indexOf(currentStep);
+
   return (
-    <div className="py-6 flex flex-col items-center gap-4">
-      <div className="relative flex h-16 w-16 items-center justify-center">
-        <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-        <LaunchTokenIcon size={60} />
+    <div className="py-2 space-y-5">
+      {/* Animated spinner */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
+          <LaunchTokenIcon size={60} />
+        </div>
+        <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
       </div>
-      <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
-      <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-        <Shield size={14} className="text-amber-500 shrink-0" />
-        <p className="text-[11px] text-amber-600 dark:text-amber-400">{t('balance.depositDoNotClose')}</p>
+
+      {/* Step list */}
+      <div className="space-y-2.5">
+        {WITHDRAW_STEPS.map((step, idx) => {
+          const isActive = idx === currentIdx;
+          const isDone = idx < currentIdx;
+
+          return (
+            <div key={step} className="flex items-center gap-3">
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
+                isDone ? 'bg-[var(--color-success)] text-white'
+                  : isActive ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-border)]/30 text-[var(--color-text-secondary)]'
+              }`}>
+                {isDone ? (
+                  <CheckCircle size={14} />
+                ) : isActive ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  idx + 1
+                )}
+              </div>
+              <span className={`text-sm transition-colors duration-300 ${
+                isDone ? 'text-[var(--color-success)] font-medium'
+                  : isActive ? 'text-[var(--color-text)] font-semibold'
+                  : 'text-[var(--color-text-secondary)]'
+              }`}>
+                {stepLabels[step]}
+                {isActive && <span className="inline-block ml-1 animate-pulse">...</span>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Warning + timer */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+          <Shield size={14} className="text-amber-500 shrink-0" />
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">{t('balance.depositDoNotClose')}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] text-[var(--color-text-secondary)]">
+            {isRu ? 'Обычно занимает 5-15 секунд' : 'Usually takes 5-15 seconds'} · {elapsedSec}{isRu ? 'с' : 's'}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -126,7 +191,7 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
 }
 
 export function BalanceDisplay() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
   const { pendingDeduction, isFrozen } = usePendingBalance();
   const { data, isLoading, refetch } = useGetVaultBalance({
@@ -150,12 +215,29 @@ export function BalanceDisplay() {
   const [depositElapsed, setDepositElapsed] = useState(0);
   const depositTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'signing' | 'success' | 'error'>('idle');
+  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'signing' | 'success' | 'error' | 'timeout'>('idle');
   const [withdrawError, setWithdrawError] = useState('');
   const [withdrawErrorTxHash, setWithdrawErrorTxHash] = useState<string | null>(null);
+  const [withdrawElapsed, setWithdrawElapsed] = useState(0);
+  const withdrawTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Track the micro amount of in-flight withdraw for optimistic updates
   const lastWithdrawMicroRef = useRef('0');
+  const lastWithdrawHumanRef = useRef('0');
+
+  // Elapsed timer for withdraw
+  useEffect(() => {
+    if (withdrawStatus === 'signing') {
+      setWithdrawElapsed(0);
+      withdrawTimerRef.current = setInterval(() => setWithdrawElapsed(s => s + 1), 1000);
+    } else {
+      if (withdrawTimerRef.current) {
+        clearInterval(withdrawTimerRef.current);
+        withdrawTimerRef.current = null;
+      }
+    }
+    return () => { if (withdrawTimerRef.current) clearInterval(withdrawTimerRef.current); };
+  }, [withdrawStatus]);
 
   const withdrawMutation = useWithdrawFromVault({
     mutation: {
@@ -188,23 +270,58 @@ export function BalanceDisplay() {
           return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
         });
 
-        // Refetch for eventual consistency (server cache may lag)
+        // Refetch for eventual consistency
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
           queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
         }, 3000);
       },
       onError: (err) => {
-        const error = err as { error?: { message?: string; details?: { txHash?: string } } };
-        setWithdrawError(error?.error?.message ?? t('balance.withdrawFailed'));
-        setWithdrawErrorTxHash(error?.error?.details?.txHash ?? null);
-        setWithdrawStatus('error');
+        const error = err as { error?: { message?: string; details?: { txHash?: string }; code?: string } };
+        const errMsg = error?.error?.message ?? '';
+        const txHash = error?.error?.details?.txHash ?? null;
+
+        // Detect timeout/network errors — the transaction may still succeed on chain
+        const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+        const isNetworkErr = err instanceof TypeError;
+
+        if (isTimeout || isNetworkErr) {
+          // Don't show as "failed" — show optimistic success with a note
+          setWithdrawStatus('timeout');
+          // Apply optimistic updates anyway — balance will correct on next refetch
+          const microAmount = lastWithdrawMicroRef.current;
+          queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
+            if (!old?.data) return old;
+            const newAvailable = BigInt(old.data.available) - BigInt(microAmount);
+            const newTotal = BigInt(old.data.total) - BigInt(microAmount);
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                available: (newAvailable < 0n ? 0n : newAvailable).toString(),
+                total: (newTotal < 0n ? 0n : newTotal).toString(),
+              },
+            };
+          });
+          queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+            return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
+          });
+          // Refetch soon to get real state
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+            queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+          }, 5000);
+        } else {
+          setWithdrawError(errMsg || t('balance.withdrawFailed'));
+          setWithdrawErrorTxHash(txHash);
+          setWithdrawStatus('error');
+        }
       },
     },
   });
 
   // Global in-flight flag: blocks ALL deposit/withdraw buttons while any operation is active
-  const isOperationInFlight = depositStatus === 'signing' || depositStatus === 'broadcasting' || withdrawMutation.isPending;
+  const isOperationInFlight = depositStatus === 'signing' || depositStatus === 'broadcasting' || withdrawMutation.isPending || withdrawStatus === 'signing';
 
   const balance = data?.data;
   const rawAvailableMicro = BigInt(balance?.available ?? '0');
@@ -391,6 +508,7 @@ export function BalanceDisplay() {
     if (isNaN(parsedHuman) || parsedHuman <= 0 || parsedHuman > availableHuman) return;
     const microAmount = toMicroLaunch(parsedHuman);
     lastWithdrawMicroRef.current = microAmount;
+    lastWithdrawHumanRef.current = withdrawAmount;
     withdrawMutation.mutate({ data: { amount: microAmount } });
   };
 
@@ -546,8 +664,8 @@ export function BalanceDisplay() {
       {showWithdraw && (
         <Modal
           open
-          onClose={withdrawMutation.isPending ? () => {} : () => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
-          showCloseButton={!withdrawMutation.isPending}
+          onClose={(withdrawMutation.isPending || withdrawStatus === 'signing') ? () => {} : () => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
+          showCloseButton={!withdrawMutation.isPending && withdrawStatus !== 'signing'}
         >
           <div className="p-5 max-w-sm w-full">
             {withdrawStatus === 'success' ? (
@@ -557,7 +675,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  −{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={45} />
+                  −{parseFloat(withdrawAmount || lastWithdrawHumanRef.current).toLocaleString()} <LaunchTokenIcon size={45} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}
@@ -567,8 +685,32 @@ export function BalanceDisplay() {
                   {t('balance.collapse')}
                 </button>
               </div>
-            ) : withdrawMutation.isPending ? (
-              <WithdrawProgressOverlay />
+            ) : withdrawStatus === 'timeout' ? (
+              /* Timeout — tx likely still processing on chain */
+              <div className="text-center py-4 animate-fade-up">
+                <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-amber-500/15 mb-3">
+                  <Shield size={28} className="text-amber-500" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">
+                  {t('locale') === 'ru' || locale === 'ru' ? 'Транзакция обрабатывается' : 'Transaction Processing'}
+                </h3>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-2">
+                  {locale === 'ru'
+                    ? 'Ответ от блокчейна занял больше времени чем обычно, но транзакция скорее всего прошла успешно.'
+                    : 'The blockchain response took longer than usual, but the transaction likely succeeded.'}
+                </p>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                  {locale === 'ru'
+                    ? 'Баланс обновится автоматически в течение нескольких секунд.'
+                    : 'Your balance will update automatically in a few seconds.'}
+                </p>
+                <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
+                  className="w-full rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-black btn-press">
+                  {locale === 'ru' ? 'Понятно' : 'Got it'}
+                </button>
+              </div>
+            ) : withdrawMutation.isPending || withdrawStatus === 'signing' ? (
+              <WithdrawProgressOverlay elapsedSec={withdrawElapsed} />
             ) : (
               <>
                 <h3 className="text-lg font-bold mb-1">{t('balance.withdrawTitle')}</h3>

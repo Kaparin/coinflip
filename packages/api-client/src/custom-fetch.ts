@@ -1,8 +1,11 @@
 // Next.js inlines NEXT_PUBLIC_* at build time — works on both client and server
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-/** Default timeout for API requests (15 seconds) */
-const REQUEST_TIMEOUT_MS = 15_000;
+/** Default timeout for GET requests (15 seconds) */
+const GET_TIMEOUT_MS = 15_000;
+
+/** Timeout for mutation requests — chain txs can take 20-30s (45 seconds) */
+const MUTATION_TIMEOUT_MS = 45_000;
 
 /** Max retry attempts for transient failures */
 const MAX_RETRIES = 2;
@@ -65,8 +68,9 @@ export const customFetch = async <T>(
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       // Create a timeout controller (merged with caller's signal if present)
+      const timeoutMs = isGet ? GET_TIMEOUT_MS : MUTATION_TIMEOUT_MS;
       const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+      const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
 
       // If caller provided a signal, abort our controller when it fires
       const callerSignal = config.signal;

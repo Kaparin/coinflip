@@ -34,31 +34,35 @@ function CollapsibleSection({
   children,
   defaultOpen = false,
   variant = 'default',
+  compact = false,
 }: {
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
   variant?: 'default' | 'danger';
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const borderClass = variant === 'danger'
     ? 'border-[var(--color-danger)]/20'
     : 'border-[var(--color-border)]';
+  const pad = compact ? 'px-4 py-3' : 'px-5 py-4';
+  const contentPad = compact ? 'px-4 pb-4' : 'px-5 pb-5';
 
   return (
     <div className={`rounded-2xl border ${borderClass} bg-[var(--color-surface)] overflow-hidden`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
+        className={`w-full flex items-center gap-3 ${pad} text-left transition-colors hover:bg-[var(--color-surface-hover)]`}
       >
         <span className="text-[var(--color-text-secondary)]">{icon}</span>
-        <span className="flex-1 text-sm font-bold">{title}</span>
+        <span className={`flex-1 font-bold ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
         <ChevronIcon open={open} />
       </button>
       {open && (
-        <div className="px-5 pb-5 border-t border-[var(--color-border)]/50">
+        <div className={`${contentPad} border-t border-[var(--color-border)]/50`}>
           {children}
         </div>
       )}
@@ -70,23 +74,32 @@ function AboutSection() {
   const { t } = useTranslation();
 
   return (
-    <div className="pt-4 space-y-5">
-      <div>
-        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          <strong className="text-[var(--color-text)]">CoinFlip</strong> — {t('profile.aboutDesc')}
-        </p>
-      </div>
+    <div className="pt-4 space-y-3">
+      <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] mb-4">
+        <strong className="text-[var(--color-text)]">{t('common.appName')}</strong> — {t('profile.aboutDescShort')}
+      </p>
 
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-          {t('profile.howWinnerDetermined')}
-        </p>
-        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] mb-3">
-          {t('profile.winnerExplanation')}
-        </p>
-        <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 overflow-x-auto">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] mb-2">{t('profile.randomCodeTitle')}</p>
-          <pre className="text-[11px] font-mono leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap">{`${t('profile.randomCodeComment1')}
+      {/* 1. Механика рандома */}
+      <CollapsibleSection
+        title={t('profile.about.randomMechanics')}
+        icon={<Code size={18} />}
+        defaultOpen={true}
+        compact
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1">
+              {t('profile.howWinnerDetermined')}
+            </p>
+            <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              {t('profile.winnerExplanation')}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 overflow-x-auto">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] mb-2">
+              {t('profile.randomCodeTitle')}
+            </p>
+            <pre className="text-[10px] font-mono leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap">{`${t('profile.randomCodeComment1')}
 import { randomBytes } from 'node:crypto';
 
 function secureCoinFlip() {
@@ -101,150 +114,170 @@ const acceptorGuess = secureCoinFlip(); ${t('profile.randomCodeComment5')}
 
 ${t('profile.randomCodeComment6')}
 ${t('profile.randomCodeComment7')}`}</pre>
-        </div>
-        <p className="text-xs text-[var(--color-text-secondary)] mt-2 leading-relaxed">
-          <code className="text-[var(--color-primary)]">crypto.randomBytes</code> {t('profile.randomCodeExplanation')}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-          {t('profile.commissionTitle')}
-        </p>
-        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          {t('profile.commissionDesc')}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-          {t('profile.securityTitle')}
-        </p>
-        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          {t('profile.securityDesc')}
-        </p>
-      </div>
-
-      {/* Contract Addresses */}
-      {(COINFLIP_CONTRACT || LAUNCH_CW20_CONTRACT) && (
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-            {t('profile.contractsTitle')}
+          </div>
+          <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
+            <code className="text-[var(--color-primary)]">crypto.randomBytes</code> {t('profile.randomCodeExplanation')}
           </p>
-          <div className="space-y-2">
-            {COINFLIP_CONTRACT && (
-              <a
-                href={`https://axiomechain.pro/contract/${COINFLIP_CONTRACT}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
-              >
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-primary)]/10 flex items-center justify-center">
-                  <Code size={16} className="text-[var(--color-primary)]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.gameContract')}</p>
-                  <p className="text-xs font-mono break-all leading-relaxed text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
-                    {COINFLIP_CONTRACT}
-                  </p>
-                </div>
-                <ExternalLink size={16} className="flex-shrink-0 text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)] transition-colors" />
-              </a>
-            )}
-            {LAUNCH_CW20_CONTRACT && (
-              <a
-                href={`https://axiomechain.pro/contract/${LAUNCH_CW20_CONTRACT}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/5 group"
-              >
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <Coins size={16} className="text-emerald-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.launchToken')}</p>
-                  <p className="text-xs font-mono break-all leading-relaxed text-[var(--color-text)] group-hover:text-emerald-400 transition-colors">
-                    {LAUNCH_CW20_CONTRACT}
-                  </p>
-                </div>
-                <ExternalLink size={16} className="flex-shrink-0 text-[var(--color-text-secondary)] group-hover:text-emerald-400 transition-colors" />
-              </a>
-            )}
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+              {t('profile.commissionTitle')}
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.commissionDesc')}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+              {t('profile.securityTitle')}
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.securityDesc')}</p>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
+      </CollapsibleSection>
 
-function RulesSection() {
-  const { t } = useTranslation();
-
-  const steps = [
-    {
-      num: '1',
-      title: t('profile.rulesStep1'),
-      desc: t('profile.rulesStep1Desc'),
-    },
-    {
-      num: '2',
-      title: t('profile.rulesStep2'),
-      desc: t('profile.rulesStep2Desc'),
-    },
-    {
-      num: '3',
-      title: t('profile.rulesStep3'),
-      desc: t('profile.rulesStep3Desc'),
-    },
-    {
-      num: '4',
-      title: t('profile.rulesStep4'),
-      desc: t('profile.rulesStep4Desc'),
-    },
-    {
-      num: '5',
-      title: t('profile.rulesStep5'),
-      desc: t('profile.rulesStep5Desc'),
-    },
-  ];
-
-  return (
-    <div className="pt-4 space-y-5">
-      <div className="space-y-3">
-        {steps.map((step) => (
-          <div key={step.num} className="flex gap-3">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
-              <span className="text-xs font-black text-[var(--color-primary)]">{step.num}</span>
+      {/* 2. Как играть */}
+      <CollapsibleSection
+        title={t('profile.about.howToPlay')}
+        icon={<BookOpen size={18} />}
+        defaultOpen={true}
+        compact
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.about.howToPlayIntro')}</p>
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="flex gap-2">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-[10px] font-bold flex items-center justify-center">
+                {n}
+              </span>
+              <div>
+                <p className="text-xs font-bold text-[var(--color-text)]">{t(`profile.about.step${n}Title` as 'profile.about.step1Title')}</p>
+                <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-0.5">
+                  {t(`profile.about.step${n}Desc` as 'profile.about.step1Desc')}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold leading-snug">{step.title}</p>
-              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed mt-0.5">{step.desc}</p>
+          ))}
+          <div className="pt-2 space-y-2 border-t border-[var(--color-border)]/50">
+            <div>
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+                {t('profile.about.depositTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.depositBody')}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+                {t('profile.about.withdrawTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.withdrawBody')}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+                {t('profile.about.betFlowTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.betFlowBody')}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+                {t('profile.about.timingsTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.timingsBody')}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+                {t('profile.about.branchChangeTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.branchChangeBody')}</p>
             </div>
           </div>
-        ))}
-      </div>
+          <div className="pt-2 border-t border-[var(--color-border)]/50">
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-2">
+              {t('profile.importantToKnow')}
+            </p>
+            <ul className="space-y-1.5">
+              {[1, 2, 3, 4].map((i) => (
+                <li key={i} className="flex gap-2 text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
+                  <span className="text-[var(--color-warning)] shrink-0">•</span>
+                  <span>{t(`profile.important${i}` as 'profile.important1')}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </CollapsibleSection>
 
-      <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 space-y-2">
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">{t('profile.importantToKnow')}</p>
-        <ul className="space-y-1.5">
-          <li className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)] leading-relaxed">
-            <span className="text-[var(--color-warning)] mt-0.5">*</span>
-            <span>{t('profile.important1')}</span>
-          </li>
-          <li className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)] leading-relaxed">
-            <span className="text-[var(--color-warning)] mt-0.5">*</span>
-            <span>{t('profile.important2')}</span>
-          </li>
-          <li className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)] leading-relaxed">
-            <span className="text-[var(--color-warning)] mt-0.5">*</span>
-            <span>{t('profile.important3')}</span>
-          </li>
-          <li className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)] leading-relaxed">
-            <span className="text-[var(--color-warning)] mt-0.5">*</span>
-            <span>{t('profile.important4')}</span>
-          </li>
-        </ul>
-      </div>
+      {/* 3. Как это работает на сервере */}
+      <CollapsibleSection
+        title={t('profile.about.serverArchitecture')}
+        icon={<Info size={18} />}
+        defaultOpen={false}
+        compact
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+              {t('profile.about.contractTitle')}
+            </p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mb-2">{t('profile.about.contractBody')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.contractStorage')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-2">{t('profile.about.contractMessages')}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+              {t('profile.about.relayerTitle')}
+            </p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.relayerBody')}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
+              {t('profile.about.indexerTitle')}
+            </p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.indexerBody')}</p>
+          </div>
+
+          {/* Contract Addresses */}
+          {(COINFLIP_CONTRACT || LAUNCH_CW20_CONTRACT) && (
+            <div className="pt-2 border-t border-[var(--color-border)]/50">
+              <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-2">
+                {t('profile.contractsTitle')}
+              </p>
+              <div className="space-y-2">
+                {COINFLIP_CONTRACT && (
+                  <a
+                    href={`https://axiomechain.pro/contract/${COINFLIP_CONTRACT}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
+                  >
+                    <Code size={14} className="text-[var(--color-primary)] shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.gameContract')}</p>
+                      <p className="text-[10px] font-mono break-all text-[var(--color-text)] group-hover:text-[var(--color-primary)]">
+                        {COINFLIP_CONTRACT}
+                      </p>
+                    </div>
+                    <ExternalLink size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  </a>
+                )}
+                {LAUNCH_CW20_CONTRACT && (
+                  <a
+                    href={`https://axiomechain.pro/contract/${LAUNCH_CW20_CONTRACT}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/5 group"
+                  >
+                    <Coins size={14} className="text-emerald-400 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.launchToken')}</p>
+                      <p className="text-[10px] font-mono break-all text-[var(--color-text)] group-hover:text-emerald-400">
+                        {LAUNCH_CW20_CONTRACT}
+                      </p>
+                    </div>
+                    <ExternalLink size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }
@@ -868,7 +901,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* About and Rules are visible even without wallet */}
+        {/* About is visible even without wallet */}
         <div className="mt-4 space-y-3 text-left">
           <CollapsibleSection
             title={t('profile.about')}
@@ -876,14 +909,6 @@ export default function ProfilePage() {
             icon={<Info size={20} />}
           >
             <AboutSection />
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title={t('profile.gameRules')}
-            defaultOpen={false}
-            icon={<BookOpen size={20} />}
-          >
-            <RulesSection />
           </CollapsibleSection>
 
           {/* Language switcher */}
@@ -971,15 +996,6 @@ export default function ProfilePage() {
         icon={<Info size={20} />}
       >
         <AboutSection />
-      </CollapsibleSection>
-
-      {/* Game Rules */}
-      <CollapsibleSection
-        title={t('profile.gameRules')}
-        defaultOpen={false}
-        icon={<BookOpen size={20} />}
-      >
-        <RulesSection />
       </CollapsibleSection>
 
       {/* Referral Program */}

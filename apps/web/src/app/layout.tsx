@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from './providers';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://coinflip.axiome-launch.com';
-const TITLE = 'CoinFlip — PvP Heads or Tails on Axiome';
+const TITLE = 'Heads or Tails — PvP on Axiome';
 const DESCRIPTION = 'Wager LAUNCH tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.';
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
     url: APP_URL,
-    siteName: 'CoinFlip',
+    siteName: 'Heads or Tails',
     type: 'website',
   },
   twitter: {

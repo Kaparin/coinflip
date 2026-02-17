@@ -341,13 +341,6 @@ export function BetList({ pendingBets = [] }: BetListProps) {
             <Coins size={32} strokeWidth={1.5} />
           </div>
           <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t('bets.noOpenBets')}</p>
-          <p className="text-xs text-[var(--color-text-secondary)]/60">{t('bets.createOneAbove')}</p>
-          <a
-            href="#create-bet-form"
-            className="rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
-          >
-            {t('wager.createBet')}
-          </a>
         </div>
       ) : null}
 

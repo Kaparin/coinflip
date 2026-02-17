@@ -31,10 +31,10 @@ const paginated = <T extends z.ZodTypeAny>(schema: T) =>
 const document = createDocument({
   openapi: '3.1.0',
   info: {
-    title: 'CoinFlip PvP dApp API',
+    title: 'Heads or Tails PvP dApp API',
     version: '1.0.0',
     description:
-      'API for the PvP CoinFlip decentralized application on Axiome Chain. Enables creating, accepting, revealing, and resolving Heads/Tails bets with LAUNCH tokens.',
+      'API for the PvP Heads or Tails decentralized application on Axiome Chain. Enables creating, accepting, revealing, and resolving Heads/Tails bets with LAUNCH tokens.',
   },
   servers: [
     { url: 'http://localhost:3001', description: 'Local development' },
