@@ -231,33 +231,27 @@ export class ReferralService {
   }
 
   /**
-   * Change referral branch (paid feature).
-   * Costs CHANGE_BRANCH_COST_MICRO from user's available vault balance.
-   * The funds go to the treasury (platform revenue).
-   *
-   * Returns: { success: true } | { success: false, reason: string }
+   * Validate a branch change request (without executing it).
+   * Checks: target exists, not self, no cycles.
    */
-  async changeBranch(
+  async validateBranchChange(
     userId: string,
     newReferrerAddress: string,
-  ): Promise<{ success: boolean; reason?: string; cost?: string }> {
-    const tag = 'referral:change-branch';
+  ): Promise<{ valid: boolean; reason?: string; newReferrerId?: string }> {
     const normalized = newReferrerAddress.trim().toLowerCase();
 
-    // Find new referrer
     const newReferrer = await this.db.query.users.findFirst({
       where: eq(users.address, normalized),
     });
     if (!newReferrer) {
-      return { success: false, reason: 'USER_NOT_FOUND' };
+      return { valid: false, reason: 'USER_NOT_FOUND' };
     }
 
     if (newReferrer.id === userId) {
-      return { success: false, reason: 'SELF_REFERRAL' };
+      return { valid: false, reason: 'SELF_REFERRAL' };
     }
 
     // Check for cycles: walk up the chain from newReferrer to see if userId appears
-    // (would create a cycle: A → B → ... → A)
     let cursor = newReferrer.id;
     const visited = new Set<string>([userId]);
     for (let i = 0; i < 20; i++) {
@@ -266,49 +260,31 @@ export class ReferralService {
       });
       if (!ref) break;
       if (visited.has(ref.referrerUserId)) {
-        return { success: false, reason: 'WOULD_CREATE_CYCLE' };
+        return { valid: false, reason: 'WOULD_CREATE_CYCLE' };
       }
       visited.add(ref.referrerUserId);
       cursor = ref.referrerUserId;
     }
 
-    // Deduct cost from available balance (atomic)
-    const deductResult = await this.db
-      .update(vaultBalances)
-      .set({
-        available: sql`${vaultBalances.available}::numeric - ${CHANGE_BRANCH_COST_MICRO}::numeric`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(vaultBalances.userId, userId),
-          sql`${vaultBalances.available}::numeric >= ${CHANGE_BRANCH_COST_MICRO}::numeric`,
-        ),
-      )
-      .returning();
+    return { valid: true, newReferrerId: newReferrer.id };
+  }
 
-    if (deductResult.length === 0) {
-      return { success: false, reason: 'INSUFFICIENT_BALANCE' };
-    }
+  /**
+   * Execute a branch change after payment has been verified on-chain.
+   * Updates the referral chain in DB.
+   */
+  async executeBranchChange(
+    userId: string,
+    newReferrerAddress: string,
+  ): Promise<void> {
+    const tag = 'referral:change-branch';
+    const normalized = newReferrerAddress.trim().toLowerCase();
 
-    // Credit treasury
-    const treasuryAddr = env.TREASURY_ADDRESS;
-    if (treasuryAddr) {
-      const treasuryUser = await this.db.query.users.findFirst({
-        where: eq(users.address, treasuryAddr),
-      });
-      if (treasuryUser) {
-        await this.db
-          .update(vaultBalances)
-          .set({
-            available: sql`${vaultBalances.available}::numeric + ${CHANGE_BRANCH_COST_MICRO}::numeric`,
-            updatedAt: new Date(),
-          })
-          .where(eq(vaultBalances.userId, treasuryUser.id));
-      }
-    }
+    const newReferrer = await this.db.query.users.findFirst({
+      where: eq(users.address, normalized),
+    });
+    if (!newReferrer) throw new Error('New referrer not found');
 
-    // Get or create new referrer's code
     const newCode = await this.getOrCreateCode(newReferrer.id);
 
     // Delete existing referral (if any)
@@ -331,8 +307,11 @@ export class ReferralService {
       { userId, newReferrerId: newReferrer.id, address: newReferrerAddress, cost: CHANGE_BRANCH_COST_MICRO },
       `${tag} — branch changed`,
     );
+  }
 
-    return { success: true, cost: CHANGE_BRANCH_COST_MICRO };
+  /** Cost to change branch, exposed for the route handler */
+  static get CHANGE_BRANCH_COST(): string {
+    return CHANGE_BRANCH_COST_MICRO;
   }
 
   /**

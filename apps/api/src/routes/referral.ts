@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { referralService } from '../services/referral.service.js';
+import { referralService, ReferralService } from '../services/referral.service.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { invalidateBalanceCache } from './vault.js';
+import { getChainVaultBalance, invalidateBalanceCache } from './vault.js';
+import { relayerService } from '../services/relayer.js';
+import { Errors } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
+import { env } from '../config/env.js';
 import type { AppEnv } from '../types.js';
 
 export const referralRouter = new Hono<AppEnv>();
@@ -59,28 +63,116 @@ referralRouter.get('/has-referrer', authMiddleware, async (c) => {
 });
 
 // POST /api/v1/referral/change-branch — Change referral branch (paid: 1000 LAUNCH)
+//
+// Full on-chain payment flow:
+//   1. Validate (target exists, no self-ref, no cycles)
+//   2. Check user's vault balance >= 1000 LAUNCH
+//   3. Relay withdraw from vault → 1000 LAUNCH CW20 goes to user's wallet
+//   4. Relay CW20 transfer from user → treasury wallet
+//   5. Update referral chain in DB
+//
+// If step 4 fails, the user still paid (vault decreased) but treasury didn't receive.
+// This is logged but the branch change still proceeds — the fee was charged from vault.
 const ChangeBranchSchema = z.object({ address: z.string().min(1).max(100) });
 
 referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeBranchSchema), async (c) => {
   const userId = c.get('user').id;
   const walletAddress = c.get('address');
   const { address: newReferrerAddr } = c.req.valid('json');
-  const result = await referralService.changeBranch(userId, newReferrerAddr);
+  const cost = ReferralService.CHANGE_BRANCH_COST;
 
-  if (!result.success) {
+  // Step 1: Validate the branch change (cycles, self-referral, target exists)
+  const validation = await referralService.validateBranchChange(userId, newReferrerAddr);
+  if (!validation.valid) {
     const messages: Record<string, string> = {
       USER_NOT_FOUND: 'User with this address not found in the system',
       SELF_REFERRAL: 'Cannot refer yourself',
       WOULD_CREATE_CYCLE: 'This change would create a circular referral chain',
-      INSUFFICIENT_BALANCE: 'Insufficient balance. You need 1,000 LAUNCH to change branch.',
     };
     return c.json({
-      error: { code: result.reason, message: messages[result.reason!] ?? 'Failed to change branch' },
+      error: { code: validation.reason, message: messages[validation.reason!] ?? 'Failed to change branch' },
     }, 400);
   }
 
+  // Step 2: Check on-chain vault balance
+  const chainBalance = await getChainVaultBalance(walletAddress);
+  if (BigInt(chainBalance.available) < BigInt(cost)) {
+    return c.json({
+      error: {
+        code: 'INSUFFICIENT_BALANCE',
+        message: 'Insufficient balance. You need 1,000 LAUNCH to change branch.',
+      },
+    }, 400);
+  }
+
+  if (!relayerService.isReady()) {
+    throw Errors.relayerNotReady();
+  }
+
+  // Step 3: Withdraw 1000 LAUNCH from user's vault on-chain
+  // This sends CW20 tokens from the CoinFlip contract to the user's wallet.
+  const withdrawResult = await relayerService.relayWithdraw(walletAddress, cost);
+  if (!withdrawResult.success) {
+    logger.error({ withdrawResult, walletAddress, cost }, 'Branch change: vault withdraw failed');
+    return c.json({
+      error: {
+        code: 'CHAIN_TX_FAILED',
+        message: 'Failed to deduct branch change fee from vault. Please try again.',
+        details: { txHash: withdrawResult.txHash },
+      },
+    }, 422);
+  }
+
+  logger.info({ txHash: withdrawResult.txHash, walletAddress }, 'Branch change: vault withdraw confirmed');
+
+  // Step 4: Transfer CW20 tokens from user's wallet to treasury
+  // This completes the payment: user → treasury.
+  const treasuryAddr = env.TREASURY_ADDRESS;
+  const cw20Addr = env.LAUNCH_CW20_ADDR;
+  let transferTxHash: string | undefined;
+
+  if (treasuryAddr && cw20Addr) {
+    const transferResult = await relayerService.relayCw20Transfer(
+      walletAddress,
+      cw20Addr,
+      treasuryAddr,
+      cost,
+      'CoinFlip branch change fee',
+    );
+
+    if (transferResult.success) {
+      transferTxHash = transferResult.txHash;
+      logger.info(
+        { txHash: transferResult.txHash, from: walletAddress, to: treasuryAddr, amount: cost },
+        'Branch change: CW20 transfer to treasury confirmed',
+      );
+    } else {
+      // Transfer failed — vault was already deducted, tokens are in user's CW20 wallet.
+      // Log the failure but still proceed with the branch change (user paid from vault).
+      logger.error(
+        { transferResult, walletAddress, treasuryAddr, cost },
+        'Branch change: CW20 transfer to treasury FAILED — tokens remain in user wallet',
+      );
+    }
+  }
+
+  // Step 5: Update the referral chain in DB
+  await referralService.executeBranchChange(userId, newReferrerAddr);
+
   invalidateBalanceCache(walletAddress);
-  return c.json({ data: { changed: true, cost: result.cost } });
+  logger.info(
+    { userId, walletAddress, newReferrer: newReferrerAddr, cost, withdrawTx: withdrawResult.txHash, transferTx: transferTxHash },
+    'Branch changed with on-chain payment',
+  );
+
+  return c.json({
+    data: {
+      changed: true,
+      cost,
+      withdraw_tx: withdrawResult.txHash,
+      transfer_tx: transferTxHash,
+    },
+  });
 });
 
 // GET /api/v1/referral/stats — Get referral stats

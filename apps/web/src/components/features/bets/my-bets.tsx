@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
+import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 
@@ -312,7 +313,9 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
       {!hasAnything && (
         <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
-          <span className="text-3xl block mb-2">🎯</span>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
+            <Coins size={32} strokeWidth={1.5} />
+          </div>
           <p className="text-sm text-[var(--color-text-secondary)]">{t('myBets.noActiveBets')}</p>
           <p className="text-xs text-[var(--color-text-secondary)]/60">{t('myBets.createToStart')}</p>
         </div>

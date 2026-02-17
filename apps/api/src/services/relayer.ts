@@ -177,10 +177,14 @@ export class RelayerService {
   }
 
   /** Build the MsgAny + fee for a given user action */
-  private buildTxPayload(userAddress: string, action: ContractAction) {
+  private buildTxPayload(
+    userAddress: string,
+    action: ContractAction | Record<string, unknown>,
+    contractAddr?: string,
+  ) {
     const innerMsg: MsgExecuteContract = {
       sender: userAddress,
-      contract: this.contractAddress,
+      contract: contractAddr ?? this.contractAddress,
       msg: toUtf8(JSON.stringify(action)),
       funds: [],
     };
@@ -210,17 +214,19 @@ export class RelayerService {
    */
   private async _submitExecInner(
     userAddress: string,
-    action: ContractAction,
+    action: ContractAction | Record<string, unknown>,
     memo: string,
     asyncMode = false,
+    contractOverride?: string,
   ): Promise<RelayResult> {
     const actionKey = Object.keys(action)[0]!;
+    const targetContract = contractOverride ?? this.contractAddress;
     logger.info(
-      { user: userAddress, action: actionKey, contract: this.contractAddress },
+      { user: userAddress, action: actionKey, contract: targetContract },
       'Submitting MsgExec',
     );
 
-    const { msgAny, fee } = this.buildTxPayload(userAddress, action);
+    const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride);
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -411,7 +417,44 @@ export class RelayerService {
     return { success: false, error: 'Max retry attempts reached' };
   }
 
-  // ---- Convenience methods for each contract action ----
+  // ---- Custom contract execution (for CW20 transfers, etc.) ----
+
+  /**
+   * Execute an action on ANY contract via authz MsgExec.
+   * The user must have granted GenericAuthorization for MsgExecuteContract.
+   */
+  async submitExecOnContract(
+    userAddress: string,
+    contractAddress: string,
+    action: Record<string, unknown>,
+    memo = '',
+  ): Promise<RelayResult> {
+    if (!this.isReady()) {
+      return { success: false, error: 'Relayer not initialized' };
+    }
+    return this._submitExecInner(userAddress, action, memo, false, contractAddress);
+  }
+
+  /**
+   * Transfer CW20 tokens from user to recipient via authz.
+   * Executes `transfer { recipient, amount }` on the CW20 contract on behalf of the user.
+   */
+  async relayCw20Transfer(
+    userAddress: string,
+    cw20Contract: string,
+    recipient: string,
+    amount: string,
+    memo = '',
+  ): Promise<RelayResult> {
+    return this.submitExecOnContract(
+      userAddress,
+      cw20Contract,
+      { transfer: { recipient, amount } },
+      memo || 'CoinFlip fee transfer',
+    );
+  }
+
+  // ---- Convenience methods for CoinFlip contract actions ----
 
   async relayDeposit(userAddress: string): Promise<RelayResult> {
     return this.submitExec(userAddress, { deposit: {} });

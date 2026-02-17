@@ -150,30 +150,61 @@ export function BalanceDisplay() {
   const [depositElapsed, setDepositElapsed] = useState(0);
   const depositTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'signing' | 'success'>('idle');
+  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'signing' | 'success' | 'error'>('idle');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawErrorTxHash, setWithdrawErrorTxHash] = useState<string | null>(null);
+
+  // Track the micro amount of in-flight withdraw for optimistic updates
+  const lastWithdrawMicroRef = useRef('0');
 
   const withdrawMutation = useWithdrawFromVault({
     mutation: {
-      onMutate: () => setWithdrawStatus('signing'),
-      onSuccess: (response) => {
-        const txHash = (response as any)?.tx_hash ?? '';
+      onMutate: () => {
+        setWithdrawStatus('signing');
+        setWithdrawError('');
+        setWithdrawErrorTxHash(null);
+      },
+      onSuccess: () => {
+        const microAmount = lastWithdrawMicroRef.current;
         setWithdrawStatus('success');
-        // Immediately invalidate balance queries
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-        queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-        // Also refetch after a short delay for blockchain propagation
+
+        // Optimistic update: immediately reflect the balance change in UI
+        queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
+          if (!old?.data) return old;
+          const newAvailable = BigInt(old.data.available) - BigInt(microAmount);
+          const newTotal = BigInt(old.data.total) - BigInt(microAmount);
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              available: (newAvailable < 0n ? 0n : newAvailable).toString(),
+              total: (newTotal < 0n ? 0n : newTotal).toString(),
+            },
+          };
+        });
+
+        // Optimistic update: add to wallet CW20 balance
+        queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+          return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
+        });
+
+        // Refetch for eventual consistency (server cache may lag)
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
           queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
         }, 3000);
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-        }, 8000);
       },
-      onError: () => setWithdrawStatus('idle'),
+      onError: (err) => {
+        const error = err as { error?: { message?: string; details?: { txHash?: string } } };
+        setWithdrawError(error?.error?.message ?? t('balance.withdrawFailed'));
+        setWithdrawErrorTxHash(error?.error?.details?.txHash ?? null);
+        setWithdrawStatus('error');
+      },
     },
   });
+
+  // Global in-flight flag: blocks ALL deposit/withdraw buttons while any operation is active
+  const isOperationInFlight = depositStatus === 'signing' || depositStatus === 'broadcasting' || withdrawMutation.isPending;
 
   const balance = data?.data;
   const rawAvailableMicro = BigInt(balance?.available ?? '0');
@@ -277,19 +308,32 @@ export function BalanceDisplay() {
       // Step 4: Confirmed (or pending)
       setDepositStep('confirming');
       const result = broadcastData.data;
+      setDepositTxHash(result.tx_hash);
+      setDepositStatus('success');
 
-      if (result.status === 'pending') {
-        // Tx submitted but not confirmed yet — still treat as success with a note
-        setDepositTxHash(result.tx_hash);
-        setDepositStatus('success');
-      } else {
-        setDepositTxHash(result.tx_hash);
-        setDepositStatus('success');
-      }
+      // Optimistic update: immediately reflect deposit in balances
+      const depositMicro = toMicroLaunch(parsedHuman);
+      queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
+        if (!old?.data) return old;
+        const newAvailable = BigInt(old.data.available) + BigInt(depositMicro);
+        const newTotal = BigInt(old.data.total) + BigInt(depositMicro);
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            available: newAvailable.toString(),
+            total: newTotal.toString(),
+          },
+        };
+      });
 
-      // Refresh balances
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-      queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+      // Optimistic update: subtract from wallet CW20 balance
+      queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+        const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
+        return (newBal < 0n ? 0n : newBal).toString();
+      });
+
+      // Refetch for eventual consistency
       setTimeout(() => {
         refetch();
         queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
@@ -304,8 +348,23 @@ export function BalanceDisplay() {
         setDepositStep('confirming');
         setDepositTxHash(result.txHash);
         setDepositStatus('success');
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-        queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+
+        // Optimistic update (same as above)
+        const depositMicro = toMicroLaunch(parsedHuman);
+        queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
+          if (!old?.data) return old;
+          const newAvailable = BigInt(old.data.available) + BigInt(depositMicro);
+          const newTotal = BigInt(old.data.total) + BigInt(depositMicro);
+          return { ...old, data: { ...old.data, available: newAvailable.toString(), total: newTotal.toString() } };
+        });
+        queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+          const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
+          return (newBal < 0n ? 0n : newBal).toString();
+        });
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+          queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+        }, 3000);
       } catch (fallbackErr) {
         const msg = fallbackErr instanceof Error ? fallbackErr.message : t('balance.depositFailed');
         setDepositError(msg);
@@ -327,9 +386,11 @@ export function BalanceDisplay() {
   };
 
   const handleWithdraw = () => {
+    if (isOperationInFlight) return;
     const parsedHuman = parseFloat(withdrawAmount);
     if (isNaN(parsedHuman) || parsedHuman <= 0 || parsedHuman > availableHuman) return;
     const microAmount = toMicroLaunch(parsedHuman);
+    lastWithdrawMicroRef.current = microAmount;
     withdrawMutation.mutate({ data: { amount: microAmount } });
   };
 
@@ -382,13 +443,23 @@ export function BalanceDisplay() {
             </div>
 
             <div className="flex gap-2">
-              <button type="button" onClick={() => setShowDeposit(true)}
-                className="flex-1 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] btn-press">
-                {t('balance.depositBtn')}
+              <button type="button" onClick={() => setShowDeposit(true)} disabled={isOperationInFlight}
+                className="flex-1 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-40 btn-press">
+                {isOperationInFlight ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    {t('common.processing')}
+                  </span>
+                ) : t('balance.depositBtn')}
               </button>
-              <button type="button" onClick={() => setShowWithdraw(true)} disabled={availableMicro <= 0n}
+              <button type="button" onClick={() => setShowWithdraw(true)} disabled={availableMicro <= 0n || isOperationInFlight}
                 className="flex-1 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-40 btn-press">
-                {t('common.withdraw')}
+                {isOperationInFlight ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    {t('common.processing')}
+                  </span>
+                ) : t('common.withdraw')}
               </button>
             </div>
           </>
@@ -475,8 +546,8 @@ export function BalanceDisplay() {
       {showWithdraw && (
         <Modal
           open
-          onClose={() => { if (withdrawStatus !== 'signing') { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); } }}
-          showCloseButton={withdrawStatus !== 'signing'}
+          onClose={withdrawMutation.isPending ? () => {} : () => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
+          showCloseButton={!withdrawMutation.isPending}
         >
           <div className="p-5 max-w-sm w-full">
             {withdrawStatus === 'success' ? (
@@ -491,12 +562,12 @@ export function BalanceDisplay() {
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}
                 </p>
-                <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); }}
+                <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
                   className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">
                   {t('balance.collapse')}
                 </button>
               </div>
-            ) : withdrawStatus === 'signing' ? (
+            ) : withdrawMutation.isPending ? (
               <WithdrawProgressOverlay />
             ) : (
               <>
@@ -525,40 +596,32 @@ export function BalanceDisplay() {
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
                 </div>
 
+                {withdrawError && (
+                  <div className="mb-3">
+                    <p className="text-xs text-[var(--color-danger)]">{withdrawError}</p>
+                    {withdrawErrorTxHash && (
+                      <a
+                        href={`${EXPLORER_URL}/transactions/${withdrawErrorTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
+                      >
+                        {t('balance.checkTxExplorer')} →
+                      </a>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); }}
+                  <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
                     className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold">{t('common.cancel')}</button>
-                  <button type="button" disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > availableHuman || withdrawMutation.isPending}
+                  <button type="button"
+                    disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > availableHuman || withdrawMutation.isPending}
                     onClick={handleWithdraw}
                     className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold disabled:opacity-40">
-                    {withdrawMutation.isPending ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        {t('common.processing')}
-                      </span>
-                    ) : t('common.withdraw')}
+                    {t('common.withdraw')}
                   </button>
                 </div>
-                {withdrawMutation.isError && (() => {
-                  const err = withdrawMutation.error as { error?: { message?: string; details?: { txHash?: string } } };
-                  const msg = err?.error?.message ?? t('balance.withdrawFailed');
-                  const txHash = err?.error?.details?.txHash;
-                  return (
-                    <div className="mt-2 text-center">
-                      <p className="text-xs text-[var(--color-danger)]">{msg}</p>
-                      {txHash && (
-                        <a
-                          href={`${EXPLORER_URL}/transactions/${txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
-                        >
-                          {t('balance.checkTxExplorer')} →
-                        </a>
-                      )}
-                    </div>
-                  );
-                })()}
               </>
             )}
           </div>

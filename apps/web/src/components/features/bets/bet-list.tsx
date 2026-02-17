@@ -16,6 +16,7 @@ import {
 } from '@coinflip/shared/constants';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { LaunchTokenIcon } from '@/components/ui';
+import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 
@@ -335,7 +336,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         </div>
       ) : myPendingBets.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
-          <span className="text-3xl">🎲</span>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+            <Coins size={32} strokeWidth={1.5} />
+          </div>
           <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t('bets.noOpenBets')}</p>
           <p className="text-xs text-[var(--color-text-secondary)]/60">{t('bets.createOneAbove')}</p>
           <a

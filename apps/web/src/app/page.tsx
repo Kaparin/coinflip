@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 
 export default function LandingPage() {
@@ -10,8 +11,8 @@ export default function LandingPage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
       {/* Hero */}
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-primary)]/15 text-4xl animate-pulse-glow mb-2">
-          🪙
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)] animate-pulse-glow mb-2">
+          <Coins size={40} strokeWidth={1.5} />
         </div>
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
           Coin<span className="text-[var(--color-primary)]">Flip</span>

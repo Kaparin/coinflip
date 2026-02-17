@@ -5,6 +5,7 @@ import { useLeaderboard, type LeaderboardEntry } from '@/hooks/use-leaderboard';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 
@@ -146,9 +147,12 @@ export function Leaderboard() {
           {t('leaderboard.failedToLoad')}
         </p>
       ) : !data?.length ? (
-        <div className="text-center py-8">
+        <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
+            <Trophy size={32} strokeWidth={1.5} />
+          </div>
           <p className="text-sm text-[var(--color-text-secondary)]">{t('leaderboard.noPlayers')}</p>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          <p className="text-xs text-[var(--color-text-secondary)]/60 mt-1">
             {t('leaderboard.beFirst')}
           </p>
         </div>

@@ -8,7 +8,7 @@ import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { formatLaunch, fromMicroLaunch, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { EXPLORER_URL } from '@/lib/constants';
-import { ChevronDown, ExternalLink, Trophy, Skull, Clock, Ban, Hourglass } from 'lucide-react';
+import { ChevronDown, ExternalLink, Trophy, Skull, Clock, Ban, Hourglass, Coins, Settings, History } from 'lucide-react';
 
 type HistoryTab = 'games' | 'system' | 'all';
 
@@ -442,9 +442,9 @@ export function HistoryList() {
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
-          <span className="text-3xl block mb-2">
-            {tab === 'games' ? '🎮' : tab === 'system' ? '⚙️' : '📋'}
-          </span>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
+            {tab === 'games' ? <Coins size={32} strokeWidth={1.5} /> : tab === 'system' ? <Settings size={32} strokeWidth={1.5} /> : <History size={32} strokeWidth={1.5} />}
+          </div>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {tab === 'games' ? t('history.noGames') :
              tab === 'system' ? t('history.noSystemEvents') :
