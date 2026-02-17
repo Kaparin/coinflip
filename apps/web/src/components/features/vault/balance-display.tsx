@@ -22,6 +22,24 @@ type DepositStep = 'connecting' | 'signing' | 'broadcasting' | 'confirming';
 
 const DEPOSIT_STEPS: DepositStep[] = ['connecting', 'signing', 'broadcasting', 'confirming'];
 
+function WithdrawProgressOverlay() {
+  const { t } = useTranslation();
+  return (
+    <div className="py-6 flex flex-col items-center gap-4">
+      <div className="relative flex h-16 w-16 items-center justify-center">
+        <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
+        <LaunchTokenIcon size={24} />
+      </div>
+      <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
+      <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+        <Shield size={14} className="text-amber-500 shrink-0" />
+        <p className="text-[11px] text-amber-600 dark:text-amber-400">{t('balance.depositDoNotClose')}</p>
+      </div>
+    </div>
+  );
+}
+
 function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: DepositStep; elapsedSec: number }) {
   const { t } = useTranslation();
   const stepLabels: Record<DepositStep, string> = {
@@ -123,10 +141,11 @@ export function BalanceDisplay() {
   const [depositElapsed, setDepositElapsed] = useState(0);
   const depositTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'success'>('idle');
+  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'signing' | 'success'>('idle');
 
   const withdrawMutation = useWithdrawFromVault({
     mutation: {
+      onMutate: () => setWithdrawStatus('signing'),
       onSuccess: (response) => {
         const txHash = (response as any)?.tx_hash ?? '';
         setWithdrawStatus('success');
@@ -143,6 +162,7 @@ export function BalanceDisplay() {
           queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
         }, 8000);
       },
+      onError: () => setWithdrawStatus('idle'),
     },
   });
 
@@ -272,7 +292,7 @@ export function BalanceDisplay() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalance')}</p>
-                    <p className="flex items-center gap-1.5 text-sm font-bold tabular-nums">{fmtNum(walletBalanceHuman)} <LaunchTokenIcon size={18} /></p>
+                    <p className="text-sm font-bold tabular-nums">{fmtNum(walletBalanceHuman)}</p>
                   </div>
                   <button type="button" onClick={() => { setDepositAmount(String(Math.floor(walletBalanceHuman))); setShowDeposit(true); }}
                     className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-[var(--color-primary-hover)]">
@@ -288,15 +308,15 @@ export function BalanceDisplay() {
             <div className="grid gap-2 grid-cols-3 mb-3">
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.available')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)} <LaunchTokenIcon size={18} /></p>
+                <p className="text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)}</p>
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.inBets')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-warning)]">{fmtNum(lockedHuman)} <LaunchTokenIcon size={18} /></p>
+                <p className="text-lg font-bold tabular-nums text-[var(--color-warning)]">{fmtNum(lockedHuman)}</p>
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.total')}</p>
-                <p className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{fmtNum(totalHuman)} <LaunchTokenIcon size={18} /></p>
+                <p className="text-lg font-bold tabular-nums">{fmtNum(totalHuman)}</p>
               </div>
             </div>
 
@@ -316,7 +336,7 @@ export function BalanceDisplay() {
 
       {/* ===== Deposit Modal ===== */}
       {showDeposit && (
-        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit}>
+        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting'}>
           <div className="p-5 max-w-sm w-full">
             {depositStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
@@ -329,7 +349,9 @@ export function BalanceDisplay() {
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4 break-all font-mono">TX: {depositTxHash.slice(0, 16)}...</p>
                 <button type="button" onClick={resetDeposit}
-                  className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">{t('common.done')}</button>
+                  className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">
+                  {t('balance.collapse')}
+                </button>
               </div>
             ) : depositStatus === 'signing' || depositStatus === 'broadcasting' ? (
               <DepositProgressOverlay currentStep={depositStep} elapsedSec={depositElapsed} />
@@ -351,11 +373,10 @@ export function BalanceDisplay() {
                   ))}
                 </div>
 
-                <div className="relative mb-3">
+                <div className="mb-3">
                   <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
                 </div>
 
                 {depositError && <p className="text-xs text-[var(--color-danger)] mb-3">{depositError}</p>}
@@ -377,7 +398,11 @@ export function BalanceDisplay() {
 
       {/* ===== Withdraw Modal ===== */}
       {showWithdraw && (
-        <Modal open onClose={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); }}>
+        <Modal
+          open
+          onClose={() => { if (withdrawStatus !== 'signing') { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); } }}
+          showCloseButton={withdrawStatus !== 'signing'}
+        >
           <div className="p-5 max-w-sm w-full">
             {withdrawStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
@@ -386,36 +411,43 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  -{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={18} />
+                  −{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={18} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}
                 </p>
                 <button type="button" onClick={() => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); }}
-                  className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">{t('common.done')}</button>
+                  className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">
+                  {t('balance.collapse')}
+                </button>
               </div>
+            ) : withdrawStatus === 'signing' ? (
+              <WithdrawProgressOverlay />
             ) : (
               <>
                 <h3 className="text-lg font-bold mb-1">{t('balance.withdrawTitle')}</h3>
-                <p className="text-xs text-[var(--color-text-secondary)] mb-1">
-                  {t('balance.withdrawAvailable', { amount: fmtNum(availableHuman) })} <span className="inline-flex items-center gap-1.5"><LaunchTokenIcon size={18} /></span>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                  {t('balance.withdrawAvailable', { amount: fmtNum(availableHuman) })}
                 </p>
 
-                <div className="flex gap-2 mt-3 mb-3">
+                <div className="flex gap-2 mb-3">
                   {[0.25, 0.5, 1].map((frac) => (
                     <button key={frac} type="button"
                       onClick={() => setWithdrawAmount(String(Math.floor(availableHuman * frac)))}
-                      className="flex-1 rounded-lg border border-[var(--color-border)] py-1.5 text-xs font-bold hover:border-[var(--color-primary)]/50">
+                      className={`flex-1 rounded-lg py-2 text-xs font-bold border transition-colors ${
+                        withdrawAmount === String(Math.floor(availableHuman * frac))
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/50'
+                      }`}>
                       {frac === 1 ? t('common.max') : `${frac * 100}%`}
                     </button>
                   ))}
                 </div>
 
-                <div className="relative mb-3">
+                <div className="mb-4">
                   <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
                 </div>
 
                 <div className="flex gap-2">

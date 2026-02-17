@@ -5,6 +5,7 @@ import { useLeaderboard, type LeaderboardEntry } from '@/hooks/use-leaderboard';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 
 type SortBy = 'wins' | 'wagered' | 'win_rate';
@@ -117,12 +118,12 @@ export function Leaderboard() {
   return (
     <div className="space-y-3">
       {/* Sort tabs */}
-      <div className="flex gap-1">
+      <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {SORT_OPTION_IDS.map((id) => (
           <button
             key={id}
             onClick={() => setSortBy(id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+            className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.98] ${
               sortBy === id
                 ? 'bg-[var(--color-primary)] text-white'
                 : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
@@ -137,7 +138,7 @@ export function Leaderboard() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 rounded-lg bg-[var(--color-surface)] animate-pulse" />
+            <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       ) : error ? (

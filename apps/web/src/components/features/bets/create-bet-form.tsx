@@ -351,7 +351,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           <div className="rounded-xl bg-[var(--color-bg)] p-4 space-y-2.5">
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.wagerLabel')}</span>
-              <span className="flex items-center gap-1.5 font-bold">{parsedAmount.toLocaleString()} <LaunchTokenIcon size={18} /></span>
+              <span className="flex items-center gap-1.5 font-bold"><LaunchTokenIcon size={18} /> {parsedAmount.toLocaleString()}</span>
             </div>
             <div className="border-t border-[var(--color-border)]" />
             <div className="flex justify-between text-sm">
@@ -391,7 +391,9 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
         <>
           {/* Amount Presets */}
           <div className="mb-3">
-            <label className="mb-2 block text-xs font-medium text-[var(--color-text-secondary)]">{t('wager.wagerInputLabel')}</label>
+            <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+              {t('wager.wagerLabel')} <LaunchTokenIcon size={14} />
+            </label>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {BET_PRESETS.map((preset, idx) => (
                 <button key={preset} type="button" onClick={() => setAmount(String(preset))}
@@ -408,23 +410,19 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
 
           {/* Custom Amount */}
           <div className="mb-4">
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder={t('wager.customAmount')}
-                value={amount}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/[^0-9.]/g, '');
-                  // Allow only one decimal point
-                  const parts = val.split('.');
-                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                  setAmount(val);
-                }}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-20 text-sm placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={18} /></span>
-            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder={t('wager.customAmount')}
+              value={amount}
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^0-9.]/g, '');
+                const parts = val.split('.');
+                if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                setAmount(val);
+              }}
+              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none"
+            />
             {parsedAmount > 0 && parsedAmount < 1 && (
               <p className="mt-1 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
             )}

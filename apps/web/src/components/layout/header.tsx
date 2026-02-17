@@ -243,15 +243,17 @@ export function Header() {
           </div>
 
           {/* Mobile: Connect button when disconnected, else 1-Click chip + burger */}
-          <div className="flex items-center gap-1.5 md:hidden">
+          <div className="flex items-center gap-1.5 md:hidden min-w-0">
             {wallet.isConnected ? (
               <>
-                <StatusChips
-                  oneClickEnabled={oneClickEnabled}
-                  gasSponsored={gasSponsored}
-                  compact
-                  onSetupClick={() => setOnboardingOpen(true)}
-                />
+                <div className="min-w-0 overflow-hidden">
+                  <StatusChips
+                    oneClickEnabled={oneClickEnabled}
+                    gasSponsored={gasSponsored}
+                    compact
+                    onSetupClick={() => setOnboardingOpen(true)}
+                  />
+                </div>
                 <button type="button" onClick={() => setMenuOpen(!menuOpen)}
                   className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
                   aria-label={t('header.toggleMenu')}>

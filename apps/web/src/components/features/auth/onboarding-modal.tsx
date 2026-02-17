@@ -98,7 +98,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
   const currentAuthIdx = AUTH_STEPS.indexOf(authStep);
 
   return (
-    <Modal open={isOpen} onClose={step === 'signing' ? () => {} : onClose}>
+    <Modal open={isOpen} onClose={step === 'signing' ? () => {} : onClose} showCloseButton={step !== 'signing'}>
       <div className="p-6 max-w-md">
         {step === 'explain' && (
           <>

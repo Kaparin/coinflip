@@ -152,9 +152,10 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
 
   if (!open) return null;
 
+  const canClose = !(step === 'confirm' && isConnecting);
   return (
-    <Modal open onClose={onClose}>
-      <div className="p-5 max-w-md w-full">
+    <Modal open onClose={onClose} showCloseButton={canClose} showCloseButtonBottom>
+      <div className="p-2 sm:p-5 max-w-md w-full">
 
         {/* ==== IMPORT MNEMONIC ==== */}
         {step === 'import' && (

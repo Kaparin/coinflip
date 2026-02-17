@@ -44,11 +44,11 @@ export function StatusChips({
           <Component
             key={chip.key}
             {...(isClickable ? { type: 'button' as const, onClick: onSetupClick } : {})}
-            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors min-w-0 ${
               chip.enabled
                 ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
                 : isClickable
-                  ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)] cursor-pointer hover:bg-[var(--color-warning)]/25'
+                  ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)] cursor-pointer hover:bg-[var(--color-warning)]/25 active:scale-[0.98]'
                   : 'bg-[var(--color-border)] text-[var(--color-text-secondary)]'
             }`}
             title={`${chip.label}: ${chip.enabled ? t('statusChips.active') : t('statusChips.notSetUp')}`}

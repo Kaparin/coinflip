@@ -323,13 +323,13 @@ export function HistoryList() {
       )}
 
       {/* Tab navigation */}
-      <div className="flex gap-1.5 mb-4">
+      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map((tabItem) => (
           <button
             key={tabItem.id}
             type="button"
             onClick={() => setTab(tabItem.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] ${
               tab === tabItem.id
                 ? 'bg-[var(--color-primary)] text-white'
                 : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'

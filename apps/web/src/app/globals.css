@@ -225,6 +225,16 @@ body {
   }
 }
 
+/* Active feedback for touch — scale down on press */
+@media (pointer: coarse) {
+  button:not(:disabled), a, [role="button"]:not(:disabled) {
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+  button:active:not(:disabled), a:active, [role="button"]:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
 /* Hide scrollbar but keep scroll */
 .scrollbar-hide {
   -ms-overflow-style: none;

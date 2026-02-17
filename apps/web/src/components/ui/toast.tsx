@@ -148,7 +148,7 @@ function ToastContainer({
   return (
     <div
       aria-live="polite"
-      className="fixed bottom-20 right-4 z-[100] flex flex-col gap-2 md:bottom-4"
+      className="fixed bottom-20 left-4 right-4 z-[100] flex flex-col gap-2 items-center md:left-auto md:right-4 md:items-end md:bottom-4"
     >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -174,7 +174,7 @@ function ToastItem({
     <div
       role="alert"
       className={[
-        'relative flex w-80 items-start gap-3 overflow-hidden rounded-xl border border-[var(--color-border)] border-l-4 px-4 py-3',
+        'relative flex w-full max-w-sm md:w-80 items-start gap-3 overflow-hidden rounded-xl border border-[var(--color-border)] border-l-4 px-4 py-3',
         'bg-[var(--color-surface)] shadow-lg backdrop-blur-sm',
         toast.exiting ? 'animate-slide-out' : 'animate-slide-in',
         cfg.border,

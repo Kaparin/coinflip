@@ -252,13 +252,13 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   return (
     <div>
       {/* Filters */}
-      <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1">
+      <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {AMOUNT_FILTERS.map((filter) => (
           <button
             key={filter.value}
             type="button"
             onClick={() => setAmountFilter(filter.value)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] ${
               amountFilter === filter.value
                 ? 'bg-[var(--color-primary)] text-white'
                 : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
@@ -334,10 +334,16 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           })}
         </div>
       ) : myPendingBets.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
           <span className="text-3xl">🎲</span>
           <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t('bets.noOpenBets')}</p>
           <p className="text-xs text-[var(--color-text-secondary)]/60">{t('bets.createOneAbove')}</p>
+          <a
+            href="#create-bet-form"
+            className="rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
+          >
+            {t('wager.createBet')}
+          </a>
         </div>
       ) : null}
 
