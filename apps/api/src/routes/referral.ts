@@ -54,6 +54,18 @@ referralRouter.post('/register-by-address', authMiddleware, zValidator('json', R
   return c.json({ data: { registered: true } });
 });
 
+// GET /api/v1/referral/check-referrer — Public: check if a wallet address already has a referrer
+// No auth required — this is not sensitive data (only returns a boolean).
+// Used by the connect-wallet modal to decide whether to show the "Who invited you?" field.
+referralRouter.get('/check-referrer', async (c) => {
+  const address = c.req.query('address')?.trim().toLowerCase();
+  if (!address || !address.startsWith('axm1') || address.length < 10) {
+    return c.json({ data: { has_referrer: false } });
+  }
+  const hasRef = await referralService.hasReferrerByAddress(address);
+  return c.json({ data: { has_referrer: hasRef } });
+});
+
 // GET /api/v1/referral/has-referrer — Check if current user has a referrer
 referralRouter.get('/has-referrer', authMiddleware, async (c) => {
   const userId = c.get('user').id;

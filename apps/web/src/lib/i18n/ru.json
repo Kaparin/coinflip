@@ -62,6 +62,7 @@
     "forgetWallet": "Забыть кошелёк",
     "switchWallet": "Переключить кошелёк",
     "savedWallets": "Сохранённые кошельки",
+    "manageWallets": "Управление кошельками",
     "toggleMenu": "Открыть меню"
   },
   "balance": {

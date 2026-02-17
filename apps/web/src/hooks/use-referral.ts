@@ -133,6 +133,25 @@ export async function checkHasReferrer(): Promise<{
 }
 
 /**
+ * Public check: does a wallet address already have a referrer?
+ * Used before auth — the connect modal calls this after deriving the address
+ * to decide whether to show the "Who invited you?" field.
+ * No auth required on the server side.
+ */
+export async function checkHasReferrerByAddress(address: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/referral/check-referrer?address=${encodeURIComponent(address)}`,
+    );
+    if (!res.ok) return false;
+    const json = await res.json();
+    return json?.data?.has_referrer === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Change referral branch (paid: 1000 LAUNCH).
  */
 export async function changeBranch(address: string): Promise<{ ok: boolean; reason?: string }> {

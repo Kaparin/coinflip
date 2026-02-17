@@ -231,6 +231,18 @@ export class ReferralService {
   }
 
   /**
+   * Check if a wallet address already has a referrer (public, no auth needed).
+   * Returns false if the address is not registered yet (new user).
+   */
+  async hasReferrerByAddress(address: string): Promise<boolean> {
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.address, address),
+    });
+    if (!user) return false;
+    return this.hasReferrer(user.id);
+  }
+
+  /**
    * Validate a branch change request (without executing it).
    * Checks: target exists, not self, no cycles.
    */

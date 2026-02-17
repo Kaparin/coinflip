@@ -218,46 +218,48 @@ export function Header() {
                       </div>
                     </div>
 
-                    {/* Saved wallets list (switch between them) */}
-                    {wallet.savedWallets.length > 0 && (
-                      <div className="py-1 border-b border-[var(--color-border)]">
-                        <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                          {t('header.savedWallets')}
-                        </p>
-                        {wallet.savedWallets.map((w) => {
-                          const addr = typeof w.address === 'string' ? w.address : '';
-                          const isCurrent = wallet.address === addr;
-                          return (
-                            <button
-                              key={addr || w.address}
-                              type="button"
-                              onClick={() => {
-                                if (isCurrent) {
+                    {/* Saved wallets — quick switch + manage */}
+                    <div className="py-1 border-b border-[var(--color-border)]">
+                      {wallet.savedWallets.length > 1 && (
+                        <>
+                          <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                            {t('header.savedWallets')}
+                          </p>
+                          {wallet.savedWallets.map((w) => {
+                            const addr = typeof w.address === 'string' ? w.address : '';
+                            const isCurrent = wallet.address === addr;
+                            return (
+                              <button
+                                key={addr || w.address}
+                                type="button"
+                                onClick={() => {
+                                  if (isCurrent) {
+                                    setWalletDropdownOpen(false);
+                                    return;
+                                  }
+                                  wallet.openConnectModal(addr);
                                   setWalletDropdownOpen(false);
-                                  return;
-                                }
-                                wallet.openConnectModal(addr);
-                                setWalletDropdownOpen(false);
-                              }}
-                              className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)] text-left"
-                            >
-                              {addr && <UserAvatar address={addr} size={24} />}
-                              <span className="font-mono truncate flex-1 min-w-0">
-                                {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
-                                {isCurrent && (
-                                  <span className="ml-1 text-[var(--color-success)]">({t('auth.current')})</span>
-                                )}
-                              </span>
-                            </button>
-                          );
-                        })}
-                        <button type="button" onClick={() => { wallet.openConnectModal(); setWalletDropdownOpen(false); }}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-xs text-[var(--color-primary)] transition-colors hover:bg-[var(--color-surface-hover)]">
-                          <Wallet size={16} />
-                          <span>{t('auth.addNewWallet')}</span>
-                        </button>
-                      </div>
-                    )}
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)] text-left"
+                              >
+                                {addr && <UserAvatar address={addr} size={24} />}
+                                <span className="font-mono truncate flex-1 min-w-0">
+                                  {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
+                                  {isCurrent && (
+                                    <span className="ml-1 text-[var(--color-success)]">({t('auth.current')})</span>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+                      <button type="button" onClick={() => { wallet.openConnectModal(); setWalletDropdownOpen(false); }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]">
+                        <Wallet size={16} />
+                        <span>{t('header.manageWallets')}</span>
+                      </button>
+                    </div>
 
                     {/* Disconnect / Forget */}
                     <div className="py-1">
@@ -346,48 +348,50 @@ export function Header() {
                 )}
               </div>
 
-              {/* Saved wallets list (mobile) */}
-              {wallet.savedWallets.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {t('header.savedWallets')}
-                  </p>
-                  <div className="flex flex-col gap-1">
-                    {wallet.savedWallets.map((w) => {
-                      const addr = typeof w.address === 'string' ? w.address : '';
-                      const isCurrent = wallet.address === addr;
-                      return (
-                        <button
-                          key={addr || w.address}
-                          type="button"
-                          onClick={() => {
-                            if (isCurrent) {
+              {/* Saved wallets — quick switch + manage (mobile) */}
+              <div className="space-y-1.5">
+                {wallet.savedWallets.length > 1 && (
+                  <>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                      {t('header.savedWallets')}
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      {wallet.savedWallets.map((w) => {
+                        const addr = typeof w.address === 'string' ? w.address : '';
+                        const isCurrent = wallet.address === addr;
+                        return (
+                          <button
+                            key={addr || w.address}
+                            type="button"
+                            onClick={() => {
+                              if (isCurrent) {
+                                setMenuOpen(false);
+                                return;
+                              }
+                              wallet.openConnectModal(addr);
                               setMenuOpen(false);
-                              return;
-                            }
-                            wallet.openConnectModal(addr);
-                            setMenuOpen(false);
-                          }}
-                          className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-left"
-                        >
-                          {addr && <UserAvatar address={addr} size={28} />}
-                          <span className="text-xs font-mono truncate flex-1 min-w-0">
-                            {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
-                            {isCurrent && (
-                              <span className="ml-1 text-[var(--color-success)] text-[10px]">({t('auth.current')})</span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    <button type="button" onClick={() => { wallet.openConnectModal(); setMenuOpen(false); }}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--color-border)] px-3 py-2 text-xs font-medium text-[var(--color-primary)]">
-                      <Wallet size={14} />
-                      {t('auth.addNewWallet')}
-                    </button>
-                  </div>
-                </div>
-              )}
+                            }}
+                            className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-left"
+                          >
+                            {addr && <UserAvatar address={addr} size={28} />}
+                            <span className="text-xs font-mono truncate flex-1 min-w-0">
+                              {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
+                              {isCurrent && (
+                                <span className="ml-1 text-[var(--color-success)] text-[10px]">({t('auth.current')})</span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+                <button type="button" onClick={() => { wallet.openConnectModal(); setMenuOpen(false); }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--color-border)] px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                  <Wallet size={14} />
+                  {t('header.manageWallets')}
+                </button>
+              </div>
 
               {/* Disconnect / Forget */}
               <div className="flex gap-2">

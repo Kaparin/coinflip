@@ -5,7 +5,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { Modal } from '@/components/ui/modal';
 import { Lock, ShieldCheck, Shield, CheckCircle, ChevronDown, UserPlus, Wallet, Plus } from 'lucide-react';
-import { getCapturedRefCode, registerByAddress } from '@/hooks/use-referral';
+import { getCapturedRefCode, registerByAddress, checkHasReferrerByAddress } from '@/hooks/use-referral';
 
 interface ConnectWalletModalProps {
   open: boolean;
@@ -36,11 +36,12 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
   const [derivedAddress, setDerivedAddress] = useState('');
   const [localError, setLocalError] = useState('');
 
-  // "Who invited you?" state
+  // "Who invited you?" state — only shown on 'confirm' step when wallet has no referrer
   const [inviterOpen, setInviterOpen] = useState(false);
   const [inviterAddr, setInviterAddr] = useState('');
   const [inviterStatus, setInviterStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [inviterError, setInviterError] = useState('');
+  const [derivedHasReferrer, setDerivedHasReferrer] = useState(false);
   const hasRefCode = typeof window !== 'undefined' && !!getCapturedRefCode();
 
   const mnemonicRef = useRef<HTMLTextAreaElement>(null);
@@ -63,12 +64,13 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       setInviterAddr('');
       setInviterStatus('idle');
       setInviterError('');
+      setDerivedHasReferrer(false);
       isInFlightRef.current = false;
       // Direct switch: open to unlock a specific wallet
       if (connectModalSwitchTo) {
         setSelectedWalletAddress(connectModalSwitchTo);
         setStep('unlock');
-      } else if (hasSaved) {
+      } else if (hasSaved && savedWallets.length > 0) {
         const showChoose = savedWallets.length > 1 || (isConnected && savedWallets.length >= 1);
         setStep(showChoose ? 'choose' : 'unlock');
         setSelectedWalletAddress(showChoose ? null : (savedWallets[0]?.address ?? null));
@@ -80,17 +82,19 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     prevOpenRef.current = open;
   }, [open, hasSaved, savedWallets, isConnected, connectModalSwitchTo]);
 
-  // When wallet becomes connected during unlock/confirm, transition to success
-  // IMPORTANT: When switching wallets, only transition when connected address matches the target.
-  // Otherwise we'd show success immediately (isConnected was already true) without asking for PIN.
+  // When wallet becomes connected during unlock/confirm, transition to success.
+  // Guards:
+  //   1. isInFlightRef must be true — prevents premature success when already connected
+  //      (e.g. adding a new wallet while connected: 'confirm' step would auto-succeed)
+  //   2. When switching wallets (selectedWalletAddress set), wait for connectedAddress to match
   useEffect(() => {
     if (!open || !isConnected || isConnecting || (step !== 'unlock' && step !== 'confirm')) return;
 
-    const targetAddr = selectedWalletAddress ?? savedAddress;
-    if (targetAddr && connectedAddress !== targetAddr) {
-      // Switching to another wallet — wait for actual switch before showing success
-      return;
-    }
+    // Only transition after an explicit connect/unlock action was initiated
+    if (!isInFlightRef.current) return;
+
+    // When switching wallets, wait for the actual address to match the target
+    if (selectedWalletAddress && connectedAddress !== selectedWalletAddress) return;
 
     isInFlightRef.current = false;
     setStep('success');
@@ -102,7 +106,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     setMnemonic('');
     setPin('');
     setPinConfirm('');
-  }, [open, isConnected, isConnecting, step, connectedAddress, selectedWalletAddress, savedAddress, inviterAddr, hasRefCode]);
+  }, [open, isConnected, isConnecting, step, connectedAddress, selectedWalletAddress, inviterAddr, hasRefCode]);
 
   // Auto-close when on success step
   useEffect(() => {
@@ -139,11 +143,17 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       const { deriveWallet } = await import('@/lib/wallet-core');
       const { address } = await deriveWallet(mnemonic);
       setDerivedAddress(address);
+
+      // Check if this wallet already has a referrer (non-blocking — don't fail on error)
+      if (!hasRefCode) {
+        checkHasReferrerByAddress(address).then(setDerivedHasReferrer).catch(() => {});
+      }
+
       setStep('confirm');
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : t('auth.invalidMnemonic'));
     }
-  }, [mnemonic, pin, pinConfirm, isValidWordCount]);
+  }, [mnemonic, pin, pinConfirm, isValidWordCount, hasRefCode]);
 
   /** Confirm and connect — the useEffect above handles success/close */
   const handleConfirmConnect = useCallback(async () => {
@@ -334,49 +344,6 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
               </span>
             </label>
 
-            {/* "Who invited you?" collapsible — only shown when no ref code captured */}
-            {!hasRefCode && (
-              <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setInviterOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/10 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <UserPlus size={14} />
-                    {t('auth.whoInvited')}
-                  </span>
-                  <ChevronDown size={14} className={`transition-transform ${inviterOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {inviterOpen && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-[var(--color-border)]">
-                    <p className="text-[10px] text-[var(--color-text-secondary)] pt-2">
-                      {t('auth.whoInvitedHint')}
-                    </p>
-                    <input
-                      type="text"
-                      value={inviterAddr}
-                      onChange={(e) => {
-                        setInviterAddr(e.target.value);
-                        setInviterStatus('idle');
-                        setInviterError('');
-                      }}
-                      placeholder="axm1..."
-                      spellCheck={false}
-                      autoComplete="off"
-                      className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-[var(--color-primary)] focus:outline-none"
-                    />
-                    <p className="text-[9px] text-[var(--color-text-secondary)]">
-                      {t('auth.inviterOptional')}
-                    </p>
-                    {inviterError && (
-                      <p className="text-[10px] text-[var(--color-danger)]">{inviterError}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             {(localError || error) && (
               <p className="text-xs text-[var(--color-danger)]">{localError || error}</p>
             )}
@@ -444,6 +411,49 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                   <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.yourAddress')}</p>
                   <p className="text-sm font-mono font-bold break-all">{derivedAddress}</p>
                 </div>
+
+                {/* "Who invited you?" — only for new wallets without a referrer and no ref code from URL */}
+                {!hasRefCode && !derivedHasReferrer && (
+                  <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setInviterOpen((v) => !v)}
+                      className="flex w-full items-center justify-between px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/10 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <UserPlus size={14} />
+                        {t('auth.whoInvited')}
+                      </span>
+                      <ChevronDown size={14} className={`transition-transform ${inviterOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {inviterOpen && (
+                      <div className="px-3 pb-3 space-y-2 border-t border-[var(--color-border)]">
+                        <p className="text-[10px] text-[var(--color-text-secondary)] pt-2">
+                          {t('auth.whoInvitedHint')}
+                        </p>
+                        <input
+                          type="text"
+                          value={inviterAddr}
+                          onChange={(e) => {
+                            setInviterAddr(e.target.value);
+                            setInviterStatus('idle');
+                            setInviterError('');
+                          }}
+                          placeholder="axm1..."
+                          spellCheck={false}
+                          autoComplete="off"
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-[var(--color-primary)] focus:outline-none"
+                        />
+                        <p className="text-[9px] text-[var(--color-text-secondary)]">
+                          {t('auth.inviterOptional')}
+                        </p>
+                        {inviterError && (
+                          <p className="text-[10px] text-[var(--color-danger)]">{inviterError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setStep('import')}

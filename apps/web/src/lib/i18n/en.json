@@ -62,6 +62,7 @@
     "forgetWallet": "Forget wallet",
     "switchWallet": "Switch wallet",
     "savedWallets": "Saved wallets",
+    "manageWallets": "Manage wallets",
     "toggleMenu": "Toggle menu"
   },
   "balance": {
