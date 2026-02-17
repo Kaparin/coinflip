@@ -61,9 +61,15 @@ export default function GamePage() {
       addToast('info', t('game.betReverted'));
     }
     if (event.type === 'bet_revealed') {
-      const winner = (event.data as any)?.winner;
-      const isWinner = winner === address;
-      addToast(isWinner ? 'success' : 'info', isWinner ? t('game.youWon') : t('game.gameResult'));
+      const data = event.data as { winner?: string; maker?: string; acceptor?: string };
+      const winner = data?.winner?.toLowerCase();
+      const maker = data?.maker?.toLowerCase();
+      const acceptor = data?.acceptor?.toLowerCase();
+      const addr = address?.toLowerCase();
+      const isParticipant = addr && (addr === maker || addr === acceptor);
+      if (!isParticipant) return;
+      const isWinner = winner && addr === winner;
+      addToast(isWinner ? 'success' : 'warning', isWinner ? t('game.youWon') : t('game.youLost'));
     }
   }, [handlePendingWsEvent, addToast, address, t]);
 

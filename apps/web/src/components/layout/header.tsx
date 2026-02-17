@@ -95,12 +95,10 @@ export function Header() {
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
                     <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={40} /></span>
                   </div>
-                  {walletBalanceHuman > 0 && (
-                    <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
-                      <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
-                      <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={40} /></span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
+                    <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={40} /></span>
+                  </div>
                 </div>
 
                 {/* Divider */}

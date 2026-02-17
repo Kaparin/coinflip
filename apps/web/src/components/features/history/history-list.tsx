@@ -233,30 +233,6 @@ export function HistoryList() {
 
   const displayBets = tab === 'games' ? gameBets : tab === 'system' ? systemBets : bets;
 
-  const stats = useMemo(() => {
-    let wins = 0, losses = 0, totalWonMicro = 0, totalLostMicro = 0;
-    for (const bet of gameBets) {
-      const isWinner = bet.winner?.toLowerCase() === address?.toLowerCase();
-      if (isWinner) {
-        wins++;
-        totalWonMicro += Number(bet.payout_amount ?? 0);
-      } else {
-        losses++;
-        totalLostMicro += Number(bet.amount ?? 0);
-      }
-    }
-    const netMicro = totalWonMicro - totalLostMicro;
-    return {
-      wins,
-      losses,
-      totalWonHuman: fromMicroLaunch(totalWonMicro),
-      totalLostHuman: fromMicroLaunch(totalLostMicro),
-      netHuman: fromMicroLaunch(netMicro),
-      total: gameBets.length,
-      winRate: gameBets.length > 0 ? Math.round((wins / gameBets.length) * 100) : 0,
-    };
-  }, [gameBets, address]);
-
   if (!isConnected) {
     return (
       <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
@@ -294,34 +270,6 @@ export function HistoryList() {
 
   return (
     <div>
-      {/* Stats bar */}
-      {tab === 'games' && stats.total > 0 && (
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 text-center">
-            <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{t('history.games')}</p>
-            <p className="text-lg font-bold">{stats.total}</p>
-          </div>
-          <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 text-center">
-            <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{t('history.winRate')}</p>
-            <p className="text-lg font-bold text-[var(--color-primary)]">{stats.winRate}%</p>
-          </div>
-          <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 text-center">
-            <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{stats.wins}W / {stats.losses}L</p>
-            <p className="text-lg font-bold">
-              <span className="text-[var(--color-success)]">{stats.wins}</span>
-              <span className="text-[var(--color-text-secondary)] mx-0.5">/</span>
-              <span className="text-[var(--color-danger)]">{stats.losses}</span>
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 text-center">
-            <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{t('history.netPnl')}</p>
-            <p className={`text-lg font-bold ${stats.netHuman >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
-              {stats.netHuman >= 0 ? '+' : ''}{fmtHuman(stats.netHuman)}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Tab navigation */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map((tabItem) => (

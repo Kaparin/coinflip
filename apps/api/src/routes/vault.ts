@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { vaultService } from '../services/vault.service.js';
 import { relayerService } from '../services/relayer.js';
 import { wsService } from '../services/ws.service.js';
-import { Errors } from '../lib/errors.js';
+import { AppError, Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import type { AppEnv } from '../types.js';
@@ -217,6 +217,29 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
   const txBytesBase64 = body.tx_bytes;
   if (!txBytesBase64 || typeof txBytesBase64 !== 'string') {
     throw Errors.validationError('tx_bytes (base64) is required');
+  }
+
+  // Pre-flight: verify user's CW20 wallet balance before broadcasting.
+  // This prevents wasting gas on a tx that will fail due to insufficient balance.
+  if (env.LAUNCH_CW20_ADDR) {
+    try {
+      const balQuery = btoa(JSON.stringify({ balance: { address } }));
+      const balRes = await fetch(
+        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${balQuery}`,
+      );
+      if (balRes.ok) {
+        const balData = await balRes.json() as { data: { balance: string } };
+        const cw20Balance = BigInt(balData.data?.balance ?? '0');
+        if (cw20Balance === 0n) {
+          throw Errors.insufficientBalance('deposit amount', '0 (wallet CW20 balance is empty)');
+        }
+      }
+    } catch (err) {
+      // If it's our own AppError, re-throw it
+      if (err instanceof AppError) throw err;
+      // Otherwise just log and continue — don't block deposit on balance check failure
+      logger.warn({ err, address }, 'CW20 balance pre-check failed, proceeding with broadcast');
+    }
   }
 
   // Prevent concurrent deposits for the same user

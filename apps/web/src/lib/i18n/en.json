@@ -69,6 +69,7 @@
     "withdrawFailed": "Withdrawal failed. Try again.",
     "walletNotUnlocked": "Wallet not unlocked. Please reconnect.",
     "depositFailed": "Deposit failed",
+    "insufficientWalletBalance": "Insufficient wallet balance: need {{need}} LAUNCH, have {{have}}",
     "checkTxExplorer": "Check transaction",
     "play": "Play:",
     "bets": "Bets:",
@@ -318,6 +319,7 @@
   "profile": {
     "title": "Profile",
     "connectToView": "Connect a wallet to view your profile.",
+    "gameStats": "Game Statistics",
     "about": "About",
     "gameRules": "Game Rules",
     "language": "Language",
@@ -391,6 +393,7 @@
     "acceptFailed": "Accept failed: {reason}",
     "betReverted": "A bet is back in Open Bets — the previous accept failed.",
     "youWon": "You won!",
+    "youLost": "You lost",
     "gameResult": "Game result is in!"
   },
   "nav": {

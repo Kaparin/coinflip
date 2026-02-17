@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { useGetVaultBalance } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { BalanceDisplay } from './balance-display';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,9 +17,10 @@ import { useTranslation } from '@/lib/i18n';
  */
 export function MobileBalanceBar() {
   const { t } = useTranslation();
-  const { isConnected } = useWalletContext();
+  const { isConnected, address } = useWalletContext();
   const { pendingDeduction, isFrozen } = usePendingBalance();
   const { data, isLoading } = useGetVaultBalance({ query: { enabled: isConnected, refetchInterval: isFrozen ? false : 10_000 } });
+  const { data: walletBalanceRaw } = useWalletBalance(address);
   const [expanded, setExpanded] = useState(false);
 
   if (!isConnected) return null;
@@ -36,6 +38,7 @@ export function MobileBalanceBar() {
   const rawLocked = BigInt(balance?.locked ?? '0');
   const availableMicro = rawAvailable - pendingDeduction < 0n ? 0n : rawAvailable - pendingDeduction;
   const lockedMicro = rawLocked + pendingDeduction;
+  const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
@@ -57,6 +60,14 @@ export function MobileBalanceBar() {
               </span>
               <span className="text-base font-bold tabular-nums text-[var(--color-success)]">
                 — {fmtNum(fromMicroLaunch(availableMicro))}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+                {t('balance.walletBalanceAxiome')}
+              </span>
+              <span className="text-sm font-semibold tabular-nums">
+                — {fmtNum(walletBalanceHuman)}
               </span>
             </div>
             <div className="flex items-baseline gap-2">

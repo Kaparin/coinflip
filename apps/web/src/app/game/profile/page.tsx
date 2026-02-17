@@ -15,8 +15,9 @@ import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
   ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User,
-  Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2,
+  Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
 } from 'lucide-react';
+import { GameStatsSection } from '@/components/features/profile/game-stats-section';
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -801,6 +802,15 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Game Statistics */}
+      <CollapsibleSection
+        title={t('profile.gameStats')}
+        defaultOpen={true}
+        icon={<Trophy size={20} />}
+      >
+        <GameStatsSection />
+      </CollapsibleSection>
 
       {/* About */}
       <CollapsibleSection

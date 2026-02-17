@@ -217,6 +217,13 @@ export function BalanceDisplay() {
     const parsedHuman = parseFloat(depositAmount);
     if (isNaN(parsedHuman) || parsedHuman <= 0) return;
 
+    // Pre-check: does the wallet have enough CW20 tokens?
+    if (walletBalanceHuman < parsedHuman) {
+      setDepositError(t('balance.insufficientWalletBalance', { need: parsedHuman, have: walletBalanceHuman.toFixed(2) }));
+      setDepositStatus('error');
+      return;
+    }
+
     const wallet = getWallet();
     if (!wallet) {
       setDepositError(t('balance.walletNotUnlocked'));
@@ -306,7 +313,7 @@ export function BalanceDisplay() {
         setDepositStatus('error');
       }
     }
-  }, [address, depositAmount, getWallet, refetch, queryClient, t]);
+  }, [address, depositAmount, walletBalanceHuman, getWallet, refetch, queryClient, t]);
 
   const resetDeposit = () => {
     setShowDeposit(false);
@@ -348,16 +355,14 @@ export function BalanceDisplay() {
         ) : (
           <>
             {/* Wallet balance (CW20 tokens in user's wallet, not deposited) */}
-            {walletBalanceHuman > 0 && (
-              <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3 mb-3">
-                <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalanceAxiome')}</p>
-                <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
-                  <LaunchTokenIcon size={45} />
-                  {fmtNum(walletBalanceHuman)}
-                </p>
-                <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{t('balance.depositToPlay')}</p>
-              </div>
-            )}
+            <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3 mb-3">
+              <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalanceAxiome')}</p>
+              <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
+                <LaunchTokenIcon size={45} />
+                {fmtNum(walletBalanceHuman)}
+              </p>
+              <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{t('balance.depositToPlay')}</p>
+            </div>
 
             {/* Vault balance (deposited in contract) */}
             <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-1.5 font-medium tracking-wide">{t('balance.gameVault')}</p>
@@ -455,7 +460,7 @@ export function BalanceDisplay() {
                   <button type="button" onClick={resetDeposit}
                     className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold">{t('common.cancel')}</button>
                   <button type="button" onClick={handleDeposit}
-                    disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                    disabled={!depositAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositAmount) > walletBalanceHuman}
                     className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold disabled:opacity-40">
                     {t('common.deposit')}
                   </button>
