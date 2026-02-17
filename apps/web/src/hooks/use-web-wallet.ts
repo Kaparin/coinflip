@@ -294,9 +294,10 @@ export function useWebWallet(): WebWalletState {
   /** Get wallet for signing */
   const getWallet = useCallback(() => walletRef.current, []);
 
-  const shortAddress = address
-    ? `${address.slice(0, 10)}...${address.slice(-4)}`
-    : null;
+  const shortAddress =
+    address && typeof address === 'string'
+      ? `${address.slice(0, 10)}...${address.slice(-4)}`
+      : null;
 
   return {
     address,
