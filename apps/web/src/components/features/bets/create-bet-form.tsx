@@ -21,6 +21,7 @@ import {
   toMicroLaunch,
   fromMicroLaunch,
 } from '@coinflip/shared/constants';
+import { extractErrorPayload, isActionInProgress, getUserFriendlyError } from '@/lib/user-friendly-errors';
 
 interface CreateBetFormProps {
   /** Called when a bet is submitted to chain (before confirmation). Parent manages pending state. */
@@ -126,12 +127,11 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           deductionIdRef.current = null;
         }
         setSubmitted(false);
-        const msg = err instanceof Error ? err.message : typeof err === 'object' && err && 'message' in err ? String((err as { message: string }).message) : 'Unknown error';
-        const is429 = msg.includes('still processing') || msg.includes('ACTION_IN_PROGRESS');
-        if (is429) {
+        const { message } = extractErrorPayload(err);
+        if (isActionInProgress(message)) {
           addToast('warning', t('bets.prevActionProcessing'));
         } else {
-          addToast('error', t('common.error') + ': ' + msg);
+          addToast('error', getUserFriendlyError(err, t, 'create'));
         }
       },
     },
@@ -256,8 +256,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
       }
     } catch (err: unknown) {
       removeDeduction(deductionId);
-      const msg = err instanceof Error ? err.message : 'Batch creation failed';
-      addToast('error', msg);
+      addToast('error', getUserFriendlyError(err, t, 'create'));
     } finally {
       setBatchSubmitting(false);
       setBatchCount('');

@@ -1,4 +1,28 @@
 {
+  "errors": {
+    "actionInProgress": "Previous action is still processing. Wait a few seconds.",
+    "insufficientBalance": "Insufficient game balance. Deposit more funds.",
+    "belowMinBet": "Minimum bet is 1 LAUNCH.",
+    "tooManyOpenBets": "Open bets limit reached. Wait for some to finish or cancel some.",
+    "dailyLimitExceeded": "Daily limit exceeded. Try again tomorrow.",
+    "betNotFound": "Bet not found. Refresh the list.",
+    "betCanceled": "Bet was already canceled.",
+    "betTakenByOther": "Someone accepted this bet before you.",
+    "betUnavailable": "Bet is no longer available.",
+    "selfAccept": "You cannot accept your own bet.",
+    "unauthorized": "Connect your wallet.",
+    "relayerNotReady": "Service temporarily unavailable. Try again in a minute.",
+    "chainTxFailed": "Transaction failed on blockchain. Try again.",
+    "chainTxTimeout": "Transaction was sent but not yet confirmed. Wait and check your balance.",
+    "validationError": "Invalid data. Check your input.",
+    "serverError": "Temporary server error. Try again later.",
+    "createFailed": "Failed to create bet. Try again.",
+    "acceptFailed": "Failed to accept bet. Try again.",
+    "cancelFailed": "Failed to cancel bet. Try again.",
+    "withdrawFailed": "Failed to withdraw. Try again.",
+    "depositFailed": "Failed to deposit. Try again.",
+    "somethingWentWrong": "Something went wrong. Try again."
+  },
   "common": {
     "appName": "Heads or Tails",
     "connectWallet": "Connect Wallet",

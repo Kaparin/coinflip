@@ -21,6 +21,7 @@ function extractTxHashFromError(err: unknown): string | null {
 }
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useTranslation } from '@/lib/i18n';
+import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 
 /** Deposit presets in human-readable LAUNCH */
 const DEPOSIT_PRESETS = [100, 500, 1000];
@@ -312,7 +313,7 @@ export function BalanceDisplay() {
             queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
           }, 5000);
         } else {
-          setWithdrawError(errMsg || t('balance.withdrawFailed'));
+          setWithdrawError(getUserFriendlyError(err, t, 'withdraw'));
           setWithdrawErrorTxHash(txHash);
           setWithdrawStatus('error');
         }
@@ -483,8 +484,7 @@ export function BalanceDisplay() {
           queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
         }, 3000);
       } catch (fallbackErr) {
-        const msg = fallbackErr instanceof Error ? fallbackErr.message : t('balance.depositFailed');
-        setDepositError(msg);
+        setDepositError(getUserFriendlyError(fallbackErr, t, 'deposit'));
         setDepositErrorTxHash(extractTxHashFromError(fallbackErr));
         setDepositStatus('error');
       }

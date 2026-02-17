@@ -16,6 +16,7 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { usePendingBets } from '@/hooks/use-pending-bets';
 import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
+import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import type { WsEvent } from '@coinflip/shared/types';
 
 type Tab = 'bets' | 'mybets' | 'history' | 'leaderboard';
@@ -48,14 +49,16 @@ export default function GamePage() {
     }
     if (event.type === 'bet_create_failed') {
       const reason = (event.data as any)?.reason ?? 'Transaction failed';
-      addToast('error', t('game.betCreateFailed', { reason }));
+      const friendlyMsg = getUserFriendlyError({ error: { message: reason } }, t, 'create');
+      addToast('error', friendlyMsg);
     }
     if (event.type === 'bet_accepted') {
       addToast('info', t('game.betAcceptedWinner'));
     }
     if (event.type === 'accept_failed') {
       const reason = (event.data as any)?.reason ?? 'Transaction failed';
-      addToast('error', t('game.acceptFailed', { reason }));
+      const friendlyMsg = getUserFriendlyError({ error: { message: reason } }, t, 'accept');
+      addToast('error', friendlyMsg);
     }
     if (event.type === 'bet_reverted') {
       addToast('info', t('game.betReverted'));

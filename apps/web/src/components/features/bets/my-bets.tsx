@@ -13,16 +13,7 @@ import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import type { PendingBet } from '@/hooks/use-pending-bets';
-
-/** Extract error message, handling 429 action-in-progress specially */
-function extractError(err: unknown): { msg: string; is429: boolean } {
-  const msg = err instanceof Error ? err.message
-    : typeof err === 'object' && err && 'message' in err
-      ? String((err as { message: string }).message)
-      : 'Unknown error';
-  const is429 = msg.includes('still processing') || msg.includes('ACTION_IN_PROGRESS');
-  return { msg, is429 };
-}
+import { extractErrorPayload, isActionInProgress, getUserFriendlyError } from '@/lib/user-friendly-errors';
 
 interface MyBetsProps {
   /** Bets submitted but not yet confirmed on chain */
@@ -75,8 +66,9 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       onError: (err: unknown) => {
         clearPending();
         invalidateAll();
-        const { msg, is429 } = extractError(err);
-        addToast(is429 ? 'warning' : 'error', is429 ? t('bets.prevActionProcessing') : t('bets.cancelError', { msg }));
+        const { message } = extractErrorPayload(err);
+        const is429 = isActionInProgress(message);
+        addToast(is429 ? 'warning' : 'error', is429 ? t('bets.prevActionProcessing') : getUserFriendlyError(err, t, 'cancel'));
       },
     },
   });

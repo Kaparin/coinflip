@@ -14,6 +14,7 @@ import {
   COMMISSION_BPS,
   LAUNCH_MULTIPLIER,
 } from '@coinflip/shared/constants';
+import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
@@ -24,15 +25,14 @@ import type { PendingBet } from '@/hooks/use-pending-bets';
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
 
 function extractError(err: unknown): { msg: string; is429: boolean; isCanceled: boolean; isClaimed: boolean; isGone: boolean } {
-  const msg = err instanceof Error ? err.message
-    : typeof err === 'object' && err && 'message' in err
-      ? String((err as { message: string }).message)
-      : 'Unknown error';
-  const is429 = msg.includes('still processing') || msg.includes('ACTION_IN_PROGRESS');
-  const isCanceled = msg.includes('BET_CANCELED') || msg.includes('canceled');
-  const isClaimed = msg.includes('BET_ALREADY_CLAIMED') || msg.includes('already being accepted');
-  const isGone = msg.includes('410') || msg.includes('Gone') || msg.includes('no longer available');
-  return { msg, is429, isCanceled, isClaimed, isGone };
+  const { message: msg } = extractErrorPayload(err);
+  return {
+    msg: msg || 'Unknown error',
+    is429: isActionInProgress(msg),
+    isCanceled: isBetCanceled(msg),
+    isClaimed: isBetClaimed(msg),
+    isGone: isBetGone(msg),
+  };
 }
 
 const AMOUNT_FILTERS: { value: AmountFilter; label: string; min: number; max: number }[] = [
@@ -97,8 +97,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
       onError: (err: unknown) => {
         clearPending();
         invalidateAll();
-        const { msg, is429 } = extractError(err);
-        addToast(is429 ? 'warning' : 'error', is429 ? t('bets.prevActionProcessing') : t('bets.cancelError', { msg }));
+        const { is429 } = extractError(err);
+        const friendlyMsg = getUserFriendlyError(err, t, 'cancel');
+        addToast(is429 ? 'warning' : 'error', is429 ? t('bets.prevActionProcessing') : friendlyMsg);
       },
     },
   });
@@ -157,7 +158,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
             return next;
           });
         }
-        const { msg, is429, isCanceled, isClaimed, isGone } = extractError(err);
+        const { is429, isCanceled, isClaimed, isGone } = extractError(err);
         if (isCanceled || isGone) {
           addToast('warning', t('bets.betUnavailable'));
           invalidateAll();
@@ -167,7 +168,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         } else if (is429) {
           addToast('warning', t('bets.prevActionWait'));
         } else {
-          addToast('error', t('bets.acceptError', { msg }));
+          addToast('error', getUserFriendlyError(err, t, 'accept'));
         }
       },
     },
