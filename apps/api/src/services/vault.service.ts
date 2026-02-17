@@ -27,25 +27,28 @@ export class VaultService {
   }
 
   async syncBalanceFromChain(userId: string, available: string, locked: string, height: bigint) {
-    // Only update if the incoming data is from a newer block height.
-    // This prevents stale chain queries from overwriting fresher data
-    // (e.g., from background tasks or concurrent requests).
+    // height=0n means "live chain query" — always trust it (no height guard).
+    // height>0n means "from indexer/background task" — only update if newer than DB row.
+    const isLiveQuery = height === 0n;
+
     await this.db
       .insert(vaultBalances)
-      .values({ userId, available, locked, sourceHeight: height })
+      .values({ userId, available, locked, sourceHeight: isLiveQuery ? null : height })
       .onConflictDoUpdate({
         target: vaultBalances.userId,
         set: {
           available,
           locked,
-          sourceHeight: height,
+          ...(isLiveQuery ? {} : { sourceHeight: height }),
           updatedAt: new Date(),
         },
-        // Guard: only overwrite if new height > existing height (or existing is null)
-        where: sql`${vaultBalances.sourceHeight} IS NULL OR ${vaultBalances.sourceHeight} < ${height}`,
+        // Only apply height guard for indexed data; live queries always win
+        ...(isLiveQuery ? {} : {
+          where: sql`${vaultBalances.sourceHeight} IS NULL OR ${vaultBalances.sourceHeight} < ${height}`,
+        }),
       });
 
-    logger.info({ userId, available, locked, height: height.toString() }, 'Vault balance synced');
+    logger.debug({ userId, available, locked, height: height.toString(), isLiveQuery }, 'Vault balance synced');
   }
 
   /**

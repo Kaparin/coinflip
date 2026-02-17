@@ -132,8 +132,12 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  // Fetch chain balance (cached for 5s to prevent hammering the chain)
-  const chainBalance = await getChainVaultBalance(address);
+  // Fetch chain balance + DB open bet count in parallel
+  const [chainBalance, dbOpenCount] = await Promise.all([
+    getChainVaultBalance(address),
+    betService.getOpenBetCountForUser(user.id),
+  ]);
+
   let available = BigInt(chainBalance.available);
   const chainLocked = BigInt(chainBalance.locked);
 
@@ -156,9 +160,6 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
 
   // Include server-side pending bet count
   const pendingBets = getPendingBetCount(user.id);
-
-  // Open bets count from DB (fast) + pending bets
-  const dbOpenCount = await betService.getOpenBetCountForUser(user.id);
   const openBetsCount = dbOpenCount + pendingBets;
 
   return c.json({
@@ -385,6 +386,9 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     if (BigInt(chainBalance.available) < BigInt(amount)) {
       throw Errors.insufficientBalance(amount, chainBalance.available);
     }
+
+    // Sync DB from chain before locking (ensures DB reflects real chain state)
+    await vaultService.syncBalanceFromChain(user.id, chainBalance.available, chainBalance.locked, 0n);
 
     // Atomically lock funds in DB to prevent double-withdraw
     const locked = await vaultService.lockFunds(user.id, amount);

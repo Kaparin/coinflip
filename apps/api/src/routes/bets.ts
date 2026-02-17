@@ -50,10 +50,10 @@ import { getPendingBetCount, incrementPendingBetCount, decrementPendingBetCount 
 function acquireInflight(address: string): void {
   const existing = inflightTxs.get(address);
   if (existing) {
-    // 2s cooldown — prevents double-clicks AND rapid sequential requests
-    // that would cause sequence/nonce errors on chain
-    if (Date.now() - existing < 2_000) {
-      throw Errors.actionInProgress(2);
+    // 1s cooldown — prevents double-clicks while keeping gameplay fast.
+    // The relayer sequence manager mutex serializes chain broadcasts.
+    if (Date.now() - existing < 1_000) {
+      throw Errors.actionInProgress(1);
     }
   }
   inflightTxs.set(address, Date.now());
@@ -497,13 +497,9 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     throw new AppError('BET_EXPIRING', 'This bet is about to expire and can no longer be accepted', 410);
   }
 
-  // Pre-flight: verify bet is still open on chain
-  const chainState = await getChainBetState(Number(betId));
-  if (chainState && !chainState.toLowerCase().includes('open')) {
-    logger.warn({ betId: betId.toString(), chainState }, 'Bet not open on chain — syncing DB');
-    await betService.updateBetStatus(betId, chainState.toLowerCase().includes('accepted') ? 'accepted' : 'canceled').catch(err => logger.error({ err, betId: betId.toString() }, 'Failed to sync bet status from chain'));
-    throw Errors.invalidState('accept', chainState);
-  }
+  // NOTE: Pre-flight chain state check removed for performance (-300ms).
+  // The DB status check above + atomic markAccepting(WHERE status='open') already prevents
+  // double-accept. If the chain rejects, the background task reverts.
 
   // Submit to chain via relayer (ASYNC MODE — returns after broadcastTxSync ~2s)
   if (!relayerService.isReady()) {
@@ -584,9 +580,11 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     releaseInflight(address);
   }
 
+  // Build address map once — reuse for WS emit and HTTP response
+  const addressMap = await betService.buildAddressMap([acceptingBet ?? existing]);
+
   // IMMEDIATELY broadcast to ALL clients — removes bet from everyone's "Open Bets"
   if (acceptingBet) {
-    const addressMap = await betService.buildAddressMap([acceptingBet]);
     wsService.emitBetAccepting(formatBetResponse(acceptingBet, addressMap) as unknown as Record<string, unknown>);
   }
 
@@ -603,10 +601,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
 
   logger.info({ txHash: relayResult.txHash, address, betId: betId.toString() }, 'Accept bet submitted — confirming in background');
 
-  const responseAddressMap = acceptingBet
-    ? await betService.buildAddressMap([acceptingBet])
-    : await betService.buildAddressMap([existing]);
-  const responseData = acceptingBet ? acceptingBet : existing;
+  const responseData = acceptingBet ?? existing;
 
   // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
   const acceptPendingAmount = getTotalPendingLocks(address);
@@ -616,7 +611,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   // Return 202 Accepted — confirmation in progress
   return c.json({
     data: {
-      ...formatBetResponse(responseData, responseAddressMap),
+      ...formatBetResponse(responseData, addressMap),
       status: 'accepting',
       acceptor: address,
       acceptor_guess: guess,

@@ -44,7 +44,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
   const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount, isFrozen } = usePendingBalance();
 
   const { data: balanceData } = useGetVaultBalance({
-    query: { enabled: isConnected, refetchInterval: isFrozen ? false : 8_000 },
+    query: { enabled: isConnected, refetchInterval: isFrozen ? false : 15_000 },
   });
 
   // ── Open bets counter (SOURCE OF TRUTH: server's chain-based count) ──

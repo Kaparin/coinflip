@@ -26,22 +26,29 @@ interface TxPollResult {
   events: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
 }
 
-/** Poll chain REST API for tx inclusion by hash. Returns result or null. */
+/** Poll chain REST API for tx inclusion by hash. Returns result or null.
+ *  Uses progressive intervals: starts fast (500ms) and backs off to cap. */
 async function pollForTx(
   txHash: string,
-  maxMs = 35_000,
-  intervalMs = 1_500,
+  maxMs = 25_000,
+  startIntervalMs = 500,
 ): Promise<TxPollResult | null> {
   const start = Date.now();
+  let interval = startIntervalMs;
+  const MAX_INTERVAL = 2_000;
   let first = true;
 
   while (Date.now() - start < maxMs) {
-    // Check immediately on first iteration, then sleep between subsequent checks
-    if (!first) await new Promise(r => setTimeout(r, intervalMs));
+    if (!first) {
+      await new Promise(r => setTimeout(r, interval));
+      interval = Math.min(interval * 1.5, MAX_INTERVAL);
+    }
     first = false;
 
     try {
-      const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`);
+      const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`, {
+        signal: AbortSignal.timeout(3000),
+      });
       if (res.ok) {
         const data = await res.json() as {
           tx_response?: {
@@ -144,11 +151,11 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       // Step 3: Fallback — query open_bets by commitment
       if (!chainBetId) {
         const maxRetries = 5;
-        const retryDelay = 2_000;
+        const retryDelays = [500, 1_000, 1_500, 2_000, 3_000];
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           if (attempt > 0) {
-            await new Promise(r => setTimeout(r, retryDelay));
+            await new Promise(r => setTimeout(r, retryDelays[attempt] ?? 2_000));
           }
           try {
             const query = JSON.stringify({ open_bets: { limit: 100 } });
@@ -275,7 +282,7 @@ export function confirmCancelBetInBackground(task: CancelBetTask): void {
           } catch (err) {
             logger.error({ err, betId: betId.toString() }, `${tag} — cleanup check failed`);
           }
-        }, 2 * 60 * 1000);
+        }, 30_000); // 30s safety timeout (was 2min)
         return;
       }
 
@@ -364,7 +371,7 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
           } catch (err) {
             logger.error({ err, betId: betId.toString() }, `${tag} — cleanup check failed`);
           }
-        }, 3 * 60 * 1000); // 3 minute safety timeout
+        }, 45_000); // 45s safety timeout (was 3min)
 
         return;
       }
@@ -408,7 +415,8 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
         wsService.emitBetAccepted(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
 
         // AUTO-REVEAL: immediately trigger reveal using stored secret
-        autoRevealBet(betId).catch(err => {
+        // Skip chain check — we just confirmed accept, no need to query chain again
+        autoRevealBet(betId, /* skipChainCheck */ true).catch(err => {
           logger.error({ err, betId: betId.toString() }, `${tag} — auto-reveal failed (will retry via background job)`);
         });
       }
@@ -577,7 +585,7 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
  * A delayed sync check picks up the result ~8s later.
  * The background sweep catches anything that falls through.
  */
-export async function autoRevealBet(betId: bigint): Promise<boolean> {
+export async function autoRevealBet(betId: bigint, skipChainCheck = false): Promise<boolean> {
   const tag = 'auto-reveal';
   const betKey = betId.toString();
 
@@ -588,13 +596,13 @@ export async function autoRevealBet(betId: bigint): Promise<boolean> {
 
   processingBets.add(betKey);
   try {
-    return await _autoRevealBetInner(betId);
+    return await _autoRevealBetInner(betId, skipChainCheck);
   } finally {
     processingBets.delete(betKey);
   }
 }
 
-async function _autoRevealBetInner(betId: bigint): Promise<boolean> {
+async function _autoRevealBetInner(betId: bigint, skipChainCheck: boolean): Promise<boolean> {
   const tag = 'auto-reveal';
   const bet = await betService.getBetById(betId);
 
@@ -608,9 +616,12 @@ async function _autoRevealBetInner(betId: bigint): Promise<boolean> {
     return false;
   }
 
-  // Step 0: Check chain state first — maybe already resolved
-  const alreadySynced = await syncBetFromChain(betId);
-  if (alreadySynced) return true;
+  // Step 0: Check chain state first — maybe already resolved.
+  // Skip when called right after accept confirmation (we know it just got accepted).
+  if (!skipChainCheck) {
+    const alreadySynced = await syncBetFromChain(betId);
+    if (alreadySynced) return true;
+  }
 
   if (!bet.makerSecret || !bet.makerSide) {
     logger.debug({ betId: betId.toString() }, `${tag} — no secret stored, skipping`);
@@ -650,41 +661,50 @@ async function _autoRevealBetInner(betId: bigint): Promise<boolean> {
 
   logger.info({ betId: betId.toString(), txHash: relayResult.txHash }, `${tag} — reveal broadcast OK`);
 
-  // Schedule a delayed chain sync — pick up the result after block inclusion (~6-10s)
-  // Don't block here — return immediately so other reveals can proceed
-  scheduleDelayedSync(betId, relayResult.txHash);
+  // Poll for reveal tx confirmation (non-blocking) and sync immediately when found
+  pollRevealAndSync(betId, relayResult.txHash ?? '');
 
   return true;
 }
 
 /**
- * Schedule a chain sync check after a delay.
- * Tries multiple times with increasing delays.
+ * Poll for reveal tx inclusion, then sync bet from chain immediately.
+ * Replaces the old scheduleDelayedSync which waited 8/15/30 seconds.
  */
-function scheduleDelayedSync(betId: bigint, txHash?: string): void {
-  const tag = 'delayed-sync';
-  const delays = [8_000, 15_000, 30_000]; // 8s, 15s, 30s
+function pollRevealAndSync(betId: bigint, txHash: string): void {
+  const tag = 'reveal-poll';
 
-  let attempt = 0;
-  const trySync = async () => {
+  // Fire-and-forget — don't block the caller
+  (async () => {
     try {
+      // Poll for tx with fast intervals (500ms start, ~1s avg)
+      const result = txHash ? await pollForTx(txHash, 25_000, 1_000) : null;
+
+      if (result) {
+        logger.info({ betId: betId.toString(), txHash, code: result.code }, `${tag} — reveal tx confirmed`);
+      } else {
+        logger.warn({ betId: betId.toString(), txHash }, `${tag} — reveal tx not found in time, syncing from chain state`);
+      }
+
+      // Sync bet state from chain regardless (tx may have landed even if poll missed it)
       const synced = await syncBetFromChain(betId);
       if (synced) {
-        logger.info({ betId: betId.toString(), txHash, attempt }, `${tag} — synced`);
+        logger.info({ betId: betId.toString() }, `${tag} — bet synced from chain`);
         return;
       }
-      attempt++;
-      if (attempt < delays.length) {
-        setTimeout(trySync, delays[attempt]! - delays[attempt - 1]!);
+
+      // If not synced yet, wait one more block and try once more
+      await new Promise(r => setTimeout(r, 3_000));
+      const synced2 = await syncBetFromChain(betId);
+      if (synced2) {
+        logger.info({ betId: betId.toString() }, `${tag} — bet synced on retry`);
       } else {
-        logger.warn({ betId: betId.toString(), txHash }, `${tag} — not synced after all attempts, sweep will handle`);
+        logger.warn({ betId: betId.toString() }, `${tag} — not synced after poll, sweep will handle`);
       }
     } catch (err) {
       logger.error({ err, betId: betId.toString() }, `${tag} — error`);
     }
-  };
-
-  setTimeout(trySync, delays[0]);
+  })();
 }
 
 // ─── Auto-Claim Timeout ─────────────────────────────────────────
@@ -754,8 +774,8 @@ export async function autoClaimTimeoutBets(): Promise<void> {
 
         logger.info({ betId: betKey, txHash: relayResult.txHash }, `${tag} — timeout tx broadcast OK`);
 
-        // Schedule delayed sync instead of blocking
-        scheduleDelayedSync(bet.betId, relayResult.txHash);
+        // Poll for tx confirmation and sync
+        pollRevealAndSync(bet.betId, relayResult.txHash ?? '');
       } catch (err) {
         logger.error({ err, betId: betKey }, `${tag} — error processing bet`);
       } finally {
@@ -939,7 +959,7 @@ async function cancelOrphanedChainBets(): Promise<void> {
         }
 
         // Wait between cancels to avoid sequence mismatch
-        await new Promise(r => setTimeout(r, 4000));
+        await new Promise(r => setTimeout(r, 1_500));
       } catch (err) {
         logger.error({ err, betId: betKey }, `${tag} — error canceling orphaned bet`);
       } finally {
@@ -966,7 +986,7 @@ let sweepRunning = false;
 export function startBackgroundSweep(): void {
   if (sweepInterval) return;
 
-  const SWEEP_INTERVAL_MS = 30_000;
+  const SWEEP_INTERVAL_MS = 15_000; // 15s (was 30s) — faster recovery for failed reveals
 
   sweepInterval = setInterval(async () => {
     if (sweepRunning) {
