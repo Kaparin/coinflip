@@ -215,13 +215,42 @@ export function Header() {
                       </div>
                     </div>
 
-                    {/* Switch wallet (when multiple saved) */}
-                    {wallet.savedWallets.length > 1 && (
+                    {/* Saved wallets list (switch between them) */}
+                    {wallet.savedWallets.length > 0 && (
                       <div className="py-1 border-b border-[var(--color-border)]">
+                        <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                          {t('header.savedWallets')}
+                        </p>
+                        {wallet.savedWallets.map((w) => {
+                          const isCurrent = wallet.address === w.address;
+                          return (
+                            <button
+                              key={w.address}
+                              type="button"
+                              onClick={() => {
+                                if (isCurrent) {
+                                  setWalletDropdownOpen(false);
+                                  return;
+                                }
+                                wallet.openConnectModal(w.address);
+                                setWalletDropdownOpen(false);
+                              }}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)] text-left"
+                            >
+                              <UserAvatar address={w.address} size={24} />
+                              <span className="font-mono truncate flex-1 min-w-0">
+                                {`${w.address.slice(0, 10)}...${w.address.slice(-6)}`}
+                                {isCurrent && (
+                                  <span className="ml-1 text-[var(--color-success)]">({t('auth.current')})</span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
                         <button type="button" onClick={() => { wallet.openConnectModal(); setWalletDropdownOpen(false); }}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]">
-                          <Wallet size={16} className="text-[var(--color-text-secondary)]" />
-                          <span>{t('header.switchWallet')}</span>
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-xs text-[var(--color-primary)] transition-colors hover:bg-[var(--color-surface-hover)]">
+                          <Wallet size={16} />
+                          <span>{t('auth.addNewWallet')}</span>
                         </button>
                       </div>
                     )}
@@ -311,13 +340,46 @@ export function Header() {
                 )}
               </div>
 
-              {/* Switch wallet (when multiple saved) */}
-              {wallet.savedWallets.length > 1 && (
-                <button type="button" onClick={() => { wallet.openConnectModal(); setMenuOpen(false); }}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium">
-                  <Wallet size={14} className="text-[var(--color-text-secondary)]" />
-                  {t('header.switchWallet')}
-                </button>
+              {/* Saved wallets list (mobile) */}
+              {wallet.savedWallets.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {t('header.savedWallets')}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {wallet.savedWallets.map((w) => {
+                      const isCurrent = wallet.address === w.address;
+                      return (
+                        <button
+                          key={w.address}
+                          type="button"
+                          onClick={() => {
+                            if (isCurrent) {
+                              setMenuOpen(false);
+                              return;
+                            }
+                            wallet.openConnectModal(w.address);
+                            setMenuOpen(false);
+                          }}
+                          className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-left"
+                        >
+                          <UserAvatar address={w.address} size={28} />
+                          <span className="text-xs font-mono truncate flex-1 min-w-0">
+                            {`${w.address.slice(0, 10)}...${w.address.slice(-6)}`}
+                            {isCurrent && (
+                              <span className="ml-1 text-[var(--color-success)] text-[10px]">({t('auth.current')})</span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <button type="button" onClick={() => { wallet.openConnectModal(); setMenuOpen(false); }}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--color-border)] px-3 py-2 text-xs font-medium text-[var(--color-primary)]">
+                      <Wallet size={14} />
+                      {t('auth.addNewWallet')}
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Disconnect / Forget */}

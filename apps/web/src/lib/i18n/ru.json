@@ -61,6 +61,7 @@
     "disconnect": "Отключить",
     "forgetWallet": "Забыть кошелёк",
     "switchWallet": "Переключить кошелёк",
+    "savedWallets": "Сохранённые кошельки",
     "toggleMenu": "Открыть меню"
   },
   "balance": {

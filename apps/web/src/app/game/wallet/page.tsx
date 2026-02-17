@@ -6,13 +6,14 @@ import { useGrantStatus } from '@/hooks/use-grant-status';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { StatusChips } from '@/components/features/auth/status-chips';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
+import { UserAvatar } from '@/components/ui';
 import { useState, useCallback } from 'react';
 import { EXPLORER_URL } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 
 export default function WalletPage() {
   const { t } = useTranslation();
-  const { address, isConnected, connect, shortAddress } = useWalletContext();
+  const { address, isConnected, connect, savedWallets, openConnectModal } = useWalletContext();
   const { data: grantData } = useGrantStatus();
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -67,6 +68,51 @@ export default function WalletPage() {
         </div>
         <p className="text-xs font-mono break-all leading-relaxed text-[var(--color-text-secondary)]">{address}</p>
       </div>
+
+      {/* Saved wallets — switch between them */}
+      {savedWallets.length > 0 && (
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-3">
+            {t('header.savedWallets')}
+          </p>
+          <div className="space-y-2">
+            {savedWallets.map((w) => {
+              const isCurrent = address === w.address;
+              return (
+                <button
+                  key={w.address}
+                  type="button"
+                  onClick={() => {
+                    if (isCurrent) return;
+                    openConnectModal(w.address);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-left transition-colors hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-border)]/10"
+                >
+                  <UserAvatar address={w.address} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-mono truncate">
+                      {`${w.address.slice(0, 12)}...${w.address.slice(-8)}`}
+                      {isCurrent && (
+                        <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
+                          ({t('auth.current')})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => openConnectModal()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] px-4 py-3 text-sm font-medium text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5"
+            >
+              <Wallet size={18} />
+              {t('auth.addNewWallet')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Full Balance Display with deposit/withdraw */}
       <BalanceDisplay />

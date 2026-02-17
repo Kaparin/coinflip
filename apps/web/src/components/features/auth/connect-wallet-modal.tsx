@@ -23,7 +23,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
   const { t, locale } = useTranslation();
   const {
     hasSaved, savedAddress, savedWallets, address: connectedAddress, isConnected, isConnecting, error,
-    connectWithMnemonic, unlockWithPin, forgetWallet,
+    connectWithMnemonic, unlockWithPin, forgetWallet, connectModalSwitchTo,
   } = useWalletContext();
 
   const [step, setStep] = useState<Step>('choose');
@@ -59,40 +59,50 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       setPinConfirm('');
       setLocalError('');
       setDerivedAddress('');
-      setSelectedWalletAddress(null);
       setInviterOpen(false);
       setInviterAddr('');
       setInviterStatus('idle');
       setInviterError('');
       isInFlightRef.current = false;
-      // Multi-wallet: show choose if multiple (or if connected—switch mode), unlock if single, import if none
-      if (hasSaved) {
+      // Direct switch: open to unlock a specific wallet
+      if (connectModalSwitchTo) {
+        setSelectedWalletAddress(connectModalSwitchTo);
+        setStep('unlock');
+      } else if (hasSaved) {
         const showChoose = savedWallets.length > 1 || (isConnected && savedWallets.length >= 1);
         setStep(showChoose ? 'choose' : 'unlock');
-        if (savedWallets.length === 1 && !showChoose) setSelectedWalletAddress(savedWallets[0]!.address);
+        setSelectedWalletAddress(showChoose ? null : (savedWallets[0]?.address ?? null));
       } else {
+        setSelectedWalletAddress(null);
         setStep('import');
       }
     }
     prevOpenRef.current = open;
-  }, [open, hasSaved, savedWallets]);
+  }, [open, hasSaved, savedWallets, isConnected, connectModalSwitchTo]);
 
   // When wallet becomes connected during unlock/confirm, transition to success
+  // IMPORTANT: When switching wallets, only transition when connected address matches the target.
+  // Otherwise we'd show success immediately (isConnected was already true) without asking for PIN.
   useEffect(() => {
-    if (open && isConnected && !isConnecting && (step === 'unlock' || step === 'confirm')) {
-      isInFlightRef.current = false;
-      setStep('success');
+    if (!open || !isConnected || isConnecting || (step !== 'unlock' && step !== 'confirm')) return;
 
-      // Register inviter by address if user entered one (and no ref code from URL)
-      if (inviterAddr.trim() && !hasRefCode) {
-        registerByAddress(inviterAddr.trim()).catch(() => {});
-      }
-
-      setMnemonic('');
-      setPin('');
-      setPinConfirm('');
+    const targetAddr = selectedWalletAddress ?? savedAddress;
+    if (targetAddr && connectedAddress !== targetAddr) {
+      // Switching to another wallet — wait for actual switch before showing success
+      return;
     }
-  }, [open, isConnected, isConnecting, step]);
+
+    isInFlightRef.current = false;
+    setStep('success');
+
+    if (inviterAddr.trim() && !hasRefCode) {
+      registerByAddress(inviterAddr.trim()).catch(() => {});
+    }
+
+    setMnemonic('');
+    setPin('');
+    setPinConfirm('');
+  }, [open, isConnected, isConnecting, step, connectedAddress, selectedWalletAddress, savedAddress, inviterAddr, hasRefCode]);
 
   // Auto-close when on success step
   useEffect(() => {
