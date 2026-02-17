@@ -276,21 +276,25 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
 
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-      {/* Mobile collapsible header */}
+      {/* Mobile collapsible header — when expanded, show only collapse action to avoid duplicating content */}
       <div className="md:hidden">
         <button
           type="button"
           onClick={() => setMobileCollapsed(!mobileCollapsed)}
           className="w-full flex items-center justify-between px-4 py-3 active:bg-[var(--color-surface-hover)] transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">{t('wager.title')}</span>
-            {parsedAmount > 0 && (
-              <span className="rounded-lg bg-[var(--color-primary)]/10 px-2 py-0.5 text-xs font-bold text-[var(--color-primary)]">
-                {parsedAmount.toLocaleString()} L
-              </span>
-            )}
-          </div>
+          {mobileIsCollapsed ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">{t('wager.title')}</span>
+              {parsedAmount > 0 && (
+                <span className="rounded-lg bg-[var(--color-primary)]/10 px-2 py-0.5 text-xs font-bold text-[var(--color-primary)]">
+                  {parsedAmount.toLocaleString()} L
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('balance.collapse')}</span>
+          )}
           <ChevronDown size={16} className={`text-[var(--color-text-secondary)] transition-transform duration-200 ${!mobileIsCollapsed ? 'rotate-180' : ''}`} />
         </button>
 

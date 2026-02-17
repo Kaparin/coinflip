@@ -47,24 +47,28 @@ export function MobileBalanceBar() {
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 transition-colors active:bg-[var(--color-surface-hover)]"
       >
-        <div className="flex flex-col items-start gap-0.5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
-              {t('balance.yourGameBalance')}
-            </span>
-            <span className="text-base font-bold tabular-nums text-[var(--color-success)]">
-              — {fmtNum(fromMicroLaunch(availableMicro))}
-            </span>
+        {expanded ? (
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('balance.collapse')}</span>
+        ) : (
+          <div className="flex flex-col items-start gap-0.5">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+                {t('balance.yourGameBalance')}
+              </span>
+              <span className="text-base font-bold tabular-nums text-[var(--color-success)]">
+                — {fmtNum(fromMicroLaunch(availableMicro))}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+                {t('balance.inBetsShort')}
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-[var(--color-warning)]">
+                — {fmtNum(fromMicroLaunch(lockedMicro))}
+              </span>
+            </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
-              {t('balance.inBetsShort')}
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-[var(--color-warning)]">
-              — {fmtNum(fromMicroLaunch(lockedMicro))}
-            </span>
-          </div>
-        </div>
+        )}
         <ChevronDown size={18} className={`shrink-0 text-[var(--color-text-secondary)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
