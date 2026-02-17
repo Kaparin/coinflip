@@ -69,6 +69,7 @@
     "withdrawFailed": "Withdrawal failed. Try again.",
     "walletNotUnlocked": "Wallet not unlocked. Please reconnect.",
     "depositFailed": "Deposit failed",
+    "checkTxExplorer": "Check transaction",
     "play": "Play:",
     "bets": "Bets:",
     "yourBalance": "Your balance",

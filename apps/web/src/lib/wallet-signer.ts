@@ -31,6 +31,13 @@ function getRpcUrl(): string {
 
 // ---- Signing Clients ----
 
+/**
+ * Broadcast timeout for deposit/withdraw (CosmJS signAndBroadcast).
+ * Default 60s can be too short when RPC/REST is slow or chain is congested.
+ * 120s gives more headroom; tx may still succeed after timeout.
+ */
+const BROADCAST_TIMEOUT_MS = 120_000;
+
 /** Create a SigningCosmWasmClient for CW20 operations (deposits). */
 export async function getCosmWasmClient(
   wallet: DirectSecp256k1HdWallet,
@@ -38,6 +45,8 @@ export async function getCosmWasmClient(
   const rpcUrl = getRpcUrl();
   return SigningCosmWasmClient.connectWithSigner(rpcUrl, wallet, {
     gasPrice: GasPrice.fromString(DEFAULT_GAS_PRICE),
+    broadcastTimeoutMs: BROADCAST_TIMEOUT_MS,
+    broadcastPollIntervalMs: 3_000,
   });
 }
 

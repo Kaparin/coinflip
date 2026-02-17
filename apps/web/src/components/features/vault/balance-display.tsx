@@ -11,6 +11,14 @@ import { LaunchTokenIcon } from '@/components/ui';
 import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { signDeposit } from '@/lib/wallet-signer';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
+import { EXPLORER_URL } from '@/lib/constants';
+
+/** Extract tx hash from CosmJS timeout error: "Transaction with ID 7C77... was submitted..." */
+function extractTxHashFromError(err: unknown): string | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  const m = msg.match(/Transaction with ID ([A-F0-9a-f]+)/i);
+  return m?.[1] ?? null;
+}
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useTranslation } from '@/lib/i18n';
 
@@ -137,6 +145,7 @@ export function BalanceDisplay() {
   const [depositStatus, setDepositStatus] = useState<'idle' | 'signing' | 'broadcasting' | 'success' | 'error'>('idle');
   const [depositStep, setDepositStep] = useState<DepositStep>('connecting');
   const [depositError, setDepositError] = useState('');
+  const [depositErrorTxHash, setDepositErrorTxHash] = useState<string | null>(null);
   const [depositTxHash, setDepositTxHash] = useState('');
   const [depositElapsed, setDepositElapsed] = useState(0);
   const depositTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -243,7 +252,9 @@ export function BalanceDisplay() {
         queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
       }, 3000);
     } catch (err) {
-      setDepositError(err instanceof Error ? err.message : t('balance.depositFailed'));
+      const msg = err instanceof Error ? err.message : t('balance.depositFailed');
+      setDepositError(msg);
+      setDepositErrorTxHash(extractTxHashFromError(err));
       setDepositStatus('error');
     }
   }, [address, depositAmount, getWallet, refetch, queryClient, t]);
@@ -254,6 +265,7 @@ export function BalanceDisplay() {
     setDepositStatus('idle');
     setDepositStep('connecting');
     setDepositError('');
+    setDepositErrorTxHash(null);
     setDepositTxHash('');
     setDepositElapsed(0);
   };
@@ -374,7 +386,21 @@ export function BalanceDisplay() {
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
                 </div>
 
-                {depositError && <p className="text-xs text-[var(--color-danger)] mb-3">{depositError}</p>}
+                {depositError && (
+                  <div className="mb-3">
+                    <p className="text-xs text-[var(--color-danger)]">{depositError}</p>
+                    {(depositErrorTxHash || depositTxHash) && (
+                      <a
+                        href={`${EXPLORER_URL}/transactions/${depositErrorTxHash ?? depositTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
+                      >
+                        {t('balance.checkTxExplorer')} →
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <button type="button" onClick={resetDeposit}
@@ -459,9 +485,26 @@ export function BalanceDisplay() {
                     ) : t('common.withdraw')}
                   </button>
                 </div>
-                {withdrawMutation.isError && (
-                  <p className="mt-2 text-xs text-[var(--color-danger)] text-center">{t('balance.withdrawFailed')}</p>
-                )}
+                {withdrawMutation.isError && (() => {
+                  const err = withdrawMutation.error as { error?: { message?: string; details?: { txHash?: string } } };
+                  const msg = err?.error?.message ?? t('balance.withdrawFailed');
+                  const txHash = err?.error?.details?.txHash;
+                  return (
+                    <div className="mt-2 text-center">
+                      <p className="text-xs text-[var(--color-danger)]">{msg}</p>
+                      {txHash && (
+                        <a
+                          href={`${EXPLORER_URL}/transactions/${txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
+                        >
+                          {t('balance.checkTxExplorer')} →
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>
