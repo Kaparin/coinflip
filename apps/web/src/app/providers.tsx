@@ -43,6 +43,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 5_000,
             refetchOnWindowFocus: false,
+            retry: 1, // At most 1 retry for queries (custom-fetch already retries GETs)
+          },
+          mutations: {
+            retry: false, // Never auto-retry mutations (chain txs are not idempotent)
           },
         },
       }),

@@ -18,6 +18,7 @@ import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
@@ -55,9 +56,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  // Smart polling: 30s when WS connected (rare fallback), 5s when WS down
   const { data, isLoading, error, refetch } = useGetBets(
     { status: 'open', limit: 50 },
-    { query: { refetchInterval: 5_000 } }, // Auto-refresh every 5s as fallback if WS misses events
+    { query: { refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED } },
   );
   const vaultKey = ['/api/v1/vault/balance'];
   const { data: balanceData } = useGetVaultBalance({ query: { enabled: isConnected } });
@@ -126,9 +128,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         }
 
         // Invalidate bets list immediately (to remove accepted bet from open bets)
+        // Balance will be refreshed by WebSocket event when chain confirms.
         invalidateBetsOnly();
-        // Refetch balance after chain confirms
-        setTimeout(() => queryClient.invalidateQueries({ queryKey: vaultKey }), 8_000);
 
         setAcceptTarget(null);
         clearPending();

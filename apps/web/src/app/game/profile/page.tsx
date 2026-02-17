@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
-  ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User,
+  ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
@@ -249,14 +249,42 @@ function RulesSection() {
   );
 }
 
+type BranchStep = 'idle' | 'validating' | 'withdrawing' | 'transferring' | 'updating' | 'done' | 'error';
+
+const BRANCH_STEPS: { key: BranchStep; labelRu: string; labelEn: string }[] = [
+  { key: 'validating', labelRu: 'Проверка данных...', labelEn: 'Validating...' },
+  { key: 'withdrawing', labelRu: 'Списание 1 000 LAUNCH из vault...', labelEn: 'Withdrawing 1,000 LAUNCH from vault...' },
+  { key: 'transferring', labelRu: 'Перевод в казну платформы...', labelEn: 'Transferring to platform treasury...' },
+  { key: 'updating', labelRu: 'Обновление реферальной ветки...', labelEn: 'Updating referral branch...' },
+];
+
 function ChangeBranchSection() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [addr, setAddr] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<BranchStep>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [referrer, setReferrer] = useState<{ address: string; nickname: string | null } | null>(null);
   const [loadingRef, setLoadingRef] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isRu = locale === 'ru';
+  const isProcessing = step !== 'idle' && step !== 'done' && step !== 'error';
+
+  // Elapsed time counter
+  useEffect(() => {
+    if (isProcessing) {
+      setElapsedSec(0);
+      timerRef.current = setInterval(() => setElapsedSec(s => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isProcessing]);
 
   // Fetch current referrer on mount
   useEffect(() => {
@@ -268,21 +296,50 @@ function ChangeBranchSection() {
     });
   }, []);
 
+  const stepLabel = (s: BranchStep) => {
+    const found = BRANCH_STEPS.find(bs => bs.key === s);
+    return found ? (isRu ? found.labelRu : found.labelEn) : '';
+  };
+
+  const currentStepIdx = BRANCH_STEPS.findIndex(bs => bs.key === step);
+
   const handleChange = useCallback(async () => {
     const trimmed = addr.trim();
     if (!trimmed || !trimmed.startsWith('axm1')) {
       addToast('warning', t('auth.inviterNotFound'));
       return;
     }
-    setLoading(true);
+    setErrorMsg('');
+    setStep('validating');
+
     try {
       const { changeBranch: doChange } = await import('@/hooks/use-referral');
+
+      // Simulate step progression based on timing
+      // The server does: validate → withdraw → transfer → update DB
+      // We show steps optimistically as the single API call progresses
+      const stepTimer1 = setTimeout(() => setStep('withdrawing'), 1500);
+      const stepTimer2 = setTimeout(() => setStep('transferring'), 6000);
+      const stepTimer3 = setTimeout(() => setStep('updating'), 12000);
+
       const result = await doChange(trimmed);
+
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      clearTimeout(stepTimer3);
+
       if (result.ok) {
+        setStep('done');
         addToast('success', t('referral.changeBranchSuccess'));
         setReferrer({ address: trimmed, nickname: null });
-        setAddr('');
-        setOpen(false);
+        // Invalidate balance cache to reflect deduction
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+        setTimeout(() => {
+          setAddr('');
+          setOpen(false);
+          setStep('idle');
+        }, 2000);
       } else {
         const msg: Record<string, string> = {
           USER_NOT_FOUND: t('referral.changeBranchNotFound'),
@@ -290,14 +347,14 @@ function ChangeBranchSection() {
           WOULD_CREATE_CYCLE: t('referral.changeBranchCycle'),
           INSUFFICIENT_BALANCE: t('referral.changeBranchNoBalance'),
         };
-        addToast('error', msg[result.reason!] ?? result.reason ?? 'Error');
+        setStep('error');
+        setErrorMsg(msg[result.reason!] ?? result.reason ?? 'Error');
       }
     } catch {
-      addToast('error', 'Network error');
-    } finally {
-      setLoading(false);
+      setStep('error');
+      setErrorMsg(isRu ? 'Ошибка сети. Попробуйте снова.' : 'Network error. Please try again.');
     }
-  }, [addr, addToast, t]);
+  }, [addr, addToast, t, queryClient, isRu]);
 
   return (
     <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
@@ -321,7 +378,8 @@ function ChangeBranchSection() {
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-500 transition-colors hover:bg-amber-500/20"
+          disabled={isProcessing}
+          className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-500 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
         >
           <Users size={12} />
           {t('referral.changeBranch')}
@@ -331,29 +389,123 @@ function ChangeBranchSection() {
 
       {open && (
         <div className="px-4 pb-4 border-t border-amber-500/20 space-y-3 pt-3">
-          <p className="text-[10px] text-[var(--color-text-secondary)]">
-            {t('referral.changeBranchDesc')}
-          </p>
-          <p className="text-[10px] font-bold text-amber-500">
-            {t('referral.changeBranchCost')}
-          </p>
-          <input
-            type="text"
-            value={addr}
-            onChange={(e) => setAddr(e.target.value)}
-            placeholder={t('referral.changeBranchInput')}
-            spellCheck={false}
-            autoComplete="off"
-            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-amber-500 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={handleChange}
-            disabled={loading || !addr.trim()}
-            className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {loading ? '...' : t('referral.changeBranchConfirm')}
-          </button>
+          {/* Processing overlay */}
+          {isProcessing && (
+            <div className="rounded-xl bg-[var(--color-bg)] border border-amber-500/20 p-4 space-y-3 animate-[fadeUp_0.2s_ease-out]">
+              {/* Spinner + current step */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-shrink-0">
+                  <span className="block h-8 w-8 animate-spin rounded-full border-3 border-amber-500/20 border-t-amber-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-amber-500 truncate">{stepLabel(step)}</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    {isRu ? 'Не закрывайте страницу' : "Don't close this page"} · {elapsedSec}{isRu ? 'с' : 's'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Step progress */}
+              <div className="space-y-1.5">
+                {BRANCH_STEPS.map((bs, idx) => {
+                  const isDone = idx < currentStepIdx;
+                  const isCurrent = idx === currentStepIdx;
+                  return (
+                    <div key={bs.key} className="flex items-center gap-2">
+                      {isDone ? (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <Check size={10} className="text-green-500" />
+                        </span>
+                      ) : isCurrent ? (
+                        <span className="flex h-4 w-4 items-center justify-center">
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-500/30 border-t-amber-500" />
+                        </span>
+                      ) : (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-border)]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-text-secondary)]/30" />
+                        </span>
+                      )}
+                      <span className={`text-[11px] ${isDone ? 'text-green-500' : isCurrent ? 'text-amber-500 font-medium' : 'text-[var(--color-text-secondary)]/50'}`}>
+                        {isRu ? bs.labelRu.replace('...', '') : bs.labelEn.replace('...', '')}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 rounded-lg bg-amber-500/5 border border-amber-500/10 p-2">
+                <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-amber-500/80">
+                  {isRu
+                    ? 'Операция включает 2 транзакции в блокчейне. Обычно занимает 10-20 секунд.'
+                    : 'This operation involves 2 blockchain transactions. Usually takes 10-20 seconds.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Success state */}
+          {step === 'done' && (
+            <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-4 flex items-center gap-3 animate-[fadeUp_0.2s_ease-out]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/15">
+                <Check size={20} className="text-green-500" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-green-500">{t('referral.changeBranchSuccess')}</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                  {isRu ? '1 000 LAUNCH списано' : '1,000 LAUNCH deducted'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Error state */}
+          {step === 'error' && (
+            <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-4 space-y-2 animate-[fadeUp_0.2s_ease-out]">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-red-500" />
+                <p className="text-sm font-bold text-red-500">{isRu ? 'Ошибка' : 'Error'}</p>
+              </div>
+              <p className="text-xs text-[var(--color-text-secondary)]">{errorMsg}</p>
+              <button
+                type="button"
+                onClick={() => setStep('idle')}
+                className="text-xs font-bold text-amber-500 hover:underline"
+              >
+                {isRu ? 'Попробовать снова' : 'Try again'}
+              </button>
+            </div>
+          )}
+
+          {/* Input form — only visible when idle */}
+          {step === 'idle' && (
+            <>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">
+                {t('referral.changeBranchDesc')}
+              </p>
+              <p className="text-[10px] font-bold text-amber-500">
+                {t('referral.changeBranchCost')}
+              </p>
+              <input
+                type="text"
+                value={addr}
+                onChange={(e) => setAddr(e.target.value)}
+                placeholder={t('referral.changeBranchInput')}
+                spellCheck={false}
+                autoComplete="off"
+                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-amber-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleChange}
+                disabled={!addr.trim()}
+                className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                {t('referral.changeBranchConfirm')}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

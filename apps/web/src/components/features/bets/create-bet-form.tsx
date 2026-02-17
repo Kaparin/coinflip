@@ -106,11 +106,8 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
         // Increment local submitted counter (tracks bets between server refetches)
         setLocalSubmitted(prev => prev + 1);
 
-        // Refetch bets list + balance after delays (chain confirmation takes ~10s)
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: vaultKey });
-          queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
-        }, 8000);
+        // No delayed refetch needed — WebSocket events will invalidate queries
+        // when the chain confirms the bet.
 
         const txHash = (response as any)?.tx_hash ?? '';
         addToast('success', t('bets.confirmingOnChain'));
@@ -239,14 +236,10 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
       // Update local submitted counter
       setLocalSubmitted(prev => prev + submitted);
 
-      // Refetch
+      // Refetch bets list immediately; balance will be updated by WS events on chain confirm
       const vaultKey = getGetVaultBalanceQueryKey();
       queryClient.invalidateQueries({ queryKey: vaultKey });
       queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: vaultKey });
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
-      }, 8000);
 
       if (failed === 0) {
         addToast('success', t('wager.batchSuccess', { done: submitted }));

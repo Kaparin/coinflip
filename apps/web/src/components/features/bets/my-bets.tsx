@@ -11,6 +11,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 
 /** Extract error message, handling 429 action-in-progress specially */
@@ -36,19 +37,22 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const [pendingBetId, setPendingBetId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | null>(null);
 
+  // Smart polling: slow (30s) when WS connected, fast (5s) when WS down
+  const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
+
   // Get all active bets
   // Fetch open bets (includes "canceling" from DB since it's set before chain confirms)
   const { data: openData, isLoading: loadingOpen } = useGetBets(
     { status: 'open', limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: 5_000 } },
+    { query: { enabled: isConnected, refetchInterval: pollInterval } },
   );
   const { data: acceptingData, isLoading: loadingAccepting } = useGetBets(
     { status: 'accepting', limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: 5_000 } },
+    { query: { enabled: isConnected, refetchInterval: pollInterval } },
   );
   const { data: acceptedData, isLoading: loadingAccepted } = useGetBets(
     { status: 'accepted' as any, limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: 5_000 } },
+    { query: { enabled: isConnected, refetchInterval: pollInterval } },
   );
 
   const invalidateAll = useCallback(() => {

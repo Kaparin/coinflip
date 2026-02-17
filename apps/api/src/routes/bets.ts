@@ -42,16 +42,16 @@ import { getPendingBetCount, incrementPendingBetCount, decrementPendingBetCount 
 
 /**
  * Mark user as having an in-flight tx. Throws 429 if one is already pending.
- * With async broadcastTxSync, the window is very short (~100ms for sequence reservation).
- * We keep a minimal guard to prevent literal double-click spam.
+ * Guard window prevents rapid sequential chain transactions that can cause
+ * sequence mismatches and nonce errors.
  */
 function acquireInflight(address: string): void {
   const existing = inflightTxs.get(address);
   if (existing) {
-    // Cooldown: 500ms is enough to prevent literal double-clicks
-    // but short enough to allow rapid sequential actions
-    if (Date.now() - existing < 500) {
-      throw Errors.actionInProgress(1);
+    // 2s cooldown — prevents double-clicks AND rapid sequential requests
+    // that would cause sequence/nonce errors on chain
+    if (Date.now() - existing < 2_000) {
+      throw Errors.actionInProgress(2);
     }
   }
   inflightTxs.set(address, Date.now());
@@ -380,11 +380,16 @@ betsRouter.post('/batch', authMiddleware, zValidator('json', BatchCreateBetsRequ
   }
 
   // Submit each bet sequentially via relayer (async broadcast mode)
+  // Small delay between relay calls to avoid sequence/nonce clashes on chain.
+  const BATCH_INTER_DELAY_MS = 300;
   const results: Array<{ index: number; amount: string; tx_hash?: string; error?: string }> = [];
   let successCount = 0;
   let lockedSoFar = 0n;
 
   for (let i = 0; i < amounts.length; i++) {
+    // Brief pause between successive relay calls to let sequence numbers settle
+    if (i > 0) await new Promise(r => setTimeout(r, BATCH_INTER_DELAY_MS));
+
     const amount = amounts[i]!;
     const makerSide: 'heads' | 'tails' = secureCoinFlip();
     const makerSecret = generateSecret();

@@ -25,6 +25,22 @@ interface UseWebSocketReturn {
 }
 
 /**
+ * Global WS connection state — components can read this to decide polling intervals.
+ * When WS is connected, polling can be slowed down dramatically (fallback only).
+ */
+let _globalWsConnected = false;
+
+/** Returns true if the global WebSocket is currently connected. */
+export function isWsConnected(): boolean {
+  return _globalWsConnected;
+}
+
+/** Polling interval when WS is connected (slow fallback) */
+export const POLL_INTERVAL_WS_CONNECTED = 30_000;
+/** Polling interval when WS is disconnected (fast fallback) */
+export const POLL_INTERVAL_WS_DISCONNECTED = 5_000;
+
+/**
  * WebSocket hook for real-time CoinFlip updates.
  *
  * Features:
@@ -88,7 +104,7 @@ export function useWebSocket({
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(flushInvalidations, 300);
+    debounceTimer.current = setTimeout(flushInvalidations, 500);
   }, [flushInvalidations]);
 
   // Build current WS URL from ref
@@ -118,6 +134,7 @@ export function useWebSocket({
         const wasDisconnected = !isConnectedRef.current;
         setIsConnected(true);
         isConnectedRef.current = true;
+        _globalWsConnected = true;
         retryCountRef.current = 0;
 
         // After reconnecting, refetch all critical queries to catch missed events
@@ -136,6 +153,7 @@ export function useWebSocket({
         if (!mountedRef.current) return;
         setIsConnected(false);
         isConnectedRef.current = false;
+        _globalWsConnected = false;
         wsRef.current = null;
 
         // Exponential backoff reconnect (min 3s, max 30s)
