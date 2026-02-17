@@ -37,5 +37,14 @@ export const bets = pgTable(
     index('bets_maker_idx').on(table.makerUserId),
     index('bets_acceptor_idx').on(table.acceptorUserId),
     index('bets_created_time_idx').on(table.createdTime),
+    // Composite indexes for common production query patterns
+    index('bets_status_created_idx').on(table.status, table.createdTime),
+    index('bets_maker_status_idx').on(table.makerUserId, table.status),
+    index('bets_acceptor_status_idx').on(table.acceptorUserId, table.status),
+    index('bets_status_resolved_idx').on(table.status, table.resolvedTime),
+    // TX hash lookups (indexer + background tasks)
+    index('bets_txhash_create_idx').on(table.txhashCreate),
+    index('bets_txhash_accept_idx').on(table.txhashAccept),
+    index('bets_commitment_idx').on(table.commitment),
   ],
 );

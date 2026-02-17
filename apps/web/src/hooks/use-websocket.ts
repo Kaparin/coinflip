@@ -104,7 +104,7 @@ export function useWebSocket({
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(flushInvalidations, 500);
+    debounceTimer.current = setTimeout(flushInvalidations, 150);
   }, [flushInvalidations]);
 
   // Build current WS URL from ref

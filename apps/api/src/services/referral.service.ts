@@ -430,43 +430,46 @@ export class ReferralService {
 
     if (rewardMap.size === 0) return;
 
-    // Write rewards + update balances
-    for (const [key, { amount, level, fromPlayer }] of rewardMap) {
-      const referrerId = key.split(':')[0]!;
-      try {
-        // Record the reward event
-        await this.db.insert(referralRewards).values({
-          recipientUserId: referrerId,
-          fromPlayerUserId: fromPlayer,
-          betId: betIdStr,
-          amount: amount.toString(),
-          level,
-        });
+    // Write rewards + update balances in a single transaction (all-or-nothing)
+    try {
+      await this.db.transaction(async (tx) => {
+        for (const [key, { amount, level, fromPlayer }] of rewardMap) {
+          const referrerId = key.split(':')[0]!;
 
-        // Upsert referral balance (on insert: set initial values; on conflict: increment)
-        await this.db
-          .insert(referralBalances)
-          .values({
-            userId: referrerId,
-            unclaimed: amount.toString(),
-            totalEarned: amount.toString(),
-          })
-          .onConflictDoUpdate({
-            target: referralBalances.userId,
-            set: {
-              unclaimed: sql`${referralBalances.unclaimed}::numeric + ${amount.toString()}::numeric`,
-              totalEarned: sql`${referralBalances.totalEarned}::numeric + ${amount.toString()}::numeric`,
-              updatedAt: new Date(),
-            },
-          });
+          // Record the reward event (unique constraint prevents duplicates from race conditions)
+          await tx.insert(referralRewards).values({
+            recipientUserId: referrerId,
+            fromPlayerUserId: fromPlayer,
+            betId: betIdStr,
+            amount: amount.toString(),
+            level,
+          }).onConflictDoNothing();
 
-        logger.info(
-          { referrerId, amount: amount.toString(), level, betId: betIdStr, fromPlayer },
-          `${tag} — reward credited`,
-        );
-      } catch (err) {
-        logger.error({ err, referrerId, betId: betIdStr, level }, `${tag} — failed to credit reward`);
-      }
+          // Upsert referral balance (on insert: set initial values; on conflict: increment)
+          await tx
+            .insert(referralBalances)
+            .values({
+              userId: referrerId,
+              unclaimed: amount.toString(),
+              totalEarned: amount.toString(),
+            })
+            .onConflictDoUpdate({
+              target: referralBalances.userId,
+              set: {
+                unclaimed: sql`${referralBalances.unclaimed}::numeric + ${amount.toString()}::numeric`,
+                totalEarned: sql`${referralBalances.totalEarned}::numeric + ${amount.toString()}::numeric`,
+                updatedAt: new Date(),
+              },
+            });
+
+          logger.info(
+            { referrerId, amount: amount.toString(), level, betId: betIdStr, fromPlayer },
+            `${tag} — reward credited`,
+          );
+        }
+      });
+    } catch (err) {
+      logger.error({ err, betId: betIdStr }, `${tag} — transaction failed, all rewards rolled back`);
     }
   }
 
@@ -484,9 +487,12 @@ export class ReferralService {
   }
 
   /**
-   * Claim referral rewards: move unclaimed balance to vault available balance.
-   * Uses atomic CAS (compare-and-swap) to prevent double-claims.
+   * Claim referral rewards: atomically zero out unclaimed balance.
    * Returns the claimed amount, or null if nothing to claim.
+   *
+   * NOTE: This only handles the DB side (zeroing unclaimed).
+   * The actual on-chain token transfer (treasury → user) is handled
+   * by the route handler using the relayer service.
    */
   async claimRewards(userId: string): Promise<string | null> {
     const balance = await this.db.query.referralBalances.findFirst({
@@ -514,31 +520,32 @@ export class ReferralService {
       return null;
     }
 
-    // Credit to vault available balance
-    const vaultUpdated = await this.db
-      .update(vaultBalances)
-      .set({
-        available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
-        updatedAt: new Date(),
-      })
-      .where(eq(vaultBalances.userId, userId))
-      .returning();
+    logger.info({ userId, amount }, 'Referral rewards claimed (DB zeroed)');
+    return amount;
+  }
 
-    if (vaultUpdated.length === 0) {
-      // Vault row doesn't exist — rollback the claim
-      logger.error({ userId, amount }, 'Referral claim: vault balance row not found — rolling back');
-      await this.db
-        .update(referralBalances)
-        .set({
+  /**
+   * Rollback a claim: add amount back to unclaimed balance.
+   * Called when the on-chain transfer fails after the DB claim succeeded.
+   */
+  async rollbackClaim(userId: string, amount: string): Promise<void> {
+    // Upsert to handle the edge case where the balance row was deleted
+    await this.db
+      .insert(referralBalances)
+      .values({
+        userId,
+        unclaimed: amount,
+        totalEarned: '0', // totalEarned is not rolled back — it tracks lifetime earnings
+      })
+      .onConflictDoUpdate({
+        target: referralBalances.userId,
+        set: {
           unclaimed: sql`${referralBalances.unclaimed}::numeric + ${amount}::numeric`,
           updatedAt: new Date(),
-        })
-        .where(eq(referralBalances.userId, userId));
-      return null;
-    }
+        },
+      });
 
-    logger.info({ userId, amount }, 'Referral rewards claimed to vault');
-    return amount;
+    logger.warn({ userId, amount }, 'Referral claim rolled back');
   }
 
   /**

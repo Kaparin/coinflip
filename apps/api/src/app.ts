@@ -9,7 +9,11 @@ import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { referralRouter } from './routes/referral.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { ipRateLimit } from './middleware/rate-limit.js';
 import { env } from './config/env.js';
+import { getDb } from './lib/db.js';
+import { sql } from 'drizzle-orm';
+import { logger } from './lib/logger.js';
 import type { AppEnv } from './types.js';
 
 export const app = new Hono<AppEnv>();
@@ -26,12 +30,47 @@ app.use(
     credentials: true,
   }),
 );
+
+// IP-based rate limit on all API routes (60 req/min per IP)
+app.use('/api/*', ipRateLimit);
+
 app.onError(errorHandler);
 
-// ---- Health check ----
-app.get('/health', (c) =>
-  c.json({ status: 'ok', timestamp: new Date().toISOString() }),
-);
+// ---- Health check (with dependency probes) ----
+app.get('/health', async (c) => {
+  const checks: Record<string, 'ok' | 'error'> = {};
+
+  // DB check
+  try {
+    const db = getDb();
+    await db.execute(sql`SELECT 1`);
+    checks.db = 'ok';
+  } catch {
+    checks.db = 'error';
+  }
+
+  // Chain RPC check
+  try {
+    const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/base/tendermint/v1beta1/syncing`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    checks.chain = res.ok ? 'ok' : 'error';
+  } catch {
+    checks.chain = 'error';
+  }
+
+  const allHealthy = Object.values(checks).every(v => v === 'ok');
+  const status = allHealthy ? 'ok' : 'degraded';
+
+  if (!allHealthy) {
+    logger.warn({ checks }, 'Health check: some dependencies unhealthy');
+  }
+
+  return c.json(
+    { status, timestamp: new Date().toISOString(), checks },
+    allHealthy ? 200 : 503,
+  );
+});
 
 // ---- Swagger UI ----
 app.get('/docs', swaggerUI({ url: '/openapi.json' }));

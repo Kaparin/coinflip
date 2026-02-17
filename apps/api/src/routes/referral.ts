@@ -204,18 +204,133 @@ referralRouter.get('/balance', authMiddleware, async (c) => {
   return c.json({ data: balance });
 });
 
-// POST /api/v1/referral/claim — Claim referral rewards to vault
+// POST /api/v1/referral/claim — Claim referral rewards via on-chain transfer
+//
+// Full on-chain transfer flow:
+//   1. Atomically zero out unclaimed balance in DB (CAS)
+//   2. Treasury withdraws from coinflip contract vault → CW20 tokens to treasury wallet
+//   3. Treasury transfers CW20 tokens to user's wallet
+//   4. On failure: rollback DB claim
+//
+// The user receives CW20 tokens in their WALLET (not vault).
+// They can deposit into vault to bet, or keep in wallet.
 referralRouter.post('/claim', authMiddleware, async (c) => {
   const userId = c.get('user').id;
   const address = c.get('address');
+
+  // Step 1: Atomically zero out unclaimed balance in DB
   const amount = await referralService.claimRewards(userId);
 
   if (!amount) {
     return c.json({ error: { code: 'NOTHING_TO_CLAIM', message: 'No unclaimed rewards' } }, 400);
   }
 
+  // Step 2: On-chain transfer from treasury vault → user wallet
+  const treasuryAddr = env.TREASURY_ADDRESS;
+  const cw20Addr = env.LAUNCH_CW20_ADDR;
+
+  if (!treasuryAddr || !cw20Addr) {
+    await referralService.rollbackClaim(userId, amount);
+    logger.error({ userId, amount }, 'Referral claim: TREASURY_ADDRESS or LAUNCH_CW20_ADDR not configured');
+    return c.json({
+      error: { code: 'CONFIG_ERROR', message: 'Service is not properly configured for claims. Please try again later.' },
+    }, 500);
+  }
+
+  if (!relayerService.isReady()) {
+    await referralService.rollbackClaim(userId, amount);
+    throw Errors.relayerNotReady();
+  }
+
+  // Step 2a: Pre-check treasury vault balance (avoid wasting gas on hopeless tx)
+  try {
+    const treasuryBalance = await getChainVaultBalance(treasuryAddr);
+    if (BigInt(treasuryBalance.available) < BigInt(amount)) {
+      await referralService.rollbackClaim(userId, amount);
+      logger.error(
+        { userId, amount, treasuryAvailable: treasuryBalance.available, treasuryAddr },
+        'Referral claim: treasury vault has insufficient balance',
+      );
+      return c.json({
+        error: { code: 'INSUFFICIENT_TREASURY', message: 'Rewards pool is temporarily low. Please try again later.' },
+      }, 503);
+    }
+  } catch (err) {
+    logger.warn({ err, treasuryAddr }, 'Referral claim: failed to pre-check treasury balance — proceeding anyway');
+  }
+
+  // Step 2b: Treasury withdraws CW20 from coinflip contract vault
+  const withdrawResult = await relayerService.relayWithdraw(treasuryAddr, amount);
+  if (!withdrawResult.success) {
+    // Withdraw failed — rollback DB claim
+    await referralService.rollbackClaim(userId, amount);
+    logger.error({ withdrawResult, userId, amount, treasuryAddr }, 'Referral claim: treasury withdraw failed');
+    return c.json({
+      error: {
+        code: 'CHAIN_TX_FAILED',
+        message: 'Failed to process claim. Please try again.',
+        details: { txHash: withdrawResult.txHash },
+      },
+    }, 422);
+  }
+
+  logger.info({ txHash: withdrawResult.txHash, amount, treasuryAddr }, 'Referral claim: treasury withdraw confirmed');
+
+  // Step 2b: Transfer CW20 from treasury wallet → user wallet
+  const transferResult = await relayerService.relayCw20Transfer(
+    treasuryAddr,
+    cw20Addr,
+    address,
+    amount,
+    'CoinFlip referral reward',
+  );
+
+  if (!transferResult.success) {
+    // Transfer failed — tokens are in treasury wallet but user didn't receive.
+    // Try to re-deposit tokens back to treasury vault to restore the original state.
+    logger.error(
+      { transferResult, userId, amount, from: treasuryAddr, to: address },
+      'Referral claim: CW20 transfer to user FAILED — attempting to re-deposit to vault',
+    );
+
+    // Best-effort: re-deposit tokens back to treasury vault
+    try {
+      await relayerService.relayDeposit(treasuryAddr);
+      logger.info({ amount, treasuryAddr }, 'Referral claim: tokens re-deposited to treasury vault');
+    } catch (reDepositErr) {
+      logger.error(
+        { err: reDepositErr, amount, treasuryAddr },
+        'Referral claim: re-deposit ALSO failed — tokens remain in treasury wallet, needs manual resolution',
+      );
+    }
+
+    // Rollback DB claim so user can try again
+    await referralService.rollbackClaim(userId, amount);
+
+    return c.json({
+      error: {
+        code: 'TRANSFER_FAILED',
+        message: 'Failed to transfer rewards. Your balance has been restored. Please try again later.',
+        details: { withdrawTx: withdrawResult.txHash, amount },
+      },
+    }, 422);
+  }
+
+  logger.info(
+    { txHash: transferResult.txHash, userId, amount, from: treasuryAddr, to: address },
+    'Referral claim: CW20 transfer to user confirmed',
+  );
+
   invalidateBalanceCache(address);
-  return c.json({ data: { claimed: amount } });
+  invalidateBalanceCache(treasuryAddr);
+
+  return c.json({
+    data: {
+      claimed: amount,
+      withdraw_tx: withdrawResult.txHash,
+      transfer_tx: transferResult.txHash,
+    },
+  });
 });
 
 // GET /api/v1/referral/rewards — Reward history (paginated)

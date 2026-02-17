@@ -14,5 +14,7 @@ export const txEvents = pgTable(
     index('tx_events_txhash_idx').on(table.txhash),
     index('tx_events_event_type_idx').on(table.eventType),
     index('tx_events_height_idx').on(table.height),
+    // Composite for deduplication: check (txhash, event_type) uniqueness
+    index('tx_events_txhash_type_idx').on(table.txhash, table.eventType),
   ],
 );

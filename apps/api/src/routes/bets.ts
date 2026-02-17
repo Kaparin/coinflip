@@ -11,6 +11,7 @@ import {
 } from '@coinflip/shared/schemas';
 import { MIN_BET_AMOUNT, MAX_OPEN_BETS_PER_USER, MAX_BATCH_SIZE } from '@coinflip/shared/constants';
 import { authMiddleware } from '../middleware/auth.js';
+import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import { betService } from '../services/bet.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { wsService } from '../services/ws.service.js';
@@ -21,6 +22,7 @@ import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import { resolveCreateBetInBackground, confirmAcceptBetInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
+import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
 
 /**
  * Cryptographically secure coin flip.
@@ -182,13 +184,12 @@ betsRouter.get('/:betId', async (c) => {
 // Returns 202 IMMEDIATELY after tx enters mempool (~2s).
 // Bet confirmation (bet_id resolution, DB save) happens in background.
 // Frontend is notified via WebSocket: bet_confirmed or bet_create_failed.
-betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema), async (c) => {
+betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', CreateBetRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const { amount } = c.req.valid('json');
 
   // Server generates random side + secret + commitment
-  const { generateSecret, computeCommitment } = await import('@coinflip/shared/commitment');
   const makerSide: 'heads' | 'tails' = secureCoinFlip();
   const makerSecret = generateSecret();
   const commitment = computeCommitment(address, makerSide, makerSecret);
@@ -208,18 +209,21 @@ betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema),
 
   let relayResult: RelayResult;
   let lockId: string | undefined;
+  // Hoist balance so it's accessible for the response after the try/finally block
+  let balance: { available: string; locked: string; total: string };
   try {
-    // Check balance AFTER inflight guard (prevents race between check & lock)
-    const balance = await vaultService.getBalance(user.id);
+    // Check balance + open bets in parallel (both are DB reads, safe to run concurrently)
+    const pendingCount = getPendingBetCount(user.id);
+    const [bal, dbCount] = await Promise.all([
+      vaultService.getBalance(user.id),
+      betService.getOpenBetCountForUser(user.id),
+    ]);
+    balance = bal;
+
     if (BigInt(balance.available) < BigInt(amount)) {
       throw Errors.insufficientBalance(amount, balance.available);
     }
 
-    // Check open bets count — DB count + pending (in-flight) bets.
-    // We use DB + pending instead of chain query here to keep the hot path fast.
-    // The chain enforces the hard limit anyway; this is a pre-flight soft check.
-    const pendingCount = getPendingBetCount(user.id);
-    const dbCount = await betService.getOpenBetCountForUser(user.id);
     const totalOpenPending = dbCount + pendingCount;
     if (totalOpenPending >= MAX_OPEN_BETS_PER_USER) {
       throw Errors.tooManyOpenBets(MAX_OPEN_BETS_PER_USER);
@@ -280,10 +284,10 @@ betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema),
 
   logger.info({ txHash: relayResult.txHash, address, amount }, 'Create bet submitted — confirming in background');
 
-  // Fetch corrected balance (includes pending lock) for immediate client update
-  const updatedBalance = await getChainVaultBalance(address);
+  // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
   const pendingAmount = getTotalPendingLocks(address);
-  const correctedAvailable = BigInt(updatedBalance.available) - pendingAmount;
+  const dbAvailable = BigInt(balance.available) - BigInt(amount) - pendingAmount;
+  const dbLocked = BigInt(balance.locked) + BigInt(amount) + pendingAmount;
 
   // Return 202 Accepted — bet is not yet in DB, but tx is in mempool
   return c.json({
@@ -295,8 +299,8 @@ betsRouter.post('/', authMiddleware, zValidator('json', CreateBetRequestSchema),
     },
     tx_hash: relayResult.txHash,
     balance: {
-      available: (correctedAvailable < 0n ? 0n : correctedAvailable).toString(),
-      locked: (BigInt(updatedBalance.locked) + pendingAmount).toString(),
+      available: (dbAvailable < 0n ? 0n : dbAvailable).toString(),
+      locked: (dbLocked < 0n ? 0n : dbLocked).toString(),
     },
     message: 'Bet submitted to blockchain. You will be notified when confirmed.',
   }, 202);
@@ -323,13 +327,11 @@ function randomBigIntInRange(min: bigint, max: bigint): bigint {
 //   mode="fixed"  → all bets have the same amount
 //   mode="random" → each bet gets a random amount between min_amount and max_amount
 // Returns 202 with list of pending tx hashes.
-betsRouter.post('/batch', authMiddleware, zValidator('json', BatchCreateBetsRequestSchema), async (c) => {
+betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', BatchCreateBetsRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const body = c.req.valid('json');
   const { mode, count } = body;
-
-  const { generateSecret, computeCommitment } = await import('@coinflip/shared/commitment');
 
   // Build list of amounts
   const amounts: string[] = [];
@@ -399,7 +401,7 @@ betsRouter.post('/batch', authMiddleware, zValidator('json', BatchCreateBetsRequ
       const relayResult = await relayerService.relayCreateBet(address, amount, commitment, true);
 
       if (!relayResult.success) {
-        results.push({ index: i, amount, error: relayResult.rawLog || relayResult.error || 'Relay failed' });
+        results.push({ index: i, amount, error: 'Transaction failed. Please try again.' });
         continue;
       }
 
@@ -463,7 +465,7 @@ betsRouter.post('/batch', authMiddleware, zValidator('json', BatchCreateBetsRequ
 // Returns 202 IMMEDIATELY after tx enters mempool (~2s).
 // Bet status transitions: open → accepting → accepted (or reverts to open on failure).
 // Frontend is notified via WebSocket: bet_accepted or accept_failed.
-betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
+betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = BigInt(c.req.param('betId'));
@@ -514,11 +516,13 @@ betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
   let relayResult: RelayResult;
   let acceptingBet: Awaited<ReturnType<typeof betService.markAccepting>> | null = null;
   let acceptLockId: string | undefined;
+  // Hoist balance so it's accessible for the response after the try/finally block
+  let acceptBalance: { available: string; locked: string; total: string };
   try {
     // Check balance AFTER inflight guard
-    const balance = await vaultService.getBalance(user.id);
-    if (BigInt(balance.available) < BigInt(existing.amount)) {
-      throw Errors.insufficientBalance(existing.amount, balance.available);
+    acceptBalance = await vaultService.getBalance(user.id);
+    if (BigInt(acceptBalance.available) < BigInt(existing.amount)) {
+      throw Errors.insufficientBalance(existing.amount, acceptBalance.available);
     }
 
     // Atomically lock acceptor funds BEFORE relay (guards against double-spend)
@@ -604,10 +608,10 @@ betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
     : await betService.buildAddressMap([existing]);
   const responseData = acceptingBet ? acceptingBet : existing;
 
-  // Fetch corrected balance (includes pending lock) for immediate client update
-  const acceptUpdatedBalance = await getChainVaultBalance(address);
+  // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
   const acceptPendingAmount = getTotalPendingLocks(address);
-  const acceptCorrectedAvail = BigInt(acceptUpdatedBalance.available) - acceptPendingAmount;
+  const acceptAvail = BigInt(acceptBalance.available) - BigInt(existing.amount) - acceptPendingAmount;
+  const acceptLocked = BigInt(acceptBalance.locked) + BigInt(existing.amount) + acceptPendingAmount;
 
   // Return 202 Accepted — confirmation in progress
   return c.json({
@@ -619,8 +623,8 @@ betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
     },
     tx_hash: relayResult.txHash,
     balance: {
-      available: (acceptCorrectedAvail < 0n ? 0n : acceptCorrectedAvail).toString(),
-      locked: (BigInt(acceptUpdatedBalance.locked) + acceptPendingAmount).toString(),
+      available: (acceptAvail < 0n ? 0n : acceptAvail).toString(),
+      locked: (acceptLocked < 0n ? 0n : acceptLocked).toString(),
     },
     message: 'Accept submitted to blockchain. Confirming...',
   }, 202);
@@ -697,7 +701,7 @@ betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealReque
 // POST /api/v1/bets/:betId/cancel — Cancel (auth required)
 // ASYNC: marks bet as "canceling" in DB, broadcasts via WS, submits chain tx,
 // and returns 202 IMMEDIATELY. Confirmation happens in background.
-betsRouter.post('/:betId/cancel', authMiddleware, async (c) => {
+betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = BigInt(c.req.param('betId'));

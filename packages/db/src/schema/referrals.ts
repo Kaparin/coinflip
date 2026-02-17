@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, timestamp, integer, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, numeric, timestamp, integer, index, unique } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
 /** Unique referral codes for each user */
@@ -51,6 +51,8 @@ export const referralRewards = pgTable(
     index('ref_rewards_recipient_idx').on(table.recipientUserId),
     index('ref_rewards_bet_idx').on(table.betId),
     index('ref_rewards_from_player_idx').on(table.fromPlayerUserId),
+    // Prevent duplicate rewards: one reward per (bet, recipient, level)
+    unique('ref_rewards_bet_recipient_level_uniq').on(table.betId, table.recipientUserId, table.level),
   ],
 );
 

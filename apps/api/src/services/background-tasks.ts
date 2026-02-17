@@ -29,13 +29,17 @@ interface TxPollResult {
 /** Poll chain REST API for tx inclusion by hash. Returns result or null. */
 async function pollForTx(
   txHash: string,
-  maxMs = 60_000,
-  intervalMs = 3_000,
+  maxMs = 35_000,
+  intervalMs = 1_500,
 ): Promise<TxPollResult | null> {
   const start = Date.now();
+  let first = true;
 
   while (Date.now() - start < maxMs) {
-    await new Promise(r => setTimeout(r, intervalMs));
+    // Check immediately on first iteration, then sleep between subsequent checks
+    if (!first) await new Promise(r => setTimeout(r, intervalMs));
+    first = false;
+
     try {
       const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`);
       if (res.ok) {
@@ -140,7 +144,7 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       // Step 3: Fallback — query open_bets by commitment
       if (!chainBetId) {
         const maxRetries = 5;
-        const retryDelay = 5_000;
+        const retryDelay = 2_000;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           if (attempt > 0) {
@@ -170,10 +174,13 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       }
 
       if (!chainBetId) {
-        // Could not resolve — very rare. Funds stay locked, indexer will eventually catch up.
-        logger.error({ txHash, commitment }, `${tag} — failed to resolve bet_id after all retries`);
+        // Could not resolve — unlock funds so user isn't stuck.
+        // If the bet WAS created on-chain, the indexer will catch it and re-lock.
+        logger.error({ txHash, commitment }, `${tag} — failed to resolve bet_id after all retries, unlocking funds`);
         decrementPendingBetCount(makerUserId);
         if (pendingLockId) removePendingLock(address, pendingLockId);
+        await vaultService.unlockFunds(makerUserId, amount).catch(err =>
+          logger.warn({ err, makerUserId, amount }, `${tag} — unlockFunds failed`));
         invalidateBalanceCache(address);
         wsService.emitBetCreateFailed(address, {
           txHash,
@@ -205,11 +212,13 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       const addressMap = await betService.buildAddressMap([bet]);
       wsService.emitBetConfirmed(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
     } catch (err) {
-      logger.error({ err, txHash }, `${tag} — unexpected error`);
+      logger.error({ err, txHash }, `${tag} — unexpected error, unlocking funds`);
       decrementPendingBetCount(makerUserId);
       if (pendingLockId) removePendingLock(address, pendingLockId);
+      // Unlock funds so user isn't stuck — if bet exists on-chain, indexer will handle it
+      await vaultService.unlockFunds(makerUserId, amount).catch(unlockErr =>
+        logger.warn({ err: unlockErr, makerUserId, amount }, `${tag} — unlockFunds failed`));
       invalidateBalanceCache(address);
-      // Notify user of failure
       wsService.emitBetCreateFailed(address, {
         txHash,
         reason: 'An unexpected error occurred. Your bet may still appear shortly.',
@@ -404,9 +413,19 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
         });
       }
     } catch (err) {
-      logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error`);
+      logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error, reverting accept and unlocking funds`);
       if (pendingLockId) removePendingLock(address, pendingLockId);
+      // Revert bet to "open" and unlock acceptor funds
+      await betService.revertAccepting(betId).catch(revertErr =>
+        logger.warn({ err: revertErr, betId: betId.toString() }, `${tag} — revertAccepting failed`));
+      await vaultService.unlockFunds(acceptorUserId, amount).catch(unlockErr =>
+        logger.warn({ err: unlockErr, acceptorUserId, amount }, `${tag} — unlockFunds failed`));
       invalidateBalanceCache(address);
+      wsService.emitAcceptFailed(address, {
+        betId: betId.toString(),
+        txHash,
+        reason: 'An unexpected error occurred. Please try again.',
+      });
     }
   })();
 }

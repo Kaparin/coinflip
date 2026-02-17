@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { DepositRequestSchema, WithdrawRequestSchema } from '@coinflip/shared/schemas';
 import { authMiddleware } from '../middleware/auth.js';
+import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import { vaultService } from '../services/vault.service.js';
 import { relayerService } from '../services/relayer.js';
 import { wsService } from '../services/ws.service.js';
@@ -364,7 +365,7 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
 });
 
 // POST /api/v1/vault/withdraw — Withdraw from vault (via relayer)
-vaultRouter.post('/withdraw', authMiddleware, zValidator('json', WithdrawRequestSchema), async (c) => {
+vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('json', WithdrawRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const { amount } = c.req.valid('json');

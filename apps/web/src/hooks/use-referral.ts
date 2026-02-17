@@ -203,7 +203,7 @@ export function useReferral(isConnected: boolean) {
     setLoading(false);
   }, [isConnected, fetchCode, fetchStats, fetchRewards]);
 
-  const claim = useCallback(async () => {
+  const claim = useCallback(async (): Promise<{ ok: boolean; amount?: string; error?: string }> => {
     setClaiming(true);
     try {
       const walletAddress = getWalletAddress();
@@ -215,8 +215,14 @@ export function useReferral(isConnected: boolean) {
         },
       });
       if (res.ok) {
+        const json = await res.json();
         await fetchStats();
+        return { ok: true, amount: json?.data?.claimed };
       }
+      const json = await res.json().catch(() => null);
+      return { ok: false, error: json?.error?.message ?? 'Claim failed' };
+    } catch {
+      return { ok: false, error: 'Network error' };
     } finally {
       setClaiming(false);
     }

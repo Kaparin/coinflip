@@ -1,15 +1,103 @@
 import { Hono } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import { ConnectRequestSchema } from '@coinflip/shared/schemas';
 import { userService } from '../services/user.service.js';
 import { referralService } from '../services/referral.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
+import {
+  generateChallenge,
+  consumeChallenge,
+  verifySignature,
+  createSessionToken,
+  SESSION_COOKIE_NAME,
+  getSessionCookieOptions,
+} from '../services/session.service.js';
 import type { AppEnv } from '../types.js';
 
 export const authRouter = new Hono<AppEnv>();
+
+// ─── Challenge-Response Authentication ─────────────────────────
+
+// GET /api/v1/auth/challenge — Request a challenge nonce for wallet signing
+authRouter.get('/challenge', async (c) => {
+  const address = c.req.query('address')?.trim().toLowerCase();
+  if (!address || !address.startsWith('axm1') || address.length < 20) {
+    return c.json({ error: { code: 'INVALID_ADDRESS', message: 'Valid axm1... address required' } }, 400);
+  }
+
+  const nonce = generateChallenge(address);
+  const message = `Sign this message to authenticate with CoinFlip.\n\nWallet: ${address}\nNonce: ${nonce}\nTimestamp: ${new Date().toISOString()}`;
+
+  return c.json({
+    data: {
+      challenge: nonce,
+      message,
+    },
+  });
+});
+
+// POST /api/v1/auth/verify — Verify wallet signature and create session
+const VerifySchema = z.object({
+  address: z.string().min(20).max(100),
+  signature: z.string().min(1).max(256),
+  pubkey: z.string().min(1).max(256),
+});
+
+authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
+  const { address, signature, pubkey } = c.req.valid('json');
+  const normalizedAddress = address.trim().toLowerCase();
+
+  // Consume the challenge (one-time use, prevents replay attacks)
+  const challenge = consumeChallenge(normalizedAddress);
+  if (!challenge) {
+    return c.json({
+      error: { code: 'INVALID_CHALLENGE', message: 'Challenge expired or not found. Please request a new one.' },
+    }, 400);
+  }
+
+  // Verify the Secp256k1 signature
+  const valid = await verifySignature(normalizedAddress, challenge, signature, pubkey);
+  if (!valid) {
+    return c.json({
+      error: { code: 'INVALID_SIGNATURE', message: 'Signature verification failed.' },
+    }, 401);
+  }
+
+  // Find or create user
+  const user = await userService.findOrCreateUser(normalizedAddress);
+
+  // Create session
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+  const session = await userService.createSession(user.id, {
+    authzEnabled: false,
+    feeSponsored: false,
+    expiresAt,
+  });
+
+  // Create HMAC session token and set as httpOnly cookie
+  const sessionToken = createSessionToken(normalizedAddress);
+  const isProd = env.NODE_ENV === 'production';
+  const cookieOpts = getSessionCookieOptions(isProd);
+  setCookie(c, SESSION_COOKIE_NAME, sessionToken, cookieOpts);
+
+  logger.info({ address: normalizedAddress }, 'Wallet authenticated via signature');
+
+  return c.json({
+    data: {
+      session_id: session.id,
+      address: user.address,
+      user_id: user.id,
+      authenticated: true,
+    },
+  });
+});
+
+// ─── Legacy Connect (backwards-compatible, also sets session token) ─────
 
 // POST /api/v1/auth/connect — Connect wallet and register session
 authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) => {
@@ -31,23 +119,28 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
   });
 
   // Auto-assign to admin referrer if user has no referral link.
-  // Delayed by 5s to give the frontend time to register a real referral code first
-  // (the frontend calls POST /referral/register right after connect).
-  // Runs in background — doesn't block the response.
   setTimeout(() => {
     referralService.autoAssignDefaultReferrer(user.id).catch((err) => {
       logger.warn({ err, userId: user.id }, 'Failed to auto-assign default referrer');
     });
   }, 5000);
 
-  // Set session cookie
-  setCookie(c, 'wallet_address', address, {
-    httpOnly: true,
-    secure: false,
-    sameSite: 'Lax',
-    maxAge: 30 * 24 * 60 * 60,
-    path: '/',
-  });
+  // Set HMAC session token as httpOnly cookie (secure auth)
+  const sessionToken = createSessionToken(address);
+  const isProd = env.NODE_ENV === 'production';
+  const cookieOpts = getSessionCookieOptions(isProd);
+  setCookie(c, SESSION_COOKIE_NAME, sessionToken, cookieOpts);
+
+  // Legacy cookie (for backwards compatibility during transition)
+  if (!isProd) {
+    setCookie(c, 'wallet_address', address, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'Lax',
+      maxAge: 30 * 24 * 60 * 60,
+      path: '/',
+    });
+  }
 
   return c.json({
     data: {

@@ -13,7 +13,7 @@ export interface PendingBet {
 }
 
 const STORAGE_KEY = 'coinflip_pending_bets';
-const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes max
+const MAX_AGE_MS = 90 * 1000; // 90 seconds — if not confirmed by now, something went wrong
 
 /** Load pending bets from sessionStorage */
 function loadPending(): PendingBet[] {
@@ -99,15 +99,33 @@ export function usePendingBets() {
     }
   }, [removePending, markFailed]);
 
-  // Clean up expired pending bets periodically
+  // Clean up expired pending bets periodically — mark stale bets as failed
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       setPendingBets(prev => {
-        const filtered = prev.filter(b => now - b.createdAt < MAX_AGE_MS);
-        return filtered.length === prev.length ? prev : filtered;
+        let changed = false;
+        const updated = prev.reduce<PendingBet[]>((acc, b) => {
+          if (now - b.createdAt >= MAX_AGE_MS) {
+            if (b.status === 'confirming') {
+              // Mark as failed instead of silently removing
+              acc.push({ ...b, status: 'failed', failReason: 'Confirmation timed out. The bet may still appear shortly.' });
+              changed = true;
+            }
+            // Already-failed bets older than MAX_AGE + 10s are removed
+            else if (now - b.createdAt >= MAX_AGE_MS + 10_000) {
+              changed = true; // drop it
+            } else {
+              acc.push(b);
+            }
+          } else {
+            acc.push(b);
+          }
+          return acc;
+        }, []);
+        return changed ? updated : prev;
       });
-    }, 30_000);
+    }, 10_000);
     return () => clearInterval(interval);
   }, []);
 

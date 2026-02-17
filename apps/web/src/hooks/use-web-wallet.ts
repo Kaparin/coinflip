@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
+import { Secp256k1, Sha256, Bip39, Slip10, Slip10Curve, stringToPath, EnglishMnemonic } from '@cosmjs/crypto';
+import { toHex } from '@cosmjs/encoding';
 import {
   deriveWallet,
   encryptMnemonic,
@@ -16,6 +18,7 @@ import {
 } from '@/lib/wallet-core';
 import { clearSigningClientCache } from '@/lib/wallet-signer';
 import { API_URL, STORAGE_KEYS } from '@/lib/constants';
+import { AXIOME_HD_PATH } from '@coinflip/shared/chain';
 
 // ---- Session persistence keys ----
 const SESSION_WALLET_KEY = 'coinflip_session_wallet';
@@ -115,9 +118,67 @@ export function useWebWallet(): WebWalletState {
   // In-memory wallet (never persisted as-is)
   const walletRef = useRef<DirectSecp256k1HdWallet | null>(null);
 
-  /** Register session with backend */
-  const registerSession = useCallback(async (addr: string) => {
+  /**
+   * Register session with backend using challenge-response auth.
+   * If mnemonic is provided, performs cryptographic signature verification.
+   * Falls back to legacy /auth/connect if signature auth fails.
+   */
+  const registerSession = useCallback(async (addr: string, mnemonic?: string) => {
     try {
+      // If mnemonic available, use secure challenge-response auth
+      if (mnemonic) {
+        try {
+          // Step 1: Get challenge from server
+          const challengeRes = await fetch(
+            `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(addr)}`,
+            { credentials: 'include' },
+          );
+          if (challengeRes.ok) {
+            const challengeData = await challengeRes.json();
+            const nonce = challengeData.data?.challenge;
+            if (nonce) {
+              // Step 2: Sign the challenge with wallet's private key
+              const seed = await Bip39.mnemonicToSeed(
+                new EnglishMnemonic(mnemonic.trim().toLowerCase()),
+              );
+              const { privkey } = Slip10.derivePath(
+                Slip10Curve.Secp256k1,
+                seed,
+                stringToPath(AXIOME_HD_PATH),
+              );
+              const { pubkey } = await Secp256k1.makeKeypair(privkey);
+              const compressedPubkey = Secp256k1.compressPubkey(pubkey);
+
+              const messageHash = new Sha256(new TextEncoder().encode(nonce)).digest();
+              const signature = await Secp256k1.createSignature(messageHash, privkey);
+              const sigBytes = new Uint8Array([
+                ...signature.r(32),
+                ...signature.s(32),
+              ]);
+
+              // Step 3: Verify with server
+              const verifyRes = await fetch(`${API_URL}/api/v1/auth/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  address: addr,
+                  signature: toHex(sigBytes),
+                  pubkey: toHex(compressedPubkey),
+                }),
+              });
+
+              if (verifyRes.ok) {
+                return; // Authenticated via signature
+              }
+            }
+          }
+        } catch {
+          // Challenge-response failed — fall back to legacy
+        }
+      }
+
+      // Fallback: legacy connect (still sets session cookie in dev mode)
       await fetch(`${API_URL}/api/v1/auth/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-wallet-address': addr },
@@ -199,8 +260,8 @@ export function useWebWallet(): WebWalletState {
       refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
       sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
 
-      // Register with backend
-      await registerSession(addr);
+      // Register with backend (pass mnemonic for secure challenge-response auth)
+      await registerSession(addr, mnemonic.trim().toLowerCase());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to connect wallet';
       setError(msg);
@@ -252,8 +313,8 @@ export function useWebWallet(): WebWalletState {
       setAddress(addr);
       sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
 
-      // Register with backend
-      await registerSession(addr);
+      // Register with backend (pass mnemonic for secure challenge-response auth)
+      await registerSession(addr, mnemonic);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
       setError(msg);

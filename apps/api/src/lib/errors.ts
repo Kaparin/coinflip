@@ -10,6 +10,36 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * Sanitize raw chain error logs before returning to clients.
+ * Removes contract addresses, internal stack traces, and implementation details
+ * that could help attackers probe the system.
+ */
+function sanitizeChainError(rawLog?: string): string {
+  if (!rawLog) return 'Transaction failed';
+
+  // Known user-facing error patterns → return clean message
+  const userMessages: Array<[RegExp, string]> = [
+    [/insufficient.*balance/i, 'Insufficient balance'],
+    [/bet.*not.*found/i, 'Bet not found'],
+    [/bet.*expired/i, 'Bet has expired'],
+    [/self.*accept.*not.*allowed/i, 'Cannot accept your own bet'],
+    [/unauthorized/i, 'Authorization required for this action'],
+    [/commitment.*mismatch/i, 'Commitment verification failed'],
+    [/invalid.*state.*transition/i, 'This action is not available for the current bet state'],
+    [/reveal.*timeout.*expired/i, 'Reveal timeout has expired'],
+    [/account sequence mismatch/i, 'Transaction ordering issue — please retry'],
+    [/max.*open.*bets/i, 'Maximum open bets reached'],
+  ];
+
+  for (const [pattern, message] of userMessages) {
+    if (pattern.test(rawLog)) return message;
+  }
+
+  // Fallback: generic message (never expose raw contract logs)
+  return 'Transaction failed. Please try again.';
+}
+
 // Pre-defined errors
 export const Errors = {
   insufficientBalance: (need: string, have: string) =>
@@ -37,7 +67,7 @@ export const Errors = {
   forbidden: () =>
     new AppError('FORBIDDEN', 'Admin access required', 403),
   chainTxFailed: (txHash: string, rawLog?: string) =>
-    new AppError('CHAIN_TX_FAILED', `Chain transaction failed: ${rawLog ?? 'unknown error'}`, 422, { txHash, rawLog }),
+    new AppError('CHAIN_TX_FAILED', sanitizeChainError(rawLog), 422, { txHash }),
   chainTimeout: (txHash?: string) =>
     new AppError('CHAIN_TX_TIMEOUT', 'Transaction was submitted but not yet confirmed. Please wait and check your balance.', 504, { txHash }),
   actionInProgress: (estimatedWaitSec = 10) =>
@@ -48,3 +78,5 @@ export const Errors = {
       { retry_after_seconds: estimatedWaitSec },
     ),
 } as const;
+
+export { sanitizeChainError };

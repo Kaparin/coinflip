@@ -549,6 +549,8 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const { t } = useTranslation();
   const { code, stats, claiming, claim, shareUrl } = useReferral(isConnected);
   const [linkCopied, setLinkCopied] = useState(false);
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   const copyLink = useCallback(() => {
     if (!shareUrl) return;
@@ -565,6 +567,18 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
       copyLink();
     }
   }, [shareUrl, t, copyLink]);
+
+  const handleClaim = useCallback(async () => {
+    const result = await claim();
+    if (result.ok) {
+      addToast('success', t('referral.claimSuccess'));
+      // Refresh wallet balance since tokens went to the wallet
+      queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+    } else {
+      addToast('error', result.error ?? t('referral.claimFailed'));
+    }
+  }, [claim, addToast, queryClient, t]);
 
   const unclaimedAmount = stats?.balance?.unclaimed ? BigInt(stats.balance.unclaimed) : 0n;
   const totalEarnedAmount = stats?.balance?.totalEarned ? BigInt(stats.balance.totalEarned) : 0n;
@@ -750,7 +764,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
           {/* Claim button */}
           {unclaimedAmount > 0n && (
             <button
-              type="button" onClick={claim} disabled={claiming}
+              type="button" onClick={handleClaim} disabled={claiming}
               className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {claiming ? t('referral.claiming') : `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} LAUNCH)`}

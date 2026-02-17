@@ -13,6 +13,7 @@ if (process.env.PORT && !process.env.API_PORT) {
 }
 
 const envSchema = z.object({
+  NODE_ENV: z.string().default('development'),
   API_PORT: z.coerce.number().default(3001),
   API_HOST: z.string().default('0.0.0.0'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
@@ -27,6 +28,8 @@ const envSchema = z.object({
   RELAYER_ADDRESS: z.string().default(''),
   TREASURY_ADDRESS: z.string().default(''),
   ADMIN_ADDRESSES: z.string().default(''),
+  /** Secret key for HMAC session tokens. MUST be set in production (min 32 chars). */
+  SESSION_SECRET: z.string().default('dev-session-secret-change-in-production'),
   /** Enable background sweep (auto-reveal, auto-cancel, orphan cleanup). Default: true in prod, false in dev. */
   ENABLE_BACKGROUND_SWEEP: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
   /** Enable chain indexer (event polling). Default: true in prod, false in dev. */
@@ -36,3 +39,48 @@ const envSchema = z.object({
 export const env = envSchema.parse(process.env);
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Validate that all critical environment variables are set.
+ * Called at server startup — crashes the process if any are missing.
+ * In dev mode, only warns (to allow partial local setups).
+ */
+export function validateProductionEnv(): void {
+  const isProd = env.NODE_ENV === 'production';
+  const required: Array<{ key: keyof typeof env; label: string }> = [
+    { key: 'COINFLIP_CONTRACT_ADDR', label: 'CoinFlip smart contract address' },
+    { key: 'LAUNCH_CW20_ADDR', label: 'LAUNCH CW20 token contract address' },
+    { key: 'RELAYER_MNEMONIC', label: 'Relayer wallet mnemonic' },
+    { key: 'RELAYER_ADDRESS', label: 'Relayer wallet address' },
+    { key: 'TREASURY_ADDRESS', label: 'Treasury wallet address' },
+    { key: 'DATABASE_URL', label: 'PostgreSQL connection string' },
+  ];
+
+  const missing: string[] = [];
+
+  for (const { key, label } of required) {
+    const val = env[key];
+    if (!val || val === '') {
+      missing.push(`  - ${key} (${label})`);
+    }
+  }
+
+  // Session secret must be strong in production
+  if (isProd && env.SESSION_SECRET.length < 32) {
+    missing.push('  - SESSION_SECRET (must be at least 32 characters in production)');
+  }
+
+  if (isProd && env.SESSION_SECRET === 'dev-session-secret-change-in-production') {
+    missing.push('  - SESSION_SECRET (still using default dev secret — MUST be changed in production)');
+  }
+
+  if (missing.length > 0) {
+    const msg = `\n⚠️  Missing critical environment variables:\n${missing.join('\n')}\n`;
+    if (isProd) {
+      console.error(msg);
+      process.exit(1);
+    } else {
+      console.warn(msg + '(Running in dev mode — continuing with defaults)\n');
+    }
+  }
+}

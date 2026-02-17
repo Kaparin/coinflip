@@ -98,8 +98,8 @@ describe('formatBetResponse', () => {
     });
 
     const addressMap = new Map([
-      ['user_maker_123', 'axm1maker...'],
-      ['user_accept_456', 'axm1accept...'],
+      ['user_maker_123', { address: 'axm1maker...', nickname: null }],
+      ['user_accept_456', { address: 'axm1accept...', nickname: null }],
     ]);
 
     const result = formatBetResponse(row, addressMap);

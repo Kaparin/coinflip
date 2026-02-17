@@ -36,7 +36,8 @@ function getRpcUrl(): string {
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/chain-rpc`;
   }
-  return 'http://49.13.3.227:26657';
+  // Server-side fallback: use env var or Next.js proxy
+  return process.env.NEXT_PUBLIC_RPC_URL || 'http://localhost:26657';
 }
 
 // ---- Signing Client Cache ----
