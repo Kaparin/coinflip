@@ -81,9 +81,9 @@ function AboutSection() {
 
       {/* 1. Механика рандома */}
       <CollapsibleSection
-        title={t('profile.about.randomMechanics')}
+        title={t('profile.aboutSections.randomMechanics')}
         icon={<Code size={18} />}
-        defaultOpen={true}
+        defaultOpen={false}
         compact
       >
         <div className="space-y-4">
@@ -135,22 +135,22 @@ ${t('profile.randomCodeComment7')}`}</pre>
 
       {/* 2. Как играть */}
       <CollapsibleSection
-        title={t('profile.about.howToPlay')}
+        title={t('profile.aboutSections.howToPlay')}
         icon={<BookOpen size={18} />}
-        defaultOpen={true}
+        defaultOpen={false}
         compact
       >
         <div className="space-y-4">
-          <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.about.howToPlayIntro')}</p>
+          <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.aboutSections.howToPlayIntro')}</p>
           {[1, 2, 3, 4, 5, 6].map((n) => (
             <div key={n} className="flex gap-2">
               <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-[10px] font-bold flex items-center justify-center">
                 {n}
               </span>
               <div>
-                <p className="text-xs font-bold text-[var(--color-text)]">{t(`profile.about.step${n}Title` as 'profile.about.step1Title')}</p>
+                <p className="text-xs font-bold text-[var(--color-text)]">{t(`profile.aboutSections.step${n}Title` as 'profile.aboutSections.step1Title')}</p>
                 <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-0.5">
-                  {t(`profile.about.step${n}Desc` as 'profile.about.step1Desc')}
+                  {t(`profile.aboutSections.step${n}Desc` as 'profile.aboutSections.step1Desc')}
                 </p>
               </div>
             </div>
@@ -158,33 +158,33 @@ ${t('profile.randomCodeComment7')}`}</pre>
           <div className="pt-2 space-y-2 border-t border-[var(--color-border)]/50">
             <div>
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-                {t('profile.about.depositTitle')}
+                {t('profile.aboutSections.depositTitle')}
               </p>
-              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.depositBody')}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.depositBody')}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-                {t('profile.about.withdrawTitle')}
+                {t('profile.aboutSections.withdrawTitle')}
               </p>
-              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.withdrawBody')}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.withdrawBody')}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-                {t('profile.about.betFlowTitle')}
+                {t('profile.aboutSections.betFlowTitle')}
               </p>
-              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.betFlowBody')}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.betFlowBody')}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-                {t('profile.about.timingsTitle')}
+                {t('profile.aboutSections.timingsTitle')}
               </p>
-              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.timingsBody')}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.timingsBody')}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-                {t('profile.about.branchChangeTitle')}
+                {t('profile.aboutSections.branchChangeTitle')}
               </p>
-              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.branchChangeBody')}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.branchChangeBody')}</p>
             </div>
           </div>
           <div className="pt-2 border-t border-[var(--color-border)]/50">
@@ -205,7 +205,7 @@ ${t('profile.randomCodeComment7')}`}</pre>
 
       {/* 3. Как это работает на сервере */}
       <CollapsibleSection
-        title={t('profile.about.serverArchitecture')}
+        title={t('profile.aboutSections.serverArchitecture')}
         icon={<Info size={18} />}
         defaultOpen={false}
         compact
@@ -213,23 +213,23 @@ ${t('profile.randomCodeComment7')}`}</pre>
         <div className="space-y-4">
           <div>
             <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-              {t('profile.about.contractTitle')}
+              {t('profile.aboutSections.contractTitle')}
             </p>
-            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mb-2">{t('profile.about.contractBody')}</p>
-            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.contractStorage')}</p>
-            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-2">{t('profile.about.contractMessages')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mb-2">{t('profile.aboutSections.contractBody')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.contractStorage')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-2">{t('profile.aboutSections.contractMessages')}</p>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-              {t('profile.about.relayerTitle')}
+              {t('profile.aboutSections.relayerTitle')}
             </p>
-            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.relayerBody')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.relayerBody')}</p>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
-              {t('profile.about.indexerTitle')}
+              {t('profile.aboutSections.indexerTitle')}
             </p>
-            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.about.indexerBody')}</p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">{t('profile.aboutSections.indexerBody')}</p>
           </div>
 
           {/* Contract Addresses */}

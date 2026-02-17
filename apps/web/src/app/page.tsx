@@ -15,7 +15,7 @@ export default function LandingPage() {
           <Coins size={40} strokeWidth={1.5} />
         </div>
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
-          Coin<span className="text-[var(--color-primary)]">Flip</span>
+          Heads or <span className="text-[var(--color-primary)]">Tails</span>
         </h1>
         <p className="max-w-sm text-sm sm:text-lg text-[var(--color-text-secondary)]">
           {t('landing.tagline')}

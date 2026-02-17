@@ -374,7 +374,7 @@
     "nicknameSaved": "Никнейм сохранён!",
     "nicknameError": "Не удалось сохранить никнейм",
     "important4": "Минимальная ставка — 1 LAUNCH.",
-    "about": {
+    "aboutSections": {
       "randomMechanics": "Механика рандома",
       "howToPlay": "Как играть",
       "serverArchitecture": "Как это работает на сервере",

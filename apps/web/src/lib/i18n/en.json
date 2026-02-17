@@ -374,7 +374,7 @@
     "nicknameSaved": "Nickname saved!",
     "nicknameError": "Failed to save nickname",
     "important4": "Minimum bet amount is 1 LAUNCH.",
-    "about": {
+    "aboutSections": {
       "randomMechanics": "Random mechanics",
       "howToPlay": "How to play",
       "serverArchitecture": "How it works on the server",
