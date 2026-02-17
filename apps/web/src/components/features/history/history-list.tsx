@@ -141,7 +141,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
         <div className="flex items-center justify-between">
           <span className="text-[var(--color-text-secondary)]">{t('history.betAmount')}</span>
           <span className="font-semibold tabular-nums flex items-center gap-1">
-            {formatLaunch(betAmountMicro)} <LaunchTokenIcon size={12} />
+            {formatLaunch(betAmountMicro)} <LaunchTokenIcon size={30} />
           </span>
         </div>
 
@@ -160,7 +160,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('history.payout')}</span>
             <span className="font-semibold tabular-nums text-[var(--color-success)] flex items-center gap-1">
-              {formatLaunch(payoutMicro)} <LaunchTokenIcon size={12} />
+              {formatLaunch(payoutMicro)} <LaunchTokenIcon size={30} />
             </span>
           </div>
         )}
@@ -170,7 +170,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('history.commission')}</span>
             <span className="font-semibold tabular-nums flex items-center gap-1">
-              {formatLaunch(commissionMicro)} <LaunchTokenIcon size={12} />
+              {formatLaunch(commissionMicro)} <LaunchTokenIcon size={30} />
             </span>
           </div>
         )}
@@ -436,7 +436,7 @@ export function HistoryList() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold tabular-nums">{formatLaunch(betAmountMicro)}</span>
-                      <LaunchTokenIcon size={16} />
+                      <LaunchTokenIcon size={40} />
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
                         isResolved
                           ? isWinner ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'

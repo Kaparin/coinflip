@@ -35,6 +35,8 @@ export function Modal({
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const historyPushedRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Mount portal target
   useEffect(() => {
@@ -52,51 +54,52 @@ export function Modal({
   }, [open]);
 
   // Android back button: push state when opening, listen to popstate
+  // Note: onClose in deps would cause effect to re-run on parent re-render (e.g. when user
+  // clicks 25% in withdraw modal), triggering cleanup → history.back() → popstate → close.
+  // We use onCloseRef so effect only runs when `open` changes.
   useEffect(() => {
     if (!open) return;
     historyPushedRef.current = true;
     history.pushState({ modal: true }, '');
     const handlePopState = () => {
-      historyPushedRef.current = false; // Back already popped our state
-      onClose();
+      historyPushedRef.current = false;
+      onCloseRef.current();
     };
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
       if (historyPushedRef.current) {
-        history.back(); // Pop our state when closed by X/overlay
+        history.back();
         historyPushedRef.current = false;
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  // Escape key handler (only when closable)
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showCloseButton) onClose();
-    },
-    [onClose, showCloseButton],
-  );
+  const showCloseButtonRef = useRef(showCloseButton);
+  showCloseButtonRef.current = showCloseButton;
 
+  // Escape key handler (only when closable) — use refs to avoid effect re-runs on parent re-render
   useEffect(() => {
-    if (open) {
-      document.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        document.body.style.overflow = '';
-      };
-    }
-  }, [open, handleKeyDown]);
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCloseButtonRef.current) onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [open]);
 
   const canClose = showCloseButton;
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (canClose && e.target === overlayRef.current) onClose();
+      if (canClose && e.target === overlayRef.current) onCloseRef.current();
     },
-    [onClose, canClose],
+    [canClose],
   );
-  const handleCloseClick = useCallback(() => onClose(), [onClose]);
+  const handleCloseClick = useCallback(() => onCloseRef.current(), []);
 
   if (!mounted || !open) return null;
 
@@ -116,6 +119,7 @@ export function Modal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
         className={[
           'w-full max-h-[90vh] sm:max-h-[85vh] sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
           'bg-[var(--color-surface)] shadow-2xl flex flex-col',

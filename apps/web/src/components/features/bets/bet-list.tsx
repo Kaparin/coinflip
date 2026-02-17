@@ -286,7 +286,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-lg font-bold tabular-nums">{formatLaunch(bet.amount)}</span>
-                    <LaunchTokenIcon size={20} />
+                    <LaunchTokenIcon size={50} />
                   </div>
                   <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold uppercase tracking-wide">
                     {t('bets.sending')}
@@ -360,7 +360,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
               <div className="border-t border-[var(--color-border)]" />
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-secondary)]">{t('wager.ifYouWin')}</span>
-                <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{acceptWinAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={16} /></span>
+                <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{acceptWinAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} /></span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-secondary)]">{t('wager.winChance')}</span>

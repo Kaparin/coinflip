@@ -29,7 +29,7 @@ function WithdrawProgressOverlay() {
       <div className="relative flex h-16 w-16 items-center justify-center">
         <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
         <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-        <LaunchTokenIcon size={24} />
+        <LaunchTokenIcon size={60} />
       </div>
       <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
       <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
@@ -57,7 +57,7 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-          <LaunchTokenIcon size={24} />
+          <LaunchTokenIcon size={60} />
         </div>
         <h3 className="text-base font-bold">{t('balance.depositInProgress')}</h3>
       </div>
@@ -289,16 +289,11 @@ export function BalanceDisplay() {
             {/* Wallet balance (CW20 tokens in user's wallet, not deposited) */}
             {walletBalanceHuman > 0 && (
               <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3 mb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalance')}</p>
-                    <p className="text-sm font-bold tabular-nums">{fmtNum(walletBalanceHuman)}</p>
-                  </div>
-                  <button type="button" onClick={() => { setDepositAmount(String(Math.floor(walletBalanceHuman))); setShowDeposit(true); }}
-                    className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-[var(--color-primary-hover)]">
-                    {t('balance.depositAll')}
-                  </button>
-                </div>
+                <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalanceAxiome')}</p>
+                <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
+                  <LaunchTokenIcon size={45} />
+                  {fmtNum(walletBalanceHuman)}
+                </p>
                 <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{t('balance.depositToPlay')}</p>
               </div>
             )}
@@ -345,7 +340,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={18} />
+                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={45} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4 break-all font-mono">TX: {depositTxHash.slice(0, 16)}...</p>
                 <button type="button" onClick={resetDeposit}
@@ -411,7 +406,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  −{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={18} />
+                  −{parseFloat(withdrawAmount).toLocaleString()} <LaunchTokenIcon size={45} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}

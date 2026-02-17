@@ -48,16 +48,20 @@ export function MobileBalanceBar() {
         className="w-full flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 transition-colors active:bg-[var(--color-surface-hover)]"
       >
         <div className="flex flex-col items-start gap-0.5">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
-            {t('balance.yourBalance')}
-          </span>
           <div className="flex items-baseline gap-2">
-            <span className="text-base font-bold tabular-nums text-[var(--color-success)]">
-              {fmtNum(fromMicroLaunch(availableMicro))}
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+              {t('balance.yourGameBalance')}
             </span>
-            <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+            <span className="text-base font-bold tabular-nums text-[var(--color-success)]">
+              — {fmtNum(fromMicroLaunch(availableMicro))}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+              {t('balance.inBetsShort')}
+            </span>
             <span className="text-sm font-semibold tabular-nums text-[var(--color-warning)]">
-              {fmtNum(fromMicroLaunch(lockedMicro))} {t('balance.inBetsShort')}
+              — {fmtNum(fromMicroLaunch(lockedMicro))}
             </span>
           </div>
         </div>

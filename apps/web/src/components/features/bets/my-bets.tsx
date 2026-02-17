@@ -177,7 +177,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 className="rounded-2xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-4 animate-pulse"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={20} /></span>
+                  <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={50} /></span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
                     {t('myBets.submitting')}
                   </span>

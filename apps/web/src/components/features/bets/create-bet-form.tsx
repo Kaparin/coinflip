@@ -302,7 +302,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
               onClick={handleConfirm}
               className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] btn-press"
             >
-              {t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={18} />
+              {t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={45} />
             </button>
           </div>
         )}
@@ -339,7 +339,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           </div>
           <p className="text-base font-bold">{t('wager.betSubmitted')}</p>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {parsedAmount.toLocaleString()} <LaunchTokenIcon size={18} />
+            {parsedAmount.toLocaleString()} <LaunchTokenIcon size={45} />
           </p>
           <p className="text-xs text-[var(--color-text-secondary)] animate-pulse">
             {t('common.confirming')}
@@ -351,12 +351,12 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           <div className="rounded-xl bg-[var(--color-bg)] p-4 space-y-2.5">
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.wagerLabel')}</span>
-              <span className="flex items-center gap-1.5 font-bold"><LaunchTokenIcon size={18} /> {parsedAmount.toLocaleString()}</span>
+              <span className="flex items-center gap-1.5 font-bold"><LaunchTokenIcon size={45} /> {parsedAmount.toLocaleString()}</span>
             </div>
             <div className="border-t border-[var(--color-border)]" />
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.ifYouWin')}</span>
-              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={18} /></span>
+              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={45} /></span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.commission')}</span>
@@ -392,7 +392,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           {/* Amount Presets */}
           <div className="mb-3">
             <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
-              {t('wager.wagerLabel')} <LaunchTokenIcon size={14} />
+              {t('wager.wagerLabel')} <LaunchTokenIcon size={35} />
             </label>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {BET_PRESETS.map((preset, idx) => (
@@ -459,7 +459,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                 : !canCreateBet
                   ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
                   : isValidAmount
-                    ? <><span>{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} </span><LaunchTokenIcon size={18} /></>
+                    ? <><span>{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} </span><LaunchTokenIcon size={45} /></>
                     : t('wager.enterAmount')}
           </button>
 
@@ -509,7 +509,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                           onChange={(e) => setBatchMinAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={14} /></span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={35} /></span>
                       </div>
                       <div className="relative">
                         <input
@@ -520,7 +520,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                           onChange={(e) => setBatchMaxAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 pr-8 text-xs focus:border-[var(--color-primary)] focus:outline-none"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={14} /></span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2"><LaunchTokenIcon size={35} /></span>
                       </div>
                     </div>
                   )}
@@ -543,7 +543,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                       </div>
                       {parsedBatchCount > 0 && batchMode === 'fixed' && parsedAmount > 0 && (
                         <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
-                          {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchFixedTotal.toLocaleString() })} <LaunchTokenIcon size={14} />
+                          {t('wager.batchCalc', { count: parsedBatchCount, amount: parsedAmount.toLocaleString(), total: batchFixedTotal.toLocaleString() })} <LaunchTokenIcon size={35} />
                           {parsedBatchCount > maxBatchCount && maxBatchCount > 0 && (
                             <span className="text-[var(--color-danger)] ml-1">{t('wager.batchMax', { max: maxBatchCount })}</span>
                           )}
@@ -556,7 +556,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
                             min: parsedBatchMin.toLocaleString(),
                             max: parsedBatchMax.toLocaleString(),
                             total: batchRandomMaxTotal.toLocaleString(),
-                          })} <LaunchTokenIcon size={14} />
+                          })} <LaunchTokenIcon size={35} />
                           {batchRandomMaxTotal > availableHuman && (
                             <span className="text-[var(--color-danger)] ml-1">{t('wager.batchRandomMax', { available: availableHuman.toLocaleString() })}</span>
                           )}

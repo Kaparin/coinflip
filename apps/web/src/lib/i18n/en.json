@@ -40,6 +40,7 @@
   "balance": {
     "connectToPlay": "Connect wallet to start playing",
     "walletBalance": "Wallet Balance",
+    "walletBalanceAxiome": "Wallet Balance (Axiome wallet)",
     "depositAll": "Deposit",
     "depositToPlay": "Deposit to start playing",
     "gameVault": "Game Vault",
@@ -71,7 +72,8 @@
     "play": "Play:",
     "bets": "Bets:",
     "yourBalance": "Your balance",
-    "inBetsShort": "in bets",
+    "yourGameBalance": "Your game balance",
+    "inBetsShort": "In bets",
     "collapse": "Collapse"
   },
   "wager": {

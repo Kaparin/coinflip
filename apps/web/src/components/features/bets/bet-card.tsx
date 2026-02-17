@@ -221,7 +221,7 @@ export function BetCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-              <LaunchTokenIcon size={22} />
+              <LaunchTokenIcon size={55} />
             </div>
           </div>
         </div>
@@ -255,7 +255,7 @@ export function BetCard({
             <span className="text-[10px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
             <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              <LaunchTokenIcon size={16} />
+              <LaunchTokenIcon size={40} />
             </span>
           </div>
         </div>
