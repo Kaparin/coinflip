@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { Modal } from '@/components/ui/modal';
-import { Lock, ShieldCheck, Shield, CheckCircle, ChevronDown, UserPlus } from 'lucide-react';
+import { Lock, ShieldCheck, Shield, CheckCircle, ChevronDown, UserPlus, Wallet, Plus } from 'lucide-react';
 import { getCapturedRefCode, registerByAddress } from '@/hooks/use-referral';
 
 interface ConnectWalletModalProps {
@@ -22,11 +22,13 @@ type Step = 'choose' | 'import' | 'unlock' | 'confirm' | 'success' | 'security';
 export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
   const { t, locale } = useTranslation();
   const {
-    hasSaved, savedAddress, isConnected, isConnecting, error,
+    hasSaved, savedAddress, savedWallets, address: connectedAddress, isConnected, isConnecting, error,
     connectWithMnemonic, unlockWithPin, forgetWallet,
   } = useWalletContext();
 
   const [step, setStep] = useState<Step>('choose');
+  /** When multiple wallets: which one user selected to unlock */
+  const [selectedWalletAddress, setSelectedWalletAddress] = useState<string | null>(null);
   const [mnemonic, setMnemonic] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -57,15 +59,23 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       setPinConfirm('');
       setLocalError('');
       setDerivedAddress('');
+      setSelectedWalletAddress(null);
       setInviterOpen(false);
       setInviterAddr('');
       setInviterStatus('idle');
       setInviterError('');
       isInFlightRef.current = false;
-      setStep(hasSaved ? 'unlock' : 'import');
+      // Multi-wallet: show choose if multiple (or if connected—switch mode), unlock if single, import if none
+      if (hasSaved) {
+        const showChoose = savedWallets.length > 1 || (isConnected && savedWallets.length >= 1);
+        setStep(showChoose ? 'choose' : 'unlock');
+        if (savedWallets.length === 1 && !showChoose) setSelectedWalletAddress(savedWallets[0]!.address);
+      } else {
+        setStep('import');
+      }
     }
     prevOpenRef.current = open;
-  }, [open, hasSaved]);
+  }, [open, hasSaved, savedWallets]);
 
   // When wallet becomes connected during unlock/confirm, transition to success
   useEffect(() => {
@@ -139,23 +149,99 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     }
     setLocalError('');
     isInFlightRef.current = true;
-    await unlockWithPin(pin);
-  }, [pin, unlockWithPin, t]);
+    const addr = selectedWalletAddress ?? savedAddress ?? undefined;
+    await unlockWithPin(pin, addr);
+  }, [pin, selectedWalletAddress, savedAddress, unlockWithPin, t]);
 
-  /** Handle forget and switch to import */
-  const handleForgetAndImport = useCallback(() => {
-    forgetWallet();
-    setStep('import');
+  /** Forget specific wallet and go to choose/import */
+  const handleForgetWallet = useCallback((addr: string) => {
+    forgetWallet(addr);
     setPin('');
     setPinConfirm('');
-  }, [forgetWallet]);
+    setSelectedWalletAddress(null);
+    // After forget, one less wallet — go to import if none left, else choose
+    const remaining = savedWallets.filter((w) => w.address !== addr).length;
+    setStep(remaining === 0 ? 'import' : 'choose');
+  }, [forgetWallet, savedWallets]);
+
+  /** Use different wallet — go to choose (or import if adding new) */
+  const handleUseDifferent = useCallback(() => {
+    setPin('');
+    setSelectedWalletAddress(null);
+    setStep(savedWallets.length > 1 ? 'choose' : 'import');
+  }, [savedWallets.length]);
 
   if (!open) return null;
 
   const canClose = !(step === 'confirm' && isConnecting);
+  const walletToUnlock = selectedWalletAddress ?? savedAddress;
+
   return (
     <Modal open onClose={onClose} showCloseButton={canClose} showCloseButtonBottom>
       <div className="p-2 sm:p-5 max-w-md w-full">
+
+        {/* ==== CHOOSE WALLET (multi-wallet) ==== */}
+        {step === 'choose' && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold">{t('auth.chooseWallet')}</h2>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              {t('auth.chooseWalletDesc')}
+            </p>
+
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              {savedWallets.map((w) => {
+                const isCurrent = connectedAddress === w.address;
+                return (
+                <button
+                  key={w.address}
+                  type="button"
+                  onClick={() => {
+                    if (isCurrent) {
+                      onClose();
+                      return;
+                    }
+                    setSelectedWalletAddress(w.address);
+                    setStep('unlock');
+                    setPin('');
+                    setLocalError('');
+                    setTimeout(() => pinRef.current?.focus(), 100);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-left transition-colors hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-border)]/10"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]/15">
+                    <Wallet size={18} className="text-[var(--color-primary)]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-mono truncate">
+                      {`${w.address.slice(0, 14)}...${w.address.slice(-8)}`}
+                      {isCurrent && (
+                        <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
+                          ({t('auth.current')})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep('import');
+                setMnemonic('');
+                setPin('');
+                setPinConfirm('');
+                setSelectedWalletAddress(null);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] px-4 py-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+            >
+              <Plus size={18} />
+              {t('auth.addNewWallet')}
+            </button>
+          </div>
+        )}
 
         {/* ==== IMPORT MNEMONIC ==== */}
         {step === 'import' && (
@@ -292,6 +378,15 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
               {isConnecting ? t('auth.deriving') : t('auth.continue')}
             </button>
 
+            {savedWallets.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setStep('choose'); setMnemonic(''); setPin(''); setPinConfirm(''); }}
+                className="w-full text-center text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:underline transition-colors"
+              >
+                {t('auth.backToWalletList')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setStep('security')}
@@ -379,7 +474,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                 <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
                   <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.savedWallet')}</p>
                   <p className="text-sm font-mono font-bold">
-                    {savedAddress ? `${savedAddress.slice(0, 12)}...${savedAddress.slice(-6)}` : '...'}
+                    {walletToUnlock ? `${walletToUnlock.slice(0, 12)}...${walletToUnlock.slice(-6)}` : '...'}
                   </p>
                 </div>
 
@@ -409,13 +504,15 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                 </button>
 
                 <div className="flex items-center justify-between pt-1">
-                  <button type="button" onClick={handleForgetAndImport}
-                    className="text-[10px] text-[var(--color-danger)] hover:underline">
-                    {t('auth.forgetThisWallet')}
-                  </button>
-                  <button type="button" onClick={() => setStep('import')}
-                    className="text-[10px] text-[var(--color-text-secondary)] hover:underline">
-                    {t('auth.useDifferentWallet')}
+                  {walletToUnlock && (
+                    <button type="button" onClick={() => handleForgetWallet(walletToUnlock)}
+                      className="text-[10px] text-[var(--color-danger)] hover:underline">
+                      {t('auth.forgetThisWallet')}
+                    </button>
+                  )}
+                  <button type="button" onClick={handleUseDifferent}
+                    className="text-[10px] text-[var(--color-text-secondary)] hover:underline ml-auto">
+                    {savedWallets.length > 1 ? t('auth.chooseAnotherWallet') : t('auth.useDifferentWallet')}
                   </button>
                 </div>
               </>
@@ -486,7 +583,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                     Open your browser DevTools (<code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">F12</code>):
                   </p>
                   <ul className="text-[11px] text-[var(--color-text-secondary)] mt-1 ml-3 space-y-0.5 list-disc list-outside leading-relaxed">
-                    <li><strong>Application &rarr; Local Storage</strong> -- you will see only the key <code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">coinflip_wallet</code> containing an encrypted JSON blob (not your mnemonic).</li>
+                    <li><strong>Application &rarr; Local Storage</strong> -- you will see only the key <code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">coinflip_wallets</code> containing an encrypted JSON array (not your mnemonic).</li>
                     <li><strong>Network tab</strong> -- filter by your mnemonic words; no request ever contains them.</li>
                   </ul>
                 </div>
@@ -566,7 +663,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                     Откройте DevTools в браузере (<code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">F12</code>):
                   </p>
                   <ul className="text-[11px] text-[var(--color-text-secondary)] mt-1 ml-3 space-y-0.5 list-disc list-outside leading-relaxed">
-                    <li><strong>Application &rarr; Local Storage</strong> -- вы увидите только ключ <code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">coinflip_wallet</code> с зашифрованным JSON (не вашу мнемонику).</li>
+                    <li><strong>Application &rarr; Local Storage</strong> -- вы увидите только ключ <code className="text-[10px] bg-[var(--color-border)]/40 px-1 rounded">coinflip_wallets</code> с зашифрованным JSON-массивом (не вашу мнемонику).</li>
                     <li><strong>Вкладка Network</strong> -- отфильтруйте по словам вашей мнемоники; ни один запрос не содержит их.</li>
                   </ul>
                 </div>

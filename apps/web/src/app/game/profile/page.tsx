@@ -1089,7 +1089,7 @@ export default function ProfilePage() {
             </div>
           </button>
 
-          <button type="button" onClick={wallet.forgetWallet}
+          <button type="button" onClick={() => wallet.forgetWallet(wallet.address ?? undefined)}
             className="w-full flex items-center gap-3 rounded-xl border border-[var(--color-danger)]/30 px-4 py-3 text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/5">
             <Trash2 size={20} />
             <div className="text-left">

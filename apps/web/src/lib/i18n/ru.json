@@ -60,6 +60,7 @@
     "adminPanel": "Панель администратора",
     "disconnect": "Отключить",
     "forgetWallet": "Забыть кошелёк",
+    "switchWallet": "Переключить кошелёк",
     "toggleMenu": "Открыть меню"
   },
   "balance": {
@@ -299,6 +300,12 @@
     "unlock": "Разблокировать",
     "forgetThisWallet": "Забыть этот кошелёк",
     "useDifferentWallet": "Использовать другой кошелёк",
+    "chooseAnotherWallet": "Выбрать другой кошелёк",
+    "chooseWallet": "Выберите кошелёк",
+    "chooseWalletDesc": "Выберите сохранённый кошелёк для разблокировки или добавьте новый.",
+    "addNewWallet": "Добавить новый кошелёк",
+    "backToWalletList": "Назад к списку кошельков",
+    "current": "текущий",
     "walletConnected": "Кошелёк подключён!",
     "readyToPlay": "Вы готовы играть.",
     "securityAuditTitle": "Аудит безопасности",

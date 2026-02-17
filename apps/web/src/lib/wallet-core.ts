@@ -19,7 +19,8 @@ import { stringToPath } from '@cosmjs/crypto';
 
 const AXIOME_HD_PATH = stringToPath("m/44'/546'/0'/0/0");
 const AXIOME_PREFIX = 'axm';
-const STORAGE_KEY_WALLET = 'coinflip_wallet_v1';
+const STORAGE_KEY_WALLET_V1 = 'coinflip_wallet_v1';
+const STORAGE_KEY_WALLETS_V2 = 'coinflip_wallets_v2';
 
 export interface StoredWallet {
   /** The axm1... address (not sensitive, used for display) */
@@ -143,40 +144,109 @@ export async function decryptMnemonic(
   }
 }
 
-// ---- Storage ----
+// ---- Storage (Multi-Wallet v2) ----
 
-/** Save encrypted wallet to localStorage (persistent) or sessionStorage (ephemeral). */
-export function saveWallet(wallet: StoredWallet): void {
-  const storage = wallet.ephemeral ? sessionStorage : localStorage;
-  storage.setItem(STORAGE_KEY_WALLET, JSON.stringify(wallet));
-}
-
-/** Load stored wallet from localStorage or sessionStorage. */
-export function loadStoredWallet(): StoredWallet | null {
-  // Check localStorage first, then sessionStorage
+/** Migrate from single-wallet v1 format to multi-wallet v2. Runs once on first load. */
+function migrateFromV1IfNeeded(): void {
   for (const storage of [localStorage, sessionStorage]) {
-    const raw = storage.getItem(STORAGE_KEY_WALLET);
-    if (raw) {
+    const rawV1 = storage.getItem(STORAGE_KEY_WALLET_V1);
+    if (rawV1) {
       try {
-        return JSON.parse(raw) as StoredWallet;
+        const legacy = JSON.parse(rawV1) as StoredWallet;
+        const arr: StoredWallet[] = [legacy];
+        storage.setItem(STORAGE_KEY_WALLETS_V2, JSON.stringify(arr));
+        storage.removeItem(STORAGE_KEY_WALLET_V1);
       } catch {
-        storage.removeItem(STORAGE_KEY_WALLET);
+        storage.removeItem(STORAGE_KEY_WALLET_V1);
       }
     }
+  }
+}
+
+/** Load wallets array from storage. Merges persistent (localStorage) and ephemeral (sessionStorage). */
+function loadWalletsArray(storage: Storage): StoredWallet[] {
+  const raw = storage.getItem(STORAGE_KEY_WALLETS_V2);
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw) as StoredWallet[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    storage.removeItem(STORAGE_KEY_WALLETS_V2);
+    return [];
+  }
+}
+
+/** Get all saved wallets (address only, no decryption). Persistent + ephemeral merged. */
+export function listSavedWallets(): { address: string; ephemeral: boolean }[] {
+  if (typeof window === 'undefined') return [];
+  migrateFromV1IfNeeded();
+
+  const persistent = loadWalletsArray(localStorage);
+  const ephemeral = loadWalletsArray(sessionStorage);
+  const seen = new Set<string>();
+
+  return [...persistent, ...ephemeral]
+    .filter((w) => {
+      if (seen.has(w.address)) return false;
+      seen.add(w.address);
+      return true;
+    })
+    .map((w) => ({ address: w.address, ephemeral: w.ephemeral }));
+}
+
+/** Load stored wallet by address. Returns null if not found. */
+export function loadStoredWalletByAddress(address: string): StoredWallet | null {
+  if (typeof window === 'undefined') return null;
+  migrateFromV1IfNeeded();
+
+  for (const storage of [localStorage, sessionStorage]) {
+    const arr = loadWalletsArray(storage);
+    const w = arr.find((x) => x.address === address);
+    if (w) return w;
   }
   return null;
 }
 
-/** Remove wallet from all storages. */
-export function forgetWallet(): void {
-  localStorage.removeItem(STORAGE_KEY_WALLET);
-  sessionStorage.removeItem(STORAGE_KEY_WALLET);
+/** Save or update wallet in storage. If address exists, replaces; otherwise appends. */
+export function saveWallet(wallet: StoredWallet): void {
+  migrateFromV1IfNeeded();
+  const storage = wallet.ephemeral ? sessionStorage : localStorage;
+  const arr = loadWalletsArray(storage);
+  const idx = arr.findIndex((w) => w.address === wallet.address);
+  if (idx >= 0) arr[idx] = wallet;
+  else arr.push(wallet);
+  storage.setItem(STORAGE_KEY_WALLETS_V2, JSON.stringify(arr));
 }
 
-/** Check if a wallet is saved (without decrypting). */
-export function hasSavedWallet(): { saved: boolean; address?: string } {
-  const w = loadStoredWallet();
-  return w ? { saved: true, address: w.address } : { saved: false };
+/** Remove wallet by address from all storages. */
+export function forgetWallet(address?: string): void {
+  migrateFromV1IfNeeded();
+
+  const removeFrom = (storage: Storage) => {
+    const arr = loadWalletsArray(storage);
+    const filtered = address ? arr.filter((w) => w.address !== address) : [];
+    if (filtered.length === 0) storage.removeItem(STORAGE_KEY_WALLETS_V2);
+    else storage.setItem(STORAGE_KEY_WALLETS_V2, JSON.stringify(filtered));
+  };
+
+  removeFrom(localStorage);
+  removeFrom(sessionStorage);
+}
+
+/** Backward compat: load "first" stored wallet (for single-wallet flows). */
+export function loadStoredWallet(): StoredWallet | null {
+  const list = listSavedWallets();
+  if (list.length === 0) return null;
+  return loadStoredWalletByAddress(list[0]!.address);
+}
+
+/** Check if any wallet is saved (without decrypting). */
+export function hasSavedWallet(): { saved: boolean; address?: string; wallets: { address: string }[] } {
+  const list = listSavedWallets();
+  const wallets = list.map((w) => ({ address: w.address }));
+  return list.length > 0
+    ? { saved: true, address: list[0]!.address, wallets }
+    : { saved: false, wallets: [] };
 }
 
 // ---- Helpers ----

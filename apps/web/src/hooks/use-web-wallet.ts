@@ -7,6 +7,7 @@ import {
   encryptMnemonic,
   decryptMnemonic,
   loadStoredWallet,
+  loadStoredWalletByAddress,
   saveWallet,
   forgetWallet as forgetStoredWallet,
   hasSavedWallet,
@@ -68,8 +69,10 @@ export interface WebWalletState {
   isConnecting: boolean;
   /** Whether there's a saved wallet in storage */
   hasSaved: boolean;
-  /** Saved address for display (before unlock) */
+  /** Saved address for display (before unlock) — first wallet when multiple */
   savedAddress: string | null;
+  /** List of saved wallet addresses (for multi-wallet UI) */
+  savedWallets: { address: string }[];
   /** Short address for compact display */
   shortAddress: string | null;
   /** Error message if any */
@@ -77,15 +80,28 @@ export interface WebWalletState {
 
   /** Connect with a new mnemonic */
   connectWithMnemonic: (mnemonic: string, pin: string, rememberMe: boolean) => Promise<void>;
-  /** Unlock a saved wallet with PIN */
-  unlockWithPin: (pin: string) => Promise<void>;
-  /** Disconnect (keep saved wallet) */
+  /** Unlock a saved wallet with PIN (address required when multiple wallets) */
+  unlockWithPin: (pin: string, address?: string) => Promise<void>;
+  /** Switch to another saved wallet (requires PIN) */
+  switchWallet: (address: string, pin: string) => Promise<void>;
+  /** Disconnect (keep saved wallets) */
   disconnect: () => void;
-  /** Forget wallet completely (remove from storage) */
-  forgetWallet: () => void;
+  /** Forget wallet (specific address, or all if none given) */
+  forgetWallet: (address?: string) => void;
 
   /** Get the wallet instance for signing (null if not connected) */
   getWallet: () => DirectSecp256k1HdWallet | null;
+}
+
+function refreshSavedState(
+  setHasSaved: (v: boolean) => void,
+  setSavedAddress: (v: string | null) => void,
+  setSavedWallets: (v: { address: string }[]) => void,
+) {
+  const info = hasSavedWallet();
+  setHasSaved(info.saved);
+  setSavedAddress(info.address ?? null);
+  setSavedWallets(info.wallets);
 }
 
 export function useWebWallet(): WebWalletState {
@@ -94,6 +110,7 @@ export function useWebWallet(): WebWalletState {
   const [error, setError] = useState<string | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
   const [savedAddress, setSavedAddress] = useState<string | null>(null);
+  const [savedWallets, setSavedWallets] = useState<{ address: string }[]>([]);
 
   // In-memory wallet (never persisted as-is)
   const walletRef = useRef<DirectSecp256k1HdWallet | null>(null);
@@ -112,13 +129,11 @@ export function useWebWallet(): WebWalletState {
     }
   }, []);
 
-  // Check for saved wallet on mount + try to auto-restore session
+  // Check for saved wallets on mount + try to auto-restore session
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const saved = hasSavedWallet();
-    setHasSaved(saved.saved);
-    if (saved.address) setSavedAddress(saved.address);
+    refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
 
     // Try to restore wallet from session (persists across page refreshes within same tab)
     const sessionAddr = sessionStorage.getItem(STORAGE_KEYS.CONNECTED_ADDRESS);
@@ -177,8 +192,7 @@ export function useWebWallet(): WebWalletState {
 
       // Update state
       setAddress(addr);
-      setHasSaved(true);
-      setSavedAddress(addr);
+      refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
       sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
 
       // Register with backend
@@ -192,18 +206,20 @@ export function useWebWallet(): WebWalletState {
     }
   }, [registerSession]);
 
-  /** Unlock saved wallet with PIN */
-  const unlockWithPin = useCallback(async (pin: string) => {
+  /** Unlock saved wallet with PIN. Pass address when multiple wallets. */
+  const unlockWithPin = useCallback(async (pin: string, targetAddress?: string) => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      const stored = loadStoredWallet();
+      const stored = targetAddress
+        ? loadStoredWalletByAddress(targetAddress)
+        : loadStoredWallet();
       if (!stored) {
         throw new Error('No saved wallet found');
       }
 
-      // Decrypt mnemonic
+      // Decrypt mnemonic (stays in memory only during this call)
       const mnemonic = await decryptMnemonic(
         stored.encryptedMnemonic,
         stored.salt,
@@ -237,6 +253,19 @@ export function useWebWallet(): WebWalletState {
     }
   }, [registerSession]);
 
+  /** Switch to another saved wallet (disconnect, then unlock with PIN) */
+  const switchWallet = useCallback(async (targetAddress: string, pin: string) => {
+    // Disconnect current first
+    walletRef.current = null;
+    setAddress(null);
+    clearSessionWallet();
+    clearSigningClientCache();
+    sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+
+    // Unlock the target
+    await unlockWithPin(pin, targetAddress);
+  }, [unlockWithPin]);
+
   /** Disconnect (keep saved wallet for later unlock) */
   const disconnect = useCallback(() => {
     walletRef.current = null;
@@ -247,18 +276,20 @@ export function useWebWallet(): WebWalletState {
     sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
   }, []);
 
-  /** Forget wallet completely */
-  const forgetWallet = useCallback(() => {
-    walletRef.current = null;
-    setAddress(null);
+  /** Forget wallet (by address) or all if no address given */
+  const forgetWallet = useCallback((targetAddress?: string) => {
+    const wasCurrent = !targetAddress || address === targetAddress;
+    if (wasCurrent) {
+      walletRef.current = null;
+      setAddress(null);
+      clearSessionWallet();
+      clearSigningClientCache();
+      sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+    }
     setError(null);
-    setHasSaved(false);
-    setSavedAddress(null);
-    forgetStoredWallet();
-    clearSessionWallet();
-    clearSigningClientCache();
-    sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
-  }, []);
+    forgetStoredWallet(targetAddress);
+    refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
+  }, [address]);
 
   /** Get wallet for signing */
   const getWallet = useCallback(() => walletRef.current, []);
@@ -273,10 +304,12 @@ export function useWebWallet(): WebWalletState {
     isConnecting,
     hasSaved,
     savedAddress,
+    savedWallets,
     shortAddress,
     error,
     connectWithMnemonic,
     unlockWithPin,
+    switchWallet,
     disconnect,
     forgetWallet,
     getWallet,

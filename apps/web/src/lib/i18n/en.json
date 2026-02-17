@@ -60,6 +60,7 @@
     "adminPanel": "Admin panel",
     "disconnect": "Disconnect",
     "forgetWallet": "Forget wallet",
+    "switchWallet": "Switch wallet",
     "toggleMenu": "Toggle menu"
   },
   "balance": {
@@ -299,6 +300,12 @@
     "unlock": "Unlock",
     "forgetThisWallet": "Forget this wallet",
     "useDifferentWallet": "Use different wallet",
+    "chooseAnotherWallet": "Choose another wallet",
+    "chooseWallet": "Choose wallet",
+    "chooseWalletDesc": "Select a saved wallet to unlock, or add a new one.",
+    "addNewWallet": "Add new wallet",
+    "backToWalletList": "Back to wallet list",
+    "current": "current",
     "walletConnected": "Wallet Connected!",
     "readyToPlay": "You're ready to play.",
     "securityAuditTitle": "Security Audit",

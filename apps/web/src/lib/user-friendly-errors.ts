@@ -97,7 +97,7 @@ export function getUserFriendlyError(
   if (msg.includes('relayer') || msg.includes('not available')) return t('errors.relayerNotReady');
 
   // Context-specific fallbacks
-  const fallbacks: Record<string, string> = {
+  const fallbacks: Record<'create' | 'accept' | 'cancel' | 'withdraw' | 'deposit' | 'generic', string> = {
     create: t('errors.createFailed'),
     accept: t('errors.acceptFailed'),
     cancel: t('errors.cancelFailed'),
@@ -105,5 +105,5 @@ export function getUserFriendlyError(
     deposit: t('errors.depositFailed'),
     generic: t('errors.somethingWentWrong'),
   };
-  return fallbacks[context] ?? fallbacks.generic;
+  return fallbacks[context];
 }

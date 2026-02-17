@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
@@ -70,7 +70,7 @@ export function Header() {
   }, [wallet]);
 
   const handleForgetWallet = useCallback(() => {
-    wallet.forgetWallet();
+    wallet.forgetWallet(wallet.address ?? undefined);
     setWalletDropdownOpen(false);
     setMenuOpen(false);
   }, [wallet]);
@@ -215,6 +215,17 @@ export function Header() {
                       </div>
                     </div>
 
+                    {/* Switch wallet (when multiple saved) */}
+                    {wallet.savedWallets.length > 1 && (
+                      <div className="py-1 border-b border-[var(--color-border)]">
+                        <button type="button" onClick={() => { wallet.openConnectModal(); setWalletDropdownOpen(false); }}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]">
+                          <Wallet size={16} className="text-[var(--color-text-secondary)]" />
+                          <span>{t('header.switchWallet')}</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Disconnect / Forget */}
                     <div className="py-1">
                       <button type="button" onClick={handleDisconnect}
@@ -299,6 +310,15 @@ export function Header() {
                   </Link>
                 )}
               </div>
+
+              {/* Switch wallet (when multiple saved) */}
+              {wallet.savedWallets.length > 1 && (
+                <button type="button" onClick={() => { wallet.openConnectModal(); setMenuOpen(false); }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-medium">
+                  <Wallet size={14} className="text-[var(--color-text-secondary)]" />
+                  {t('header.switchWallet')}
+                </button>
+              )}
 
               {/* Disconnect / Forget */}
               <div className="flex gap-2">
