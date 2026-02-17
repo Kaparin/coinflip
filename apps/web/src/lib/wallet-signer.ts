@@ -3,11 +3,20 @@
  *
  * All signing happens in the browser using CosmJS.
  * No private keys or mnemonics are ever sent to the server.
+ *
+ * Deposit flow (optimized):
+ *   1. Sign tx locally with cached client + fixed gas (no simulate RPC call)
+ *   2. Send signed tx bytes to server via POST /api/v1/vault/deposit/broadcast
+ *   3. Server broadcasts directly to RPC node (bypasses Vercel proxy)
+ *   4. Server polls REST API for confirmation (2s intervals, same as relayer)
+ *
+ * This eliminates the slow path: Browser → Vercel CDN → Next.js → RPC node
+ * and replaces it with: Browser → API server → RPC node (direct connection).
  */
 
 import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
-import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
+import { SigningStargateClient, GasPrice, calculateFee } from '@cosmjs/stargate';
 import { DEFAULT_GAS_PRICE } from '@coinflip/shared/chain';
 import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT } from '@/lib/constants';
 import { toMicroLaunch } from '@coinflip/shared/constants';
@@ -15,6 +24,8 @@ import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
 import { MsgExec, MsgGrant } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
 import { GenericAuthorization } from 'cosmjs-types/cosmos/authz/v1beta1/authz';
+import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
+import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 
 /**
  * Get the RPC URL for signing.
@@ -23,30 +34,59 @@ import { GenericAuthorization } from 'cosmjs-types/cosmos/authz/v1beta1/authz';
  */
 function getRpcUrl(): string {
   if (typeof window !== 'undefined') {
-    // In browser: use the Next.js proxy to avoid CORS
     return `${window.location.origin}/chain-rpc`;
   }
   return 'http://49.13.3.227:26657';
 }
 
-// ---- Signing Clients ----
+// ---- Signing Client Cache ----
+// Reuse the CosmWasm client across deposits to avoid the ~1-2s connection overhead.
+// The client maintains a WebSocket connection to the RPC node via the Next.js proxy.
 
-/**
- * Broadcast timeout for deposit/withdraw (CosmJS signAndBroadcast).
- * Default 60s can be too short when RPC/REST is slow or chain is congested.
- * 120s gives more headroom; tx may still succeed after timeout.
- */
-const BROADCAST_TIMEOUT_MS = 120_000;
+let _cachedCosmWasmClient: SigningCosmWasmClient | null = null;
+let _cachedWalletAddr: string | null = null;
 
-/** Create a SigningCosmWasmClient for CW20 operations (deposits). */
+async function getCachedCosmWasmClient(
+  wallet: DirectSecp256k1HdWallet,
+): Promise<SigningCosmWasmClient> {
+  const accounts = await wallet.getAccounts();
+  const addr = accounts[0]!.address;
+
+  if (_cachedCosmWasmClient && _cachedWalletAddr === addr) {
+    return _cachedCosmWasmClient;
+  }
+
+  // Cleanup old client
+  if (_cachedCosmWasmClient) {
+    try { _cachedCosmWasmClient.disconnect(); } catch { /* ignore */ }
+  }
+
+  const rpcUrl = getRpcUrl();
+  _cachedCosmWasmClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, wallet, {
+    gasPrice: GasPrice.fromString(DEFAULT_GAS_PRICE),
+  });
+  _cachedWalletAddr = addr;
+  return _cachedCosmWasmClient;
+}
+
+/** Clear the cached signing client (call on wallet change / disconnect). */
+export function clearSigningClientCache(): void {
+  if (_cachedCosmWasmClient) {
+    try { _cachedCosmWasmClient.disconnect(); } catch { /* ignore */ }
+    _cachedCosmWasmClient = null;
+    _cachedWalletAddr = null;
+  }
+}
+
+/** Create a SigningCosmWasmClient for CW20 operations (legacy, non-cached). */
 export async function getCosmWasmClient(
   wallet: DirectSecp256k1HdWallet,
 ): Promise<SigningCosmWasmClient> {
   const rpcUrl = getRpcUrl();
   return SigningCosmWasmClient.connectWithSigner(rpcUrl, wallet, {
     gasPrice: GasPrice.fromString(DEFAULT_GAS_PRICE),
-    broadcastTimeoutMs: BROADCAST_TIMEOUT_MS,
-    broadcastPollIntervalMs: 3_000,
+    broadcastTimeoutMs: 60_000,
+    broadcastPollIntervalMs: 2_000,
   });
 }
 
@@ -65,7 +105,86 @@ export async function getStargateClient(
   });
 }
 
-// ---- Deposit (CW20 Send) ----
+// ---- Deposit (CW20 Send) — Optimized: sign-only ----
+
+/**
+ * Fixed gas limit for CW20 Send → CoinFlip deposit.
+ * CW20 Send with deposit submessage typically uses 250k-400k gas.
+ * 500k provides headroom without wasting fees.
+ * Eliminates the extra `simulate` RPC call that 'auto' gas requires.
+ */
+const DEPOSIT_GAS_LIMIT = 500_000;
+
+/** Convert Uint8Array to base64 string (browser-safe). */
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Sign a deposit transaction locally and return the raw tx bytes (base64).
+ * Does NOT broadcast — the caller sends bytes to the API server for direct broadcast.
+ *
+ * This is the optimized path: only 1 RPC roundtrip (account sequence query),
+ * then pure local signing. No simulate, no broadcast through proxy.
+ *
+ * @returns base64-encoded signed tx bytes ready for broadcast
+ */
+export async function signDepositTxBytes(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  humanAmount: number,
+): Promise<{ txBytes: string }> {
+  let client: SigningCosmWasmClient;
+  try {
+    client = await getCachedCosmWasmClient(wallet);
+  } catch {
+    // Cached client connection may be stale — recreate
+    clearSigningClientCache();
+    client = await getCachedCosmWasmClient(wallet);
+  }
+
+  const microAmount = toMicroLaunch(humanAmount);
+
+  const msg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: MsgExecuteContract.fromPartial({
+      sender: address,
+      contract: LAUNCH_CW20_CONTRACT,
+      msg: new TextEncoder().encode(JSON.stringify({
+        send: {
+          contract: COINFLIP_CONTRACT,
+          amount: microAmount,
+          msg: btoa(JSON.stringify({ deposit: {} })),
+        },
+      })),
+      funds: [],
+    }),
+  };
+
+  const fee = calculateFee(DEPOSIT_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+
+  let txRaw: TxRaw;
+  try {
+    txRaw = await client.sign(address, [msg], fee, 'CoinFlip deposit');
+  } catch (err) {
+    // Connection might be stale — try reconnecting once
+    const errMsg = err instanceof Error ? err.message : '';
+    if (errMsg.includes('WebSocket') || errMsg.includes('socket') || errMsg.includes('connect')) {
+      clearSigningClientCache();
+      const freshClient = await getCachedCosmWasmClient(wallet);
+      txRaw = await freshClient.sign(address, [msg], fee, 'CoinFlip deposit');
+    } else {
+      throw err;
+    }
+  }
+
+  const txBytes = TxRaw.encode(txRaw).finish();
+  return { txBytes: uint8ToBase64(txBytes) };
+}
 
 export interface DepositResult {
   txHash: string;
@@ -73,19 +192,15 @@ export interface DepositResult {
 }
 
 /**
- * Deposit LAUNCH tokens into the CoinFlip vault.
- * Signs a CW20 Send transaction client-side.
- *
- * @param wallet - CosmJS wallet instance
- * @param address - Sender's axm1... address
- * @param humanAmount - Amount in human-readable LAUNCH (e.g. 100)
+ * Legacy: Deposit LAUNCH tokens with full client-side sign + broadcast.
+ * Kept as fallback; prefer signDepositTxBytes() + server broadcast.
  */
 export async function signDeposit(
   wallet: DirectSecp256k1HdWallet,
   address: string,
   humanAmount: number,
 ): Promise<DepositResult> {
-  const client = await getCosmWasmClient(wallet);
+  const client = await getCachedCosmWasmClient(wallet);
   const microAmount = toMicroLaunch(humanAmount);
 
   const sendMsg = {
@@ -96,11 +211,13 @@ export async function signDeposit(
     },
   };
 
+  const fee = calculateFee(DEPOSIT_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+
   const result = await client.execute(
     address,
     LAUNCH_CW20_CONTRACT,
     sendMsg,
-    'auto',
+    fee,
     'CoinFlip deposit',
   );
 

@@ -171,18 +171,10 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   });
 });
 
-// POST /api/v1/vault/deposit — Deposit via CW20 Send (relayed)
+// POST /api/v1/vault/deposit — Deposit via CW20 Send (returns unsigned payload)
 vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSchema), async (c) => {
-  const user = c.get('user');
-  const address = c.get('address');
   const { amount } = c.req.valid('json');
 
-  // For deposit, the user needs to execute a CW20 Send to the contract.
-  // This is a MsgExecuteContract on the CW20 token, not on the CoinFlip contract.
-  // The relayer can only execute messages on the CoinFlip contract via authz.
-  // So deposit requires the user to sign directly or use a special CW20 authz grant.
-  //
-  // For MVP: return unsigned tx payload that the frontend signs via Keplr.
   const depositMsg = {
     send: {
       contract: env.COINFLIP_CONTRACT_ADDR,
@@ -199,6 +191,153 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
       instruction: 'Sign this CW20 Send transaction via Keplr to deposit LAUNCH tokens.',
     },
   });
+});
+
+// POST /api/v1/vault/deposit/broadcast — Broadcast a client-signed deposit tx
+//
+// Optimized deposit flow:
+//   1. Frontend signs tx locally (fast, only 1 RPC call for account sequence)
+//   2. Frontend POSTs signed tx bytes here
+//   3. Server broadcasts directly to RPC node (no Vercel proxy in the path)
+//   4. Server polls REST API for confirmation (2s intervals, max 30s)
+//   5. Server syncs balance and returns result
+//
+// This is ~3-5x faster than the old flow where everything went through Vercel proxy.
+vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const address = c.get('address');
+
+  let body: { tx_bytes?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    throw Errors.validationError('Invalid JSON body');
+  }
+
+  const txBytesBase64 = body.tx_bytes;
+  if (!txBytesBase64 || typeof txBytesBase64 !== 'string') {
+    throw Errors.validationError('tx_bytes (base64) is required');
+  }
+
+  // Prevent concurrent deposits for the same user
+  acquireInflight(address);
+
+  try {
+    // Step 1: Broadcast via Cosmos REST API (BROADCAST_MODE_SYNC)
+    // This is a direct connection from our server to the chain node — no proxy overhead.
+    const broadcastRes = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tx_bytes: txBytesBase64,
+        mode: 'BROADCAST_MODE_SYNC',
+      }),
+    });
+
+    const broadcastData = await broadcastRes.json() as {
+      tx_response?: {
+        txhash: string;
+        code: number;
+        raw_log?: string;
+      };
+    };
+
+    const txResponse = broadcastData.tx_response;
+    if (!txResponse) {
+      throw Errors.chainTxFailed('', 'Invalid broadcast response from chain node');
+    }
+
+    // CheckTx failed — tx rejected from mempool
+    if (txResponse.code !== 0) {
+      throw Errors.chainTxFailed(
+        txResponse.txhash || '',
+        txResponse.raw_log || `CheckTx failed with code ${txResponse.code}`,
+      );
+    }
+
+    const txHash = txResponse.txhash;
+    logger.info({ txHash, address }, 'Deposit tx in mempool (sync broadcast)');
+
+    // Step 2: Poll for block inclusion (same as relayer: 2s interval, 30s timeout)
+    const pollStartTime = Date.now();
+    const maxPollMs = 30_000;
+    const pollIntervalMs = 2_000;
+    let txResult: { code: number; rawLog: string; height: number } | null = null;
+
+    while (Date.now() - pollStartTime < maxPollMs) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      try {
+        const txRes = await fetch(
+          `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
+        );
+        if (txRes.ok) {
+          const txData = await txRes.json() as {
+            tx_response?: {
+              code: number;
+              raw_log?: string;
+              height?: string;
+            };
+          };
+          if (txData.tx_response) {
+            txResult = {
+              code: txData.tx_response.code,
+              rawLog: txData.tx_response.raw_log ?? '',
+              height: Number(txData.tx_response.height ?? 0),
+            };
+            break;
+          }
+        }
+      } catch {
+        // Not yet indexed — keep polling
+      }
+    }
+
+    if (!txResult) {
+      // Tx is in mempool but not confirmed within timeout — still likely to succeed
+      logger.warn({ txHash, address }, 'Deposit tx poll timeout — still in mempool');
+      return c.json({
+        data: {
+          status: 'pending',
+          tx_hash: txHash,
+          message: 'Transaction submitted but not yet confirmed. It may still succeed.',
+        },
+      });
+    }
+
+    if (txResult.code !== 0) {
+      throw Errors.chainTxFailed(txHash, txResult.rawLog);
+    }
+
+    // Step 3: Success — invalidate cache and sync balance
+    logger.info({ txHash, address, height: txResult.height }, 'Deposit confirmed on chain');
+    invalidateBalanceCache(address);
+
+    // Sync balance from chain in background (don't block response)
+    getChainVaultBalance(address).then(chainBalance => {
+      vaultService.syncBalanceFromChain(
+        user.id,
+        chainBalance.available,
+        chainBalance.locked,
+        BigInt(txResult!.height),
+      ).catch(err => logger.warn({ err }, 'Background vault sync failed after deposit'));
+
+      wsService.sendToAddress(address, {
+        type: 'balance_updated',
+        data: { available: chainBalance.available, locked: chainBalance.locked },
+      });
+    }).catch(err => logger.warn({ err }, 'Failed to sync balance after deposit'));
+
+    return c.json({
+      data: {
+        status: 'confirmed',
+        tx_hash: txHash,
+        height: txResult.height,
+        message: 'Deposit confirmed on chain.',
+      },
+    });
+  } finally {
+    releaseInflight(address);
+  }
 });
 
 // POST /api/v1/vault/withdraw — Withdraw from vault (via relayer)

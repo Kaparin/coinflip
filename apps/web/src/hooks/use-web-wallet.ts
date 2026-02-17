@@ -13,6 +13,7 @@ import {
   validateMnemonicFormat,
   type StoredWallet,
 } from '@/lib/wallet-core';
+import { clearSigningClientCache } from '@/lib/wallet-signer';
 import { API_URL, STORAGE_KEYS } from '@/lib/constants';
 
 // ---- Session persistence keys ----
@@ -242,6 +243,7 @@ export function useWebWallet(): WebWalletState {
     setAddress(null);
     setError(null);
     clearSessionWallet();
+    clearSigningClientCache();
     sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
   }, []);
 
@@ -254,6 +256,7 @@ export function useWebWallet(): WebWalletState {
     setSavedAddress(null);
     forgetStoredWallet();
     clearSessionWallet();
+    clearSigningClientCache();
     sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
   }, []);
 

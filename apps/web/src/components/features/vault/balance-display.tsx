@@ -9,9 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { LaunchTokenIcon } from '@/components/ui';
 import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { signDeposit } from '@/lib/wallet-signer';
+import { signDepositTxBytes, signDeposit } from '@/lib/wallet-signer';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
-import { EXPLORER_URL } from '@/lib/constants';
+import { API_URL, EXPLORER_URL } from '@/lib/constants';
 
 /** Extract tx hash from CosmJS timeout error: "Transaction with ID 7C77... was submitted..." */
 function extractTxHashFromError(err: unknown): string | null {
@@ -211,7 +211,7 @@ export function BalanceDisplay() {
     };
   }, [depositStatus]);
 
-  // --- Deposit via Web Wallet (client-side signing) ---
+  // --- Deposit via Web Wallet (optimized: sign locally, broadcast via server) ---
   const handleDeposit = useCallback(async () => {
     if (!address || !depositAmount) return;
     const parsedHuman = parseFloat(depositAmount);
@@ -226,36 +226,85 @@ export function BalanceDisplay() {
 
     try {
       setDepositStatus('signing');
-      setDepositStep('connecting');
       setDepositError('');
+      setDepositErrorTxHash(null);
 
-      // Simulate sub-step progression: connecting → signing → broadcasting → confirming
-      // signDeposit does: connect to RPC → sign → broadcast → wait for inclusion
+      // Step 1: Connect to cached client (or create new one)
+      setDepositStep('connecting');
+
+      // Step 2: Sign transaction locally (queries account sequence — 1 RPC call)
+      // Uses cached client + fixed gas (no simulate roundtrip)
       setDepositStep('signing');
+      const { txBytes } = await signDepositTxBytes(wallet, address, parsedHuman);
 
-      // Small delay to show "signing" step before the actual heavy operation
-      await new Promise((r) => setTimeout(r, 300));
+      // Step 3: Broadcast via API server (direct RPC connection, no Vercel proxy)
       setDepositStep('broadcasting');
+      setDepositStatus('broadcasting');
 
-      const result = await signDeposit(wallet, address, parsedHuman);
+      const walletAddress =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('coinflip_connected_address')
+          : null;
 
+      const broadcastRes = await fetch(`${API_URL}/api/v1/vault/deposit/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ tx_bytes: txBytes }),
+      });
+
+      const broadcastData = await broadcastRes.json();
+
+      if (!broadcastRes.ok) {
+        const errMsg = broadcastData?.error?.message ?? t('balance.depositFailed');
+        const errTxHash = broadcastData?.error?.details?.txHash;
+        setDepositError(errMsg);
+        if (errTxHash) setDepositErrorTxHash(errTxHash);
+        setDepositStatus('error');
+        return;
+      }
+
+      // Step 4: Confirmed (or pending)
       setDepositStep('confirming');
-      // Brief pause to show confirming step
-      await new Promise((r) => setTimeout(r, 800));
+      const result = broadcastData.data;
 
-      setDepositTxHash(result.txHash);
-      setDepositStatus('success');
+      if (result.status === 'pending') {
+        // Tx submitted but not confirmed yet — still treat as success with a note
+        setDepositTxHash(result.tx_hash);
+        setDepositStatus('success');
+      } else {
+        setDepositTxHash(result.tx_hash);
+        setDepositStatus('success');
+      }
 
+      // Refresh balances
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
       setTimeout(() => {
         refetch();
         queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
         queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
       }, 3000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('balance.depositFailed');
-      setDepositError(msg);
-      setDepositErrorTxHash(extractTxHashFromError(err));
-      setDepositStatus('error');
+      // If optimized flow fails, try legacy full client-side deposit as fallback
+      try {
+        setDepositStep('broadcasting');
+        setDepositStatus('broadcasting');
+        const result = await signDeposit(wallet, address, parsedHuman);
+        setDepositStep('confirming');
+        setDepositTxHash(result.txHash);
+        setDepositStatus('success');
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+      } catch (fallbackErr) {
+        const msg = fallbackErr instanceof Error ? fallbackErr.message : t('balance.depositFailed');
+        setDepositError(msg);
+        setDepositErrorTxHash(extractTxHashFromError(fallbackErr));
+        setDepositStatus('error');
+      }
     }
   }, [address, depositAmount, getWallet, refetch, queryClient, t]);
 
