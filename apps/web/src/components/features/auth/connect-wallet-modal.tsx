@@ -200,17 +200,19 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
 
             <div className="space-y-2 max-h-[40vh] overflow-y-auto">
               {savedWallets.map((w) => {
-                const isCurrent = connectedAddress === w.address;
+                const addr = typeof w.address === 'string' ? w.address : '';
+                if (!addr) return null;
+                const isCurrent = connectedAddress === addr;
                 return (
                 <button
-                  key={w.address}
+                  key={addr}
                   type="button"
                   onClick={() => {
                     if (isCurrent) {
                       onClose();
                       return;
                     }
-                    setSelectedWalletAddress(w.address);
+                    setSelectedWalletAddress(addr);
                     setStep('unlock');
                     setPin('');
                     setLocalError('');
@@ -223,7 +225,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-mono truncate">
-                      {`${w.address.slice(0, 14)}...${w.address.slice(-8)}`}
+                      {`${addr.slice(0, 14)}...${addr.slice(-8)}`}
                       {isCurrent && (
                         <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
                           ({t('auth.current')})
@@ -484,7 +486,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                 <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
                   <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.savedWallet')}</p>
                   <p className="text-sm font-mono font-bold">
-                    {walletToUnlock ? `${walletToUnlock.slice(0, 12)}...${walletToUnlock.slice(-6)}` : '...'}
+                    {walletToUnlock && typeof walletToUnlock === 'string' ? `${walletToUnlock.slice(0, 12)}...${walletToUnlock.slice(-6)}` : '...'}
                   </p>
                 </div>
 

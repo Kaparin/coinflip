@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { useWalletContext } from '@/contexts/wallet-context';
 
 interface Deduction {
   microAmount: bigint;
@@ -36,9 +37,22 @@ export function usePendingBalance() {
 let nextId = 0;
 
 export function PendingBalanceProvider({ children }: { children: React.ReactNode }) {
+  const { address } = useWalletContext();
   const [deductions, setDeductions] = useState<Map<string, Deduction>>(new Map());
   const frozenUntilRef = useRef(0);
   const [isFrozen, setIsFrozen] = useState(false);
+
+  // Reset pending deductions when the connected wallet changes.
+  // Deductions belong to a specific wallet and must not carry over.
+  const prevAddrRef = useRef(address);
+  useEffect(() => {
+    if (prevAddrRef.current !== address) {
+      prevAddrRef.current = address;
+      setDeductions(new Map());
+      setIsFrozen(false);
+      frozenUntilRef.current = 0;
+    }
+  }, [address]);
 
   const addDeduction = useCallback((microAmount: string, isBetCreate = false): string => {
     const id = `pd_${++nextId}_${Date.now()}`;

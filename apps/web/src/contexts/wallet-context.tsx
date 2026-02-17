@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWebWallet, type WebWalletState } from '@/hooks/use-web-wallet';
 
 /** Extended wallet context — includes modal control */
@@ -21,8 +22,21 @@ const WalletContext = createContext<WalletContextValue | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const wallet = useWebWallet();
+  const queryClient = useQueryClient();
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [connectModalSwitchTo, setConnectModalSwitchTo] = useState<string | null>(null);
+
+  // Invalidate all cached queries when the connected wallet address changes.
+  // Many query keys (vault balance, bets, grants) don't include the address,
+  // so stale data from the previous wallet would persist without this.
+  const prevAddressRef = useRef<string | null>(wallet.address);
+  useEffect(() => {
+    const prev = prevAddressRef.current;
+    prevAddressRef.current = wallet.address;
+    if (prev !== wallet.address && prev !== null && wallet.address !== null) {
+      queryClient.invalidateQueries();
+    }
+  }, [wallet.address, queryClient]);
 
   const openConnectModal = useCallback((switchToAddress?: string) => {
     setConnectModalSwitchTo(switchToAddress ?? null);

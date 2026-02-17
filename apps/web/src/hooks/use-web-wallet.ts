@@ -174,6 +174,10 @@ export function useWebWallet(): WebWalletState {
 
       // Derive wallet
       const { wallet, address: addr } = await deriveWallet(mnemonic);
+
+      // Clear old signing client — new wallet needs a fresh connection
+      clearSigningClientCache();
+
       walletRef.current = wallet;
 
       // Encrypt and save to localStorage
@@ -229,6 +233,12 @@ export function useWebWallet(): WebWalletState {
 
       // Derive wallet from decrypted mnemonic
       const { wallet, address: addr } = await deriveWallet(mnemonic);
+
+      // IMPORTANT: Clear old signing client before switching wallet reference.
+      // The cached SigningCosmWasmClient holds a WebSocket + keys from the previous wallet.
+      // Without this, deposits/authz after switching would use the OLD wallet's keys.
+      clearSigningClientCache();
+
       walletRef.current = wallet;
 
       // Verify address matches

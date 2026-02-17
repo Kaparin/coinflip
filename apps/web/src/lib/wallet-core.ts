@@ -146,30 +146,49 @@ export async function decryptMnemonic(
 
 // ---- Storage (Multi-Wallet v2) ----
 
+/** Runtime check: is this a valid StoredWallet object? */
+function isValidStoredWallet(w: unknown): w is StoredWallet {
+  return (
+    typeof w === 'object' &&
+    w !== null &&
+    typeof (w as StoredWallet).address === 'string' &&
+    (w as StoredWallet).address.length > 0 &&
+    typeof (w as StoredWallet).encryptedMnemonic === 'string' &&
+    typeof (w as StoredWallet).salt === 'string' &&
+    typeof (w as StoredWallet).iv === 'string'
+  );
+}
+
 /** Migrate from single-wallet v1 format to multi-wallet v2. Runs once on first load. */
 function migrateFromV1IfNeeded(): void {
   for (const storage of [localStorage, sessionStorage]) {
     const rawV1 = storage.getItem(STORAGE_KEY_WALLET_V1);
     if (rawV1) {
       try {
-        const legacy = JSON.parse(rawV1) as StoredWallet;
-        const arr: StoredWallet[] = [legacy];
-        storage.setItem(STORAGE_KEY_WALLETS_V2, JSON.stringify(arr));
-        storage.removeItem(STORAGE_KEY_WALLET_V1);
+        const legacy = JSON.parse(rawV1) as unknown;
+        if (isValidStoredWallet(legacy)) {
+          const arr: StoredWallet[] = [legacy];
+          storage.setItem(STORAGE_KEY_WALLETS_V2, JSON.stringify(arr));
+        }
       } catch {
-        storage.removeItem(STORAGE_KEY_WALLET_V1);
+        // Corrupted v1 data — just remove it
       }
+      storage.removeItem(STORAGE_KEY_WALLET_V1);
     }
   }
 }
 
-/** Load wallets array from storage. Merges persistent (localStorage) and ephemeral (sessionStorage). */
+/** Load wallets array from storage with runtime validation — drops invalid entries. */
 function loadWalletsArray(storage: Storage): StoredWallet[] {
   const raw = storage.getItem(STORAGE_KEY_WALLETS_V2);
   if (!raw) return [];
   try {
-    const arr = JSON.parse(raw) as StoredWallet[];
-    return Array.isArray(arr) ? arr : [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      storage.removeItem(STORAGE_KEY_WALLETS_V2);
+      return [];
+    }
+    return parsed.filter(isValidStoredWallet);
   } catch {
     storage.removeItem(STORAGE_KEY_WALLETS_V2);
     return [];
@@ -187,11 +206,12 @@ export function listSavedWallets(): { address: string; ephemeral: boolean }[] {
 
   return [...persistent, ...ephemeral]
     .filter((w) => {
+      if (!w.address || typeof w.address !== 'string') return false;
       if (seen.has(w.address)) return false;
       seen.add(w.address);
       return true;
     })
-    .map((w) => ({ address: w.address, ephemeral: w.ephemeral }));
+    .map((w) => ({ address: w.address, ephemeral: w.ephemeral ?? false }));
 }
 
 /** Load stored wallet by address. Returns null if not found. */

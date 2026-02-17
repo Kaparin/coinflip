@@ -77,21 +77,23 @@ export default function WalletPage() {
           </p>
           <div className="space-y-2">
             {savedWallets.map((w) => {
-              const isCurrent = address === w.address;
+              const addr = typeof w.address === 'string' ? w.address : '';
+              if (!addr) return null;
+              const isCurrent = address === addr;
               return (
                 <button
-                  key={w.address}
+                  key={addr}
                   type="button"
                   onClick={() => {
                     if (isCurrent) return;
-                    openConnectModal(w.address);
+                    openConnectModal(addr);
                   }}
                   className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-left transition-colors hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-border)]/10"
                 >
-                  <UserAvatar address={w.address} size={36} />
+                  <UserAvatar address={addr} size={36} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-mono truncate">
-                      {`${w.address.slice(0, 12)}...${w.address.slice(-8)}`}
+                      {`${addr.slice(0, 12)}...${addr.slice(-8)}`}
                       {isCurrent && (
                         <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
                           ({t('auth.current')})

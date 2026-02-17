@@ -397,16 +397,11 @@ export function BalanceDisplay() {
       setDepositStep('broadcasting');
       setDepositStatus('broadcasting');
 
-      const walletAddress =
-        typeof window !== 'undefined'
-          ? sessionStorage.getItem('coinflip_connected_address')
-          : null;
-
       const broadcastRes = await fetch(`${API_URL}/api/v1/vault/deposit/broadcast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+          ...(address ? { 'x-wallet-address': address } : {}),
         },
         credentials: 'include',
         body: JSON.stringify({ tx_bytes: txBytes }),
