@@ -73,9 +73,9 @@ const typeConfig: Record<
 /*  Context                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const DISMISS_DELAY = 5000;
+const DISMISS_DELAY = 4000;
 const EXIT_DURATION = 200;
-const MAX_TOASTS = 3;
+const MAX_TOASTS = 2;
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
@@ -99,6 +99,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (type: ToastType, message: string) => {
       const id = `toast-${++counter}`;
       setToasts((prev) => {
+        // Deduplicate: skip if an identical toast (same type + message) is already visible
+        const duplicate = prev.find(
+          (t) => t.type === type && t.message === message && !t.exiting,
+        );
+        if (duplicate) return prev;
+
         const next = [...prev, { id, type, message }];
         // Keep max N toasts — remove oldest if over limit
         if (next.length > MAX_TOASTS) {
@@ -106,6 +112,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }
         return next;
       });
+      // Schedule removal (safe even if deduplicated — id won't exist)
       setTimeout(() => removeToast(id), DISMISS_DELAY);
     },
     [removeToast],
