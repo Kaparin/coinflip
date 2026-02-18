@@ -21,6 +21,8 @@ interface MyBetsProps {
   pendingBets?: PendingBet[];
 }
 
+type MyBetsTab = 'open' | 'inplay' | 'results';
+
 export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const { address, isConnected } = useWalletContext();
   const { t } = useTranslation();
@@ -28,6 +30,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const { addToast } = useToast();
   const [pendingBetId, setPendingBetId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<MyBetsTab>('open');
 
   // Smart polling: slow (30s) when WS connected, faster (15s) when WS down
   const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
@@ -230,208 +233,224 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
   const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
 
-  const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0 || visibleResolved.length > 0;
+  // ─── Tab counts ───
+  const openCount = myPending.length + myOpenBets.length;
+  const inPlayCount = myAccepting.length + myInProgress.length;
+  const resultsCount = visibleResolved.length;
+
+  // Build available tabs (only show tabs with data)
+  const availableTabs = useMemo(() => {
+    const tabs: { id: MyBetsTab; label: string; count: number }[] = [];
+    if (openCount > 0)    tabs.push({ id: 'open', label: t('myBets.tabOpen'), count: openCount });
+    if (inPlayCount > 0)  tabs.push({ id: 'inplay', label: t('myBets.tabInPlay'), count: inPlayCount });
+    if (resultsCount > 0) tabs.push({ id: 'results', label: t('myBets.tabResults'), count: resultsCount });
+    return tabs;
+  }, [openCount, inPlayCount, resultsCount, t]);
+
+  // Auto-select first available tab if current tab has no data
+  const effectiveTab = useMemo(() => {
+    if (availableTabs.some(tab => tab.id === activeSubTab)) return activeSubTab;
+    return availableTabs[0]?.id ?? 'open';
+  }, [availableTabs, activeSubTab]);
+
+  const hasAnything = availableTabs.length > 0;
+
+  // ─── Render helpers ───
+  const renderBetCard = (bet: any, opts?: { isMine?: boolean; withCancel?: boolean }) => (
+    <BetCard
+      key={bet.id}
+      id={String(bet.id)}
+      maker={bet.maker}
+      makerNickname={(bet as any).maker_nickname}
+      amount={Number(bet.amount)}
+      status={bet.status}
+      createdAt={new Date(bet.created_at)}
+      revealDeadline={(bet as any).reveal_deadline}
+      expiresAt={(bet as any).expires_at}
+      acceptedAt={(bet as any).accepted_at}
+      winner={(bet as any).winner}
+      acceptor={(bet as any).acceptor}
+      isMine={opts?.isMine ?? (bet.maker?.toLowerCase() === addrLower)}
+      isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
+      pendingBetId={opts?.withCancel ? pendingBetId : undefined}
+      pendingAction={opts?.withCancel ? pendingAction : undefined}
+      onCancel={opts?.withCancel && !cancelAllState ? handleCancel : undefined}
+    />
+  );
+
+  const renderPendingCard = (bet: PendingBet) => (
+    <div
+      key={bet.txHash}
+      className="rounded-2xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-4 animate-pulse"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={50} /></span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
+          {t('myBets.submitting')}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
+        <span>{t('common.confirming')}</span>
+      </div>
+    </div>
+  );
+
+  const renderResolvedCard = (bet: any) => {
+    const winner = (bet as any).winner?.toLowerCase();
+    const isWinner = winner === addrLower;
+    const isRevealed = bet.status === 'revealed' || bet.status === 'timeout_claimed';
+    const payout = isRevealed && isWinner
+      ? formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))
+      : null;
+    const opacity = getResolvedOpacity(String(bet.id));
+    return (
+      <div
+        key={bet.id}
+        style={{ opacity }}
+        className={`rounded-2xl border p-4 transition-opacity duration-[2000ms] ${
+          isRevealed
+            ? isWinner
+              ? 'border-green-500/40 bg-green-500/10'
+              : 'border-red-500/40 bg-red-500/10'
+            : 'border-[var(--color-border)] bg-[var(--color-surface)]'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
+            {formatLaunch(bet.amount)} <LaunchTokenIcon size={50} />
+          </span>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+            isRevealed
+              ? isWinner
+                ? 'bg-green-500/20 text-green-400'
+                : 'bg-red-500/20 text-red-400'
+              : 'bg-gray-500/20 text-gray-400'
+          }`}>
+            {isRevealed
+              ? isWinner ? (t('game.youWon') ?? 'WIN') : (t('game.youLost') ?? 'LOSS')
+              : t('common.canceled')}
+          </span>
+        </div>
+        {isRevealed && (
+          <p className={`text-sm font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+            {isWinner ? `+${payout} LAUNCH` : `-${formatLaunch(bet.amount)} LAUNCH`}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Confirming on blockchain (just submitted, no bet_id yet) */}
-      {myPending.length > 0 && (
-        <div>
-          <h3 className="text-xs font-bold uppercase text-[var(--color-primary)] mb-2 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
-            {t('myBets.submittingCount', { count: myPending.length })}
-          </h3>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            {myPending.map((bet) => (
-              <div
-                key={bet.txHash}
-                className="rounded-2xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-4 animate-pulse"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={50} /></span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
-                    {t('myBets.submitting')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
-                  <span>{t('common.confirming')}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+    <div className="space-y-3">
+      {/* Mini-tabs — only show when 2+ sections have data */}
+      {availableTabs.length > 1 && (
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+          {availableTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] ${
+                effectiveTab === tab.id
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                effectiveTab === tab.id
+                  ? 'bg-white/20'
+                  : 'bg-[var(--color-bg)]'
+              }`}>{tab.count}</span>
+            </button>
+          ))}
         </div>
       )}
 
-      {/* In progress: accepting or determining winner */}
-      {(myAccepting.length > 0 || myInProgress.length > 0) && (
-        <div>
-          <h3 className="text-xs font-bold uppercase text-[var(--color-warning)] mb-2 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
-            {t('myBets.inProgress', { count: myAccepting.length + myInProgress.length })}
-          </h3>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            {myAccepting.map((bet) => (
-              <BetCard
-                key={bet.id}
-                id={String(bet.id)}
-                maker={bet.maker}
-                makerNickname={(bet as any).maker_nickname}
-                amount={Number(bet.amount)}
-                status={bet.status}
-                createdAt={new Date(bet.created_at)}
-                revealDeadline={(bet as any).reveal_deadline}
-                expiresAt={(bet as any).expires_at}
-                acceptedAt={(bet as any).accepted_at}
-                winner={(bet as any).winner}
-                acceptor={(bet as any).acceptor}
-                isMine={bet.maker?.toLowerCase() === addrLower}
-                isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
-              />
-            ))}
-            {myInProgress.map((bet) => (
-              <BetCard
-                key={bet.id}
-                id={String(bet.id)}
-                maker={bet.maker}
-                makerNickname={(bet as any).maker_nickname}
-                amount={Number(bet.amount)}
-                status={bet.status}
-                createdAt={new Date(bet.created_at)}
-                revealDeadline={(bet as any).reveal_deadline}
-                expiresAt={(bet as any).expires_at}
-                acceptedAt={(bet as any).accepted_at}
-                winner={(bet as any).winner}
-                acceptor={(bet as any).acceptor}
-                isMine={bet.maker?.toLowerCase() === addrLower}
-                isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* My open bets — waiting for opponent */}
-      {myOpenBets.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)]">
-              {t('myBets.waitingForOpponent', { count: myOpenBets.length })}
-            </h3>
-            {myOpenBets.length > 1 && !cancelAllState && (
-              <button
-                type="button"
-                onClick={() => handleCancelAll(myOpenBets.map(b => String(b.id)))}
-                className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-1 text-[10px] font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
-              >
-                {t('myBets.cancelAll', { count: myOpenBets.length })}
-              </button>
-            )}
-          </div>
-
-          {/* Cancel All progress bar */}
-          {cancelAllState && (
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 mb-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium">
-                  {t('myBets.cancelingBatch', { done: cancelAllState.done, total: cancelAllState.total })}
-                  {cancelAllState.errors > 0 && (
-                    <span className="text-[var(--color-danger)] ml-1">{t('wager.errorsCount', { errors: cancelAllState.errors })}</span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleStopCancelAll}
-                  className="text-[10px] font-bold text-[var(--color-danger)] hover:underline"
-                >
-                  {t('common.stop')}
-                </button>
-              </div>
-              <div className="h-1.5 rounded-full bg-[var(--color-bg)] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[var(--color-danger)] transition-all duration-300"
-                  style={{ width: `${(cancelAllState.done / cancelAllState.total) * 100}%` }}
-                />
+      {/* ─── Open tab: pending + my open bets ─── */}
+      {effectiveTab === 'open' && openCount > 0 && (
+        <div className="space-y-3">
+          {/* Pending (submitting to chain) */}
+          {myPending.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase text-[var(--color-primary)] mb-2 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
+                {t('myBets.submittingCount', { count: myPending.length })}
+              </h3>
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+                {myPending.map(renderPendingCard)}
               </div>
             </div>
           )}
 
+          {/* Open bets waiting for opponent */}
+          {myOpenBets.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)]">
+                  {t('myBets.waitingForOpponent', { count: myOpenBets.length })}
+                </h3>
+                {myOpenBets.length > 1 && !cancelAllState && (
+                  <button
+                    type="button"
+                    onClick={() => handleCancelAll(myOpenBets.map(b => String(b.id)))}
+                    className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-1 text-[10px] font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
+                  >
+                    {t('myBets.cancelAll', { count: myOpenBets.length })}
+                  </button>
+                )}
+              </div>
+
+              {cancelAllState && (
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium">
+                      {t('myBets.cancelingBatch', { done: cancelAllState.done, total: cancelAllState.total })}
+                      {cancelAllState.errors > 0 && (
+                        <span className="text-[var(--color-danger)] ml-1">{t('wager.errorsCount', { errors: cancelAllState.errors })}</span>
+                      )}
+                    </span>
+                    <button type="button" onClick={handleStopCancelAll}
+                      className="text-[10px] font-bold text-[var(--color-danger)] hover:underline">{t('common.stop')}</button>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--color-bg)] overflow-hidden">
+                    <div className="h-full rounded-full bg-[var(--color-danger)] transition-all duration-300"
+                      style={{ width: `${(cancelAllState.done / cancelAllState.total) * 100}%` }} />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+                {myOpenBets.map((bet) => renderBetCard(bet, { isMine: true, withCancel: true }))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── In Play tab: accepting + accepted ─── */}
+      {effectiveTab === 'inplay' && inPlayCount > 0 && (
+        <div>
+          <h3 className="text-xs font-bold uppercase text-[var(--color-warning)] mb-2 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
+            {t('myBets.inProgress', { count: inPlayCount })}
+          </h3>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            {myOpenBets.map((bet) => (
-              <BetCard
-                key={bet.id}
-                id={String(bet.id)}
-                maker={bet.maker}
-                makerNickname={(bet as any).maker_nickname}
-                amount={Number(bet.amount)}
-                status={bet.status}
-                createdAt={new Date(bet.created_at)}
-                revealDeadline={(bet as any).reveal_deadline}
-                expiresAt={(bet as any).expires_at}
-                acceptedAt={(bet as any).accepted_at}
-                winner={(bet as any).winner}
-                acceptor={(bet as any).acceptor}
-                isMine
-                pendingBetId={pendingBetId}
-                pendingAction={pendingAction}
-                onCancel={cancelAllState ? undefined : handleCancel}
-              />
-            ))}
+            {myAccepting.map((bet) => renderBetCard(bet))}
+            {myInProgress.map((bet) => renderBetCard(bet))}
           </div>
         </div>
       )}
 
-      {/* Recently resolved — show result with smooth fade-out */}
-      {visibleResolved.length > 0 && (
+      {/* ─── Results tab: resolved/canceled ─── */}
+      {effectiveTab === 'results' && resultsCount > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
-            {t('myBets.recentResults', { count: visibleResolved.length })}
+            {t('myBets.recentResults', { count: resultsCount })}
           </h3>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            {visibleResolved.map((bet) => {
-              const winner = (bet as any).winner?.toLowerCase();
-              const isWinner = winner === addrLower;
-              const isRevealed = bet.status === 'revealed' || bet.status === 'timeout_claimed';
-              const payout = isRevealed && isWinner
-                ? formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))
-                : null;
-              const opacity = getResolvedOpacity(String(bet.id));
-              return (
-                <div
-                  key={bet.id}
-                  style={{ opacity }}
-                  className={`rounded-2xl border p-4 transition-opacity duration-[2000ms] ${
-                    isRevealed
-                      ? isWinner
-                        ? 'border-green-500/40 bg-green-500/10'
-                        : 'border-red-500/40 bg-red-500/10'
-                      : 'border-[var(--color-border)] bg-[var(--color-surface)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
-                      {formatLaunch(bet.amount)} <LaunchTokenIcon size={50} />
-                    </span>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
-                      isRevealed
-                        ? isWinner
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-red-500/20 text-red-400'
-                        : 'bg-gray-500/20 text-gray-400'
-                    }`}>
-                      {isRevealed
-                        ? isWinner ? (t('game.youWon') ?? 'WIN') : (t('game.youLost') ?? 'LOSS')
-                        : t('common.canceled')}
-                    </span>
-                  </div>
-                  {isRevealed && (
-                    <p className={`text-sm font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
-                      {isWinner ? `+${payout} LAUNCH` : `-${formatLaunch(bet.amount)} LAUNCH`}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+            {visibleResolved.map(renderResolvedCard)}
           </div>
         </div>
       )}

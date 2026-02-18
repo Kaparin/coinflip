@@ -14,6 +14,8 @@ import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { ADMIN_ADDRESS, EXPLORER_URL } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
+import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 
 export function Header() {
   const { t, locale, setLocale } = useTranslation();
@@ -21,9 +23,13 @@ export function Header() {
   const wallet = useWalletContext();
   const { data: grantData } = useGrantStatus();
   const { data: balanceData } = useGetVaultBalance({
-    query: { enabled: wallet.isConnected },
+    query: {
+      enabled: wallet.isConnected,
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
+    },
   });
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
+  const { pendingDeduction } = usePendingBalance();
   const [menuOpen, setMenuOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
@@ -31,7 +37,9 @@ export function Header() {
   const [copied, setCopied] = useState(false);
 
   const balance = balanceData?.data;
-  const availableHuman = fromMicroLaunch(balance?.available ?? '0');
+  const rawAvailable = BigInt(balance?.available ?? '0');
+  const adjusted = rawAvailable - pendingDeduction;
+  const availableHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const oneClickEnabled = grantData?.authz_granted ?? false;
   const gasSponsored = grantData?.fee_grant_active ?? false;

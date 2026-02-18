@@ -29,6 +29,7 @@
     "connecting": "Подключение...",
     "loading": "Загрузка...",
     "cancel": "Отмена",
+    "canceled": "Отменена",
     "back": "Назад",
     "done": "Готово",
     "retry": "Повторить",
@@ -201,7 +202,10 @@
     "cancelingBatch": "Отмена ставок: {done}/{total}",
     "noActiveBets": "Нет активных ставок",
     "createToStart": "Создайте ставку, чтобы начать играть!",
-    "recentResults": "Результаты ({count})"
+    "recentResults": "Результаты ({count})",
+    "tabOpen": "Открытые",
+    "tabInPlay": "В игре",
+    "tabResults": "Результаты"
   },
   "history": {
     "connectToView": "Подключите кошелёк для просмотра истории",

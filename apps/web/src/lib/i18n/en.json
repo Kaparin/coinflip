@@ -29,6 +29,7 @@
     "connecting": "Connecting...",
     "loading": "Loading...",
     "cancel": "Cancel",
+    "canceled": "Canceled",
     "back": "Back",
     "done": "Done",
     "retry": "Retry",
@@ -201,7 +202,10 @@
     "cancelingBatch": "Canceling bets: {done}/{total}",
     "noActiveBets": "No active bets",
     "createToStart": "Create a bet above to start playing!",
-    "recentResults": "Results ({count})"
+    "recentResults": "Results ({count})",
+    "tabOpen": "Open",
+    "tabInPlay": "In Play",
+    "tabResults": "Results"
   },
   "history": {
     "connectToView": "Connect wallet to view history",
