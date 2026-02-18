@@ -210,7 +210,13 @@ export function HistoryList() {
   const { t } = useTranslation();
   const { data, isLoading, error, refetch } = useGetBetHistory(
     { limit: 100 },
-    { query: { enabled: isConnected } },
+    {
+      query: {
+        enabled: isConnected,
+        retry: 3,
+        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+      },
+    },
   );
 
   const bets = data?.data ?? [];
@@ -249,7 +255,7 @@ export function HistoryList() {
     );
   }
 
-  if (error) {
+  if (error && !data?.data?.length) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
         <p className="text-sm text-[var(--color-text-secondary)]">{t('history.failedToLoad')}</p>

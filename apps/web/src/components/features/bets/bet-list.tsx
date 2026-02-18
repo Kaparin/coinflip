@@ -56,10 +56,18 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  // Smart polling: 30s when WS connected (rare fallback), 15s when WS down
-  const { data, isLoading, error, refetch } = useGetBets(
+  // Smart polling: 30s when WS connected (rare fallback), 15s when WS down.
+  // retry: 3 with exponential backoff prevents transient errors (rate limits) from breaking the page.
+  // keepPreviousData equivalent: placeholderData keeps stale data visible during error/refetch.
+  const { data, isLoading, isFetching, error, refetch } = useGetBets(
     { status: 'open', limit: 50 },
-    { query: { refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED } },
+    {
+      query: {
+        refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
+        retry: 3,
+        retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+      },
+    },
   );
   const vaultKey = ['/api/v1/vault/balance'];
   const { pendingDeduction, addDeduction, removeDeduction } = usePendingBalance();
@@ -278,7 +286,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     );
   }
 
-  if (error) {
+  // Only show error UI if we have NO cached data at all.
+  // If we have stale data + error (e.g. from a transient 429), keep showing stale data
+  // with a subtle retry indicator — never block the whole page.
+  if (error && !data?.data?.length) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
         <p className="text-sm text-[var(--color-text-secondary)]">{t('bets.failedToLoad')}</p>

@@ -42,6 +42,8 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     enabled: isConnected && !!address,
     refetchInterval: pollInterval,
     staleTime: 3_000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
   });
 
   const allBets = myBetsData?.data ?? [];
@@ -419,7 +421,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                     }`}>
                       {isRevealed
                         ? isWinner ? (t('game.youWon') ?? 'WIN') : (t('game.youLost') ?? 'LOSS')
-                        : (t('common.canceled') ?? 'Canceled')}
+                        : t('common.canceled')}
                     </span>
                   </div>
                   {isRevealed && (

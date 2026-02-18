@@ -2,9 +2,10 @@
  * Rate Limiting Middleware — in-memory sliding window.
  *
  * Two layers:
- *   1. IP-based:     120 requests per minute per IP (all endpoints)
- *   2. Wallet-based: 10 transaction requests per minute per wallet (write endpoints)
+ *   1. IP-based:     1000 requests per minute per IP (DDoS protection only)
+ *   2. Wallet-based: 60 transaction requests per minute per wallet (create/batch/withdraw only)
  *
+ * Accept and cancel are NOT rate limited — protected by atomic DB operations.
  * Uses a sliding window counter stored in memory.
  * For multi-instance production deployments, swap to Redis-based counters.
  */
@@ -63,7 +64,7 @@ function checkLimit(
 
 // ─── IP Rate Limit (all requests) ────────────────────────────────
 
-const IP_MAX_REQUESTS = 120;
+const IP_MAX_REQUESTS = 1000;
 const IP_WINDOW_MS = 60_000; // 1 minute
 
 export async function ipRateLimit(c: Context, next: Next) {
@@ -87,7 +88,7 @@ export async function ipRateLimit(c: Context, next: Next) {
 
 // ─── Wallet Rate Limit (transaction endpoints only) ──────────────
 
-const WALLET_MAX_TX = 30;
+const WALLET_MAX_TX = 60;
 const WALLET_WINDOW_MS = 60_000; // 1 minute
 
 export async function walletTxRateLimit(c: Context, next: Next) {
