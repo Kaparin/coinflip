@@ -139,6 +139,7 @@ export class BetService {
         status: 'accepting',
         acceptorUserId: params.acceptorUserId,
         acceptorGuess: params.acceptorGuess,
+        acceptedTime: new Date(), // Track when accepting started (used by stuck-bet sweep)
       })
       .where(
         and(
@@ -168,6 +169,7 @@ export class BetService {
         status: 'open',
         acceptorUserId: null,
         acceptorGuess: null,
+        acceptedTime: null,
         resolvedTime: null,
       })
       .where(and(eq(bets.betId, betId), eq(bets.status, 'accepting')))
@@ -386,7 +388,9 @@ export class BetService {
       .limit(limit);
   }
 
-  /** Get bets stuck in transitional states for too long (for recovery sweep) */
+  /** Get bets stuck in transitional states for too long (for recovery sweep).
+   *  Uses acceptedTime for 'accepting' bets (tracks when accepting started),
+   *  falls back to createdTime for 'canceling' or if acceptedTime is not set. */
   async getStuckTransitionalBets(limit = 100): Promise<BetRow[]> {
     return this.db
       .select()
@@ -394,7 +398,7 @@ export class BetService {
       .where(
         and(
           inArray(bets.status, ['accepting', 'canceling']),
-          sql`${bets.createdTime} < NOW() - INTERVAL '2 minutes'`,
+          sql`COALESCE(${bets.acceptedTime}, ${bets.createdTime}) < NOW() - INTERVAL '2 minutes'`,
         ),
       )
       .limit(limit);
