@@ -238,3 +238,21 @@ export function useReferral(isConnected: boolean) {
 
   return { code, stats, rewards, loading, claiming, claim, refresh, shareUrl };
 }
+
+/** Platform stats for transparency: treasury vault + total referral paid. Public, no auth. */
+export interface PlatformStats {
+  treasuryVaultAvailable: string;
+  treasuryVaultLocked: string;
+  totalReferralPaid: string;
+}
+
+export async function fetchPlatformStats(): Promise<PlatformStats | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/referral/platform-stats`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
+}

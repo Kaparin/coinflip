@@ -476,6 +476,19 @@ export class ReferralService {
   }
 
   /**
+   * Get total referral rewards paid out to all users (for platform transparency).
+   * totalPaid = sum(totalEarned) - sum(unclaimed) across all users.
+   */
+  async getTotalReferralPaid(): Promise<string> {
+    const [row] = await this.db
+      .select({
+        total: sql<string>`coalesce(sum(${referralBalances.totalEarned}::numeric - ${referralBalances.unclaimed}::numeric), 0)::text`,
+      })
+      .from(referralBalances);
+    return row?.total ?? '0';
+  }
+
+  /**
    * Get referral balance for a user.
    */
   async getBalance(userId: string): Promise<{ unclaimed: string; totalEarned: string }> {

@@ -577,7 +577,12 @@
     "changeBranchCycle": "This change would create a circular chain",
     "changeBranchNoBalance": "Insufficient balance. You need 1,000 LAUNCH.",
     "currentReferrer": "Current referrer",
-    "noReferrer": "No referrer"
+    "noReferrer": "No referrer",
+    "platformStats": "Platform statistics",
+    "treasuryVault": "Treasury vault",
+    "totalReferralPaid": "Total referral paid",
+    "rewardSourceTitle": "Where rewards come from",
+    "rewardSourceDesc": "Rewards come from the platform commission (10% of each pot). When you claim, tokens are sent from the treasury vault directly to your Axiome wallet — not to your game vault. You can then deposit to play or keep them in your wallet."
   },
   "walletPage": {
     "connectTitle": "Connect your wallet",

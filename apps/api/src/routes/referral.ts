@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { referralService, ReferralService } from '../services/referral.service.js';
+import { treasuryService } from '../services/treasury.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getChainVaultBalance, invalidateBalanceCache } from './vault.js';
 import { relayerService } from '../services/relayer.js';
@@ -14,6 +15,32 @@ import type { AppEnv } from '../types.js';
 const claimInflight = new Set<string>();
 
 export const referralRouter = new Hono<AppEnv>();
+
+// GET /api/v1/referral/platform-stats — Public: treasury vault balance + total referral paid (for transparency)
+referralRouter.get('/platform-stats', async (c) => {
+  try {
+    const [balance, totalReferralPaid] = await Promise.all([
+      treasuryService.getBalance(),
+      referralService.getTotalReferralPaid(),
+    ]);
+    return c.json({
+      data: {
+        treasuryVaultAvailable: balance.vaultAvailable,
+        treasuryVaultLocked: balance.vaultLocked,
+        totalReferralPaid,
+      },
+    });
+  } catch (err) {
+    logger.warn({ err }, 'Referral platform-stats failed');
+    return c.json({
+      data: {
+        treasuryVaultAvailable: '0',
+        treasuryVaultLocked: '0',
+        totalReferralPaid: '0',
+      },
+    }, 503);
+  }
+});
 
 // GET /api/v1/referral/code — Get or create referral code
 referralRouter.get('/code', authMiddleware, async (c) => {

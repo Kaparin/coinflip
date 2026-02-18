@@ -8,7 +8,7 @@ import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
-import { useReferral } from '@/hooks/use-referral';
+import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use-referral';
 import { UserAvatar } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
@@ -16,6 +16,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import {
   ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
+  Loader2, BarChart3,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
 
@@ -549,8 +550,13 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const { t } = useTranslation();
   const { code, stats, claiming, claim, shareUrl } = useReferral(isConnected);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    fetchPlatformStats().then(setPlatformStats);
+  }, []);
 
   const copyLink = useCallback(() => {
     if (!shareUrl) return;
@@ -572,9 +578,9 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
     const result = await claim();
     if (result.ok) {
       addToast('success', t('referral.claimSuccess'));
-      // Refresh wallet balance since tokens went to the wallet
       queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+      fetchPlatformStats().then(setPlatformStats);
     } else {
       addToast('error', result.error ?? t('referral.claimFailed'));
     }
@@ -592,126 +598,160 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   return (
     <div className="space-y-4">
 
-      {/* How it works — steps */}
-      <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-          {t('referral.howItWorks')}
-        </p>
-        <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed mb-3">
-          {t('referral.inviteDesc')}
-        </p>
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map(step => (
-            <div key={step} className="flex items-start gap-2">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-[10px] font-bold flex items-center justify-center">
-                {step}
-              </span>
-              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                {t(`referral.step${step}` as 'referral.step1')}
-              </p>
-            </div>
-          ))}
+      {/* Platform stats — collapsible */}
+      <CollapsibleSection
+        title={t('referral.platformStats')}
+        icon={<BarChart3 size={18} />}
+        defaultOpen={true}
+        compact
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3">
+            <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.treasuryVault')}</p>
+            <p className="text-lg font-extrabold text-[var(--color-primary)]">
+              {platformStats ? formatLaunch(BigInt(platformStats.treasuryVaultAvailable)) : '—'}
+            </p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">LAUNCH</p>
+          </div>
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3">
+            <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.totalReferralPaid')}</p>
+            <p className="text-lg font-extrabold text-[var(--color-success)]">
+              {platformStats ? formatLaunch(BigInt(platformStats.totalReferralPaid)) : '—'}
+            </p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">LAUNCH</p>
+          </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* 3-Level reward structure — visual cards */}
-      <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1">
-          {t('referral.rewardStructure')}
-        </p>
-        <p className="text-[11px] text-[var(--color-text-secondary)] mb-3 leading-relaxed">
-          {t('referral.rewardStructureDesc')}
-        </p>
+      {/* Referral info — collapsible */}
+      <CollapsibleSection
+        title={t('referral.howItWorks')}
+        icon={<BookOpen size={18} />}
+        defaultOpen={false}
+        compact
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+            {t('referral.inviteDesc')}
+          </p>
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map(step => (
+              <div key={step} className="flex items-start gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-[10px] font-bold flex items-center justify-center">
+                  {step}
+                </span>
+                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                  {t(`referral.step${step}` as 'referral.step1')}
+                </p>
+              </div>
+            ))}
+          </div>
 
-        {/* Visual tree */}
-        <div className="relative space-y-2">
-          {LEVELS.map(({ level, pct, commPct, color, bgColor, textColor, borderColor }) => (
-            <div key={level} className={`relative rounded-xl border ${borderColor} ${bgColor} p-3`} style={{ marginLeft: `${(level - 1) * 12}px` }}>
-              {level > 1 && (
-                <div className="absolute -top-2 left-3 w-px h-2 bg-[var(--color-border)]" />
-              )}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center`}>
-                    <span className="text-xs font-extrabold text-white">L{level}</span>
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1">
+              {t('referral.rewardStructure')}
+            </p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] mb-3 leading-relaxed">
+              {t('referral.rewardStructureDesc')}
+            </p>
+
+            <div className="relative space-y-2">
+              {LEVELS.map(({ level, pct, commPct, color, bgColor, textColor, borderColor }) => (
+                <div key={level} className={`relative rounded-xl border ${borderColor} ${bgColor} p-3`} style={{ marginLeft: `${(level - 1) * 12}px` }}>
+                  {level > 1 && (
+                    <div className="absolute -top-2 left-3 w-px h-2 bg-[var(--color-border)]" />
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center`}>
+                        <span className="text-xs font-extrabold text-white">L{level}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">{t('referral.level', { level })}</p>
+                        <p className="text-[10px] text-[var(--color-text-secondary)]">
+                          {t(`referral.levelWho${level}` as 'referral.levelWho1')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-extrabold ${textColor}`}>{pct}</p>
+                      <p className="text-[9px] text-[var(--color-text-secondary)]">
+                        {t('referral.ofPot')} ({commPct} {t('referral.ofCommission')})
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold">{t('referral.level', { level })}</p>
-                    <p className="text-[10px] text-[var(--color-text-secondary)]">
-                      {t(`referral.levelWho${level}` as 'referral.levelWho1')}
+                </div>
+              ))}
+
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3" style={{ marginLeft: '0px' }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--color-border)] flex items-center justify-center">
+                      <Building size={16} className="text-[var(--color-text-secondary)]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t('referral.platform')}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">5%</p>
+                    <p className="text-[9px] text-[var(--color-text-secondary)]">
+                      {t('referral.ofPot')} (50% {t('referral.ofCommission')})
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-lg font-extrabold ${textColor}`}>{pct}</p>
-                  <p className="text-[9px] text-[var(--color-text-secondary)]">
-                    {t('referral.ofPot')} ({commPct} {t('referral.ofCommission')})
-                  </p>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] mb-2">
+                {t('referral.example')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] mb-2 leading-relaxed">
+                {t('referral.exampleDesc')}
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
+                  <span className="font-bold">180 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(90%)</span></span>
+                </div>
+                <div className="h-px bg-[var(--color-border)]" />
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-violet-400">{t('referral.exampleL1')}</span>
+                  <span className="font-bold text-violet-400">6 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(3%)</span></span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-blue-400">{t('referral.exampleL2')}</span>
+                  <span className="font-bold text-blue-400">3 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(1.5%)</span></span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-teal-400">{t('referral.exampleL3')}</span>
+                  <span className="font-bold text-teal-400">1 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(0.5%)</span></span>
+                </div>
+                <div className="h-px bg-[var(--color-border)]" />
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
+                  <span className="font-bold text-[var(--color-text-secondary)]">10 LAUNCH <span className="font-normal">(5%)</span></span>
                 </div>
               </div>
             </div>
-          ))}
 
-          {/* Platform keeps */}
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3" style={{ marginLeft: '0px' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[var(--color-border)] flex items-center justify-center">
-                  <Building size={16} className="text-[var(--color-text-secondary)]" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t('referral.platform')}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">5%</p>
-                <p className="text-[9px] text-[var(--color-text-secondary)]">
-                  {t('referral.ofPot')} (50% {t('referral.ofCommission')})
-                </p>
-              </div>
+            <p className="mt-2 text-[10px] text-[var(--color-text-secondary)] leading-relaxed">
+              {t('referral.rewardNote')}
+            </p>
+
+            {/* Token source info */}
+            <div className="mt-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-500 mb-1">
+                {t('referral.rewardSourceTitle')}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
+                {t('referral.rewardSourceDesc')}
+              </p>
             </div>
           </div>
         </div>
-
-        {/* Example calculation */}
-        <div className="mt-3 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] mb-2">
-            {t('referral.example')}
-          </p>
-          <p className="text-[11px] text-[var(--color-text-secondary)] mb-2 leading-relaxed">
-            {t('referral.exampleDesc')}
-          </p>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[11px]">
-              <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
-              <span className="font-bold">180 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(90%)</span></span>
-            </div>
-            <div className="h-px bg-[var(--color-border)]" />
-            <div className="flex justify-between text-[11px]">
-              <span className="text-violet-400">{t('referral.exampleL1')}</span>
-              <span className="font-bold text-violet-400">6 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(3%)</span></span>
-            </div>
-            <div className="flex justify-between text-[11px]">
-              <span className="text-blue-400">{t('referral.exampleL2')}</span>
-              <span className="font-bold text-blue-400">3 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(1.5%)</span></span>
-            </div>
-            <div className="flex justify-between text-[11px]">
-              <span className="text-teal-400">{t('referral.exampleL3')}</span>
-              <span className="font-bold text-teal-400">1 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(0.5%)</span></span>
-            </div>
-            <div className="h-px bg-[var(--color-border)]" />
-            <div className="flex justify-between text-[11px]">
-              <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
-              <span className="font-bold text-[var(--color-text-secondary)]">10 LAUNCH <span className="font-normal">(5%)</span></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Important note */}
-        <p className="mt-2 text-[10px] text-[var(--color-text-secondary)] leading-relaxed">
-          {t('referral.rewardNote')}
-        </p>
-      </div>
+      </CollapsibleSection>
 
       {/* Referral link */}
       {code && shareUrl && (
@@ -739,37 +779,48 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
         </div>
       )}
 
-      {/* Stats */}
+      {/* Claim section — stats + claim button */}
       {stats && (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
-              <p className="text-2xl font-extrabold">{stats.directInvites}</p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.directInvites')}</p>
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-3">
+              {t('referral.stats')}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
+                <p className="text-2xl font-extrabold">{stats.directInvites}</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.directInvites')}</p>
+              </div>
+              <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
+                <p className="text-2xl font-extrabold">{stats.teamSize}</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.teamSize')}</p>
+              </div>
+              <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
+                <p className="text-2xl font-extrabold text-[var(--color-success)]">{formatLaunch(totalEarnedAmount)}</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.totalEarned')}</p>
+              </div>
+              <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
+                <p className="text-2xl font-extrabold text-[var(--color-warning)]">{formatLaunch(unclaimedAmount)}</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.unclaimed')}</p>
+              </div>
             </div>
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
-              <p className="text-2xl font-extrabold">{stats.teamSize}</p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.teamSize')}</p>
-            </div>
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
-              <p className="text-2xl font-extrabold text-[var(--color-success)]">{formatLaunch(totalEarnedAmount)}</p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.totalEarned')}</p>
-            </div>
-            <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 text-center">
-              <p className="text-2xl font-extrabold text-[var(--color-warning)]">{formatLaunch(unclaimedAmount)}</p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('referral.unclaimed')}</p>
-            </div>
-          </div>
 
-          {/* Claim button */}
-          {unclaimedAmount > 0n && (
-            <button
-              type="button" onClick={handleClaim} disabled={claiming}
-              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {claiming ? t('referral.claiming') : `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} LAUNCH)`}
-            </button>
-          )}
+            {unclaimedAmount > 0n && (
+              <button
+                type="button" onClick={handleClaim} disabled={claiming}
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {claiming ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin shrink-0" />
+                    {t('referral.claiming')}
+                  </>
+                ) : (
+                  `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} LAUNCH)`
+                )}
+              </button>
+            )}
+          </div>
 
           {/* Earnings by level */}
           <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4">

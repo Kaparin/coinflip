@@ -577,7 +577,12 @@
     "changeBranchCycle": "Это изменение создаст циклическую цепочку",
     "changeBranchNoBalance": "Недостаточно средств. Нужно 1 000 LAUNCH.",
     "currentReferrer": "Текущий реферер",
-    "noReferrer": "Нет реферера"
+    "noReferrer": "Нет реферера",
+    "platformStats": "Статистика платформы",
+    "treasuryVault": "Treasury vault",
+    "totalReferralPaid": "Всего выплачено рефералам",
+    "rewardSourceTitle": "Откуда берутся награды",
+    "rewardSourceDesc": "Награды берутся из комиссии платформы (10% от каждого банка). При заборе токены отправляются из vault казначейства прямо на ваш Axiome кошелёк — не в игровой vault. Затем вы можете их вложить для игры или оставить в кошельке."
   },
   "walletPage": {
     "connectTitle": "Подключите кошелёк",
