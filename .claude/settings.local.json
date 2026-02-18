@@ -36,7 +36,8 @@
       "WebFetch(domain:i.postimg.cc)",
       "Bash(npx railway:*)",
       "Bash(npx @railway/cli whoami:*)",
-      "Bash(npx @railway/cli login:*)"
+      "Bash(npx @railway/cli login:*)",
+      "Bash(git -C E:Workcoinflip diff --stat)"
     ]
   }
 }
