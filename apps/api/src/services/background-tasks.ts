@@ -387,7 +387,7 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
           logger.info({ betId: betId.toString(), revealTxHash: revealResult.txHash }, `${tag} — reveal tx pipelined (broadcast before accept confirmed)`);
         }
       } catch (err) {
-        logger.warn({ err, betId: betId.toString() }, `${tag} — pipelined reveal broadcast failed (will retry after accept)`);
+        logger.info({ err, betId: betId.toString() }, `${tag} — pipelined reveal broadcast failed (will retry after accept confirms)`);
       }
     }
 
@@ -1211,27 +1211,24 @@ export function startBackgroundSweep(): void {
 
     sweepRunning = true;
     try {
-      // 1. Find accepted bets that need auto-reveal — process in parallel batches
+      // 1. Find accepted bets that need auto-reveal — process sequentially
+      //    to guarantee strict nonce ordering through the broadcast queue.
       const unrevealed = await betService.getAcceptedBetsWithSecrets();
       if (unrevealed.length > 0) {
-        logger.info({ count: unrevealed.length }, 'sweep: processing unrevealed bets in parallel');
-        const BATCH_SIZE = 10;
-        for (let i = 0; i < unrevealed.length; i += BATCH_SIZE) {
-          const batch = unrevealed.slice(i, i + BATCH_SIZE);
-          await Promise.allSettled(
-            batch.map(bet =>
-              autoRevealBet(bet.betId).catch(err => {
-                logger.error({ err, betId: bet.betId.toString() }, 'sweep:auto-reveal failed');
-              })
-            ),
-          );
+        logger.info({ count: unrevealed.length }, 'sweep: processing unrevealed bets sequentially');
+        for (const bet of unrevealed) {
+          await autoRevealBet(bet.betId).catch(err => {
+            logger.error({ err, betId: bet.betId.toString() }, 'sweep:auto-reveal failed');
+          });
         }
       }
 
-      // 2-6: Run independent sweep phases in parallel for faster recovery
+      // 2-3: Relayer-dependent tasks — run sequentially (same relayer, same nonce space)
+      await autoClaimTimeoutBets();
+      await autoCancelExpiredBets();
+
+      // 4-6: Non-relayer recovery tasks — safe to run in parallel
       await Promise.allSettled([
-        autoClaimTimeoutBets(),
-        autoCancelExpiredBets(),
         recoverStuckTransitionalBets(),
         recoverStuckLockedFunds(),
         reconcileOrphanedChainBets(),

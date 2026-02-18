@@ -80,6 +80,9 @@ export class RelayerService {
   private chainId: string;
   private initialized = false;
 
+  /** Promise-chain mutex: serializes the entire sign+broadcast+retry cycle */
+  private _broadcastQueue: Promise<void> = Promise.resolve();
+
   constructor() {
     this.relayerAddress = env.RELAYER_ADDRESS;
     this.contractAddress = env.COINFLIP_CONTRACT_ADDR;
@@ -155,9 +158,8 @@ export class RelayerService {
   /**
    * Submit a MsgExec transaction on behalf of a user.
    *
-   * NO GLOBAL QUEUE — transactions are broadcast concurrently.
-   * The SequenceManager mutex ensures each tx gets a unique, sequential sequence.
-   * Cosmos mempool accepts out-of-order sequences from the same sender and orders them.
+   * Serialized by broadcast queue — each sign+broadcast+retry cycle runs
+   * one at a time to guarantee strict nonce ordering on chain.
    *
    * @param asyncMode — if true, return immediately after broadcastTxSync
    *   (skip the 25s poll for block inclusion). The tx is confirmed in the background
@@ -208,9 +210,33 @@ export class RelayerService {
   }
 
   /**
+   * Promise-chain mutex for broadcast serialization.
+   * Ensures sign+broadcast+retry cycles execute one at a time in strict nonce order.
+   * Each broadcastTxSync takes ~100ms, so throughput is ~10 tx/sec — more than sufficient.
+   */
+  private acquireBroadcastLock(): Promise<() => void> {
+    let outerResolve: (release: () => void) => void;
+    const result = new Promise<() => void>((resolve) => {
+      outerResolve = resolve;
+    });
+
+    const prev = this._broadcastQueue;
+    let releaseFn: () => void;
+    this._broadcastQueue = new Promise<void>((resolve) => {
+      releaseFn = resolve;
+    });
+
+    prev.then(() => {
+      outerResolve!(releaseFn!);
+    });
+
+    return result;
+  }
+
+  /**
    * Internal: sign + broadcast with explicit sequence tracking.
    * Up to 3 attempts: on sequence mismatch, parse the expected sequence and retry.
-   * With concurrent broadcasts, sequence mismatches are more likely but recoverable.
+   * Serialized by broadcast lock — only one tx goes through sign+broadcast at a time.
    */
   private async _submitExecInner(
     userAddress: string,
@@ -228,6 +254,8 @@ export class RelayerService {
 
     const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride);
 
+    const release = await this.acquireBroadcastLock();
+    try {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         // 1. Get next sequence from our local manager
@@ -416,6 +444,9 @@ export class RelayerService {
 
     // Should not reach here, but just in case
     return { success: false, error: 'Max retry attempts reached' };
+    } finally {
+      release();
+    }
   }
 
   // ---- Custom contract execution (for CW20 transfers, etc.) ----
