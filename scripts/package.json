@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "deploy": "tsx deploy-contract.ts",
-    "verify": "tsx verify-contract.ts"
+    "verify": "tsx verify-contract.ts",
+    "diagnose:locked": "tsx diagnose-stuck-locked.ts"
   },
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.38.1",

@@ -172,6 +172,34 @@ adminRouter.get('/users/:userId', async (c) => {
 
   const [balance] = await db.select().from(vaultBalances).where(eq(vaultBalances.userId, userId)).limit(1);
 
+  // Fetch chain balance for comparison (chain is source of truth for UI)
+  let chainBalance: { available: string; locked: string } | null = null;
+  let chainUserBets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }> = [];
+  if (user.address && env.COINFLIP_CONTRACT_ADDR) {
+    try {
+      const vbQuery = btoa(JSON.stringify({ vault_balance: { address: user.address } }));
+      const vbRes = await fetch(
+        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${vbQuery}`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (vbRes.ok) {
+        const vbData = await vbRes.json() as { data: { available: string; locked: string } };
+        chainBalance = vbData.data;
+      }
+      const ubQuery = btoa(JSON.stringify({ user_bets: { address: user.address, limit: 20 } }));
+      const ubRes = await fetch(
+        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${ubQuery}`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (ubRes.ok) {
+        const ubData = await ubRes.json() as { data: { bets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }> } };
+        chainUserBets = ubData.data.bets ?? [];
+      }
+    } catch (err) {
+      logger.warn({ err, userId }, 'admin: failed to fetch chain balance/bets');
+    }
+  }
+
   const userBets = await db.select({
     betId: bets.betId,
     amount: bets.amount,
@@ -202,6 +230,8 @@ adminRouter.get('/users/:userId', async (c) => {
         available: balance?.available ?? '0',
         locked: balance?.locked ?? '0',
       },
+      chainVault: chainBalance ? { available: chainBalance.available, locked: chainBalance.locked } : null,
+      chainUserBets: chainUserBets.map(b => ({ id: b.id, status: b.status, amount: b.amount, maker: b.maker, acceptor: b.acceptor })),
       bets: userBets.map(b => ({
         ...b,
         betId: b.betId.toString(),

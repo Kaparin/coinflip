@@ -193,6 +193,8 @@ export interface DiagnosticsData {
 export interface UserDetail {
   user: { id: string; address: string; nickname: string | null; createdAt: string | null };
   vault: { available: string; locked: string };
+  chainVault: { available: string; locked: string } | null;
+  chainUserBets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }>;
   bets: Array<{
     betId: string;
     amount: string;

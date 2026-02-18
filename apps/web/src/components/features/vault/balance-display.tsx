@@ -194,11 +194,11 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
 export function BalanceDisplay() {
   const { t, locale } = useTranslation();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
-  const { pendingDeduction, isFrozen } = usePendingBalance();
+  const { pendingDeduction } = usePendingBalance();
   const { data, isLoading, refetch } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: isFrozen ? false : 15_000, // Pause refetch while deductions pending
+      refetchInterval: 15_000,
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);

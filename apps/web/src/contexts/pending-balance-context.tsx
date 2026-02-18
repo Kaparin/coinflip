@@ -18,7 +18,7 @@ interface PendingBalanceContextType {
   addDeduction: (microAmount: string, isBetCreate?: boolean) => string;
   /** Remove a deduction by ID (confirmed on server or reverted) */
   removeDeduction: (id: string) => void;
-  /** Whether balance refetching should be paused */
+  /** Whether balance refetching should be paused (true while any deductions exist) */
   isFrozen: boolean;
 }
 
@@ -39,8 +39,7 @@ let nextId = 0;
 export function PendingBalanceProvider({ children }: { children: React.ReactNode }) {
   const { address } = useWalletContext();
   const [deductions, setDeductions] = useState<Map<string, Deduction>>(new Map());
-  const frozenUntilRef = useRef(0);
-  const [isFrozen, setIsFrozen] = useState(false);
+  const expiryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Reset pending deductions when the connected wallet changes.
   // Deductions belong to a specific wallet and must not carry over.
@@ -48,9 +47,9 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (prevAddrRef.current !== address) {
       prevAddrRef.current = address;
+      for (const t of expiryTimersRef.current.values()) clearTimeout(t);
+      expiryTimersRef.current.clear();
       setDeductions(new Map());
-      setIsFrozen(false);
-      frozenUntilRef.current = 0;
     }
   }, [address]);
 
@@ -64,13 +63,9 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
       return next;
     });
 
-    // Freeze balance refetching for 12 seconds — long enough for server cache (5s TTL)
-    // to expire and chain to confirm. Prevents WS events from overwriting optimistic balance.
-    frozenUntilRef.current = Date.now() + 12000;
-    setIsFrozen(true);
-
     // Auto-expire deduction after 30 seconds as absolute safety net
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      expiryTimersRef.current.delete(id);
       setDeductions(prev => {
         if (!prev.has(id)) return prev;
         const next = new Map(prev);
@@ -78,11 +73,17 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
         return next;
       });
     }, 30_000);
+    expiryTimersRef.current.set(id, timer);
 
     return id;
   }, []);
 
   const removeDeduction = useCallback((id: string) => {
+    const timer = expiryTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      expiryTimersRef.current.delete(id);
+    }
     setDeductions(prev => {
       if (!prev.has(id)) return prev;
       const next = new Map(prev);
@@ -91,25 +92,14 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
     });
   }, []);
 
-  // Update isFrozen based on timer
-  useEffect(() => {
-    if (!isFrozen) return;
-    const timer = setInterval(() => {
-      if (Date.now() >= frozenUntilRef.current) {
-        setIsFrozen(false);
-        clearInterval(timer);
-      }
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isFrozen]);
-
-  // Compute aggregates
+  // Compute aggregates — isFrozen = true whenever we have any deductions
   let pendingDeduction = 0n;
   let pendingBetCount = 0;
   for (const d of deductions.values()) {
     pendingDeduction += d.microAmount;
     if (d.isBetCreate) pendingBetCount++;
   }
+  const isFrozen = deductions.size > 0;
 
   return (
     <PendingBalanceContext.Provider value={{ pendingDeduction, pendingBetCount, addDeduction, removeDeduction, isFrozen }}>

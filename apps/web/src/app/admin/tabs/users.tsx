@@ -134,11 +134,59 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
         <p className="text-[10px] text-[var(--color-text-secondary)]">Joined: {detail.user.createdAt ? new Date(detail.user.createdAt).toLocaleString() : '—'}</p>
       </div>
 
-      {/* Vault */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Available" value={formatLaunch(detail.vault.available)} />
-        <StatCard label="Locked" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
+      {/* Vault — DB vs Chain (chain is source of truth for UI) */}
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Vault</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="DB Available" value={formatLaunch(detail.vault.available)} />
+          <StatCard label="DB Locked" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
+          {detail.chainVault && (
+            <>
+              <StatCard label="Chain Available" value={formatLaunch(detail.chainVault.available)} />
+              <StatCard label="Chain Locked" value={formatLaunch(detail.chainVault.locked)} warn={BigInt(detail.chainVault.locked) > 0n} />
+            </>
+          )}
+        </div>
+        {detail.chainVault && (BigInt(detail.vault.locked) !== BigInt(detail.chainVault.locked)) && (
+          <p className="text-[11px] text-amber-500">DB/Chain mismatch — run sync-balances script to fix DB</p>
+        )}
       </div>
+
+      {/* Chain user bets — bets on chain where user is maker or acceptor */}
+      {detail.chainUserBets?.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+            Bets on chain (user_bets)
+          </p>
+          <TableWrapper>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
+                  <th className="text-left px-3 py-2">ID</th>
+                  <th className="text-left px-3 py-2">Status</th>
+                  <th className="text-right px-3 py-2">Amount</th>
+                  <th className="text-left px-3 py-2">Maker</th>
+                  <th className="text-left px-3 py-2">Acceptor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.chainUserBets.map((b) => (
+                  <tr key={b.id} className="border-b border-[var(--color-border)]/50 last:border-0">
+                    <td className="px-3 py-2 font-mono">#{b.id}</td>
+                    <td className="px-3 py-2"><StatusBadge status={b.status} /></td>
+                    <td className="px-3 py-2 text-right font-mono">{formatLaunch(b.amount)}</td>
+                    <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)]">{shortAddr(b.maker)}</td>
+                    <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)]">{b.acceptor ? shortAddr(b.acceptor) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrapper>
+          <p className="text-[11px] text-[var(--color-text-secondary)]">
+            Locked funds come from active bets (open/accepted). Resolve via cancel, reveal, or claim_timeout.
+          </p>
+        </div>
+      )}
 
       {/* Bets */}
       <div className="space-y-2">

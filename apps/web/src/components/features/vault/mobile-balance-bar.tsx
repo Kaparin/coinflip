@@ -18,8 +18,8 @@ import { useTranslation } from '@/lib/i18n';
 export function MobileBalanceBar() {
   const { t } = useTranslation();
   const { isConnected, address } = useWalletContext();
-  const { pendingDeduction, isFrozen } = usePendingBalance();
-  const { data, isLoading } = useGetVaultBalance({ query: { enabled: isConnected, refetchInterval: isFrozen ? false : 15_000 } });
+  const { pendingDeduction } = usePendingBalance();
+  const { data, isLoading } = useGetVaultBalance({ query: { enabled: isConnected, refetchInterval: 15_000 } });
   const { data: walletBalanceRaw } = useWalletBalance(address);
   const [expanded, setExpanded] = useState(false);
 

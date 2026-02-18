@@ -41,10 +41,10 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
   const { t } = useTranslation();
 
   const queryClient = useQueryClient();
-  const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount, isFrozen } = usePendingBalance();
+  const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount } = usePendingBalance();
 
   const { data: balanceData } = useGetVaultBalance({
-    query: { enabled: isConnected, refetchInterval: isFrozen ? false : 15_000 },
+    query: { enabled: isConnected, refetchInterval: 15_000 },
   });
 
   // ── Open bets counter (SOURCE OF TRUTH: server's chain-based count) ──
@@ -84,10 +84,17 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
     mutation: {
       onSuccess: (response) => {
         const vaultKey = getGetVaultBalanceQueryKey();
+        const amountMicro = BigInt(betAmountRef.current || '0');
+        const willBeEmpty = amountMicro > 0n && pendingDeduction - amountMicro === 0n;
 
-        // Server returns corrected balance in 202 response (with pending locks deducted)
+        if (deductionIdRef.current) {
+          removeDeduction(deductionIdRef.current);
+          deductionIdRef.current = null;
+        }
+
+        // Only apply server balance when this is the last pending deduction
         const serverBalance = (response as any)?.balance;
-        if (serverBalance) {
+        if (serverBalance && willBeEmpty) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
             ...old,
             data: {
@@ -96,12 +103,6 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
               locked: serverBalance.locked,
             },
           }));
-        }
-
-        // Remove the pending deduction (server balance is authoritative now)
-        if (deductionIdRef.current) {
-          removeDeduction(deductionIdRef.current);
-          deductionIdRef.current = null;
         }
 
         // Increment local submitted counter (tracks bets between server refetches)

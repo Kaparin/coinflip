@@ -62,11 +62,6 @@ export function useWebSocket({
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
 
-  // Track balance freeze state — skip vault balance invalidation while pending deductions exist
-  const { isFrozen: balanceFrozen } = usePendingBalance();
-  const balanceFrozenRef = useRef(balanceFrozen);
-  balanceFrozenRef.current = balanceFrozen;
-
   // Store mutable refs for values used inside connect (avoids stale closures & re-renders)
   const addressRef = useRef(address);
   const enabledRef = useRef(enabled);
@@ -97,10 +92,9 @@ export function useWebSocket({
 
   const scheduleInvalidation = useCallback((...queryKeys: string[]) => {
     for (const key of queryKeys) {
-      // Skip vault balance invalidation while optimistic deductions are pending.
-      // This prevents WS events from overwriting the correct optimistic balance
-      // with stale server-cached data.
-      if (key === '/api/v1/vault/balance' && balanceFrozenRef.current) continue;
+      // Always allow vault balance invalidation — display uses (rawAvailable - pendingDeduction),
+      // so we never show inflated balance. Allowing updates ensures wins/losses from resolved
+      // bets are reflected even while other accepts are still in flight.
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);

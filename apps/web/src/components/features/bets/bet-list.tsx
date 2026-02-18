@@ -62,8 +62,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     { query: { refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED } },
   );
   const vaultKey = ['/api/v1/vault/balance'];
-  const { data: balanceData } = useGetVaultBalance({ query: { enabled: isConnected } });
   const { pendingDeduction, addDeduction, removeDeduction } = usePendingBalance();
+  const { data: balanceData } = useGetVaultBalance({
+    query: { enabled: isConnected, refetchInterval: 15_000 },
+  });
   const rawAvailableMicro = BigInt(balanceData?.data?.available ?? '0');
   const availableMicro = rawAvailableMicro - pendingDeduction < 0n ? 0n : rawAvailableMicro - pendingDeduction;
 
@@ -108,16 +110,20 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     mutation: {
       onSuccess: (response: any, variables) => {
         const betId = String(variables.betId);
-        // Remove the pending deduction — server balance is authoritative now
+        const amountMicro = BigInt(response?.data?.amount ?? response?.amount ?? '0');
+        // Only apply server balance when this is the LAST pending deduction.
+        // Otherwise we'd overwrite with stale data and show inflated available balance
+        // while other accepts are still in flight.
+        const willBeEmpty = amountMicro > 0n && pendingDeduction - amountMicro === 0n;
+
         const deductionId = acceptDeductionRef.current.get(betId);
         if (deductionId) {
           removeDeduction(deductionId);
           acceptDeductionRef.current.delete(betId);
         }
 
-        // Use server-returned balance (with pending locks already deducted)
         const serverBalance = response?.balance;
-        if (serverBalance) {
+        if (serverBalance && willBeEmpty) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
             ...old,
             data: {
@@ -128,10 +134,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           }));
         }
 
-        // Invalidate bets list immediately (to remove accepted bet from open bets)
-        // Balance will be refreshed by WebSocket event when chain confirms.
         invalidateBetsOnly();
-
         setAcceptTarget(null);
         clearPending();
         addToast('success', t('bets.betAccepted'));
