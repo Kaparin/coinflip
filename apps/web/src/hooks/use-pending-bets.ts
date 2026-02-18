@@ -13,7 +13,7 @@ export interface PendingBet {
 }
 
 const STORAGE_KEY = 'coinflip_pending_bets';
-const MAX_AGE_MS = 90 * 1000; // 90 seconds — if not confirmed by now, something went wrong
+const MAX_AGE_MS = 120 * 1000; // 120 seconds — must exceed pending deduction TTL (90s) so UI stays consistent
 
 /** Load pending bets from sessionStorage */
 function loadPending(): PendingBet[] {

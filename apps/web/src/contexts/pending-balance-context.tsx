@@ -63,7 +63,8 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
       return next;
     });
 
-    // Auto-expire deduction after 30 seconds as absolute safety net
+    // Auto-expire deduction after 90 seconds as absolute safety net.
+    // Must exceed chain tx confirmation time (can take 30-60s on Axiome).
     const timer = setTimeout(() => {
       expiryTimersRef.current.delete(id);
       setDeductions(prev => {
@@ -72,7 +73,7 @@ export function PendingBalanceProvider({ children }: { children: React.ReactNode
         next.delete(id);
         return next;
       });
-    }, 30_000);
+    }, 90_000);
     expiryTimersRef.current.set(id, timer);
 
     return id;

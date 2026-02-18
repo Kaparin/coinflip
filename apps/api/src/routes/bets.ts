@@ -781,7 +781,9 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
     throw Errors.invalidState('cancel', 'bet was already claimed or is no longer open');
   }
   const cancelAddr = await betService.buildAddressMap([cancelingBet]);
-  wsService.emitBetCanceled(formatBetResponse(cancelingBet, cancelAddr) as unknown as Record<string, unknown>);
+  // Emit "canceling" (transitional) — NOT "canceled" (final). The background task
+  // emits bet_canceled after chain confirmation. This prevents double-emit causing UI flicker.
+  wsService.broadcast({ type: 'bet_canceling', data: formatBetResponse(cancelingBet, cancelAddr) as unknown as Record<string, unknown> });
 
   // STEP 2: Submit to chain (ASYNC MODE — returns after broadcastTxSync ~1-2s)
   if (!relayerService.isReady()) {

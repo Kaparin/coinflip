@@ -13,8 +13,8 @@ const MAX_RETRIES = 2;
 /** Base delay for exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 1_000;
 
-/** HTTP status codes that are safe to retry */
-const RETRYABLE_STATUS_CODES = new Set([408, 429, 502, 503, 504]);
+/** HTTP status codes that are safe to retry (429 excluded — retrying worsens rate limit) */
+const RETRYABLE_STATUS_CODES = new Set([408, 502, 503, 504]);
 
 /** Sleep helper */
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));

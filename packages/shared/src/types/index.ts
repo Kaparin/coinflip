@@ -37,6 +37,7 @@ export type WsEventType =
   | 'bet_accepting'
   | 'bet_accepted'
   | 'bet_revealed'
+  | 'bet_canceling'
   | 'bet_canceled'
   | 'bet_timeout_claimed'
   | 'bet_create_failed'

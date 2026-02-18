@@ -2,7 +2,7 @@
  * Rate Limiting Middleware — in-memory sliding window.
  *
  * Two layers:
- *   1. IP-based:     30 requests per minute per IP (all endpoints)
+ *   1. IP-based:     120 requests per minute per IP (all endpoints)
  *   2. Wallet-based: 10 transaction requests per minute per wallet (write endpoints)
  *
  * Uses a sliding window counter stored in memory.
@@ -63,7 +63,7 @@ function checkLimit(
 
 // ─── IP Rate Limit (all requests) ────────────────────────────────
 
-const IP_MAX_REQUESTS = 60;
+const IP_MAX_REQUESTS = 120;
 const IP_WINDOW_MS = 60_000; // 1 minute
 
 export async function ipRateLimit(c: Context, next: Next) {

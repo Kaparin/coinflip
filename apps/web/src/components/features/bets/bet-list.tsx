@@ -56,15 +56,19 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  // Smart polling: 30s when WS connected (rare fallback), 5s when WS down
+  // Smart polling: 30s when WS connected (rare fallback), 15s when WS down
   const { data, isLoading, error, refetch } = useGetBets(
     { status: 'open', limit: 50 },
     { query: { refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED } },
   );
   const vaultKey = ['/api/v1/vault/balance'];
   const { pendingDeduction, addDeduction, removeDeduction } = usePendingBalance();
+  // Use WS-aware shared balance query (no dedicated polling — WS events + main balance handle it)
   const { data: balanceData } = useGetVaultBalance({
-    query: { enabled: isConnected, refetchInterval: 15_000 },
+    query: {
+      enabled: isConnected,
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
+    },
   });
   const rawAvailableMicro = BigInt(balanceData?.data?.available ?? '0');
   const availableMicro = rawAvailableMicro - pendingDeduction < 0n ? 0n : rawAvailableMicro - pendingDeduction;
@@ -75,10 +79,6 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-  }, [queryClient]);
-
-  const invalidateBetsOnly = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
   }, [queryClient]);
 
   const clearPending = useCallback(() => {
@@ -92,12 +92,14 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const cancelMutation = useCancelBet({
     mutation: {
       onSuccess: () => {
-        invalidateAll();
+        // Don't invalidateAll here — WS bet_canceled event handles cache invalidation.
+        // Only clear local pending state to avoid double refetch + flicker.
         clearPending();
         addToast('success', t('bets.cancelingFunds'));
       },
       onError: (err: unknown) => {
         clearPending();
+        // On error, DO invalidate to restore correct state
         invalidateAll();
         const { is429 } = extractError(err);
         const friendlyMsg = getUserFriendlyError(err, t, 'cancel');
@@ -110,11 +112,6 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     mutation: {
       onSuccess: (response: any, variables) => {
         const betId = String(variables.betId);
-        const amountMicro = BigInt(response?.data?.amount ?? response?.amount ?? '0');
-        // Only apply server balance when this is the LAST pending deduction.
-        // Otherwise we'd overwrite with stale data and show inflated available balance
-        // while other accepts are still in flight.
-        const willBeEmpty = amountMicro > 0n && pendingDeduction - amountMicro === 0n;
 
         const deductionId = acceptDeductionRef.current.get(betId);
         if (deductionId) {
@@ -122,8 +119,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           acceptDeductionRef.current.delete(betId);
         }
 
+        // Apply server balance from 202 response immediately via setQueryData
+        // This is always safe — the server computed it with pending locks accounted for.
         const serverBalance = response?.balance;
-        if (serverBalance && willBeEmpty) {
+        if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
             ...old,
             data: {
@@ -134,7 +133,21 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           }));
         }
 
-        invalidateBetsOnly();
+        // Optimistically remove the accepted bet from the open bets cache
+        // so the card disappears instantly without waiting for WS + refetch.
+        queryClient.setQueriesData(
+          { queryKey: ['/api/v1/bets'] },
+          (old: any) => {
+            if (!old?.data) return old;
+            return {
+              ...old,
+              data: old.data.filter((b: any) => String(b.id) !== betId),
+            };
+          },
+        );
+
+        // Don't call invalidateQueries — WS events (bet_accepting, bet_accepted)
+        // will handle the full cache refresh. This avoids triple-refetch flicker.
         setAcceptTarget(null);
         clearPending();
         addToast('success', t('bets.betAccepted'));
@@ -172,6 +185,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           addToast('warning', t('bets.prevActionWait'));
         } else {
           addToast('error', getUserFriendlyError(err, t, 'accept'));
+          invalidateAll();
         }
       },
     },

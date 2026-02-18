@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCancelBet, cancelBet } from '@coinflip/api-client';
-import { API_URL } from '@/lib/constants';
+import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { BetCard } from './bet-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,26 +29,19 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const [pendingBetId, setPendingBetId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | null>(null);
 
-  // Smart polling: slow (30s) when WS connected, fast (5s) when WS down
+  // Smart polling: slow (30s) when WS connected, faster (15s) when WS down
   const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
 
-  const { data: myBetsData, isLoading } = useQuery({
+  const { data: myBetsData, isLoading, error: myBetsError } = useQuery({
     queryKey: ['/api/v1/bets/mine', address],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/v1/bets/mine`, {
-        headers: {
-          'x-wallet-address': address!,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-      if (!res.ok) return { data: [] };
-      return res.json() as Promise<{ data: any[] }>;
-    },
+    queryFn: () =>
+      customFetch<{ data: any[] }>({
+        url: '/api/v1/bets/mine',
+        method: 'GET',
+      }),
     enabled: isConnected && !!address,
     refetchInterval: pollInterval,
-    staleTime: 0,
-    refetchOnMount: 'always' as const,
+    staleTime: 3_000,
   });
 
   const allBets = myBetsData?.data ?? [];
@@ -66,13 +59,28 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
   const cancelMutation = useCancelBet({
     mutation: {
-      onSuccess: () => {
-        invalidateAll();
+      onSuccess: (_response: any, variables) => {
+        // Don't invalidateAll — WS bet_canceled event handles cache invalidation.
+        // Optimistically remove the bet from MyBets cache for instant UI update.
+        const betId = String(variables.betId);
+        queryClient.setQueriesData(
+          { queryKey: ['/api/v1/bets/mine'] },
+          (old: any) => {
+            if (!old?.data) return old;
+            return {
+              ...old,
+              data: old.data.map((b: any) =>
+                String(b.id) === betId ? { ...b, status: 'canceling' } : b,
+              ),
+            };
+          },
+        );
         clearPending();
         addToast('success', t('bets.cancelingFunds'));
       },
       onError: (err: unknown) => {
         clearPending();
+        // On error, DO invalidate to restore correct state
         invalidateAll();
         const { message } = extractErrorPayload(err);
         const is429 = isActionInProgress(message);
@@ -152,16 +160,75 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     );
   }
 
-  // Categorize bets
-  const myOpenBets = myBets.filter(b => b.status === 'open' && b.maker?.toLowerCase() === addrLower);
+  if (myBetsError && !myBetsData) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('bets.failedToLoad')}</p>
+        <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/v1/bets/mine'] })}
+          className="rounded-lg bg-[var(--color-surface)] px-4 py-2 text-xs font-medium"
+        >
+          {t('common.retry')}
+        </button>
+      </div>
+    );
+  }
+
+  // Categorize bets (include 'canceling' with open bets so cards don't vanish instantly)
+  const myOpenBets = myBets.filter(b => (b.status === 'open' || b.status === 'canceling') && b.maker?.toLowerCase() === addrLower);
   const myAccepting = myBets.filter(b => b.status === 'accepting');
   const myInProgress = myBets.filter(b => b.status === 'accepted');
   const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || (b.status === 'canceled' && (b as any).acceptor));
+
+  // Track when each resolved bet was first seen client-side for smooth fade-out.
+  // Server shows resolved bets for ~60s; we fade them out starting at ~50s client-side.
+  const resolvedFirstSeenRef = useRef<Map<string, number>>(new Map());
+  const [, forceRerender] = useState(0);
+
+  useEffect(() => {
+    const now = Date.now();
+    const seen = resolvedFirstSeenRef.current;
+    // Register newly seen resolved bets
+    for (const bet of myResolved) {
+      if (!seen.has(String(bet.id))) {
+        seen.set(String(bet.id), now);
+      }
+    }
+    // Clean up bets that are no longer in the resolved list
+    for (const id of seen.keys()) {
+      if (!myResolved.some(b => String(b.id) === id)) {
+        seen.delete(id);
+      }
+    }
+    // Schedule re-render when oldest bet should start fading (at 50s mark)
+    if (myResolved.length > 0) {
+      const timer = setTimeout(() => forceRerender(n => n + 1), 5_000);
+      return () => clearTimeout(timer);
+    }
+  }, [myResolved]);
+
+  // Compute opacity for each resolved bet (full opacity for first 50s, fades over next 10s)
+  const getResolvedOpacity = useCallback((betId: string): number => {
+    const firstSeen = resolvedFirstSeenRef.current.get(betId);
+    if (!firstSeen) return 1;
+    const age = Date.now() - firstSeen;
+    if (age < 50_000) return 1;
+    if (age > 60_000) return 0;
+    return 1 - (age - 50_000) / 10_000;
+  }, []);
+
+  // Filter out fully faded resolved bets
+  const visibleResolved = useMemo(
+    () => myResolved.filter(b => getResolvedOpacity(String(b.id)) > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [myResolved, forceRerender],
+  );
+
   // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
   const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
   const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
 
-  const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0 || myResolved.length > 0;
+  const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0 || visibleResolved.length > 0;
 
   return (
     <div className="space-y-4">
@@ -312,24 +379,26 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
         </div>
       )}
 
-      {/* Recently resolved — show result for ~60s before moving to history */}
-      {myResolved.length > 0 && (
+      {/* Recently resolved — show result with smooth fade-out */}
+      {visibleResolved.length > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
-            {t('myBets.recentResults') ?? `Results (${myResolved.length})`}
+            {t('myBets.recentResults') ?? `Results (${visibleResolved.length})`}
           </h3>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            {myResolved.map((bet) => {
+            {visibleResolved.map((bet) => {
               const winner = (bet as any).winner?.toLowerCase();
               const isWinner = winner === addrLower;
               const isRevealed = bet.status === 'revealed' || bet.status === 'timeout_claimed';
               const payout = isRevealed && isWinner
                 ? formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))
                 : null;
+              const opacity = getResolvedOpacity(String(bet.id));
               return (
                 <div
                   key={bet.id}
-                  className={`rounded-2xl border p-4 transition-opacity duration-1000 ${
+                  style={{ opacity }}
+                  className={`rounded-2xl border p-4 transition-opacity duration-[2000ms] ${
                     isRevealed
                       ? isWinner
                         ? 'border-green-500/40 bg-green-500/10'

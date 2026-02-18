@@ -84,17 +84,16 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
     mutation: {
       onSuccess: (response) => {
         const vaultKey = getGetVaultBalanceQueryKey();
-        const amountMicro = BigInt(betAmountRef.current || '0');
-        const willBeEmpty = amountMicro > 0n && pendingDeduction - amountMicro === 0n;
 
         if (deductionIdRef.current) {
           removeDeduction(deductionIdRef.current);
           deductionIdRef.current = null;
         }
 
-        // Only apply server balance when this is the last pending deduction
+        // Always apply server balance from 202 response — it's computed with
+        // pending locks already accounted for, so it's always accurate.
         const serverBalance = (response as any)?.balance;
-        if (serverBalance && willBeEmpty) {
+        if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
             ...old,
             data: {

@@ -54,7 +54,7 @@ export async function getChainVaultBalance(address: string): Promise<{ available
 // reflected on-chain. The balance endpoint subtracts these from chain
 // balance so clients always see the correct available amount.
 // Each entry auto-expires after 30s as a safety net.
-const PENDING_LOCK_TTL = 30_000;
+const PENDING_LOCK_TTL = 90_000;
 
 interface PendingLock {
   id: string;

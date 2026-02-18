@@ -37,8 +37,8 @@ export function isWsConnected(): boolean {
 
 /** Polling interval when WS is connected (slow fallback) */
 export const POLL_INTERVAL_WS_CONNECTED = 30_000;
-/** Polling interval when WS is disconnected (fast fallback) */
-export const POLL_INTERVAL_WS_DISCONNECTED = 5_000;
+/** Polling interval when WS is disconnected (fallback — keep moderate to avoid 429) */
+export const POLL_INTERVAL_WS_DISCONNECTED = 15_000;
 
 /**
  * WebSocket hook for real-time CoinFlip updates.
@@ -98,7 +98,7 @@ export function useWebSocket({
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(flushInvalidations, 150);
+    debounceTimer.current = setTimeout(flushInvalidations, 800);
   }, [flushInvalidations]);
 
   // Build current WS URL from ref
@@ -135,6 +135,7 @@ export function useWebSocket({
         if (wasDisconnected && reconnectCountRef.current > 0) {
           scheduleInvalidation(
             '/api/v1/bets',
+            '/api/v1/bets/mine',
             '/api/v1/bets/history',
             '/api/v1/vault/balance',
             'wallet-cw20-balance',
@@ -172,6 +173,12 @@ export function useWebSocket({
           switch (parsed.type) {
             case 'bet_created':
             case 'bet_confirmed':
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
+              break;
+            case 'bet_canceling':
+              // Transitional state — update bets lists so card shows "canceling" state
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
+              break;
             case 'bet_canceled':
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
