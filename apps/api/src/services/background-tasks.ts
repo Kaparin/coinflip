@@ -337,7 +337,121 @@ export function confirmCancelBetInBackground(task: CancelBetTask): void {
   })();
 }
 
-// ─── Background Accept Bet Confirmation ─────────────────────────
+// ─── Background Accept+Reveal Confirmation (new single-tx flow) ─
+
+export interface AcceptAndRevealTask {
+  betId: bigint;
+  txHash: string;
+  acceptorUserId: string;
+  acceptorGuess: string;
+  address: string;
+  amount: string;
+  pendingLockId?: string;
+}
+
+/**
+ * Confirm accept_and_reveal tx on chain.
+ * Much simpler than the old accept+reveal flow:
+ * - Single tx: Open → Revealed (no intermediate "accepted" state)
+ * - No separate reveal step, no pipeline, no timeout claims needed
+ */
+export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): void {
+  (async () => {
+    const { betId, txHash, acceptorUserId, acceptorGuess, address, amount, pendingLockId } = task;
+    const tag = 'bg:accept_and_reveal';
+
+    try {
+      const txResult = await pollForTx(txHash);
+
+      if (!txResult) {
+        // Timeout — tx might still be in mempool
+        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout`);
+
+        setTimeout(async () => {
+          try {
+            const bet = await betService.getBetById(betId);
+            if (bet && bet.status === 'accepting') {
+              // Try syncing from chain — tx might have succeeded
+              const synced = await syncBetFromChain(betId);
+              if (synced) {
+                logger.info({ betId: betId.toString() }, `${tag} — synced from chain after timeout`);
+                if (pendingLockId) removePendingLock(address, pendingLockId);
+                invalidateBalanceCache(address);
+                return;
+              }
+              // Not resolved — revert
+              if (pendingLockId) removePendingLock(address, pendingLockId);
+              await betService.revertAccepting(betId).catch(() => null);
+              await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
+                logger.warn({ err }, `${tag} — unlockFunds failed`));
+              invalidateBalanceCache(address);
+              wsService.emitAcceptFailed(address, {
+                betId: betId.toString(),
+                txHash,
+                reason: 'Accept confirmation timed out. Please try again.',
+              });
+            }
+          } catch (err) {
+            logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
+          }
+        }, 30_000);
+
+        return;
+      }
+
+      if (txResult.code !== 0) {
+        // Transaction failed on chain — revert to "open"
+        logger.error({ txHash, betId: betId.toString(), code: txResult.code, rawLog: txResult.rawLog }, `${tag} — tx failed`);
+        if (pendingLockId) removePendingLock(address, pendingLockId);
+        await betService.revertAccepting(betId).catch(() => null);
+        await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
+          logger.warn({ err }, `${tag} — unlockFunds failed`));
+        invalidateBalanceCache(address);
+        wsService.emitAcceptFailed(address, {
+          betId: betId.toString(),
+          txHash,
+          reason: txResult.rawLog || 'Transaction failed on chain',
+        });
+        return;
+      }
+
+      // Success — tx confirmed. The bet is now Revealed on chain (accept + reveal atomic).
+      if (pendingLockId) removePendingLock(address, pendingLockId);
+      invalidateBalanceCache(address);
+
+      // Sync from chain: picks up winner, payout, commission and updates DB.
+      // resolveBet() handles accepting → revealed transition.
+      const synced = await syncBetFromChain(betId);
+      if (synced) {
+        logger.info({ betId: betId.toString(), txHash }, `${tag} — confirmed & resolved`);
+      } else {
+        // Chain state might take a moment — retry once
+        logger.warn({ betId: betId.toString() }, `${tag} — not synced immediately, retrying`);
+        await new Promise(r => setTimeout(r, 3_000));
+        const synced2 = await syncBetFromChain(betId);
+        if (synced2) {
+          logger.info({ betId: betId.toString() }, `${tag} — synced on retry`);
+        } else {
+          logger.error({ betId: betId.toString() }, `${tag} — failed to sync after confirmed tx`);
+        }
+      }
+    } catch (err) {
+      logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error`);
+      if (pendingLockId) removePendingLock(address, pendingLockId);
+      await betService.revertAccepting(betId).catch(() => null);
+      await vaultService.unlockFunds(acceptorUserId, amount).catch(unlockErr =>
+        logger.warn({ err: unlockErr }, `${tag} — unlockFunds failed`));
+      invalidateBalanceCache(address);
+      wsService.emitAcceptFailed(address, {
+        betId: betId.toString(),
+        txHash,
+        reason: 'An unexpected error occurred. Please try again.',
+      });
+    }
+  })();
+}
+
+// ─── Background Accept Bet Confirmation (legacy — kept for existing "accepting" bets)
 
 export interface AcceptBetTask {
   betId: bigint;
@@ -721,9 +835,17 @@ async function _autoRevealBetInner(betId: bigint, skipChainCheck: boolean): Prom
 
   // Step 0: Check chain state first — maybe already resolved.
   // Skip when called right after accept confirmation (we know it just got accepted).
+  // NOTE: Don't use syncBetFromChain here — it returns true for "accepted" chain state,
+  // which would skip the reveal. Only skip if actually resolved on chain.
   if (!skipChainCheck) {
-    const alreadySynced = await syncBetFromChain(betId);
-    if (alreadySynced) return true;
+    const chainState = await getChainBetState(Number(betId));
+    if (chainState) {
+      const cs = chainState.status.toLowerCase();
+      if (cs === 'revealed' || cs === 'timeout_claimed' || cs === 'timeoutclaimed' || cs === 'canceled') {
+        await syncBetFromChain(betId);
+        return true;
+      }
+    }
   }
 
   if (!bet.makerSecret || !bet.makerSide) {
@@ -841,9 +963,16 @@ export async function autoClaimTimeoutBets(): Promise<void> {
 
       processingBets.add(betKey);
       try {
-        // Step 0: Check chain state first
-        const alreadySynced = await syncBetFromChain(bet.betId);
-        if (alreadySynced) continue;
+        // Step 0: Check chain state — only skip if already resolved (not just "accepted").
+        // syncBetFromChain returns true for "accepted" which caused timeout claims to never fire.
+        const chainState = await getChainBetState(Number(bet.betId));
+        if (chainState) {
+          const cs = chainState.status.toLowerCase();
+          if (cs === 'revealed' || cs === 'timeout_claimed' || cs === 'timeoutclaimed' || cs === 'canceled') {
+            await syncBetFromChain(bet.betId);
+            continue;
+          }
+        }
 
         if (!relayerService.isReady()) {
           logger.warn({}, `${tag} — relayer not ready, stopping`);
@@ -869,8 +998,10 @@ export async function autoClaimTimeoutBets(): Promise<void> {
         );
 
         if (!relayResult.success) {
-          const synced = await syncBetFromChain(bet.betId);
-          if (synced) continue;
+          // Check if already resolved on chain (e.g. claimed by someone else)
+          if (chainState) {
+            await syncBetFromChain(bet.betId);
+          }
           logger.error({ betId: betKey, error: relayResult.rawLog }, `${tag} — relay failed`);
           continue;
         }

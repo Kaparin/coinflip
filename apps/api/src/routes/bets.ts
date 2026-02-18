@@ -20,7 +20,7 @@ import { formatBetResponse } from '../lib/format.js';
 import { AppError, Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
-import { resolveCreateBetInBackground, confirmAcceptBetInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
+import { resolveCreateBetInBackground, confirmAcceptAndRevealInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
 import { chainCached } from '../lib/chain-cache.js';
@@ -543,6 +543,12 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   }
   if (existing.makerUserId === user.id) throw Errors.selfAccept();
 
+  // Reject if bet is missing maker secret — auto-reveal would be impossible,
+  // making the outcome predetermined (acceptor always wins via timeout).
+  if (!existing.makerSecret) {
+    throw new AppError('BET_NO_SECRET', 'This bet cannot be accepted right now. Please try another bet.', 422);
+  }
+
   // Reject if bet expires within 30 seconds (prevents accepting about-to-expire bets)
   const OPEN_BET_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
   const EXPIRY_BUFFER_MS = 30_000; // 30 seconds
@@ -602,10 +608,14 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     }
 
     try {
-      relayResult = await relayerService.relayAcceptBet(
+      // Use accept_and_reveal: single atomic tx — accept + verify + resolve in one step.
+      // No separate reveal tx needed, no "accepted" intermediate state.
+      relayResult = await relayerService.relayAcceptAndReveal(
         address,
         Number(betId),
         guess as 'heads' | 'tails',
+        existing.makerSide as 'heads' | 'tails',
+        existing.makerSecret,
         /* asyncMode */ true,
       );
     } catch (err) {
@@ -642,21 +652,9 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     wsService.emitBetAccepting(formatBetResponse(acceptingBet, addressMap) as unknown as Record<string, unknown>);
   }
 
-  // Pre-load reveal info for pipelining (saves one full block cycle ~5-6s)
-  let revealInfo: { makerAddress: string; makerSide: 'heads' | 'tails'; makerSecret: string } | undefined;
-  if (existing.makerSide && existing.makerSecret) {
-    const makerAddr = await betService.getUserAddress(existing.makerUserId).catch(() => null);
-    if (makerAddr) {
-      revealInfo = {
-        makerAddress: makerAddr,
-        makerSide: existing.makerSide as 'heads' | 'tails',
-        makerSecret: existing.makerSecret,
-      };
-    }
-  }
-
-  // Fire-and-forget: confirm tx in background, update DB, notify via WS
-  confirmAcceptBetInBackground({
+  // Fire-and-forget: confirm tx in background, update DB, notify via WS.
+  // Uses the simpler accept_and_reveal flow — no separate reveal step needed.
+  confirmAcceptAndRevealInBackground({
     betId,
     txHash: relayResult.txHash!,
     acceptorUserId: user.id,
@@ -664,7 +662,6 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     address,
     amount: existing.amount,
     pendingLockId: acceptLockId,
-    revealInfo,
   });
 
   logger.info({ txHash: relayResult.txHash, address, betId: betId.toString() }, 'Accept bet submitted — confirming in background');

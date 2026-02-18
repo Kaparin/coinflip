@@ -59,6 +59,7 @@ export type ContractAction =
   | { withdraw: { amount: string } }
   | { create_bet: { amount: string; commitment: string } }
   | { accept_bet: { bet_id: number; guess: 'heads' | 'tails' } }
+  | { accept_and_reveal: { bet_id: number; guess: 'heads' | 'tails'; side: 'heads' | 'tails'; secret: string } }
   | { reveal: { bet_id: number; side: 'heads' | 'tails'; secret: string } }
   | { cancel_bet: { bet_id: number } }
   | { claim_timeout: { bet_id: number } };
@@ -513,6 +514,23 @@ export class RelayerService {
     asyncMode = false,
   ): Promise<RelayResult> {
     return this.submitExec(userAddress, { accept_bet: { bet_id: betId, guess } }, '', asyncMode);
+  }
+
+  async relayAcceptAndReveal(
+    acceptorAddress: string,
+    betId: number,
+    guess: 'heads' | 'tails',
+    makerSide: 'heads' | 'tails',
+    makerSecretHex: string,
+    asyncMode = false,
+  ): Promise<RelayResult> {
+    const secretBase64 = toBase64(fromHex(makerSecretHex));
+    return this.submitExec(
+      acceptorAddress,
+      { accept_and_reveal: { bet_id: betId, guess, side: makerSide, secret: secretBase64 } },
+      '',
+      asyncMode,
+    );
   }
 
   async relayReveal(

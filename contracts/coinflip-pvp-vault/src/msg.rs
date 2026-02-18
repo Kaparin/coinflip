@@ -39,7 +39,15 @@ pub enum ExecuteMsg {
         guess: Side,
     },
 
-    /// Reveal commitment — resolves the bet
+    /// Accept + reveal in one atomic tx — instant result, no intermediate state
+    AcceptAndReveal {
+        bet_id: u64,
+        guess: Side,
+        side: Side,
+        secret: Binary,
+    },
+
+    /// Reveal commitment — resolves the bet (legacy, kept for compatibility)
     Reveal {
         bet_id: u64,
         side: Side,

@@ -64,6 +64,11 @@ pub fn execute(
         ExecuteMsg::AcceptBet { bet_id, guess } => {
             crate::execute::accept_bet::execute_accept_bet(deps, env, info, bet_id, guess)
         }
+        ExecuteMsg::AcceptAndReveal { bet_id, guess, side, secret } => {
+            crate::execute::accept_and_reveal::execute_accept_and_reveal(
+                deps, env, info, bet_id, guess, side, secret,
+            )
+        }
         ExecuteMsg::Reveal { bet_id, side, secret } => {
             crate::execute::reveal::execute_reveal(deps, env, info, bet_id, side, secret)
         }

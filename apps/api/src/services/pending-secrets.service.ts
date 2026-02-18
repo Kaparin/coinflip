@@ -93,12 +93,30 @@ class PendingSecretsService {
     }
   }
 
-  /** Garbage-collect rows older than the given age (default: 1 hour). */
-  async cleanup(maxAgeMs = 60 * 60 * 1000): Promise<number> {
+  /**
+   * Smart garbage-collect: only delete pending secrets that are no longer needed.
+   *
+   * Rules:
+   * - KEEP if a bet with this commitment exists WITHOUT a secret (still needed for recovery)
+   * - DELETE if older than maxAgeMs AND no bet needs it
+   *   (either the bet has the secret already, or no matching bet exists at all)
+   */
+  async cleanup(maxAgeMs = 24 * 60 * 60 * 1000): Promise<number> {
     try {
       const cutoff = new Date(Date.now() - maxAgeMs);
+      const { sql: sqlTag } = await import('drizzle-orm');
+      const { bets } = await import('@coinflip/db/schema');
+
+      // Only delete old secrets where no bet needs them
       const result = await this.db.delete(pendingBetSecrets)
-        .where(lt(pendingBetSecrets.createdAt, cutoff));
+        .where(
+          sqlTag`${pendingBetSecrets.createdAt} < ${cutoff}
+            AND NOT EXISTS (
+              SELECT 1 FROM ${bets}
+              WHERE ${bets.commitment} = ${pendingBetSecrets.commitment}
+                AND ${bets.makerSecret} IS NULL
+            )`,
+        );
       const count = (result as { rowCount?: number }).rowCount ?? 0;
       if (count > 0) {
         logger.info({ count, maxAgeMs }, 'pending-secrets: cleaned up stale rows');
