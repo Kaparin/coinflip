@@ -87,7 +87,7 @@ export async function ipRateLimit(c: Context, next: Next) {
 
 // ─── Wallet Rate Limit (transaction endpoints only) ──────────────
 
-const WALLET_MAX_TX = 10;
+const WALLET_MAX_TX = 30;
 const WALLET_WINDOW_MS = 60_000; // 1 minute
 
 export async function walletTxRateLimit(c: Context, next: Next) {

@@ -24,7 +24,7 @@ import { resolveCreateBetInBackground, confirmAcceptAndRevealInBackground, confi
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
 import { chainCached } from '../lib/chain-cache.js';
-import { pendingSecretsService } from '../services/pending-secrets.service.js';
+import { pendingSecretsService, normalizeCommitmentToHex } from '../services/pending-secrets.service.js';
 
 /**
  * Cryptographically secure coin flip.
@@ -549,7 +549,9 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   let makerSide = existing.makerSide;
 
   if (!makerSecret && existing.commitment) {
-    const pending = await pendingSecretsService.getByCommitment(existing.commitment);
+    // Normalize: bets table may have BASE64 (from old orphan imports), pending_bet_secrets has HEX
+    const hexCommitment = normalizeCommitmentToHex(existing.commitment);
+    const pending = await pendingSecretsService.getByCommitment(hexCommitment);
     if (pending) {
       makerSecret = pending.makerSecret;
       makerSide = pending.makerSide;
@@ -579,82 +581,79 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     throw Errors.relayerNotReady();
   }
 
-  // Acquire inflight guard FIRST to serialize per-user requests
-  acquireInflight(address);
+  // No inflight guard needed: markAccepting (WHERE status='open') is atomic and prevents
+  // double-accept, lockFunds (WHERE available >= amount) is atomic and prevents double-spend.
+  // Removing the 2s per-address cooldown allows rapid accepting of different bets.
 
   let relayResult: RelayResult;
   let acceptingBet: Awaited<ReturnType<typeof betService.markAccepting>> | null = null;
   let acceptLockId: string | undefined;
   // Hoist balance so it's accessible for the response after the try/finally block
   let acceptBalance: { available: string; locked: string; total: string };
-  try {
-    // Check balance AFTER inflight guard
-    acceptBalance = await vaultService.getBalance(user.id);
-    if (BigInt(acceptBalance.available) < BigInt(existing.amount)) {
-      throw Errors.insufficientBalance(existing.amount, acceptBalance.available);
-    }
 
-    // Atomically lock acceptor funds BEFORE relay (guards against double-spend)
-    const locked = await vaultService.lockFunds(user.id, existing.amount);
-    if (!locked) {
-      throw Errors.insufficientBalance(existing.amount, '0');
-    }
+  acceptBalance = await vaultService.getBalance(user.id);
+  if (BigInt(acceptBalance.available) < BigInt(existing.amount)) {
+    throw Errors.insufficientBalance(existing.amount, acceptBalance.available);
+  }
 
-    // Track pending lock server-side so balance API returns correct available
-    acceptLockId = addPendingLock(address, existing.amount);
+  // Atomically lock acceptor funds BEFORE relay (guards against double-spend)
+  const locked = await vaultService.lockFunds(user.id, existing.amount);
+  if (!locked) {
+    throw Errors.insufficientBalance(existing.amount, '0');
+  }
+
+  // Track pending lock server-side so balance API returns correct available
+  acceptLockId = addPendingLock(address, existing.amount);
+  invalidateBalanceCache(address);
+
+  // Atomically mark bet as "accepting" — uses WHERE status='open' to prevent double-accept.
+  acceptingBet = await betService.markAccepting({
+    betId,
+    acceptorUserId: user.id,
+    acceptorGuess: guess,
+  });
+
+  if (!acceptingBet) {
+    // Race condition: someone else accepted first. Unlock our funds.
+    removePendingLock(address, acceptLockId);
+    await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
+      logger.warn({ err: e }, 'Failed to unlock funds after race'));
     invalidateBalanceCache(address);
+    throw new AppError('BET_ALREADY_CLAIMED', 'This bet is already being accepted by another player', 409);
+  }
 
-    // Atomically mark bet as "accepting" — uses WHERE status='open' to prevent double-accept.
-    acceptingBet = await betService.markAccepting({
-      betId,
-      acceptorUserId: user.id,
-      acceptorGuess: guess,
-    });
+  try {
+    // Use accept_and_reveal: single atomic tx — accept + verify + resolve in one step.
+    // No separate reveal tx needed, no "accepted" intermediate state.
+    relayResult = await relayerService.relayAcceptAndReveal(
+      address,
+      Number(betId),
+      guess as 'heads' | 'tails',
+      makerSide as 'heads' | 'tails',
+      makerSecret,
+      /* asyncMode */ true,
+    );
+  } catch (err) {
+    // Relay failed — unlock and revert
+    removePendingLock(address, acceptLockId);
+    await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
+      logger.warn({ err: e }, 'Failed to unlock funds after relay error'));
+    await betService.revertAccepting(betId).catch(e =>
+      logger.warn({ err: e }, 'Failed to revert accepting after relay error'));
+    invalidateBalanceCache(address);
+    throw err;
+  }
 
-    if (!acceptingBet) {
-      // Race condition: someone else accepted first. Unlock our funds.
-      removePendingLock(address, acceptLockId);
-      await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
-        logger.warn({ err: e }, 'Failed to unlock funds after race'));
-      invalidateBalanceCache(address);
-      throw new AppError('BET_ALREADY_CLAIMED', 'This bet is already being accepted by another player', 409);
-    }
-
-    try {
-      // Use accept_and_reveal: single atomic tx — accept + verify + resolve in one step.
-      // No separate reveal tx needed, no "accepted" intermediate state.
-      relayResult = await relayerService.relayAcceptAndReveal(
-        address,
-        Number(betId),
-        guess as 'heads' | 'tails',
-        makerSide as 'heads' | 'tails',
-        makerSecret,
-        /* asyncMode */ true,
-      );
-    } catch (err) {
-      // Relay failed — unlock and revert
-      removePendingLock(address, acceptLockId);
-      await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
-        logger.warn({ err: e }, 'Failed to unlock funds after relay error'));
-      await betService.revertAccepting(betId).catch(e =>
-        logger.warn({ err: e }, 'Failed to revert accepting after relay error'));
-      invalidateBalanceCache(address);
-      throw err;
-    }
-
-    if (!relayResult.success) {
-      // Chain rejected — unlock and revert
-      removePendingLock(address, acceptLockId);
-      await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
-        logger.warn({ err: e }, 'Failed to unlock funds after relay failure'));
-      await betService.revertAccepting(betId).catch(e =>
-        logger.warn({ err: e }, 'Failed to revert accepting after relay failure'));
-      invalidateBalanceCache(address);
-      logger.error({ relayResult, address, betId: betId.toString() }, 'Accept bet relay failed (CheckTx)');
-      throwRelayError(relayResult);
-    }
-  } finally {
-    releaseInflight(address);
+  if (!relayResult.success) {
+    // Chain rejected — unlock and revert
+    removePendingLock(address, acceptLockId);
+    await vaultService.unlockFunds(user.id, existing.amount).catch(e =>
+      logger.warn({ err: e }, 'Failed to unlock funds after relay failure'));
+    await betService.revertAccepting(betId).catch(e =>
+      logger.warn({ err: e }, 'Failed to revert accepting after relay failure'));
+    invalidateBalanceCache(address);
+    logger.error({ relayResult, address, betId: betId.toString() }, 'Accept bet relay failed (CheckTx)');
+    throwRelayError(relayResult);
   }
 
   // Build address map once — reuse for WS emit and HTTP response
@@ -806,12 +805,11 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
     throw Errors.relayerNotReady();
   }
 
-  acquireInflight(address);
+  // No inflight guard needed: markCanceling (WHERE status='open') is atomic.
   let relayResult: RelayResult;
   try {
     relayResult = await relayerService.relayCancelBet(address, Number(betId), /* asyncMode */ true);
   } catch (err) {
-    releaseInflight(address);
     await betService.updateBetStatus(betId, 'open');
     const revBet = await betService.getBetById(betId);
     if (revBet) {
@@ -820,7 +818,6 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
     }
     throw err;
   }
-  releaseInflight(address);
 
   if (!relayResult.success) {
     const alreadyCanceled = relayResult.rawLog?.includes('cannot cancel bet in Canceled state')

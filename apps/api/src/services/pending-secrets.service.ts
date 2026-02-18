@@ -15,6 +15,23 @@ import { pendingBetSecrets } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
+/**
+ * Normalize a commitment to lowercase HEX.
+ * pending_bet_secrets always stores HEX (from computeCommitment),
+ * but the chain returns BASE64. This ensures lookups always match.
+ */
+export function normalizeCommitmentToHex(commitment: string): string {
+  // Already a valid 64-char hex string (SHA256 hash)?
+  if (/^[0-9a-fA-F]{64}$/.test(commitment)) return commitment.toLowerCase();
+  // Assume base64 → decode to hex
+  try {
+    const hex = Buffer.from(commitment, 'base64').toString('hex');
+    if (hex.length === 64) return hex.toLowerCase();
+  } catch { /* not valid base64 */ }
+  // Fallback: return as-is (lowercased)
+  return commitment.toLowerCase();
+}
+
 class PendingSecretsService {
   private db = getDb();
 
@@ -61,20 +78,21 @@ class PendingSecretsService {
     }
   }
 
-  /** Retrieve secrets by commitment hash. */
+  /** Retrieve secrets by commitment hash. Normalizes to HEX before lookup. */
   async getByCommitment(commitment: string): Promise<{
     makerSide: string;
     makerSecret: string;
     txHash: string | null;
   } | null> {
     try {
+      const hexCommitment = normalizeCommitmentToHex(commitment);
       const [row] = await this.db.select({
         makerSide: pendingBetSecrets.makerSide,
         makerSecret: pendingBetSecrets.makerSecret,
         txHash: pendingBetSecrets.txHash,
       })
         .from(pendingBetSecrets)
-        .where(eq(pendingBetSecrets.commitment, commitment))
+        .where(eq(pendingBetSecrets.commitment, hexCommitment))
         .limit(1);
       return row ?? null;
     } catch (err) {

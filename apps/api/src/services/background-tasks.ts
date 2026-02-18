@@ -17,7 +17,7 @@ import { decrementPendingBetCount } from '../lib/pending-counts.js';
 import { removePendingLock, invalidateBalanceCache } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
-import { pendingSecretsService } from './pending-secrets.service.js';
+import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -1184,14 +1184,18 @@ async function reconcileOrphanedChainBets(): Promise<void> {
           continue;
         }
 
+        // Chain returns commitment in BASE64, but pending_bet_secrets stores HEX.
+        // Normalize to HEX for consistent storage and lookups.
+        const commitmentHex = normalizeCommitmentToHex(chainBet.commitment);
+
         // Recover secrets from pending_bet_secrets table (saved before broadcast)
-        const pendingSecret = await pendingSecretsService.getByCommitment(chainBet.commitment);
+        const pendingSecret = await pendingSecretsService.getByCommitment(commitmentHex);
 
         await betService.createBet({
           betId,
           makerUserId: userId,
           amount: chainBet.amount,
-          commitment: chainBet.commitment,
+          commitment: commitmentHex,
           txhashCreate: pendingSecret?.txHash ?? `chain_reconcile_${betKey}`,
           makerSide: pendingSecret?.makerSide as 'heads' | 'tails' | undefined,
           makerSecret: pendingSecret?.makerSecret,
@@ -1199,7 +1203,7 @@ async function reconcileOrphanedChainBets(): Promise<void> {
 
         // Secret is now in `bets` — clean up pending table
         if (pendingSecret) {
-          await pendingSecretsService.delete(chainBet.commitment).catch(() => {});
+          await pendingSecretsService.delete(commitmentHex).catch(() => {});
         }
 
         invalidateBalanceCache(chainBet.maker);
