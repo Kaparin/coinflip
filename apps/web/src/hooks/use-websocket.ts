@@ -175,16 +175,91 @@ export function useWebSocket({
             case 'bet_confirmed':
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
-            case 'bet_canceling':
-              // Transitional state — update bets lists so card shows "canceling" state
+            case 'bet_canceling': {
+              // Instantly remove from open bets for all clients
+              const cancelingBetId = String((parsed.data as any)?.id);
+              if (cancelingBetId) {
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return { ...old, data: old.data.filter((b: any) => String(b.id) !== cancelingBetId) };
+                  },
+                );
+                // Update my-bets to show 'canceling' status
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets/mine'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return {
+                      ...old,
+                      data: old.data.map((b: any) =>
+                        String(b.id) === cancelingBetId ? { ...b, status: 'canceling' } : b,
+                      ),
+                    };
+                  },
+                );
+              }
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
               break;
-            case 'bet_canceled':
+            }
+            case 'bet_canceled': {
+              // Instantly remove from open bets and my-bets caches
+              const canceledBetId = String((parsed.data as any)?.id);
+              if (canceledBetId) {
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return { ...old, data: old.data.filter((b: any) => String(b.id) !== canceledBetId) };
+                  },
+                );
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets/mine'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return {
+                      ...old,
+                      data: old.data.map((b: any) =>
+                        String(b.id) === canceledBetId ? { ...b, status: 'canceled' } : b,
+                      ),
+                    };
+                  },
+                );
+              }
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
-            case 'bet_accepting':
+            }
+            case 'bet_accepting': {
+              // Instantly remove the bet from open bets cache for ALL clients
+              // so the card disappears immediately — don't wait for debounced refetch.
+              const acceptingBetId = String((parsed.data as any)?.id);
+              if (acceptingBetId) {
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return { ...old, data: old.data.filter((b: any) => String(b.id) !== acceptingBetId) };
+                  },
+                );
+                // Also update my-bets cache to show 'accepting' status instantly
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets/mine'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return {
+                      ...old,
+                      data: old.data.map((b: any) =>
+                        String(b.id) === acceptingBetId ? { ...b, status: 'accepting' } : b,
+                      ),
+                    };
+                  },
+                );
+              }
+              // Still schedule background refetch to sync any missed data
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
               break;
+            }
             case 'bet_reverted':
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
