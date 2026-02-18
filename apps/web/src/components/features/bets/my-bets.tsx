@@ -312,33 +312,36 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
         </div>
       )}
 
-      {/* Recently resolved — show results for 5 minutes before moving to history */}
+      {/* Recently resolved — show result for ~60s before moving to history */}
       {myResolved.length > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
-            {t('myBets.recentResults') ?? `Recent Results (${myResolved.length})`}
+            {t('myBets.recentResults') ?? `Results (${myResolved.length})`}
           </h3>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             {myResolved.map((bet) => {
               const winner = (bet as any).winner?.toLowerCase();
               const isWinner = winner === addrLower;
               const isRevealed = bet.status === 'revealed' || bet.status === 'timeout_claimed';
+              const payout = isRevealed && isWinner
+                ? formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))
+                : null;
               return (
                 <div
                   key={bet.id}
-                  className={`rounded-2xl border p-4 ${
+                  className={`rounded-2xl border p-4 transition-opacity duration-1000 ${
                     isRevealed
                       ? isWinner
-                        ? 'border-green-500/30 bg-green-500/5'
-                        : 'border-red-500/30 bg-red-500/5'
+                        ? 'border-green-500/40 bg-green-500/10'
+                        : 'border-red-500/40 bg-red-500/10'
                       : 'border-[var(--color-border)] bg-[var(--color-surface)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
                       {formatLaunch(bet.amount)} <LaunchTokenIcon size={50} />
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
                       isRevealed
                         ? isWinner
                           ? 'bg-green-500/20 text-green-400'
@@ -346,15 +349,13 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                         : 'bg-gray-500/20 text-gray-400'
                     }`}>
                       {isRevealed
-                        ? isWinner ? (t('game.youWon') ?? 'You Won!') : (t('game.youLost') ?? 'You Lost')
+                        ? isWinner ? (t('game.youWon') ?? 'WIN') : (t('game.youLost') ?? 'LOSS')
                         : (t('common.canceled') ?? 'Canceled')}
                     </span>
                   </div>
                   {isRevealed && (
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      {isWinner
-                        ? `+${formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))} LAUNCH`
-                        : `-${formatLaunch(bet.amount)} LAUNCH`}
+                    <p className={`text-sm font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+                      {isWinner ? `+${payout} LAUNCH` : `-${formatLaunch(bet.amount)} LAUNCH`}
                     </p>
                   )}
                 </div>

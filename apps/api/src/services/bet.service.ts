@@ -267,7 +267,7 @@ export class BetService {
           sql`(${bets.makerUserId} = ${userId} OR ${bets.acceptorUserId} = ${userId})`,
           sql`(
             ${bets.status} IN ('open', 'accepting', 'accepted', 'canceling')
-            OR (${bets.status} IN ('revealed', 'timeout_claimed', 'canceled') AND ${bets.resolvedTime} > NOW() - INTERVAL '5 minutes')
+            OR (${bets.status} IN ('revealed', 'timeout_claimed', 'canceled') AND ${bets.resolvedTime} > NOW() - INTERVAL '60 seconds')
           )`,
         ),
       )
