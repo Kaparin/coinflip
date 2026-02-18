@@ -156,11 +156,12 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const myOpenBets = myBets.filter(b => b.status === 'open' && b.maker?.toLowerCase() === addrLower);
   const myAccepting = myBets.filter(b => b.status === 'accepting');
   const myInProgress = myBets.filter(b => b.status === 'accepted');
+  const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || (b.status === 'canceled' && (b as any).acceptor));
   // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
   const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
   const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
 
-  const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0;
+  const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0 || myResolved.length > 0;
 
   return (
     <div className="space-y-4">
@@ -307,6 +308,58 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 onCancel={cancelAllState ? undefined : handleCancel}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recently resolved — show results for 5 minutes before moving to history */}
+      {myResolved.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
+            {t('myBets.recentResults') ?? `Recent Results (${myResolved.length})`}
+          </h3>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            {myResolved.map((bet) => {
+              const winner = (bet as any).winner?.toLowerCase();
+              const isWinner = winner === addrLower;
+              const isRevealed = bet.status === 'revealed' || bet.status === 'timeout_claimed';
+              return (
+                <div
+                  key={bet.id}
+                  className={`rounded-2xl border p-4 ${
+                    isRevealed
+                      ? isWinner
+                        ? 'border-green-500/30 bg-green-500/5'
+                        : 'border-red-500/30 bg-red-500/5'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
+                      {formatLaunch(bet.amount)} <LaunchTokenIcon size={50} />
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      isRevealed
+                        ? isWinner
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                        : 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {isRevealed
+                        ? isWinner ? (t('game.youWon') ?? 'You Won!') : (t('game.youLost') ?? 'You Lost')
+                        : (t('common.canceled') ?? 'Canceled')}
+                    </span>
+                  </div>
+                  {isRevealed && (
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      {isWinner
+                        ? `+${formatLaunch(String(BigInt(bet.amount) * 2n * 9n / 10n))} LAUNCH`
+                        : `-${formatLaunch(bet.amount)} LAUNCH`}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

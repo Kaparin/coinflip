@@ -265,7 +265,10 @@ export class BetService {
       .where(
         and(
           sql`(${bets.makerUserId} = ${userId} OR ${bets.acceptorUserId} = ${userId})`,
-          inArray(bets.status, ['open', 'accepting', 'accepted', 'canceling']),
+          sql`(
+            ${bets.status} IN ('open', 'accepting', 'accepted', 'canceling')
+            OR (${bets.status} IN ('revealed', 'timeout_claimed', 'canceled') AND ${bets.resolvedTime} > NOW() - INTERVAL '5 minutes')
+          )`,
         ),
       )
       .orderBy(desc(bets.createdTime))

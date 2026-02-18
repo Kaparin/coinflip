@@ -172,26 +172,27 @@ export function useWebSocket({
           const parsed = JSON.parse(event.data as string) as WsEvent;
           setLastEvent(parsed);
 
-          // Debounced targeted invalidation based on event type
+          // Debounced targeted invalidation based on event type.
+          // IMPORTANT: '/api/v1/bets/mine' has a DIFFERENT query key than '/api/v1/bets'
+          // so it must be invalidated separately (React Query uses array prefix matching).
           switch (parsed.type) {
             case 'bet_created':
             case 'bet_confirmed':
             case 'bet_canceled':
-              scheduleInvalidation('/api/v1/bets', '/api/v1/vault/balance');
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
             case 'bet_accepting':
-              // Someone claimed a bet — remove from Open Bets for ALL users
-              scheduleInvalidation('/api/v1/bets');
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
               break;
             case 'bet_reverted':
-              // Accept failed — bet is back in Open Bets
-              scheduleInvalidation('/api/v1/bets', '/api/v1/vault/balance');
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
             case 'bet_accepted':
             case 'bet_revealed':
             case 'bet_timeout_claimed':
               scheduleInvalidation(
                 '/api/v1/bets',
+                '/api/v1/bets/mine',
                 '/api/v1/bets/history',
                 '/api/v1/vault/balance',
                 'wallet-cw20-balance',
@@ -199,7 +200,7 @@ export function useWebSocket({
               break;
             case 'bet_create_failed':
             case 'accept_failed':
-              scheduleInvalidation('/api/v1/bets', '/api/v1/vault/balance');
+              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
             case 'balance_updated':
               scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
