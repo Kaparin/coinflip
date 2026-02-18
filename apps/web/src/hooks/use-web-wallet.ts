@@ -205,9 +205,9 @@ export function useWebWallet(): WebWalletState {
           const [account] = await wallet.getAccounts();
           if (account?.address === sessionAddr) {
             walletRef.current = wallet;
+            // Re-register session with mnemonic (ensures fresh cookie via challenge-response)
+            await registerSession(sessionAddr, wallet.mnemonic);
             setAddress(sessionAddr);
-            // Re-register session with backend (refresh may have lost cookies)
-            registerSession(sessionAddr);
           } else {
             // Address mismatch — clear stale session
             clearSessionWallet();
@@ -255,13 +255,13 @@ export function useWebWallet(): WebWalletState {
       // Save serialized wallet to sessionStorage for refresh persistence
       await saveSessionWallet(wallet);
 
-      // Update state
+      // Register session BEFORE updating address state (same reason as unlockWithPin)
+      await registerSession(addr, mnemonic.trim().toLowerCase());
+
+      // Update state — session cookie is already set, so queries will use correct wallet
       setAddress(addr);
       refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
       sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
-
-      // Register with backend (pass mnemonic for secure challenge-response auth)
-      await registerSession(addr, mnemonic.trim().toLowerCase());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to connect wallet';
       setError(msg);
@@ -310,11 +310,14 @@ export function useWebWallet(): WebWalletState {
       // Save serialized wallet to sessionStorage for refresh persistence
       await saveSessionWallet(wallet);
 
+      // Register session BEFORE updating address state.
+      // This ensures the session cookie is set for the new wallet
+      // before React re-renders trigger queries (useGrantStatus, etc.)
+      // that depend on the cookie for authentication.
+      await registerSession(addr, mnemonic);
+
       setAddress(addr);
       sessionStorage.setItem(STORAGE_KEYS.CONNECTED_ADDRESS, addr);
-
-      // Register with backend (pass mnemonic for secure challenge-response auth)
-      await registerSession(addr, mnemonic);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
       setError(msg);
