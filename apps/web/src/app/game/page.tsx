@@ -44,31 +44,45 @@ export default function GamePage() {
   const handleWsEvent = useCallback((event: WsEvent) => {
     handlePendingWsEvent(event);
 
+    const data = event.data as any;
+    const addr = address?.toLowerCase();
+    // Check if current user is involved in this bet (maker or acceptor)
+    const isMyBet = addr && (
+      data?.maker?.toLowerCase() === addr ||
+      data?.acceptor?.toLowerCase() === addr
+    );
+
     if (event.type === 'bet_confirmed') {
-      addToast('success', t('game.betConfirmed'));
+      // Only show to the maker who created the bet
+      if (addr && data?.maker?.toLowerCase() === addr) {
+        addToast('success', t('game.betConfirmed'));
+      }
     }
     if (event.type === 'bet_create_failed') {
-      const reason = (event.data as any)?.reason ?? 'Transaction failed';
+      // Targeted event — only sent to the maker's address
+      const reason = data?.reason ?? 'Transaction failed';
       addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'create'));
     }
     if (event.type === 'bet_accepted') {
-      addToast('info', t('game.betAcceptedWinner'));
+      // Only show to maker and acceptor
+      if (isMyBet) {
+        addToast('info', t('game.betAcceptedWinner'));
+      }
     }
     if (event.type === 'accept_failed') {
-      const reason = (event.data as any)?.reason ?? 'Transaction failed';
+      // Targeted event — only sent to the acceptor's address
+      const reason = data?.reason ?? 'Transaction failed';
       addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'accept'));
     }
     if (event.type === 'bet_reverted') {
-      addToast('info', t('game.betReverted'));
+      // Only show to maker and acceptor (not everyone watching)
+      if (isMyBet) {
+        addToast('info', t('game.betReverted'));
+      }
     }
     if (event.type === 'bet_revealed') {
-      const data = event.data as { winner?: string; maker?: string; acceptor?: string };
+      if (!isMyBet) return;
       const winner = data?.winner?.toLowerCase();
-      const maker = data?.maker?.toLowerCase();
-      const acceptor = data?.acceptor?.toLowerCase();
-      const addr = address?.toLowerCase();
-      const isParticipant = addr && (addr === maker || addr === acceptor);
-      if (!isParticipant) return;
       const isWinner = winner && addr === winner;
       addToast(isWinner ? 'success' : 'warning', isWinner ? t('game.youWon') : t('game.youLost'));
     }

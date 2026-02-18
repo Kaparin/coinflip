@@ -148,7 +148,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const myOpenBets = myBets.filter(b => (b.status === 'open' || b.status === 'canceling') && b.maker?.toLowerCase() === addrLower);
   const myAccepting = myBets.filter(b => b.status === 'accepting');
   const myInProgress = myBets.filter(b => b.status === 'accepted');
-  const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || (b.status === 'canceled' && (b as any).acceptor));
+  const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || b.status === 'canceled');
 
   // Track when each resolved bet was first seen client-side for smooth fade-out.
   // Server shows resolved bets for ~60s; we fade them out starting at ~50s client-side.

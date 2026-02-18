@@ -233,7 +233,8 @@ export function useWebSocket({
             case 'bet_accepting': {
               // Instantly remove the bet from open bets cache for ALL clients
               // so the card disappears immediately — don't wait for debounced refetch.
-              const acceptingBetId = String((parsed.data as any)?.id);
+              const acceptingBet = parsed.data as any;
+              const acceptingBetId = String(acceptingBet?.id);
               if (acceptingBetId) {
                 queryClientRef.current.setQueriesData(
                   { queryKey: ['/api/v1/bets'] },
@@ -242,19 +243,29 @@ export function useWebSocket({
                     return { ...old, data: old.data.filter((b: any) => String(b.id) !== acceptingBetId) };
                   },
                 );
-                // Also update my-bets cache to show 'accepting' status instantly
-                queryClientRef.current.setQueriesData(
-                  { queryKey: ['/api/v1/bets/mine'] },
-                  (old: any) => {
-                    if (!old?.data) return old;
-                    return {
-                      ...old,
-                      data: old.data.map((b: any) =>
-                        String(b.id) === acceptingBetId ? { ...b, status: 'accepting' } : b,
-                      ),
-                    };
-                  },
-                );
+                // Add or update in my-bets cache for involved parties.
+                // The old .map() only updated existing entries — if the acceptor didn't have
+                // this bet in their my-bets cache, it was invisible until the next refetch.
+                // Now we ADD it if not found (for the acceptor) or UPDATE it (for the maker).
+                const addr = addressRef.current?.toLowerCase();
+                const isMaker = acceptingBet.maker?.toLowerCase() === addr;
+                const isAcceptor = acceptingBet.acceptor?.toLowerCase() === addr;
+                if (isMaker || isAcceptor) {
+                  queryClientRef.current.setQueriesData(
+                    { queryKey: ['/api/v1/bets/mine'] },
+                    (old: any) => {
+                      const entry = { ...acceptingBet, status: 'accepting' };
+                      if (!old?.data) return { data: [entry] };
+                      const exists = old.data.some((b: any) => String(b.id) === acceptingBetId);
+                      if (exists) {
+                        return { ...old, data: old.data.map((b: any) =>
+                          String(b.id) === acceptingBetId ? { ...b, ...entry } : b,
+                        ) };
+                      }
+                      return { ...old, data: [entry, ...old.data] };
+                    },
+                  );
+                }
               }
               // Still schedule background refetch to sync any missed data
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
@@ -265,7 +276,33 @@ export function useWebSocket({
               break;
             case 'bet_accepted':
             case 'bet_revealed':
-            case 'bet_timeout_claimed':
+            case 'bet_timeout_claimed': {
+              // Instantly update my-bets cache for involved parties — no wait for refetch.
+              // This makes win/loss results appear immediately in "My Bets" tab.
+              const resolvedBet = parsed.data as any;
+              const resolvedBetId = String(resolvedBet?.id);
+              if (resolvedBetId) {
+                const addr = addressRef.current?.toLowerCase();
+                const isInvolved = addr && (
+                  resolvedBet?.maker?.toLowerCase() === addr ||
+                  resolvedBet?.acceptor?.toLowerCase() === addr
+                );
+                if (isInvolved) {
+                  queryClientRef.current.setQueriesData(
+                    { queryKey: ['/api/v1/bets/mine'] },
+                    (old: any) => {
+                      if (!old?.data) return { data: [resolvedBet] };
+                      const exists = old.data.some((b: any) => String(b.id) === resolvedBetId);
+                      if (exists) {
+                        return { ...old, data: old.data.map((b: any) =>
+                          String(b.id) === resolvedBetId ? { ...b, ...resolvedBet } : b,
+                        ) };
+                      }
+                      return { ...old, data: [resolvedBet, ...old.data] };
+                    },
+                  );
+                }
+              }
               scheduleInvalidation(
                 '/api/v1/bets',
                 '/api/v1/bets/mine',
@@ -274,6 +311,7 @@ export function useWebSocket({
                 'wallet-cw20-balance',
               );
               break;
+            }
             case 'bet_create_failed':
             case 'accept_failed':
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');

@@ -146,7 +146,27 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           },
         );
 
-        // Don't call invalidateQueries — WS events (bet_accepting, bet_accepted)
+        // Instantly add the bet to my-bets cache so it appears in "My Bets"
+        // without waiting for the debounced WS refetch (~1.5s gap).
+        // Server returns the full bet object with status='accepting' + acceptor set.
+        const betData = response?.data;
+        if (betData) {
+          queryClient.setQueriesData(
+            { queryKey: ['/api/v1/bets/mine'] },
+            (old: any) => {
+              if (!old?.data) return { data: [betData] };
+              const exists = old.data.some((b: any) => String(b.id) === betId);
+              if (exists) {
+                return { ...old, data: old.data.map((b: any) =>
+                  String(b.id) === betId ? { ...b, ...betData } : b,
+                ) };
+              }
+              return { ...old, data: [betData, ...old.data] };
+            },
+          );
+        }
+
+        // Don't call invalidateQueries — WS events (bet_accepting, bet_revealed)
         // will handle the full cache refresh. This avoids triple-refetch flicker.
         setAcceptTarget(null);
         clearPending();
