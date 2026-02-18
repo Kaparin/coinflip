@@ -1186,6 +1186,308 @@ async function recoverStuckLockedFunds(): Promise<void> {
   }
 }
 
+// ─── Heal Sweep (Admin One-Click Fix) ────────────────────────────
+
+export interface HealResult {
+  secretsRecovered: number;
+  syncedFromChain: number;
+  revealsTriggered: number;
+  timeoutsClaimed: number;
+  transitionalReverted: number;
+  fundsUnlocked: number;
+  orphansImported: number;
+  errors: string[];
+  duration: string;
+  message: string;
+}
+
+/**
+ * Run all recovery steps sequentially and return a structured report.
+ * Called from the admin "Heal System" endpoint.
+ *
+ * Steps:
+ * 1. Recover secrets — accepted bets missing maker_secret → try pending_bet_secrets
+ * 2. Sync from chain — accepted/accepting/canceling bets → query chain and sync DB
+ * 3. Auto-reveal — accepted bets WITH secrets → relay reveal
+ * 4. Claim timeouts — accepted bets >5 min without reveal → relay claim_timeout
+ * 5. Revert stuck transitional — accepting/canceling >2 min → revert/cancel
+ * 6. Unlock orphaned funds — users with locked > 0 but no active bets
+ * 7. Import orphaned chain bets — open bets on chain not in DB
+ */
+export async function runHealSweep(): Promise<HealResult> {
+  const tag = 'heal-sweep';
+  const start = Date.now();
+  const result: HealResult = {
+    secretsRecovered: 0,
+    syncedFromChain: 0,
+    revealsTriggered: 0,
+    timeoutsClaimed: 0,
+    transitionalReverted: 0,
+    fundsUnlocked: 0,
+    orphansImported: 0,
+    errors: [],
+    duration: '',
+    message: '',
+  };
+
+  logger.info({}, `${tag} — starting`);
+
+  // Step 1: Recover secrets for accepted bets missing maker_secret
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const { bets: betsTable } = await import('@coinflip/db/schema');
+    const { eq, and: andOp } = await import('drizzle-orm');
+
+    const missingSecretBets = await db.select({
+      betId: betsTable.betId,
+      commitment: betsTable.commitment,
+    })
+      .from(betsTable)
+      .where(andOp(
+        eq(betsTable.status, 'accepted'),
+        sql`${betsTable.makerSecret} IS NULL`,
+      ));
+
+    for (const bet of missingSecretBets) {
+      try {
+        const pending = await pendingSecretsService.getByCommitment(bet.commitment);
+        if (pending) {
+          await db.update(betsTable)
+            .set({ makerSide: pending.makerSide, makerSecret: pending.makerSecret })
+            .where(eq(betsTable.betId, bet.betId));
+          await pendingSecretsService.delete(bet.commitment).catch(() => {});
+          result.secretsRecovered++;
+          logger.info({ betId: bet.betId.toString() }, `${tag} — recovered secret`);
+        }
+      } catch (err) {
+        result.errors.push(`bet ${bet.betId}: secret recovery failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 1 (recover secrets): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 2: Sync from chain for all accepted/accepting/canceling bets
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const { bets: betsTable } = await import('@coinflip/db/schema');
+    const { inArray: inArrayOp } = await import('drizzle-orm');
+
+    const stuckBets = await db.select({ betId: betsTable.betId })
+      .from(betsTable)
+      .where(inArrayOp(betsTable.status, ['accepted', 'accepting', 'canceling']));
+
+    for (const bet of stuckBets) {
+      try {
+        const synced = await syncBetFromChain(bet.betId);
+        if (synced) {
+          result.syncedFromChain++;
+        }
+      } catch (err) {
+        result.errors.push(`bet ${bet.betId}: chain sync failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 2 (sync from chain): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 3: Auto-reveal accepted bets WITH secrets
+  try {
+    const unrevealed = await betService.getAcceptedBetsWithSecrets();
+    for (const bet of unrevealed) {
+      try {
+        const revealed = await autoRevealBet(bet.betId);
+        if (revealed) result.revealsTriggered++;
+      } catch (err) {
+        result.errors.push(`bet ${bet.betId}: reveal failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 3 (auto-reveal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 4: Claim timeouts for accepted bets >5 min old
+  try {
+    const timedOut = await betService.getTimedOutAcceptedBets();
+    for (const bet of timedOut) {
+      const betKey = bet.betId.toString();
+      if (processingBets.has(betKey)) continue;
+
+      processingBets.add(betKey);
+      try {
+        // Re-check — step 2/3 may have resolved it
+        const current = await betService.getBetById(bet.betId);
+        if (!current || current.status !== 'accepted') continue;
+
+        if (!relayerService.isReady()) {
+          result.errors.push('Relayer not ready — timeout claims skipped');
+          break;
+        }
+
+        const acceptorAddress = bet.acceptorUserId
+          ? await betService.getUserAddress(bet.acceptorUserId)
+          : null;
+        if (!acceptorAddress) continue;
+
+        const relayResult = await relayerService.relayClaimTimeout(
+          acceptorAddress,
+          Number(bet.betId),
+          /* asyncMode */ true,
+        );
+
+        if (relayResult.success) {
+          result.timeoutsClaimed++;
+          pollRevealAndSync(bet.betId, relayResult.txHash ?? '');
+        } else {
+          result.errors.push(`bet ${betKey}: timeout claim relay failed — ${relayResult.rawLog ?? 'unknown'}`);
+        }
+      } catch (err) {
+        result.errors.push(`bet ${betKey}: timeout claim failed — ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        processingBets.delete(betKey);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 4 (claim timeouts): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 5: Revert stuck transitional bets (accepting/canceling >2 min)
+  try {
+    const stuck = await betService.getStuckTransitionalBets();
+    for (const bet of stuck) {
+      const betKey = bet.betId.toString();
+      if (processingBets.has(betKey)) continue;
+
+      processingBets.add(betKey);
+      try {
+        // Re-check — step 2 may have synced it
+        const current = await betService.getBetById(bet.betId);
+        if (!current || !['accepting', 'canceling'].includes(current.status)) continue;
+
+        if (current.status === 'accepting') {
+          const reverted = await betService.revertAccepting(bet.betId).catch(() => null);
+          if (reverted) {
+            if (bet.acceptorUserId) {
+              await vaultService.unlockFunds(bet.acceptorUserId, bet.amount).catch(() => {});
+            }
+            const addressMap = await betService.buildAddressMap([reverted]);
+            wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+            result.transitionalReverted++;
+          }
+        } else if (current.status === 'canceling') {
+          const canceled = await betService.cancelBet(bet.betId);
+          if (canceled) {
+            await vaultService.unlockFunds(bet.makerUserId, bet.amount).catch(() => {});
+            result.transitionalReverted++;
+          }
+        }
+      } catch (err) {
+        result.errors.push(`bet ${betKey}: revert failed — ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        processingBets.delete(betKey);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 5 (revert transitional): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 6: Unlock orphaned funds (users with locked > 0 but no active bets)
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const stuckLocked = await db.execute(sql`
+      SELECT vb.user_id, vb.locked
+      FROM vault_balances vb
+      WHERE vb.locked::numeric > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM bets b
+          WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
+            AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
+        )
+    `);
+    const rows = stuckLocked as unknown as Array<{ user_id: string; locked: string }>;
+    for (const row of rows) {
+      try {
+        await vaultService.unlockFunds(row.user_id, row.locked);
+        result.fundsUnlocked++;
+      } catch (err) {
+        result.errors.push(`user ${row.user_id}: unlock failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 6 (unlock funds): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 7: Import orphaned chain bets (on chain but not in DB)
+  try {
+    const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
+    const encoded = Buffer.from(query).toString('base64');
+    const res = await fetch(
+      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+
+    if (res.ok) {
+      const data = await res.json() as {
+        data: { bets: Array<{ id: number; maker: string; amount: string; commitment: string }> };
+      };
+      const chainBets = data.data.bets ?? [];
+
+      for (const chainBet of chainBets) {
+        const betId = BigInt(chainBet.id);
+        const dbBet = await betService.getBetById(betId);
+        if (dbBet) continue;
+
+        try {
+          const userId = await resolveUserId(chainBet.maker);
+          if (!userId) continue;
+
+          const pendingSecret = await pendingSecretsService.getByCommitment(chainBet.commitment);
+          await betService.createBet({
+            betId,
+            makerUserId: userId,
+            amount: chainBet.amount,
+            commitment: chainBet.commitment,
+            txhashCreate: pendingSecret?.txHash ?? `heal_import_${chainBet.id}`,
+            makerSide: pendingSecret?.makerSide as 'heads' | 'tails' | undefined,
+            makerSecret: pendingSecret?.makerSecret,
+          });
+
+          if (pendingSecret) {
+            await pendingSecretsService.delete(chainBet.commitment).catch(() => {});
+          }
+
+          invalidateBalanceCache(chainBet.maker);
+
+          const bet = await betService.getBetById(betId);
+          if (bet) {
+            const addressMap = await betService.buildAddressMap([bet]);
+            wsService.emitBetConfirmed(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
+          }
+
+          result.orphansImported++;
+        } catch (err) {
+          result.errors.push(`chain bet ${chainBet.id}: import failed — ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 7 (import orphans): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const totalFixed = result.secretsRecovered + result.syncedFromChain + result.revealsTriggered +
+    result.timeoutsClaimed + result.transitionalReverted + result.fundsUnlocked + result.orphansImported;
+  const durationMs = Date.now() - start;
+  result.duration = `${(durationMs / 1000).toFixed(1)}s`;
+  result.message = result.errors.length > 0
+    ? `Healed ${totalFixed} issues (${result.errors.length} error${result.errors.length > 1 ? 's' : ''})`
+    : totalFixed > 0
+      ? `Healed ${totalFixed} issues`
+      : 'System is healthy — nothing to fix';
+
+  logger.info({ ...result, errors: result.errors.length }, `${tag} — completed`);
+  return result;
+}
+
 // ─── Background Sweep Job ────────────────────────────────────────
 
 let sweepInterval: ReturnType<typeof setInterval> | null = null;

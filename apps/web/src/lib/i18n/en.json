@@ -200,7 +200,8 @@
     "cancelAll": "Cancel all ({count})",
     "cancelingBatch": "Canceling bets: {done}/{total}",
     "noActiveBets": "No active bets",
-    "createToStart": "Create a bet above to start playing!"
+    "createToStart": "Create a bet above to start playing!",
+    "recentResults": "Results ({count})"
   },
   "history": {
     "connectToView": "Connect wallet to view history",

@@ -577,6 +577,19 @@ adminRouter.get('/pending-secrets', async (c) => {
 // Admin Actions
 // ═══════════════════════════════════════════
 
+// POST /api/v1/admin/actions/heal-system — one-click fix for all stuck bets
+adminRouter.post('/actions/heal-system', async (c) => {
+  try {
+    const { runHealSweep } = await import('../services/background-tasks.js');
+    const result = await runHealSweep();
+    logger.info({ admin: c.get('address'), result: result.message }, 'admin: heal-system completed');
+    return c.json({ data: result });
+  } catch (err: any) {
+    logger.error({ err }, 'admin: heal-system failed');
+    return c.json({ error: { code: 'HEAL_FAILED', message: err.message } }, 500);
+  }
+});
+
 // POST /api/v1/admin/actions/unlock-funds — force-unlock stuck funds for a user
 const UnlockFundsSchema = z.object({
   userId: z.string().uuid(),

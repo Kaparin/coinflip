@@ -383,7 +383,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       {visibleResolved.length > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
-            {t('myBets.recentResults') ?? `Results (${visibleResolved.length})`}
+            {t('myBets.recentResults', { count: visibleResolved.length })}
           </h3>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             {visibleResolved.map((bet) => {

@@ -200,7 +200,8 @@
     "cancelAll": "Отменить все ({count})",
     "cancelingBatch": "Отмена ставок: {done}/{total}",
     "noActiveBets": "Нет активных ставок",
-    "createToStart": "Создайте ставку, чтобы начать играть!"
+    "createToStart": "Создайте ставку, чтобы начать играть!",
+    "recentResults": "Результаты ({count})"
   },
   "history": {
     "connectToView": "Подключите кошелёк для просмотра истории",

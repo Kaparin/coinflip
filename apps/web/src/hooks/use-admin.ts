@@ -401,6 +401,35 @@ export function useAdminDiagnostics() {
   });
 }
 
+// ─── Heal System ──────────────────────────────────────────────────
+
+export interface HealResult {
+  secretsRecovered: number;
+  syncedFromChain: number;
+  revealsTriggered: number;
+  timeoutsClaimed: number;
+  transitionalReverted: number;
+  fundsUnlocked: number;
+  orphansImported: number;
+  errors: string[];
+  duration: string;
+  message: string;
+}
+
+export function useAdminHealSystem() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      adminFetch<HealResult>('/api/v1/admin/actions/heal-system', address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+  });
+}
+
 // ─── Admin Actions ────────────────────────────────────────────────
 
 export function useAdminUnlockFunds() {

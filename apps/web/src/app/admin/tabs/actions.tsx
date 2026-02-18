@@ -6,7 +6,9 @@ import {
   useAdminForceCancel,
   useAdminRecoverSecret,
   useAdminImportOrphaned,
+  useAdminHealSystem,
 } from '@/hooks/use-admin';
+import type { HealResult } from '@/hooks/use-admin';
 
 export function ActionsTab() {
   return (
@@ -15,10 +17,86 @@ export function ActionsTab() {
         Manual admin actions for fixing stuck states. Use with caution — these operations directly modify the database.
       </p>
 
+      <HealSystemAction />
       <UnlockFundsAction />
       <ForceCancelAction />
       <RecoverSecretAction />
       <ImportOrphanedAction />
+    </div>
+  );
+}
+
+function HealSystemAction() {
+  const heal = useAdminHealSystem();
+  const [result, setResult] = useState<HealResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleHeal = async () => {
+    setResult(null);
+    setError(null);
+    try {
+      const res = await heal.mutateAsync();
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Heal failed');
+    }
+  };
+
+  const counters: Array<{ label: string; key: keyof HealResult; color: string }> = [
+    { label: 'Secrets recovered', key: 'secretsRecovered', color: 'text-green-400' },
+    { label: 'Synced from chain', key: 'syncedFromChain', color: 'text-blue-400' },
+    { label: 'Reveals triggered', key: 'revealsTriggered', color: 'text-yellow-400' },
+    { label: 'Timeouts claimed', key: 'timeoutsClaimed', color: 'text-orange-400' },
+    { label: 'Transitional reverted', key: 'transitionalReverted', color: 'text-purple-400' },
+    { label: 'Funds unlocked', key: 'fundsUnlocked', color: 'text-cyan-400' },
+    { label: 'Orphans imported', key: 'orphansImported', color: 'text-pink-400' },
+  ];
+
+  return (
+    <div className="rounded-xl border-2 border-[var(--color-primary)] bg-[var(--color-surface)] p-5 space-y-4">
+      <div>
+        <h3 className="text-base font-bold">Heal System</h3>
+        <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
+          One-click fix for all stuck bets. Recovers secrets, syncs chain state, triggers reveals,
+          claims timeouts, reverts stuck transitions, unlocks orphaned funds, and imports missing bets.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        disabled={heal.isPending}
+        onClick={handleHeal}
+        className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-3 text-sm font-bold disabled:opacity-40 transition-opacity"
+      >
+        {heal.isPending ? 'Healing...' : 'Heal System'}
+      </button>
+
+      {result && (
+        <div className="space-y-2 text-xs">
+          <p className="font-bold">{result.message} ({result.duration})</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {counters.map(({ label, key, color }) => {
+              const val = result[key] as number;
+              return (
+                <div key={key} className="flex justify-between">
+                  <span className="text-[var(--color-text-secondary)]">{label}</span>
+                  <span className={val > 0 ? color : 'text-[var(--color-text-secondary)]'}>{val}</span>
+                </div>
+              );
+            })}
+          </div>
+          {result.errors.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[var(--color-danger)] font-bold">Errors:</p>
+              {result.errors.map((err, i) => (
+                <p key={i} className="text-[var(--color-danger)] text-[11px] break-all">{err}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
     </div>
   );
 }

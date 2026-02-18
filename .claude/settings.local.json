@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(pnpm --filter @coinflip/web typecheck:*)",
+      "Bash(pnpm --filter @coinflip/api typecheck:*)",
+      "Bash(pnpm --filter @coinflip/shared typecheck:*)",
+      "Bash(pnpm --filter @coinflip/web build:*)",
+      "Bash(git -C \"E:\\\\Work\\\\coinflip\" diff --stat)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: eliminate UI flickering, fix balance sync, improve reliability\n\n- Fix card flickering: replace cascading invalidateQueries with instant\n  setQueriesData optimistic updates on accept/cancel\n- Fix balance: always apply server balance from 202 response, increase\n  pending lock/deduction TTL from 30s to 90s, remove duplicate polling\n- Fix MyBets: replace raw fetch with customFetch \\(retry, timeout, error UI\\),\n  add staleTime 3s, show error state instead of silent empty list\n- Fix WS reconnect: add missing /api/v1/bets/mine invalidation\n- Fix double WS emit: split bet_canceled into bet_canceling + bet_canceled\n- Add smooth fade-out for resolved bet cards \\(50-60s\\)\n- Increase WS event debounce from 400ms to 800ms\n- Increase pending bets TTL from 90s to 120s for consistency\n- Fix rate-limit comment \\(30 -> 120 req/min\\)\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(npx turbo:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: move React hooks before early returns in MyBets \\(Error #310\\)\n\nHooks \\(useRef, useState, useEffect, useCallback, useMemo\\) for the\nresolved bets fade-out feature were placed after conditional early\nreturns, violating React''s Rules of Hooks and crashing production.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: instant optimistic cache updates on WS bet_accepting/canceling/canceled\n\nWhen any user accepts or cancels a bet, the WS event now triggers\nimmediate cache removal/update via setQueriesData instead of waiting\nfor the 800ms debounced refetch. Other users see the card disappear\ninstantly rather than after ~1.5s delay.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: serialize relayer broadcasts to prevent nonce race condition\n\nBets were getting stuck in \"accepted\" state because concurrent reveal\ntransactions raced on nonce assignment. Added broadcast queue mutex to\nRelayerService and made sweep processing sequential for relayer tasks.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
