@@ -42,3 +42,6 @@ coverage/
 
 # Database
 *.sqlite
+
+# MCP config (contains API keys)
+.mcp.json

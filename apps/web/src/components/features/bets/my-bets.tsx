@@ -199,6 +199,32 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     [myResolved, forceRerender],
   );
 
+  // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
+  const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
+  const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
+
+  // ─── Tab counts ───
+  const openCount = myPending.length + myOpenBets.length;
+  const inPlayCount = myAccepting.length + myInProgress.length;
+  const resultsCount = visibleResolved.length;
+
+  // Build available tabs (only show tabs with data)
+  const availableTabs = useMemo(() => {
+    const tabs: { id: MyBetsTab; label: string; count: number }[] = [];
+    if (openCount > 0)    tabs.push({ id: 'open', label: t('myBets.tabOpen'), count: openCount });
+    if (inPlayCount > 0)  tabs.push({ id: 'inplay', label: t('myBets.tabInPlay'), count: inPlayCount });
+    if (resultsCount > 0) tabs.push({ id: 'results', label: t('myBets.tabResults'), count: resultsCount });
+    return tabs;
+  }, [openCount, inPlayCount, resultsCount, t]);
+
+  // Auto-select first available tab if current tab has no data
+  const effectiveTab = useMemo(() => {
+    if (availableTabs.some(tab => tab.id === activeSubTab)) return activeSubTab;
+    return availableTabs[0]?.id ?? 'open';
+  }, [availableTabs, activeSubTab]);
+
+  const hasAnything = availableTabs.length > 0;
+
   if (!isConnected) {
     return (
       <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
@@ -228,32 +254,6 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       </div>
     );
   }
-
-  // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
-  const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
-  const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
-
-  // ─── Tab counts ───
-  const openCount = myPending.length + myOpenBets.length;
-  const inPlayCount = myAccepting.length + myInProgress.length;
-  const resultsCount = visibleResolved.length;
-
-  // Build available tabs (only show tabs with data)
-  const availableTabs = useMemo(() => {
-    const tabs: { id: MyBetsTab; label: string; count: number }[] = [];
-    if (openCount > 0)    tabs.push({ id: 'open', label: t('myBets.tabOpen'), count: openCount });
-    if (inPlayCount > 0)  tabs.push({ id: 'inplay', label: t('myBets.tabInPlay'), count: inPlayCount });
-    if (resultsCount > 0) tabs.push({ id: 'results', label: t('myBets.tabResults'), count: resultsCount });
-    return tabs;
-  }, [openCount, inPlayCount, resultsCount, t]);
-
-  // Auto-select first available tab if current tab has no data
-  const effectiveTab = useMemo(() => {
-    if (availableTabs.some(tab => tab.id === activeSubTab)) return activeSubTab;
-    return availableTabs[0]?.id ?? 'open';
-  }, [availableTabs, activeSubTab]);
-
-  const hasAnything = availableTabs.length > 0;
 
   // ─── Render helpers ───
   const renderBetCard = (bet: any, opts?: { isMine?: boolean; withCancel?: boolean }) => (

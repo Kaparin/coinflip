@@ -37,7 +37,15 @@
       "Bash(npx railway:*)",
       "Bash(npx @railway/cli whoami:*)",
       "Bash(npx @railway/cli login:*)",
-      "Bash(git -C E:Workcoinflip diff --stat)"
+      "Bash(git -C E:Workcoinflip diff --stat)",
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:claudelog.com)",
+      "WebFetch(domain:medium.com)",
+      "Bash(claude mcp add:*)",
+      "WebFetch(domain:apidog.com)",
+      "WebFetch(domain:claudefa.st)"
     ]
   }
 }
