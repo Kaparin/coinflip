@@ -15,6 +15,7 @@ import { logger } from '../lib/logger.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
 import { removePendingLock, invalidateBalanceCache } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
+import { pendingSecretsService } from './pending-secrets.service.js';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -182,18 +183,16 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       }
 
       if (!chainBetId) {
-        // Could not resolve — unlock funds so user isn't stuck.
-        // If the bet WAS created on-chain, the indexer will catch it and re-lock.
-        logger.error({ txHash, commitment }, `${tag} — failed to resolve bet_id after all retries, unlocking funds`);
+        // Could not resolve bet_id, but the tx WAS broadcast successfully.
+        // The bet very likely exists on chain — DO NOT unlock funds.
+        // The reconciliation sweep (reconcileOrphanedChainBets) will find it
+        // within 2 minutes and import it into the DB automatically.
+        logger.warn({ txHash, commitment }, `${tag} — failed to resolve bet_id after all retries. Funds stay locked; reconciliation sweep will handle.`);
         decrementPendingBetCount(makerUserId);
         if (pendingLockId) removePendingLock(address, pendingLockId);
-        await vaultService.unlockFunds(makerUserId, amount).catch(err =>
-          logger.warn({ err, makerUserId, amount }, `${tag} — unlockFunds failed`));
-        invalidateBalanceCache(address);
-        wsService.emitBetCreateFailed(address, {
-          txHash,
-          reason: 'Bet was submitted but confirmation is taking longer than expected. It will appear shortly.',
-        });
+        // DON'T unlock — the bet is almost certainly on chain.
+        // DON'T emit betCreateFailed — it would confuse the user.
+        // The bet will appear once the reconciliation sweep imports it.
         return;
       }
 
@@ -209,7 +208,10 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
         makerSecret,
       });
 
-      // Bet is now in DB — decrement pending counter, clear pending lock
+      // Bet is now in DB with secret — clean up pending_bet_secrets
+      await pendingSecretsService.delete(commitment).catch(() => {});
+
+      // Decrement pending counter, clear pending lock
       decrementPendingBetCount(makerUserId);
       if (pendingLockId) removePendingLock(address, pendingLockId);
       invalidateBalanceCache(address);
@@ -224,20 +226,25 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       decrementPendingBetCount(makerUserId);
       if (pendingLockId) removePendingLock(address, pendingLockId);
 
-      // Only unlock if the bet was NOT already created in DB (e.g. by indexer race).
-      // If bet exists, funds should remain locked as the bet is valid.
+      // Check if the bet already exists in DB (e.g. saved by indexer race)
       const existingBetInDb = chainBetId
         ? await betService.getBetById(BigInt(chainBetId)).catch(() => null)
         : null;
-      if (!existingBetInDb) {
+
+      if (existingBetInDb) {
+        logger.info({ betId: chainBetId, txHash }, `${tag} — bet exists in DB despite error, skipping unlock`);
+      } else if (txHash) {
+        // Tx was broadcast — bet likely exists on chain even if we hit an error.
+        // DON'T unlock. The reconciliation sweep will find and import it.
+        logger.warn({ txHash }, `${tag} — error after broadcast, funds stay locked; reconciliation sweep will handle`);
+      } else {
+        // Tx was never broadcast — safe to unlock
         await vaultService.unlockFunds(makerUserId, amount).catch(unlockErr =>
           logger.warn({ err: unlockErr, makerUserId, amount }, `${tag} — unlockFunds failed`));
         wsService.emitBetCreateFailed(address, {
-          txHash,
-          reason: 'An unexpected error occurred. Your bet may still appear shortly.',
+          txHash: txHash ?? '',
+          reason: 'An unexpected error occurred. Please try again.',
         });
-      } else {
-        logger.info({ betId: chainBetId, txHash }, `${tag} — bet exists in DB despite error, skipping unlock`);
       }
       invalidateBalanceCache(address);
     }
@@ -911,17 +918,18 @@ async function autoCancelExpiredBets(): Promise<void> {
 // ─── Cancel Orphaned Chain Bets ─────────────────────────────────
 
 /**
- * Find open bets on chain that are NOT in our DB and cancel them.
+ * Find open bets on chain that are NOT in our DB and import them.
  * These are "orphaned" bets — created on chain but the background
- * task that saves them to DB failed. Without this cleanup, the
- * maker's funds stay locked forever.
+ * task that saves them to DB failed (common with batch operations).
+ *
+ * Instead of silently canceling them, we import them into the DB so they
+ * appear in the UI. The user can then cancel them manually.
+ * Note: imported bets lack maker_secret/maker_side, so auto-reveal won't work.
  */
-async function cancelOrphanedChainBets(): Promise<void> {
-  const tag = 'orphan-cancel';
+async function reconcileOrphanedChainBets(): Promise<void> {
+  const tag = 'orphan-reconcile';
 
   try {
-    if (!relayerService.isReady()) return;
-
     // Query chain for all open bets
     const query = JSON.stringify({ open_bets: { limit: 200 } });
     const encoded = Buffer.from(query).toString('base64');
@@ -931,54 +939,73 @@ async function cancelOrphanedChainBets(): Promise<void> {
     if (!res.ok) return;
 
     const data = await res.json() as {
-      data: { bets: Array<{ id: number; maker: string; amount: string; created_at_time: number }> };
+      data: { bets: Array<{ id: number; maker: string; amount: string; commitment: string; created_at_time: number }> };
     };
     const chainBets = data.data.bets;
     if (!chainBets || chainBets.length === 0) return;
 
-    // Check which ones are NOT in our DB
     for (const chainBet of chainBets) {
       const betId = BigInt(chainBet.id);
       const betKey = betId.toString();
 
       if (processingBets.has(betKey)) continue;
 
-      // Grace period: skip bets created less than 5 minutes ago
+      // Grace period: skip bets created less than 2 minutes ago
       // (background task may still be saving them to DB)
       if (chainBet.created_at_time) {
         const createdAtMs = chainBet.created_at_time > 1e12 ? chainBet.created_at_time : chainBet.created_at_time * 1000;
         const ageMs = Date.now() - createdAtMs;
-        if (ageMs < 5 * 60 * 1000) {
-          logger.debug({ betId: betKey, ageMs }, `${tag} — skipping recent bet (grace period)`);
-          continue;
-        }
+        if (ageMs < 2 * 60 * 1000) continue;
       }
 
       const dbBet = await betService.getBetById(betId);
-      if (dbBet) continue; // Already in DB — will be handled by normal auto-cancel
+      if (dbBet) continue;
 
-      // Orphaned bet — not in DB and older than 5min. Cancel it via relayer.
+      // Orphaned bet — import into DB so it's visible to the user
       processingBets.add(betKey);
       try {
-        logger.warn({ betId: betKey, maker: chainBet.maker }, `${tag} — found orphaned bet, canceling`);
-
-        const relayResult = await relayerService.relayCancelBet(
-          chainBet.maker,
-          Number(betId),
-          true,
-        );
-
-        if (relayResult.success) {
-          invalidateBalanceCache(chainBet.maker);
-          logger.info({ betId: betKey, txHash: relayResult.txHash }, `${tag} — orphaned bet canceled`);
-        } else {
-          logger.error({ betId: betKey, error: relayResult.rawLog }, `${tag} — cancel failed`);
+        // Resolve maker address → user_id
+        const userId = await resolveUserId(chainBet.maker);
+        if (!userId) {
+          logger.warn({ betId: betKey, maker: chainBet.maker }, `${tag} — maker not in users table, skipping`);
+          continue;
         }
 
-        // Wait between cancels to avoid sequence mismatch
-        await new Promise(r => setTimeout(r, 1_500));
+        // Recover secrets from pending_bet_secrets table (saved before broadcast)
+        const pendingSecret = await pendingSecretsService.getByCommitment(chainBet.commitment);
+
+        await betService.createBet({
+          betId,
+          makerUserId: userId,
+          amount: chainBet.amount,
+          commitment: chainBet.commitment,
+          txhashCreate: pendingSecret?.txHash ?? `chain_reconcile_${betKey}`,
+          makerSide: pendingSecret?.makerSide as 'heads' | 'tails' | undefined,
+          makerSecret: pendingSecret?.makerSecret,
+        });
+
+        // Secret is now in `bets` — clean up pending table
+        if (pendingSecret) {
+          await pendingSecretsService.delete(chainBet.commitment).catch(() => {});
+        }
+
+        invalidateBalanceCache(chainBet.maker);
+
+        // Notify via WS so the bet appears in the UI
+        const bet = await betService.getBetById(betId);
+        if (bet) {
+          const addressMap = await betService.buildAddressMap([bet]);
+          wsService.emitBetConfirmed(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
+        }
+
+        logger.info({
+          betId: betKey,
+          maker: chainBet.maker,
+          amount: chainBet.amount,
+          secretRecovered: !!pendingSecret,
+        }, `${tag} — orphaned bet imported to DB${pendingSecret ? ' (with secret — auto-reveal will work)' : ' (NO secret — manual cancel only)'}`);
       } catch (err) {
-        logger.error({ err, betId: betKey }, `${tag} — error canceling orphaned bet`);
+        logger.error({ err, betId: betKey }, `${tag} — error importing orphaned bet`);
       } finally {
         processingBets.delete(betKey);
       }
@@ -1036,8 +1063,12 @@ export function startBackgroundSweep(): void {
       // 3. Auto-cancel expired open bets (12h TTL)
       await autoCancelExpiredBets();
 
-      // 4. Cancel orphaned chain bets (on chain but not in DB)
-      await cancelOrphanedChainBets();
+      // 4. Reconcile orphaned chain bets (on chain but not in DB)
+      await reconcileOrphanedChainBets();
+
+      // 5. Garbage-collect stale pending_bet_secrets (older than 1 hour)
+      await pendingSecretsService.cleanup().catch(err =>
+        logger.warn({ err }, 'sweep: pending secrets cleanup failed'));
     } catch (err) {
       logger.error({ err }, 'Background sweep error');
     } finally {

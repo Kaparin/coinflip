@@ -23,6 +23,7 @@ import { env } from '../config/env.js';
 import { resolveCreateBetInBackground, confirmAcceptBetInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
+import { pendingSecretsService } from '../services/pending-secrets.service.js';
 
 /**
  * Cryptographically secure coin flip.
@@ -248,6 +249,9 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
     // Track pending bet in-memory (decremented when bet is confirmed/failed in background)
     incrementPendingBetCount(user.id);
 
+    // Persist secret BEFORE broadcasting — survives background task failures & server restarts
+    await pendingSecretsService.save({ commitment, makerSide, makerSecret });
+
     try {
       relayResult = await relayerService.relayCreateBet(address, amount, commitment, /* asyncMode */ true);
     } catch (err) {
@@ -257,6 +261,7 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
       await vaultService.unlockFunds(user.id, amount).catch(e =>
         logger.warn({ err: e }, 'Failed to unlock funds after relay error'));
       invalidateBalanceCache(address);
+      await pendingSecretsService.delete(commitment);
       throw err;
     }
   } finally {
@@ -270,9 +275,13 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
     await vaultService.unlockFunds(user.id, amount).catch(e =>
       logger.warn({ err: e }, 'Failed to unlock funds after relay failure'));
     invalidateBalanceCache(address);
+    await pendingSecretsService.delete(commitment);
     logger.error({ relayResult, address, amount }, 'Create bet relay failed (CheckTx)');
     throwRelayError(relayResult);
   }
+
+  // Update pending secret with txHash for traceability
+  await pendingSecretsService.setTxHash(commitment, relayResult.txHash!).catch(() => {});
 
   // Fire-and-forget: resolve bet_id and save to DB in background
   const commitmentBase64 = Buffer.from(commitment, 'hex').toString('base64');
@@ -389,46 +398,58 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
     throw Errors.insufficientBalance(totalRequired.toString(), '0');
   }
 
-  // Submit each bet sequentially via relayer (async broadcast mode)
-  // Small delay between relay calls to avoid sequence/nonce clashes on chain.
-  const BATCH_INTER_DELAY_MS = 300;
+  // Submit bets sequentially via relayer, then resolve in batches of 3.
+  // The sequence manager serializes signing correctly, but background resolution
+  // (polling chain REST API) can't handle 12+ concurrent tasks — they timeout
+  // and lose bet data. So we stagger background resolution.
+  const BATCH_RELAY_DELAY_MS = 500; // between relay broadcasts (sequence manager handles nonces)
   const results: Array<{ index: number; amount: string; tx_hash?: string; error?: string }> = [];
+  const pendingResolutions: Array<{ task: Parameters<typeof resolveCreateBetInBackground>[0]; index: number }> = [];
   let successCount = 0;
   let lockedSoFar = 0n;
 
+  // Phase 1: Broadcast all txs (fast — just mempool acceptance)
   for (let i = 0; i < amounts.length; i++) {
-    // Brief pause between successive relay calls to let sequence numbers settle
-    if (i > 0) await new Promise(r => setTimeout(r, BATCH_INTER_DELAY_MS));
+    if (i > 0) await new Promise(r => setTimeout(r, BATCH_RELAY_DELAY_MS));
 
     const amount = amounts[i]!;
     const makerSide: 'heads' | 'tails' = secureCoinFlip();
     const makerSecret = generateSecret();
     const commitment = computeCommitment(address, makerSide, makerSecret);
 
+    // Persist secret BEFORE broadcasting
+    await pendingSecretsService.save({ commitment, makerSide, makerSecret }).catch(err =>
+      logger.warn({ err, index: i }, 'Batch: failed to persist secret (continuing anyway)'));
+
     try {
       const relayResult = await relayerService.relayCreateBet(address, amount, commitment, true);
 
       if (!relayResult.success) {
+        await pendingSecretsService.delete(commitment).catch(() => {});
         results.push({ index: i, amount, error: 'Transaction failed. Please try again.' });
         continue;
       }
 
-      // Track pending bet + pending lock
+      // Update pending secret with txHash
+      await pendingSecretsService.setTxHash(commitment, relayResult.txHash!).catch(() => {});
+
       const lockId = addPendingLock(address, amount);
       incrementPendingBetCount(user.id);
 
-      // Fire background task to resolve bet_id
       const commitmentBase64 = Buffer.from(commitment, 'hex').toString('base64');
-      resolveCreateBetInBackground({
-        txHash: relayResult.txHash!,
-        commitment,
-        commitmentBase64,
-        makerUserId: user.id,
-        amount,
-        address,
-        makerSide,
-        makerSecret,
-        pendingLockId: lockId,
+      pendingResolutions.push({
+        index: i,
+        task: {
+          txHash: relayResult.txHash!,
+          commitment,
+          commitmentBase64,
+          makerUserId: user.id,
+          amount,
+          address,
+          makerSide,
+          makerSecret,
+          pendingLockId: lockId,
+        },
       });
 
       results.push({ index: i, amount, tx_hash: relayResult.txHash });
@@ -436,7 +457,22 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
       lockedSoFar += BigInt(amount);
     } catch (err: any) {
       logger.error({ err, index: i, amount }, 'Batch create: bet relay failed');
+      await pendingSecretsService.delete(commitment).catch(() => {});
       results.push({ index: i, amount, error: err.message || 'Unexpected error' });
+    }
+  }
+
+  // Phase 2: Stagger background resolution (max 3 concurrent to avoid REST API overload)
+  const BATCH_RESOLVE_CONCURRENCY = 3;
+  const BATCH_RESOLVE_STAGGER_MS = 2_000;
+  for (let i = 0; i < pendingResolutions.length; i += BATCH_RESOLVE_CONCURRENCY) {
+    const batch = pendingResolutions.slice(i, i + BATCH_RESOLVE_CONCURRENCY);
+    for (const { task } of batch) {
+      resolveCreateBetInBackground(task);
+    }
+    // Stagger between batches so they don't all poll the chain simultaneously
+    if (i + BATCH_RESOLVE_CONCURRENCY < pendingResolutions.length) {
+      await new Promise(r => setTimeout(r, BATCH_RESOLVE_STAGGER_MS));
     }
   }
 
