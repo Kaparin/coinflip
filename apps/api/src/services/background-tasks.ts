@@ -403,6 +403,14 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
           try {
             const bet = await betService.getBetById(betId);
             if (bet && bet.status === 'accepting') {
+              // Try syncing from chain first — tx might have succeeded (REST was slow)
+              const synced = await syncBetFromChain(betId);
+              if (synced) {
+                logger.info({ betId: betId.toString() }, `${tag} — synced from chain after poll timeout, no revert`);
+                if (pendingLockId) removePendingLock(address, pendingLockId);
+                invalidateBalanceCache(address);
+                return;
+              }
               logger.warn({ betId: betId.toString() }, `${tag} — still "accepting" after cleanup timeout, reverting`);
               if (pendingLockId) removePendingLock(address, pendingLockId);
               const reverted = await betService.revertAccepting(betId).catch(err => { logger.warn({ err }, `${tag} — revertAccepting failed`); return null; });
@@ -559,6 +567,29 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
 
   const chainStatus = chainState.status.toLowerCase();
   logger.debug({ betId: betId.toString(), chainStatus }, `${tag} — chain status`);
+
+  // Chain says "accepted" — bet was accepted on chain but DB might still be "accepting".
+  // Sync DB to "accepted" and emit bet_accepted (avoids false revert by sweep/cleanup).
+  const isAccepted = chainStatus === 'accepted';
+  if (isAccepted) {
+    const currentBet = await betService.getBetById(betId);
+    if (currentBet && currentBet.status === 'accepting' && currentBet.acceptorUserId) {
+      const accepted = await betService.acceptBet({
+        betId,
+        acceptorUserId: currentBet.acceptorUserId,
+        acceptorGuess: currentBet.acceptorGuess ?? 'heads',
+        txhashAccept: currentBet.txhashAccept ?? '',
+      });
+      if (accepted) {
+        logger.info({ betId: betId.toString() }, `${tag} — DB synced: accepting → accepted`);
+        const addressMap = await betService.buildAddressMap([accepted]);
+        wsService.emitBetAccepted(formatBetResponse(accepted, addressMap) as unknown as Record<string, unknown>);
+        return true;
+      }
+    }
+    // Already accepted in DB or not in accepting — nothing to sync
+    return true;
+  }
 
   // Chain uses "timeoutclaimed" (no underscore), DB uses "timeout_claimed"
   const isResolved = chainStatus === 'revealed'
