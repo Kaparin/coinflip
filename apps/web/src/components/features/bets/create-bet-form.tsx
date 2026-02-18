@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useCreateBet, useGetVaultBalance, getGetVaultBalanceQueryKey, createBet as createBetApi } from '@coinflip/api-client';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useQueryClient } from '@tanstack/react-query';
@@ -55,13 +55,13 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
   // Reset localSubmitted when vault balance refetches (server count is now up to date)
   const serverOpenBetsCount: number | null = (balanceData?.data as any)?.open_bets_count ?? null;
   const lastServerCountRef = useRef<number | null>(null);
-  if (serverOpenBetsCount !== null && serverOpenBetsCount !== lastServerCountRef.current) {
-    // Server provided a fresh count — it includes our pending bets, so reset local offset
-    lastServerCountRef.current = serverOpenBetsCount;
-    if (localSubmitted > 0) {
+  useEffect(() => {
+    if (serverOpenBetsCount !== null && serverOpenBetsCount !== lastServerCountRef.current) {
+      // Server provided a fresh count — it includes our pending bets, so reset local offset
+      lastServerCountRef.current = serverOpenBetsCount;
       setLocalSubmitted(0);
     }
-  }
+  }, [serverOpenBetsCount]);
 
   // Compute effective count: server count (authoritative) + local offset (for gap between submit and refetch)
   const serverCount = serverOpenBetsCount ?? 0;

@@ -205,17 +205,21 @@ export function useWebWallet(): WebWalletState {
           const [account] = await wallet.getAccounts();
           if (account?.address === sessionAddr) {
             walletRef.current = wallet;
-            // Re-register session with mnemonic (ensures fresh cookie via challenge-response)
-            await registerSession(sessionAddr, wallet.mnemonic);
             setAddress(sessionAddr);
+            setIsConnecting(false);
+            // Register session in background (fire-and-forget)
+            registerSession(sessionAddr, wallet.mnemonic).catch((err) => {
+              console.error('[useWebWallet] Session registration failed:', err);
+            });
           } else {
             // Address mismatch — clear stale session
             clearSessionWallet();
             sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+            setIsConnecting(false);
           }
+        } else {
+          setIsConnecting(false);
         }
-        // If restore failed, user will need to re-enter PIN — hasSaved is true
-        setIsConnecting(false);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

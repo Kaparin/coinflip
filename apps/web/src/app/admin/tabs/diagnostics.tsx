@@ -83,6 +83,20 @@ export function DiagnosticsTab() {
         </section>
       )}
 
+      {/* Coin Flip Randomness (since server start) */}
+      {d?.coinFlipStats && d.coinFlipStats.total > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+            Coin Flip Randomness (since server start)
+          </h2>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Heads" value={d.coinFlipStats.heads} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.heads / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
+            <StatCard label="Tails" value={d.coinFlipStats.tails} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.tails / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
+            <StatCard label="Total Flips" value={d.coinFlipStats.total} sub="crypto.randomBytes" />
+          </div>
+        </section>
+      )}
+
       {/* Pending Bet Secrets */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">

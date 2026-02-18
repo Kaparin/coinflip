@@ -8,6 +8,21 @@ import {
 } from '../services/session.service.js';
 import { env } from '../config/env.js';
 
+const USER_CACHE_TTL_MS = 30_000;
+const USER_CACHE_CLEANUP_INTERVAL_MS = 30_000;
+const USER_CACHE_MAX_AGE_MS = 60_000;
+
+const userCache = new Map<string, { user: any; ts: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of userCache.entries()) {
+    if (now - entry.ts > USER_CACHE_MAX_AGE_MS) {
+      userCache.delete(key);
+    }
+  }
+}, USER_CACHE_CLEANUP_INTERVAL_MS);
+
 /**
  * Auth middleware: verifies wallet ownership via cryptographic session token.
  *
@@ -42,8 +57,16 @@ export async function authMiddleware(c: Context, next: Next) {
     throw new AppError('UNAUTHORIZED', 'Authentication required. Please connect your wallet.', 401);
   }
 
-  // Find or create user
-  const user = await userService.findOrCreateUser(address);
+  // Find or create user (with in-memory cache)
+  let user: any;
+  const cached = userCache.get(address);
+  const now = Date.now();
+  if (cached && now - cached.ts < USER_CACHE_TTL_MS) {
+    user = cached.user;
+  } else {
+    user = await userService.findOrCreateUser(address);
+    userCache.set(address, { user, ts: now });
+  }
 
   // Store in context for downstream handlers
   c.set('user', user);

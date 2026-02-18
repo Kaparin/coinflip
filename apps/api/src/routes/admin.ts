@@ -12,7 +12,9 @@ import { getDb } from '../lib/db.js';
 import { users, bets, vaultBalances, pendingBetSecrets } from '@coinflip/db/schema';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { getCoinFlipStats } from './bets.js';
 import type { AppEnv } from '../types.js';
+import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
 export const adminRouter = new Hono<AppEnv>();
 
@@ -397,10 +399,11 @@ adminRouter.get('/bets/orphaned', async (c) => {
 
   try {
     // Fetch all open bets from chain
-    const query = JSON.stringify({ open_bets: { limit: 200 } });
+    const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await fetch(
       `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      { signal: AbortSignal.timeout(5000) },
     );
 
     if (!res.ok) {
@@ -458,6 +461,7 @@ adminRouter.post('/bets/orphaned/import', zValidator('json', ImportOrphanedSchem
     const encoded = Buffer.from(query).toString('base64');
     const res = await fetch(
       `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      { signal: AbortSignal.timeout(5000) },
     );
 
     if (!res.ok) {
@@ -703,6 +707,7 @@ adminRouter.get('/diagnostics', async (c) => {
           address: r.address,
           locked: r.locked,
         })),
+        coinFlipStats: getCoinFlipStats(),
         timestamp: new Date().toISOString(),
       },
     });

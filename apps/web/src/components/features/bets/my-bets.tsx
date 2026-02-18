@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { useGetBets, useCancelBet, cancelBet } from '@coinflip/api-client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCancelBet, cancelBet } from '@coinflip/api-client';
+import { API_URL } from '@/lib/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { BetCard } from './bet-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,25 +32,32 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   // Smart polling: slow (30s) when WS connected, fast (5s) when WS down
   const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
 
-  // Get all active bets
-  // Fetch open bets (includes "canceling" from DB since it's set before chain confirms)
-  const { data: openData, isLoading: loadingOpen } = useGetBets(
-    { status: 'open', limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: pollInterval } },
-  );
-  const { data: acceptingData, isLoading: loadingAccepting } = useGetBets(
-    { status: 'accepting', limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: pollInterval } },
-  );
-  const { data: acceptedData, isLoading: loadingAccepted } = useGetBets(
-    { status: 'accepted' as any, limit: 50 },
-    { query: { enabled: isConnected, refetchInterval: pollInterval } },
-  );
+  const { data: myBetsData, isLoading } = useQuery({
+    queryKey: ['/api/v1/bets/mine', address],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/v1/bets/mine`, {
+        headers: {
+          'x-wallet-address': address!,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (!res.ok) return { data: [] };
+      return res.json() as Promise<{ data: any[] }>;
+    },
+    enabled: isConnected && !!address,
+    refetchInterval: pollInterval,
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
+  });
+
+  const allBets = myBetsData?.data ?? [];
 
   const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['/api/v1/bets/mine', address] });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-  }, [queryClient]);
+  }, [queryClient, address]);
 
   const clearPending = useCallback(() => {
     setPendingBetId(null);
@@ -73,13 +81,9 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     },
   });
 
-  const isLoading = loadingOpen || loadingAccepting || loadingAccepted;
-  const allBets = [...(openData?.data ?? []), ...(acceptingData?.data ?? []), ...(acceptedData?.data ?? [])];
-
-  // Filter to only my bets
-  const myBets = allBets.filter(
-    (bet) => bet.maker === address || (bet as any).acceptor === address,
-  );
+  // /mine returns only my bets — no client-side filtering needed
+  const addrLower = address?.toLowerCase();
+  const myBets = allBets;
 
   const handleCancel = useCallback((id: string) => {
     setPendingBetId(id);
@@ -149,12 +153,12 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   }
 
   // Categorize bets
-  const myOpenBets = myBets.filter(b => b.status === 'open' && b.maker === address);
-  const myAccepting = myBets.filter(b => b.status === 'accepting' && ((b as any).acceptor === address || b.maker === address));
+  const myOpenBets = myBets.filter(b => b.status === 'open' && b.maker?.toLowerCase() === addrLower);
+  const myAccepting = myBets.filter(b => b.status === 'accepting');
   const myInProgress = myBets.filter(b => b.status === 'accepted');
   // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
   const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
-  const myPending = pendingBets.filter(b => b.maker === address && !confirmedTxHashes.has(b.txHash));
+  const myPending = pendingBets.filter(b => b.maker?.toLowerCase() === addrLower && !confirmedTxHashes.has(b.txHash));
 
   const hasAnything = myPending.length > 0 || myAccepting.length > 0 || myInProgress.length > 0 || myOpenBets.length > 0;
 
@@ -211,8 +215,8 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 acceptedAt={(bet as any).accepted_at}
                 winner={(bet as any).winner}
                 acceptor={(bet as any).acceptor}
-                isMine={bet.maker === address}
-                isAcceptor={(bet as any).acceptor === address}
+                isMine={bet.maker?.toLowerCase() === addrLower}
+                isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
               />
             ))}
             {myInProgress.map((bet) => (
@@ -229,8 +233,8 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 acceptedAt={(bet as any).accepted_at}
                 winner={(bet as any).winner}
                 acceptor={(bet as any).acceptor}
-                isMine={bet.maker === address}
-                isAcceptor={(bet as any).acceptor === address}
+                isMine={bet.maker?.toLowerCase() === addrLower}
+                isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
               />
             ))}
           </div>

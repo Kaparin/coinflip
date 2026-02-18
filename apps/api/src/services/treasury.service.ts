@@ -28,6 +28,7 @@ export class TreasuryService {
       const query = btoa(JSON.stringify({ vault_balance: { address: treasuryAddr } }));
       const res = await fetch(
         `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+        { signal: AbortSignal.timeout(5000) },
       );
       if (res.ok) {
         const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -44,6 +45,7 @@ export class TreasuryService {
       const query = btoa(JSON.stringify({ balance: { address: treasuryAddr } }));
       const res = await fetch(
         `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
+        { signal: AbortSignal.timeout(5000) },
       );
       if (res.ok) {
         const data = (await res.json()) as { data: { balance: string } };

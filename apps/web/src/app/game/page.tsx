@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { useQueryClient } from '@tanstack/react-query';
 import { CreateBetForm } from '@/components/features/bets/create-bet-form';
@@ -21,8 +21,11 @@ import type { WsEvent } from '@coinflip/shared/types';
 
 type Tab = 'bets' | 'mybets' | 'history' | 'leaderboard';
 
+const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
+
 export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
+  const activeTabRef = useRef<Tab>('bets');
   const queryClient = useQueryClient();
   const { address, isConnected } = useWalletContext();
   const { addToast } = useToast();
@@ -36,29 +39,24 @@ export default function GamePage() {
     ]);
   }, [queryClient]);
 
-  // Pending bets manager (bets submitted but not yet confirmed on chain)
   const { pendingBets, addPending, handleWsEvent: handlePendingWsEvent } = usePendingBets();
 
-  // WS event handler — server handles reveal/claim automatically
   const handleWsEvent = useCallback((event: WsEvent) => {
     handlePendingWsEvent(event);
 
-    // Toast notifications
     if (event.type === 'bet_confirmed') {
       addToast('success', t('game.betConfirmed'));
     }
     if (event.type === 'bet_create_failed') {
       const reason = (event.data as any)?.reason ?? 'Transaction failed';
-      const friendlyMsg = getUserFriendlyError({ error: { message: reason } }, t, 'create');
-      addToast('error', friendlyMsg);
+      addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'create'));
     }
     if (event.type === 'bet_accepted') {
       addToast('info', t('game.betAcceptedWinner'));
     }
     if (event.type === 'accept_failed') {
       const reason = (event.data as any)?.reason ?? 'Transaction failed';
-      const friendlyMsg = getUserFriendlyError({ error: { message: reason } }, t, 'accept');
-      addToast('error', friendlyMsg);
+      addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'accept'));
     }
     if (event.type === 'bet_reverted') {
       addToast('info', t('game.betReverted'));
@@ -78,20 +76,24 @@ export default function GamePage() {
 
   const { isConnected: wsConnected } = useWebSocket({ address, enabled: isConnected, onEvent: handleWsEvent });
 
+  const handleTabChange = useCallback((tab: Tab) => {
+    activeTabRef.current = tab;
+    setActiveTab(tab);
+  }, []);
+
+  const setTabByDelta = useCallback((delta: number) => {
+    const currentIdx = TAB_ORDER.indexOf(activeTabRef.current);
+    const next = Math.max(0, Math.min(TAB_ORDER.length - 1, currentIdx + delta));
+    const tab = TAB_ORDER[next];
+    if (tab) handleTabChange(tab);
+  }, [handleTabChange]);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'bets', label: t('game.openBets') },
     { id: 'mybets', label: t('game.myBets') },
     { id: 'history', label: t('game.historyTab') },
     { id: 'leaderboard', label: t('game.topPlayers') },
   ];
-
-  const tabOrder: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
-  const currentIdx = tabOrder.indexOf(activeTab);
-  const setTabByDelta = useCallback((delta: number) => {
-    const next = Math.max(0, Math.min(tabOrder.length - 1, currentIdx + delta));
-    const tab = tabOrder[next];
-    if (tab) setActiveTab(tab);
-  }, [currentIdx]);
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => setTabByDelta(1),
@@ -103,7 +105,6 @@ export default function GamePage() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24 md:pb-6">
-      {/* WS disconnection warning */}
       {isConnected && !wsConnected && (
         <div className="flex items-center gap-2 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 px-3 py-2 text-xs text-[var(--color-warning)]">
           <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
@@ -111,24 +112,22 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* Vault Balance — compact bar on mobile, full on desktop */}
       <MobileBalanceBar />
       <div className="hidden md:block">
         <BalanceDisplay />
       </div>
 
-      {/* Create Bet */}
       <div id="create-bet-form">
         <CreateBetForm onBetSubmitted={addPending} />
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — all always mounted, hidden via CSS to preserve state & scroll */}
       <div>
         <div className="flex gap-1 border-b border-[var(--color-border)] mb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px active:scale-[0.98] ${
                 activeTab === tab.id
                   ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
@@ -141,10 +140,18 @@ export default function GamePage() {
         </div>
 
         <div {...swipeHandlers} className="min-h-[200px]">
-          {activeTab === 'bets' && <BetList pendingBets={pendingBets} />}
-          {activeTab === 'mybets' && <MyBets pendingBets={pendingBets} />}
-          {activeTab === 'history' && <HistoryList />}
-          {activeTab === 'leaderboard' && <Leaderboard />}
+          <div style={{ display: activeTab === 'bets' ? 'block' : 'none' }}>
+            <BetList pendingBets={pendingBets} />
+          </div>
+          <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>
+            <MyBets pendingBets={pendingBets} />
+          </div>
+          <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
+            <HistoryList />
+          </div>
+          <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
+            <Leaderboard />
+          </div>
         </div>
       </div>
     </div>

@@ -58,6 +58,9 @@ export const COMMISSION_BPS = 1000;
 /** Authz grant duration in days */
 export const AUTHZ_GRANT_DURATION_DAYS = 30;
 
+/** Limit for chain open_bets query (contract pagination) */
+export const CHAIN_OPEN_BETS_LIMIT = 200;
+
 /** Daily max amount in play per wallet (micro-LAUNCH) */
 export const MAX_DAILY_AMOUNT = '1000000000000'; // = 1,000,000 LAUNCH
 

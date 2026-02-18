@@ -58,7 +58,7 @@ export class BetService {
     acceptorGuess: string;
     txhashAccept: string;
   }) {
-    const [bet] = await this.db
+    const result = await this.db
       .update(bets)
       .set({
         status: 'accepted',
@@ -67,10 +67,14 @@ export class BetService {
         acceptedTime: new Date(),
         txhashAccept: params.txhashAccept,
       })
-      .where(eq(bets.betId, params.betId))
+      .where(and(eq(bets.betId, params.betId), eq(bets.status, 'accepting')))
       .returning();
 
-    return bet;
+    if (result.length === 0) {
+      logger.warn({ betId: params.betId.toString() }, 'acceptBet: no rows updated — bet not in accepting state');
+      return null;
+    }
+    return result[0]!;
   }
 
   async resolveBet(params: {
@@ -81,7 +85,7 @@ export class BetService {
     txhashResolve: string;
     status: 'revealed' | 'timeout_claimed';
   }) {
-    const [bet] = await this.db
+    const result = await this.db
       .update(bets)
       .set({
         status: params.status,
@@ -91,24 +95,32 @@ export class BetService {
         resolvedTime: new Date(),
         txhashResolve: params.txhashResolve,
       })
-      .where(eq(bets.betId, params.betId))
+      .where(and(eq(bets.betId, params.betId), inArray(bets.status, ['accepted', 'accepting'])))
       .returning();
 
-    return bet;
+    if (result.length === 0) {
+      logger.warn({ betId: params.betId.toString(), targetStatus: params.status }, 'resolveBet: no rows updated — bet not in accepted/accepting state');
+      return null;
+    }
+    return result[0]!;
   }
 
   async cancelBet(betId: bigint, txhash?: string) {
-    const [bet] = await this.db
+    const result = await this.db
       .update(bets)
       .set({
         status: 'canceled',
         txhashResolve: txhash,
         resolvedTime: new Date(),
       })
-      .where(eq(bets.betId, betId))
+      .where(and(eq(bets.betId, betId), inArray(bets.status, ['open', 'canceling'])))
       .returning();
 
-    return bet;
+    if (result.length === 0) {
+      logger.warn({ betId: betId.toString() }, 'cancelBet: no rows updated — bet not in open/canceling state');
+      return null;
+    }
+    return result[0]!;
   }
 
   /**
@@ -150,7 +162,7 @@ export class BetService {
    * Called when the chain tx fails.
    */
   async revertAccepting(betId: bigint) {
-    const [bet] = await this.db
+    const result = await this.db
       .update(bets)
       .set({
         status: 'open',
@@ -158,11 +170,15 @@ export class BetService {
         acceptorGuess: null,
         resolvedTime: null,
       })
-      .where(eq(bets.betId, betId))
+      .where(and(eq(bets.betId, betId), eq(bets.status, 'accepting')))
       .returning();
 
+    if (result.length === 0) {
+      logger.warn({ betId: betId.toString() }, 'revertAccepting: no rows updated — bet not in accepting state (may have been resolved)');
+      return null;
+    }
     logger.info({ betId: betId.toString() }, 'Bet reverted from accepting to open');
-    return bet;
+    return result[0]!;
   }
 
   /**
@@ -242,6 +258,20 @@ export class BetService {
     return { data, cursor: nextCursor, has_more: hasMore };
   }
 
+  async getMyActiveBets(userId: string): Promise<BetRow[]> {
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        and(
+          sql`(${bets.makerUserId} = ${userId} OR ${bets.acceptorUserId} = ${userId})`,
+          inArray(bets.status, ['open', 'accepting', 'accepted', 'canceling']),
+        ),
+      )
+      .orderBy(desc(bets.createdTime))
+      .limit(100);
+  }
+
   async getUserBetHistory(params: { userId: string; cursor?: string; limit: number }) {
     const limit = Math.min(params.limit, 100);
 
@@ -302,8 +332,7 @@ export class BetService {
     return row?.address ?? null;
   }
 
-  /** Get accepted bets that have stored secrets (need auto-reveal) */
-  async getAcceptedBetsWithSecrets(): Promise<BetRow[]> {
+  async getAcceptedBetsWithSecrets(limit = 200): Promise<BetRow[]> {
     return this.db
       .select()
       .from(bets)
@@ -313,13 +342,11 @@ export class BetService {
           sql`${bets.makerSecret} IS NOT NULL`,
           sql`${bets.makerSide} IS NOT NULL`,
         ),
-      );
+      )
+      .limit(limit);
   }
 
-  /** Get accepted bets that have timed out (reveal deadline passed) */
-  async getTimedOutAcceptedBets(): Promise<BetRow[]> {
-    // reveal_timeout is typically 300s (5 min) from accepted_time
-    // Also catch old bets where acceptedTime is NULL (legacy) but are old enough
+  async getTimedOutAcceptedBets(limit = 200): Promise<BetRow[]> {
     return this.db
       .select()
       .from(bets)
@@ -332,12 +359,11 @@ export class BetService {
             (${bets.acceptedTime} IS NULL AND ${bets.createdTime} < NOW() - INTERVAL '10 minutes')
           )`,
         ),
-      );
+      )
+      .limit(limit);
   }
 
-  /** Get open bets that have expired (older than OPEN_BET_TTL_SECS) */
-  async getExpiredOpenBets(): Promise<BetRow[]> {
-    // OPEN_BET_TTL_SECS = 10800 (3 hours)
+  async getExpiredOpenBets(limit = 200): Promise<BetRow[]> {
     return this.db
       .select()
       .from(bets)
@@ -346,7 +372,22 @@ export class BetService {
           inArray(bets.status, ['open', 'canceling']),
           sql`${bets.createdTime} < NOW() - INTERVAL '3 hours'`,
         ),
-      );
+      )
+      .limit(limit);
+  }
+
+  /** Get bets stuck in transitional states for too long (for recovery sweep) */
+  async getStuckTransitionalBets(limit = 100): Promise<BetRow[]> {
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        and(
+          inArray(bets.status, ['accepting', 'canceling']),
+          sql`${bets.createdTime} < NOW() - INTERVAL '2 minutes'`,
+        ),
+      )
+      .limit(limit);
   }
 
   /** Build a map of userId -> { address, nickname } for a list of bets */

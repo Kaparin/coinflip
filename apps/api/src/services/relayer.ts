@@ -282,6 +282,7 @@ export class RelayerService {
           try {
             const txRes = await fetch(
               `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
+              { signal: AbortSignal.timeout(5000) },
             );
             if (txRes.ok) {
               const txData = await txRes.json() as {

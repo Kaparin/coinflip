@@ -13,21 +13,8 @@ import type { AppEnv } from '../types.js';
 import type { RelayResult } from '../services/relayer.js';
 import { getPendingBetCount } from '../lib/pending-counts.js';
 import { betService } from '../services/bet.service.js';
-
-// ─── Per-user in-flight transaction guard ─────────────────────
-const inflightTxs = new Map<string, number>();
-
-function acquireInflight(address: string): void {
-  const existing = inflightTxs.get(address);
-  if (existing && Date.now() - existing < 30_000) {
-    throw Errors.actionInProgress(5);
-  }
-  inflightTxs.set(address, Date.now());
-}
-
-function releaseInflight(address: string): void {
-  inflightTxs.delete(address);
-}
+import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
+import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 
 /** Throw an appropriate AppError for a failed relay result */
 function throwRelayError(relayResult: RelayResult): never {
@@ -40,37 +27,26 @@ function throwRelayError(relayResult: RelayResult): never {
 export const vaultRouter = new Hono<AppEnv>();
 
 /** Query vault balance directly from chain contract (with cache) */
-const balanceCache = new Map<string, { data: { available: string; locked: string }; ts: number }>();
-const BALANCE_CACHE_TTL = 5_000; // 5 seconds
-
-// Periodic cleanup of expired cache entries (prevents unbounded map growth)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, val] of balanceCache) {
-    if (now - val.ts > BALANCE_CACHE_TTL) balanceCache.delete(key);
-  }
-}, 30_000);
-
 export async function getChainVaultBalance(address: string): Promise<{ available: string; locked: string }> {
-  // Check cache first
-  const cached = balanceCache.get(address);
-  if (cached && Date.now() - cached.ts < BALANCE_CACHE_TTL) {
-    return cached.data;
-  }
-
-  try {
-    const query = btoa(JSON.stringify({ vault_balance: { address } }));
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-    );
-    if (!res.ok) return { available: '0', locked: '0' };
-    const data = (await res.json()) as { data: { available: string; locked: string } };
-    balanceCache.set(address, { data: data.data, ts: Date.now() });
-    return data.data;
-  } catch (err) {
-    logger.warn({ err, address }, 'Failed to query chain vault balance, falling back to DB');
-    return { available: '0', locked: '0' };
-  }
+  return chainCached(
+    'vault:' + address,
+    async () => {
+      try {
+        const query = btoa(JSON.stringify({ vault_balance: { address } }));
+        const res = await fetch(
+          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (!res.ok) return { available: '0', locked: '0' };
+        const data = (await res.json()) as { data: { available: string; locked: string } };
+        return data.data;
+      } catch (err) {
+        logger.warn({ err, address }, 'Failed to query chain vault balance, falling back to DB');
+        return { available: '0', locked: '0' };
+      }
+    },
+    10_000,
+  );
 }
 
 // ─── Server-side pending locks ──────────────────────────────────
@@ -129,7 +105,7 @@ export function getTotalPendingLocks(address: string): bigint {
 
 /** Invalidate balance cache for a user (call after lockFunds/unlockFunds) */
 export function invalidateBalanceCache(address: string): void {
-  balanceCache.delete(address);
+  invalidateChainCache('vault:' + address);
 }
 
 // GET /api/v1/vault/balance — Get balance (auth required)
@@ -236,6 +212,7 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
       const balQuery = btoa(JSON.stringify({ balance: { address } }));
       const balRes = await fetch(
         `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${balQuery}`,
+        { signal: AbortSignal.timeout(5000) },
       );
       if (balRes.ok) {
         const balData = await balRes.json() as { data: { balance: string } };
@@ -265,6 +242,7 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
         tx_bytes: txBytesBase64,
         mode: 'BROADCAST_MODE_SYNC',
       }),
+      signal: AbortSignal.timeout(5000),
     });
 
     const broadcastData = await broadcastRes.json() as {
@@ -302,6 +280,7 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
       try {
         const txRes = await fetch(
           `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
+          { signal: AbortSignal.timeout(5000) },
         );
         if (txRes.ok) {
           const txData = await txRes.json() as {

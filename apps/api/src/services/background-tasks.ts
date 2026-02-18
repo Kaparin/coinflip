@@ -5,6 +5,7 @@
  * They poll the chain for tx inclusion and update the DB + notify via WebSocket.
  */
 
+import { sql } from 'drizzle-orm';
 import { betService } from './bet.service.js';
 import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
@@ -15,7 +16,9 @@ import { logger } from '../lib/logger.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
 import { removePendingLock, invalidateBalanceCache } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
+import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService } from './pending-secrets.service.js';
+import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -160,10 +163,11 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
             await new Promise(r => setTimeout(r, retryDelays[attempt] ?? 2_000));
           }
           try {
-            const query = JSON.stringify({ open_bets: { limit: 100 } });
+            const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
             const encoded = Buffer.from(query).toString('base64');
             const res = await fetch(
               `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+              { signal: AbortSignal.timeout(5000) },
             );
             if (res.ok) {
               const data = await res.json() as {
@@ -343,23 +347,52 @@ export interface AcceptBetTask {
   address: string;
   amount: string;
   pendingLockId?: string;
+  /** Pre-loaded reveal info for pipelining — avoids an extra DB read. */
+  revealInfo?: {
+    makerAddress: string;
+    makerSide: 'heads' | 'tails';
+    makerSecret: string;
+  };
 }
 
 /**
  * Confirm accept bet tx on chain.
  * Runs in background after API returns 202.
  *
- * 1. Poll for tx inclusion (up to 35s)
- * 2. If success: update DB, WS broadcast
- * 3. If failure: revert bet to "open", unlock funds, WS notify
+ * Pipeline optimization: if revealInfo is provided, the reveal tx is broadcast
+ * IMMEDIATELY in parallel with accept tx polling. Both txs land in the mempool
+ * and are processed by the chain in nonce order (accept first, then reveal).
+ * This saves one full block cycle (~5-6s) compared to waiting for accept confirmation.
  */
 export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
   (async () => {
-    const { betId, txHash, acceptorUserId, acceptorGuess, address, amount, pendingLockId } = task;
+    const { betId, txHash, acceptorUserId, acceptorGuess, address, amount, pendingLockId, revealInfo } = task;
     const tag = `bg:accept_bet`;
 
+    // PIPELINE OPTIMIZATION: broadcast reveal tx immediately, in parallel with accept polling.
+    // The chain processes txs in nonce order, so accept will execute before reveal.
+    // This saves ~5-6s (one block cycle) in the happy path.
+    let pipelinedRevealTxHash: string | undefined;
+    if (revealInfo && relayerService.isReady()) {
+      try {
+        const revealResult = await relayerService.relayReveal(
+          revealInfo.makerAddress,
+          Number(betId),
+          revealInfo.makerSide,
+          revealInfo.makerSecret,
+          /* asyncMode */ true,
+        );
+        if (revealResult.success && revealResult.txHash) {
+          pipelinedRevealTxHash = revealResult.txHash;
+          logger.info({ betId: betId.toString(), revealTxHash: revealResult.txHash }, `${tag} — reveal tx pipelined (broadcast before accept confirmed)`);
+        }
+      } catch (err) {
+        logger.warn({ err, betId: betId.toString() }, `${tag} — pipelined reveal broadcast failed (will retry after accept)`);
+      }
+    }
+
     try {
-      // Step 1: Poll for tx result
+      // Step 1: Poll for accept tx result
       const txResult = await pollForTx(txHash);
 
       if (!txResult) {
@@ -431,11 +464,16 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
         const addressMap = await betService.buildAddressMap([bet]);
         wsService.emitBetAccepted(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
 
-        // AUTO-REVEAL: immediately trigger reveal using stored secret
-        // Skip chain check — we just confirmed accept, no need to query chain again
-        autoRevealBet(betId, /* skipChainCheck */ true).catch(err => {
-          logger.error({ err, betId: betId.toString() }, `${tag} — auto-reveal failed (will retry via background job)`);
-        });
+        if (pipelinedRevealTxHash) {
+          // Reveal was already broadcast — just poll for its confirmation
+          logger.info({ betId: betId.toString(), revealTxHash: pipelinedRevealTxHash }, `${tag} — using pipelined reveal tx`);
+          pollRevealAndSync(betId, pipelinedRevealTxHash);
+        } else {
+          // Reveal wasn't pipelined — do it now
+          autoRevealBet(betId, /* skipChainCheck */ true).catch(err => {
+            logger.error({ err, betId: betId.toString() }, `${tag} — auto-reveal failed (will retry via background job)`);
+          });
+        }
       }
     } catch (err) {
       logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error, reverting accept and unlocking funds`);
@@ -469,18 +507,25 @@ interface ChainBetState {
 
 /** Query the on-chain state of a bet */
 async function getChainBetState(betId: number): Promise<ChainBetState | null> {
-  try {
-    const query = JSON.stringify({ bet: { bet_id: betId } });
-    const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-    );
-    if (!res.ok) return null;
-    const data = await res.json() as { data: ChainBetState };
-    return data.data;
-  } catch {
-    return null;
-  }
+  return chainCached(
+    'bet:' + betId,
+    async () => {
+      try {
+        const query = JSON.stringify({ bet: { bet_id: betId } });
+        const encoded = Buffer.from(query).toString('base64');
+        const res = await fetch(
+          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (!res.ok) return null;
+        const data = await res.json() as { data: ChainBetState };
+        return data.data;
+      } catch {
+        return null;
+      }
+    },
+    3_000,
+  );
 }
 
 /** Processing lock — prevents concurrent operations on the same bet */
@@ -531,17 +576,21 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
       : chainStatus === 'canceled' ? 'canceled'
       : 'revealed';
 
+    let dbUpdated = false;
+
     if (dbStatus === 'canceled') {
-      await betService.cancelBet(betId);
+      const canceled = await betService.cancelBet(betId);
+      dbUpdated = !!canceled;
+      if (!canceled) {
+        logger.warn({ betId: betId.toString() }, `${tag} — cancelBet returned null (already resolved)`);
+      }
     } else {
-      // If winner address couldn't be resolved to a user, defer resolution.
-      // Both maker and acceptor should exist in the DB — if not, something is wrong.
       if (!winnerUserId && chainState.winner) {
         logger.error({ betId: betId.toString(), winnerAddress: chainState.winner }, 'syncBetFromChain: winner not found in DB — deferring');
         return false;
       }
 
-      await betService.resolveBet({
+      const resolved = await betService.resolveBet({
         betId,
         winnerUserId: winnerUserId ?? '',
         commissionAmount: chainState.commission_paid ?? '0',
@@ -549,28 +598,27 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
         txhashResolve: '',
         status: dbStatus as 'revealed' | 'timeout_claimed',
       });
+      dbUpdated = !!resolved;
+      if (!resolved) {
+        logger.warn({ betId: betId.toString(), dbStatus }, `${tag} — resolveBet returned null (already resolved)`);
+      }
 
-      // Distribute referral rewards from commission
-      if (currentBet && currentBet.acceptorUserId) {
+      if (resolved && currentBet && currentBet.acceptorUserId) {
         const totalPot = BigInt(currentBet.amount) * 2n;
         referralService.distributeRewards(betId, totalPot, currentBet.makerUserId, currentBet.acceptorUserId)
           .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — referral reward distribution failed`));
       }
     }
 
-    // Unlock vault funds for involved parties if the bet was in an active state
-    if (currentBet && (currentBet.status === 'open' || currentBet.status === 'accepting' || currentBet.status === 'accepted')) {
+    // Only unlock vault funds if we actually transitioned the bet status
+    if (dbUpdated && currentBet && (currentBet.status === 'open' || currentBet.status === 'accepting' || currentBet.status === 'accepted')) {
       try {
         if (dbStatus === 'canceled') {
-          // Cancel: unlock maker's funds
           await vaultService.unlockFunds(currentBet.makerUserId, currentBet.amount);
-          // If there was an acceptor (accepting state), unlock their funds too
           if (currentBet.acceptorUserId) {
             await vaultService.unlockFunds(currentBet.acceptorUserId, currentBet.amount);
           }
         }
-        // For revealed/timeout_claimed: funds were sent on chain, just unlock the locked amounts
-        // The vault balances will be corrected on next chain sync via vault.syncUserBalance
       } catch (err) {
         logger.warn({ err, betId: betId.toString() }, `${tag} — vault unlock failed (non-critical)`);
       }
@@ -701,8 +749,8 @@ function pollRevealAndSync(betId: bigint, txHash: string): void {
   // Fire-and-forget — don't block the caller
   (async () => {
     try {
-      // Poll for tx with fast intervals (500ms start, ~1s avg)
-      const result = txHash ? await pollForTx(txHash, 25_000, 1_000) : null;
+      // Poll aggressively — reveal result is what the user is waiting for
+      const result = txHash ? await pollForTx(txHash, 30_000, 400) : null;
 
       if (result) {
         logger.info({ betId: betId.toString(), txHash, code: result.code }, `${tag} — reveal tx confirmed`);
@@ -883,10 +931,12 @@ async function autoCancelExpiredBets(): Promise<void> {
           try {
             const txResult = await pollForTx(cancelTxHash!, 30_000, 3_000);
             if (txResult && txResult.code === 0) {
-              await vaultService.unlockFunds(cancelUserId, cancelAmount).catch(err =>
-                logger.warn({ err }, `${tag} — unlockFunds failed`));
-              await betService.cancelBet(cancelBetId, cancelTxHash!);
-              logger.info({ betId: cancelBetId.toString() }, `${tag} — expired bet canceled & funds returned`);
+              const canceled = await betService.cancelBet(cancelBetId, cancelTxHash!);
+              if (canceled) {
+                await vaultService.unlockFunds(cancelUserId, cancelAmount).catch(err =>
+                  logger.warn({ err }, `${tag} — unlockFunds failed`));
+              }
+              logger.info({ betId: cancelBetId.toString(), canceled: !!canceled }, `${tag} — expired bet cancel processed`);
 
               // Notify via WS
               const updated = await betService.getBetById(cancelBetId);
@@ -931,10 +981,11 @@ async function reconcileOrphanedChainBets(): Promise<void> {
 
   try {
     // Query chain for all open bets
-    const query = JSON.stringify({ open_bets: { limit: 200 } });
+    const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await fetch(
       `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      { signal: AbortSignal.timeout(5000) },
     );
     if (!res.ok) return;
 
@@ -1015,6 +1066,95 @@ async function reconcileOrphanedChainBets(): Promise<void> {
   }
 }
 
+// ─── Recovery: Stuck Transitional Bets ──────────────────────────
+
+async function recoverStuckTransitionalBets(): Promise<void> {
+  const tag = 'recover-stuck';
+  try {
+    const stuck = await betService.getStuckTransitionalBets();
+    if (stuck.length === 0) return;
+
+    logger.info({ count: stuck.length }, `${tag} — found stuck transitional bets`);
+
+    for (const bet of stuck) {
+      const betKey = bet.betId.toString();
+      if (processingBets.has(betKey)) continue;
+      processingBets.add(betKey);
+
+      try {
+        // Check chain state first — the tx might have succeeded
+        const synced = await syncBetFromChain(bet.betId);
+        if (synced) {
+          logger.info({ betId: betKey, status: bet.status }, `${tag} — synced from chain`);
+          continue;
+        }
+
+        // Not resolved on chain — revert to previous safe state
+        if (bet.status === 'accepting') {
+          const reverted = await betService.revertAccepting(bet.betId);
+          if (reverted) {
+            if (bet.acceptorUserId) {
+              await vaultService.unlockFunds(bet.acceptorUserId, bet.amount).catch(() => {});
+            }
+            const addressMap = await betService.buildAddressMap([reverted]);
+            wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+            logger.info({ betId: betKey }, `${tag} — reverted accepting → open`);
+          }
+        } else if (bet.status === 'canceling') {
+          const canceled = await betService.cancelBet(bet.betId);
+          if (canceled) {
+            await vaultService.unlockFunds(bet.makerUserId, bet.amount).catch(() => {});
+            logger.info({ betId: betKey }, `${tag} — finalized canceling → canceled + unlocked`);
+          }
+        }
+      } catch (err) {
+        logger.error({ err, betId: betKey }, `${tag} — error`);
+      } finally {
+        processingBets.delete(betKey);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, `${tag} — sweep failed`);
+  }
+}
+
+// ─── Recovery: Stuck Locked Funds ───────────────────────────────
+
+async function recoverStuckLockedFunds(): Promise<void> {
+  const tag = 'recover-locked';
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+
+    // Find users with locked > 0 but no active bets
+    const stuck = await db.execute(sql`
+      SELECT vb.user_id, vb.locked
+      FROM vault_balances vb
+      WHERE vb.locked::numeric > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM bets b
+          WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
+            AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
+        )
+    `);
+
+    const rows = stuck as unknown as Array<{ user_id: string; locked: string }>;
+    if (rows.length === 0) return;
+
+    logger.info({ count: rows.length }, `${tag} — found users with stuck locked funds`);
+
+    for (const row of rows) {
+      try {
+        await vaultService.unlockFunds(row.user_id, row.locked);
+        logger.info({ userId: row.user_id, amount: row.locked }, `${tag} — unlocked stuck funds`);
+      } catch (err) {
+        logger.warn({ err, userId: row.user_id }, `${tag} — unlock failed`);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, `${tag} — sweep failed`);
+  }
+}
+
 // ─── Background Sweep Job ────────────────────────────────────────
 
 let sweepInterval: ReturnType<typeof setInterval> | null = null;
@@ -1057,18 +1197,28 @@ export function startBackgroundSweep(): void {
         }
       }
 
-      // 2. Auto-claim timed-out bets
-      await autoClaimTimeoutBets();
+      // 2-6: Run independent sweep phases in parallel for faster recovery
+      await Promise.allSettled([
+        autoClaimTimeoutBets(),
+        autoCancelExpiredBets(),
+        recoverStuckTransitionalBets(),
+        recoverStuckLockedFunds(),
+        reconcileOrphanedChainBets(),
+      ]);
 
-      // 3. Auto-cancel expired open bets (12h TTL)
-      await autoCancelExpiredBets();
-
-      // 4. Reconcile orphaned chain bets (on chain but not in DB)
-      await reconcileOrphanedChainBets();
-
-      // 5. Garbage-collect stale pending_bet_secrets (older than 1 hour)
+      // 7. Garbage-collect stale pending_bet_secrets (older than 1 hour)
       await pendingSecretsService.cleanup().catch(err =>
         logger.warn({ err }, 'sweep: pending secrets cleanup failed'));
+
+      // 8. Cleanup expired sessions
+      try {
+        const db = (await import('../lib/db.js')).getDb();
+        const { sessions } = await import('@coinflip/db/schema');
+        const { lt } = await import('drizzle-orm');
+        await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+      } catch (err) {
+        logger.warn({ err }, 'sweep: session cleanup failed');
+      }
     } catch (err) {
       logger.error({ err }, 'Background sweep error');
     } finally {

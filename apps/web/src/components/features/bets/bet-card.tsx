@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
 import { Crown, Flame, Zap, Coins, Clock } from 'lucide-react';
@@ -57,7 +57,7 @@ function useCountdown(targetDate: Date | null): {
     const ms = remaining < 3600_000 ? 1000 : 10_000;
     const interval = setInterval(() => setNow(Date.now()), ms);
     return () => clearInterval(interval);
-  }, [targetDate]);
+  }, [targetDate?.getTime() ?? null]);
 
   if (!targetDate) return { remaining: 0, formatted: '--:--', isExpired: false, urgency: 'normal' };
 
@@ -167,11 +167,17 @@ export function BetCard({
   const winAmount = humanAmount * 2 * (1 - COMMISSION_BPS / 10000);
 
   // Live countdown for accepted bets (reveal deadline)
-  const deadlineDate = revealDeadline ? new Date(revealDeadline) : null;
+  const deadlineDate = useMemo(
+    () => (revealDeadline ? new Date(revealDeadline) : null),
+    [revealDeadline],
+  );
   const countdown = useCountdown(status === 'accepted' ? deadlineDate : null);
 
   // Live countdown for open bets (expiration)
-  const expiryDate = expiresAt ? new Date(expiresAt) : null;
+  const expiryDate = useMemo(
+    () => (expiresAt ? new Date(expiresAt) : null),
+    [expiresAt],
+  );
   const expiryCountdown = useCountdown(status === 'open' ? expiryDate : null);
   const isExpiringSoon = expiryCountdown.remaining > 0 && expiryCountdown.remaining <= 30;
 

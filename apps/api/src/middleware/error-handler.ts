@@ -21,6 +21,15 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
+  // Error with explicit status (e.g. inflight guard 429)
+  const status = (err as { status?: number }).status;
+  if (typeof status === 'number' && status >= 400 && status < 600) {
+    return c.json(
+      { error: { code: 'ACTION_IN_PROGRESS', message: err.message } },
+      status as ContentfulStatusCode,
+    );
+  }
+
   // Unknown error
   logger.error({ err, path: c.req.path, method: c.req.method }, 'Unhandled error');
   return c.json(

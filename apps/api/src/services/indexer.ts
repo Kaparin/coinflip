@@ -143,6 +143,7 @@ export class IndexerService {
       const queryStr = encodeURIComponent(`tx.height=${height}`);
       const response = await fetch(
         `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs?query=${queryStr}&pagination.limit=100`,
+        { signal: AbortSignal.timeout(5000) },
       );
 
       if (!response.ok) return;
@@ -549,6 +550,7 @@ export class IndexerService {
           const openEncoded = Buffer.from(openQuery).toString('base64');
           const openRes = await fetch(
             `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${openEncoded}`,
+            { signal: AbortSignal.timeout(5000) },
           );
           if (openRes.ok) {
             const openData = await openRes.json() as { data: { bets: Array<{ id: number; commitment: string; status: string }> } };
@@ -596,6 +598,7 @@ export class IndexerService {
           const encoded = Buffer.from(query).toString('base64');
           const res = await fetch(
             `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${encoded}`,
+            { signal: AbortSignal.timeout(5000) },
           );
           if (!res.ok) continue;
 

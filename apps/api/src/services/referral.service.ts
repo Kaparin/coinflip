@@ -299,21 +299,23 @@ export class ReferralService {
 
     const newCode = await this.getOrCreateCode(newReferrer.id);
 
-    // Delete existing referral (if any)
-    await this.db.delete(referrals).where(eq(referrals.userId, userId));
+    await this.db.transaction(async (tx) => {
+      // Delete existing referral (if any)
+      await tx.delete(referrals).where(eq(referrals.userId, userId));
 
-    // Insert new referral
-    await this.db.insert(referrals).values({
-      userId,
-      referrerUserId: newReferrer.id,
-      code: newCode,
+      // Insert new referral
+      await tx.insert(referrals).values({
+        userId,
+        referrerUserId: newReferrer.id,
+        code: newCode,
+      });
+
+      // Update legacy field
+      await tx
+        .update(users)
+        .set({ referrerAddress: newReferrer.address })
+        .where(eq(users.id, userId));
     });
-
-    // Update legacy field
-    await this.db
-      .update(users)
-      .set({ referrerAddress: newReferrer.address })
-      .where(eq(users.id, userId));
 
     logger.info(
       { userId, newReferrerId: newReferrer.id, address: newReferrerAddress, cost: CHANGE_BRANCH_COST_MICRO },

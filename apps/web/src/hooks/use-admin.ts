@@ -186,6 +186,7 @@ export interface DiagnosticsData {
   };
   pendingSecrets: { count: number; oldest: string | null };
   stuckLockedFunds: Array<{ userId: string; address: string; locked: string }>;
+  coinFlipStats: { heads: number; tails: number; total: number };
   timestamp: string;
 }
 

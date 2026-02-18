@@ -9,7 +9,7 @@ import {
   BetListQuerySchema,
   BetHistoryQuerySchema,
 } from '@coinflip/shared/schemas';
-import { MIN_BET_AMOUNT, MAX_OPEN_BETS_PER_USER, MAX_BATCH_SIZE } from '@coinflip/shared/constants';
+import { MIN_BET_AMOUNT, MAX_OPEN_BETS_PER_USER, MAX_BATCH_SIZE, CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 import { authMiddleware } from '../middleware/auth.js';
 import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import { betService } from '../services/bet.service.js';
@@ -23,47 +23,31 @@ import { env } from '../config/env.js';
 import { resolveCreateBetInBackground, confirmAcceptBetInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
+import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 
 /**
  * Cryptographically secure coin flip.
- * Uses crypto.randomBytes instead of Math.random for true randomness.
+ * Uses crypto.randomBytes (CSPRNG) — 128 even / 128 odd values = exact 50/50.
+ * Both maker's side and acceptor's guess use independent random calls.
  */
+const _flipStats = { heads: 0, tails: 0 };
 function secureCoinFlip(): 'heads' | 'tails' {
   const byte = randomBytes(1)[0]!;
-  return byte % 2 === 0 ? 'heads' : 'tails';
+  const result = byte % 2 === 0 ? 'heads' : 'tails';
+  _flipStats[result]++;
+  return result;
+}
+/** Expose flip stats for admin diagnostics */
+export function getCoinFlipStats() {
+  return { ..._flipStats, total: _flipStats.heads + _flipStats.tails };
 }
 import type { AppEnv } from '../types.js';
 import type { RelayResult } from '../services/relayer.js';
-
-// ─── Per-user in-flight transaction guard ─────────────────────
-// Map<address, timestamp_started>. Prevents users from queueing up multiple chain txs.
-const inflightTxs = new Map<string, number>();
+import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 
 // Re-export pending bet counts from shared lib (avoids circular deps with background-tasks)
 import { getPendingBetCount, incrementPendingBetCount, decrementPendingBetCount } from '../lib/pending-counts.js';
-
-/**
- * Mark user as having an in-flight tx. Throws 429 if one is already pending.
- * Guard window prevents rapid sequential chain transactions that can cause
- * sequence mismatches and nonce errors.
- */
-function acquireInflight(address: string): void {
-  const existing = inflightTxs.get(address);
-  if (existing) {
-    // 1s cooldown — prevents double-clicks while keeping gameplay fast.
-    // The relayer sequence manager mutex serializes chain broadcasts.
-    if (Date.now() - existing < 1_000) {
-      throw Errors.actionInProgress(1);
-    }
-  }
-  inflightTxs.set(address, Date.now());
-}
-
-/** Release the in-flight guard for a user */
-function releaseInflight(address: string): void {
-  inflightTxs.delete(address);
-}
 
 /** Parse and validate bet ID from URL param */
 function parseBetId(raw: string): bigint {
@@ -81,17 +65,24 @@ function throwRelayError(relayResult: RelayResult): never {
 
 /** Query on-chain bet state (returns null if query fails) */
 async function getChainBetState(betId: number): Promise<string | null> {
-  try {
-    const query = btoa(JSON.stringify({ bet: { bet_id: betId } }));
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { data: { status?: string } };
-    return data.data?.status ?? null;
-  } catch {
-    return null;
-  }
+  return chainCached(
+    'bet:' + betId,
+    async () => {
+      try {
+        const query = btoa(JSON.stringify({ bet: { bet_id: betId } }));
+        const res = await fetch(
+          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as { data: { status?: string } };
+        return data.data?.status ?? null;
+      } catch {
+        return null;
+      }
+    },
+    3_000,
+  );
 }
 
 /**
@@ -101,15 +92,21 @@ async function getChainBetState(betId: number): Promise<string | null> {
  */
 async function getChainOpenBetCountForMaker(makerAddress: string): Promise<number> {
   try {
-    // Query open_bets from contract (includes maker field)
-    const query = JSON.stringify({ open_bets: { limit: 200 } });
-    const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+    const allBets = await chainCached(
+      'open_bets_all',
+      async () => {
+        const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
+        const encoded = Buffer.from(query).toString('base64');
+        const res = await fetch(
+          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (!res.ok) return [];
+        const data = (await res.json()) as { data: { bets: Array<{ id: number; maker?: string }> } };
+        return data.data?.bets ?? [];
+      },
+      5_000,
     );
-    if (!res.ok) return -1;
-    const data = (await res.json()) as { data: { bets: Array<{ id: number; maker?: string }> } };
-    const allBets = data.data?.bets ?? [];
     return allBets.filter(b => b.maker === makerAddress).length;
   } catch (err) {
     logger.warn({ err, makerAddress }, 'Failed to query chain open bets count — falling back to DB');
@@ -150,6 +147,19 @@ betsRouter.get('/', zValidator('query', BetListQuerySchema), async (c) => {
     data: result.data.map((bet) => formatBetResponse(bet, addressMap)),
     cursor: result.cursor,
     has_more: result.has_more,
+  });
+});
+
+// GET /api/v1/bets/mine — Get all active bets for the authenticated user (single query)
+betsRouter.get('/mine', authMiddleware, async (c) => {
+  const user = c.get('user');
+
+  // Single query: fetch all my bets in active states
+  const myBets = await betService.getMyActiveBets(user.id);
+  const addressMap = await betService.buildAddressMap(myBets);
+
+  return c.json({
+    data: myBets.map((bet) => formatBetResponse(bet, addressMap)),
   });
 });
 
@@ -632,6 +642,19 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     wsService.emitBetAccepting(formatBetResponse(acceptingBet, addressMap) as unknown as Record<string, unknown>);
   }
 
+  // Pre-load reveal info for pipelining (saves one full block cycle ~5-6s)
+  let revealInfo: { makerAddress: string; makerSide: 'heads' | 'tails'; makerSecret: string } | undefined;
+  if (existing.makerSide && existing.makerSecret) {
+    const makerAddr = await betService.getUserAddress(existing.makerUserId).catch(() => null);
+    if (makerAddr) {
+      revealInfo = {
+        makerAddress: makerAddr,
+        makerSide: existing.makerSide as 'heads' | 'tails',
+        makerSecret: existing.makerSecret,
+      };
+    }
+  }
+
   // Fire-and-forget: confirm tx in background, update DB, notify via WS
   confirmAcceptBetInBackground({
     betId,
@@ -641,6 +664,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     address,
     amount: existing.amount,
     pendingLockId: acceptLockId,
+    revealInfo,
   });
 
   logger.info({ txHash: relayResult.txHash, address, betId: betId.toString() }, 'Accept bet submitted — confirming in background');

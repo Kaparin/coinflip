@@ -8,16 +8,33 @@ type WsClient = {
 
 class WsService {
   private clients = new Map<string, WsClient>();
+  private addressIndex = new Map<string, Set<string>>();
   private idCounter = 0;
 
   addClient(ws: WsClient['ws'], address?: string): string {
     const id = `ws_${++this.idCounter}`;
     this.clients.set(id, { ws, address });
+    if (address) {
+      let set = this.addressIndex.get(address);
+      if (!set) {
+        set = new Set();
+        this.addressIndex.set(address, set);
+      }
+      set.add(id);
+    }
     logger.info({ clientId: id, address, total: this.clients.size }, 'WS client connected');
     return id;
   }
 
   removeClient(id: string) {
+    const client = this.clients.get(id);
+    if (client?.address) {
+      const set = this.addressIndex.get(client.address);
+      if (set) {
+        set.delete(id);
+        if (set.size === 0) this.addressIndex.delete(client.address);
+      }
+    }
     this.clients.delete(id);
     logger.info({ clientId: id, total: this.clients.size }, 'WS client disconnected');
   }
@@ -45,16 +62,18 @@ class WsService {
   /** Send to a specific wallet address */
   sendToAddress(address: string, event: { type: string; data: Record<string, unknown> }) {
     const message = JSON.stringify({ ...event, timestamp: Date.now() });
+    const ids = this.addressIndex.get(address);
+    if (!ids) return;
 
-    for (const [id, client] of this.clients) {
-      if (client.address === address) {
-        try {
-          if (client.ws.readyState === 1) {
-            client.ws.send(message);
-          }
-        } catch {
-          this.clients.delete(id);
+    for (const id of [...ids]) {
+      const client = this.clients.get(id);
+      if (!client) continue;
+      try {
+        if (client.ws.readyState === 1) {
+          client.ws.send(message);
         }
+      } catch {
+        this.removeClient(id);
       }
     }
   }

@@ -41,12 +41,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5_000,
-            refetchOnWindowFocus: false,
-            retry: 1, // At most 1 retry for queries (custom-fetch already retries GETs)
+            staleTime: 3_000,
+            refetchOnWindowFocus: true,
+            retry: 1,
           },
           mutations: {
-            retry: false, // Never auto-retry mutations (chain txs are not idempotent)
+            retry: false,
           },
         },
       }),
