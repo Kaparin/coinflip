@@ -900,7 +900,7 @@ function NicknameEditor({ currentNickname, address }: { currentNickname: string 
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
         <input
           ref={inputRef}
           type="text"
@@ -909,16 +909,18 @@ function NicknameEditor({ currentNickname, address }: { currentNickname: string 
           onKeyDown={handleKeyDown}
           maxLength={20}
           placeholder={t('profile.enterNickname')}
-          className="h-8 flex-1 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-bg)] px-2.5 text-sm font-medium outline-none focus:border-[var(--color-primary)] transition-colors"
+          className="h-8 w-full min-w-0 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-bg)] px-2.5 text-sm font-medium outline-none focus:border-[var(--color-primary)] transition-colors sm:flex-1"
         />
-        <button type="button" onClick={handleSave} disabled={saving}
-          className="h-8 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-bold text-white disabled:opacity-50 transition-opacity">
-          {saving ? '...' : t('common.save')}
-        </button>
-        <button type="button" onClick={() => setEditing(false)}
-          className="h-8 rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]">
-          {t('common.cancel')}
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="h-8 flex-1 sm:flex-none rounded-lg bg-[var(--color-primary)] px-3 text-xs font-bold text-white disabled:opacity-50 transition-opacity">
+            {saving ? '...' : t('common.save')}
+          </button>
+          <button type="button" onClick={() => setEditing(false)}
+            className="h-8 flex-1 sm:flex-none rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]">
+            {t('common.cancel')}
+          </button>
+        </div>
       </div>
     );
   }

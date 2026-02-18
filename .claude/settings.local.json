@@ -13,7 +13,30 @@
       "Bash(npx turbo:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: move React hooks before early returns in MyBets \\(Error #310\\)\n\nHooks \\(useRef, useState, useEffect, useCallback, useMemo\\) for the\nresolved bets fade-out feature were placed after conditional early\nreturns, violating React''s Rules of Hooks and crashing production.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: instant optimistic cache updates on WS bet_accepting/canceling/canceled\n\nWhen any user accepts or cancels a bet, the WS event now triggers\nimmediate cache removal/update via setQueriesData instead of waiting\nfor the 800ms debounced refetch. Other users see the card disappear\ninstantly rather than after ~1.5s delay.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: serialize relayer broadcasts to prevent nonce race condition\n\nBets were getting stuck in \"accepted\" state because concurrent reveal\ntransactions raced on nonce assignment. Added broadcast queue mutex to\nRelayerService and made sweep processing sequential for relayer tasks.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: serialize relayer broadcasts to prevent nonce race condition\n\nBets were getting stuck in \"accepted\" state because concurrent reveal\ntransactions raced on nonce assignment. Added broadcast queue mutex to\nRelayerService and made sweep processing sequential for relayer tasks.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cargo check:*)",
+      "Bash(where:*)",
+      "Bash(git commit:*)",
+      "Bash(cargo --version:*)",
+      "Bash(rustup --version:*)",
+      "Bash(docker:*)",
+      "Bash(wsl:*)",
+      "Bash(docker.exe --version:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe -Command \"docker --version\")",
+      "Bash(powershell.exe -Command \"Get-Command docker -ErrorAction SilentlyContinue; ls ''C:\\\\Program Files\\\\Docker\\\\Docker\\\\'' -ErrorAction SilentlyContinue | Select-Object Name\")",
+      "Bash(powershell.exe:*)",
+      "Bash(DOCKER=\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\")",
+      "Bash(git checkout:*)",
+      "Bash(npx tsx:*)",
+      "Bash(curl:*)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:49.13.3.227)",
+      "Bash(MIGRATE_CODE_ID=23 npx tsx:*)",
+      "WebFetch(domain:i.postimg.cc)",
+      "Bash(npx railway:*)",
+      "Bash(npx @railway/cli whoami:*)",
+      "Bash(npx @railway/cli login:*)"
     ]
   }
 }
