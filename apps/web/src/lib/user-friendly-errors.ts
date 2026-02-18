@@ -34,7 +34,7 @@ export function isActionInProgress(msg: string): boolean {
 
 /** Check if error indicates bet was canceled */
 export function isBetCanceled(msg: string): boolean {
-  return msg.includes('BET_CANCELED') || msg.includes('canceled');
+  return msg.includes('BET_CANCELED') || msg.includes('bet canceled') || msg.includes('bet has been canceled');
 }
 
 /** Check if error indicates bet was already claimed by someone else */
@@ -90,11 +90,11 @@ export function getUserFriendlyError(
   if (isBetCanceled(message)) return t('errors.betCanceled');
   if (isBetClaimed(message)) return t('errors.betTakenByOther');
   if (isBetGone(message)) return t('errors.betUnavailable');
-  if (msg.includes('insufficient') || msg.includes('balance')) return t('errors.insufficientBalance');
-  if (msg.includes('minimum') || msg.includes('min')) return t('errors.belowMinBet');
-  if (msg.includes('too many') || msg.includes('limit')) return t('errors.tooManyOpenBets');
+  if (msg.includes('insufficient balance') || msg.includes('insufficient funds') || msg.includes('not enough')) return t('errors.insufficientBalance');
+  if (msg.includes('minimum bet') || msg.includes('below min')) return t('errors.belowMinBet');
+  if (msg.includes('too many open') || msg.includes('max open bets')) return t('errors.tooManyOpenBets');
   if (msg.includes('timeout') || msg.includes('not yet confirmed')) return t('errors.chainTxTimeout');
-  if (msg.includes('relayer') || msg.includes('not available')) return t('errors.relayerNotReady');
+  if (msg.includes('relayer') || msg.includes('relayer not available')) return t('errors.relayerNotReady');
 
   // Context-specific fallbacks
   const fallbacks: Record<'create' | 'accept' | 'cancel' | 'withdraw' | 'deposit' | 'generic', string> = {

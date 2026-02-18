@@ -40,7 +40,7 @@ export function MobileBalanceBar() {
   const lockedMicro = rawLocked + pendingDeduction;
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
 
-  const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   return (
     <div className="md:hidden">

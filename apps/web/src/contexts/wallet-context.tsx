@@ -33,8 +33,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const prev = prevAddressRef.current;
     prevAddressRef.current = wallet.address;
-    if (prev !== wallet.address && prev !== null && wallet.address !== null) {
-      queryClient.invalidateQueries();
+
+    // When wallet address changes, invalidate all cached data.
+    // During a wallet switch, the address transitions through null (disconnect → reconnect).
+    // We must clear cache when a new address appears regardless of how we got there.
+    if (prev !== wallet.address && wallet.address !== null) {
+      if (prev !== null) {
+        // Direct switch: addr1 → addr2 — invalidate immediately
+        queryClient.invalidateQueries();
+      } else {
+        // Reconnected after disconnect (null → addr2) — remove stale cache
+        queryClient.removeQueries();
+      }
     }
   }, [wallet.address, queryClient]);
 

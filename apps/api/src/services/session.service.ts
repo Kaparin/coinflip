@@ -17,7 +17,7 @@
  * and fast to verify on every request.
  */
 
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Secp256k1, Secp256k1Signature, Sha256, ripemd160 } from '@cosmjs/crypto';
 import { toBech32, fromHex } from '@cosmjs/encoding';
 import { env } from '../config/env.js';
@@ -134,11 +134,10 @@ export function verifySessionToken(token: string): { address: string; expiresAt:
       .update(payload)
       .digest('base64url');
 
-    // Timing-safe comparison
-    if (expectedHmac.length !== providedHmac.length) return null;
+    // Timing-safe comparison (prevents side-channel attacks)
     const a = Buffer.from(expectedHmac);
     const b = Buffer.from(providedHmac);
-    if (!a.equals(b)) return null;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
     return { address, expiresAt };
   } catch {

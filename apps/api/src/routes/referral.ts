@@ -10,6 +10,9 @@ import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import type { AppEnv } from '../types.js';
 
+// Inflight guard for claim/change-branch operations (prevents concurrent chain txs)
+const claimInflight = new Set<string>();
+
 export const referralRouter = new Hono<AppEnv>();
 
 // GET /api/v1/referral/code — Get or create referral code
@@ -92,6 +95,15 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
   const walletAddress = c.get('address');
   const { address: newReferrerAddr } = c.req.valid('json');
   const cost = ReferralService.CHANGE_BRANCH_COST;
+
+  // Inflight guard — prevent concurrent branch changes (double-withdraw risk)
+  const branchKey = `branch:${userId}`;
+  if (claimInflight.has(branchKey)) {
+    return c.json({ error: { code: 'ACTION_IN_PROGRESS', message: 'Branch change is already being processed.' } }, 429);
+  }
+  claimInflight.add(branchKey);
+
+  try {
 
   // Step 1: Validate the branch change (cycles, self-referral, target exists)
   const validation = await referralService.validateBranchChange(userId, newReferrerAddr);
@@ -185,6 +197,10 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
       transfer_tx: transferTxHash,
     },
   });
+
+  } finally {
+    claimInflight.delete(branchKey);
+  }
 });
 
 // GET /api/v1/referral/stats — Get referral stats
@@ -218,8 +234,17 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
   const userId = c.get('user').id;
   const address = c.get('address');
 
+  // Inflight guard — prevent double-claim from rapid clicks
+  const claimKey = `claim:${userId}`;
+  if (claimInflight.has(claimKey)) {
+    return c.json({ error: { code: 'ACTION_IN_PROGRESS', message: 'Claim is already being processed.' } }, 429);
+  }
+  claimInflight.add(claimKey);
+
+  let amount: string | null = null;
+  try {
   // Step 1: Atomically zero out unclaimed balance in DB
-  const amount = await referralService.claimRewards(userId);
+  amount = await referralService.claimRewards(userId);
 
   if (!amount) {
     return c.json({ error: { code: 'NOTHING_TO_CLAIM', message: 'No unclaimed rewards' } }, 400);
@@ -331,6 +356,18 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
       transfer_tx: transferResult.txHash,
     },
   });
+
+  } catch (err) {
+    // Catch-all: if any unhandled exception occurs after claimRewards zeroed the balance,
+    // rollback so the user can retry.
+    if (amount) {
+      await referralService.rollbackClaim(userId, amount).catch(rollbackErr =>
+        logger.error({ err: rollbackErr, userId, amount }, 'Referral claim: rollback failed after unhandled error'));
+    }
+    throw err;
+  } finally {
+    claimInflight.delete(claimKey);
+  }
 });
 
 // GET /api/v1/referral/rewards — Reward history (paginated)

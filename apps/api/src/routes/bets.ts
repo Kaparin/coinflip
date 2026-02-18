@@ -64,6 +64,12 @@ function releaseInflight(address: string): void {
   inflightTxs.delete(address);
 }
 
+/** Parse and validate bet ID from URL param */
+function parseBetId(raw: string): bigint {
+  if (!/^\d+$/.test(raw)) throw Errors.betNotFound(raw);
+  return BigInt(raw);
+}
+
 /** Throw an appropriate AppError for a failed relay result */
 function throwRelayError(relayResult: RelayResult): never {
   if (relayResult.timeout) {
@@ -285,9 +291,11 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
   logger.info({ txHash: relayResult.txHash, address, amount }, 'Create bet submitted — confirming in background');
 
   // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
+  // pendingAmount already includes the lock for this bet (added at addPendingLock above),
+  // so we don't subtract `amount` separately to avoid double-counting.
   const pendingAmount = getTotalPendingLocks(address);
-  const dbAvailable = BigInt(balance.available) - BigInt(amount) - pendingAmount;
-  const dbLocked = BigInt(balance.locked) + BigInt(amount) + pendingAmount;
+  const dbAvailable = BigInt(balance.available) - pendingAmount;
+  const dbLocked = BigInt(balance.locked) + pendingAmount;
 
   // Return 202 Accepted — bet is not yet in DB, but tx is in mempool
   return c.json({
@@ -468,7 +476,7 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
 betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
-  const betId = BigInt(c.req.param('betId'));
+  const betId = parseBetId(c.req.param('betId'));
   // Server picks random guess — cryptographically secure
   const guess: 'heads' | 'tails' = secureCoinFlip();
 
@@ -604,9 +612,10 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   const responseData = acceptingBet ?? existing;
 
   // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
+  // pendingAmount already includes this bet's lock — don't double-subtract
   const acceptPendingAmount = getTotalPendingLocks(address);
-  const acceptAvail = BigInt(acceptBalance.available) - BigInt(existing.amount) - acceptPendingAmount;
-  const acceptLocked = BigInt(acceptBalance.locked) + BigInt(existing.amount) + acceptPendingAmount;
+  const acceptAvail = BigInt(acceptBalance.available) - acceptPendingAmount;
+  const acceptLocked = BigInt(acceptBalance.locked) + acceptPendingAmount;
 
   // Return 202 Accepted — confirmation in progress
   return c.json({
@@ -629,7 +638,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
 betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
-  const betId = BigInt(c.req.param('betId'));
+  const betId = parseBetId(c.req.param('betId'));
   const { side, secret } = c.req.valid('json');
 
   // Validate secret format: must be 64 hex characters
@@ -699,7 +708,7 @@ betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealReque
 betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
-  const betId = BigInt(c.req.param('betId'));
+  const betId = parseBetId(c.req.param('betId'));
 
   const existing = await betService.getBetById(betId);
   if (!existing) throw Errors.betNotFound(betId.toString());
@@ -747,7 +756,8 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
     if (alreadyCanceled) {
       await betService.cancelBet(betId, relayResult.txHash);
       await vaultService.unlockFunds(user.id, existing.amount).catch(err => logger.warn({ err, userId: user.id }, 'unlockFunds failed during cancel'));
-      return c.json({ data: (await betService.getBetById(betId)) ? formatBetResponse((await betService.getBetById(betId))!) : null, message: 'Bet canceled.' });
+      const canceledBet = await betService.getBetById(betId);
+      return c.json({ data: canceledBet ? formatBetResponse(canceledBet) : null, message: 'Bet canceled.' });
     }
 
     await betService.updateBetStatus(betId, 'open');
@@ -782,7 +792,7 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
 betsRouter.post('/:betId/claim-timeout', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
-  const betId = BigInt(c.req.param('betId'));
+  const betId = parseBetId(c.req.param('betId'));
 
   const existing = await betService.getBetById(betId);
   if (!existing) throw Errors.betNotFound(betId.toString());

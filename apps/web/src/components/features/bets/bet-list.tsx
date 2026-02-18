@@ -202,11 +202,15 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     if (bet) setAcceptTarget({ id, amount: Number(bet.amount) });
   }, [bets]);
 
+  // Extract stable `mutate` references to avoid re-creating callbacks on every render
+  const cancelBet = cancelMutation.mutate;
+  const acceptBet = acceptMutation.mutate;
+
   const handleCancelClick = useCallback((id: string) => {
     setPendingBetId(id);
     setPendingAction('cancel');
-    cancelMutation.mutate({ betId: Number(id) });
-  }, [cancelMutation]);
+    cancelBet({ betId: Number(id) });
+  }, [cancelBet]);
 
   const handleConfirmAccept = useCallback(() => {
     if (!acceptTarget) return;
@@ -220,12 +224,12 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     setPendingAction('accept');
     setRecentlyAcceptedIds(prev => new Set(prev).add(betId));
     // No guess needed — server picks randomly
-    acceptMutation.mutate({
+    acceptBet({
       betId: Number(betId),
       data: { guess: 'heads' }, // server ignores this, picks randomly
     });
     setAcceptTarget(null);
-  }, [acceptTarget, acceptMutation, addDeduction]);
+  }, [acceptTarget, acceptBet, addDeduction]);
 
   if (isLoading) {
     return (

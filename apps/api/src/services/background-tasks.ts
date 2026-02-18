@@ -120,6 +120,8 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
     const { txHash, commitment, commitmentBase64, makerUserId, amount, address, makerSide, makerSecret, pendingLockId } = task;
     const tag = `bg:create_bet`;
 
+    let chainBetId: string | undefined;
+
     try {
       // Step 1: Poll for tx result
       const txResult = await pollForTx(txHash);
@@ -139,7 +141,6 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       }
 
       // Step 2: Extract bet_id from events
-      let chainBetId: string | undefined;
 
       if (txResult) {
         chainBetId = extractWasmAttr(txResult.events, 'bet_id');
@@ -219,17 +220,26 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       const addressMap = await betService.buildAddressMap([bet]);
       wsService.emitBetConfirmed(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
     } catch (err) {
-      logger.error({ err, txHash }, `${tag} — unexpected error, unlocking funds`);
+      logger.error({ err, txHash }, `${tag} — unexpected error`);
       decrementPendingBetCount(makerUserId);
       if (pendingLockId) removePendingLock(address, pendingLockId);
-      // Unlock funds so user isn't stuck — if bet exists on-chain, indexer will handle it
-      await vaultService.unlockFunds(makerUserId, amount).catch(unlockErr =>
-        logger.warn({ err: unlockErr, makerUserId, amount }, `${tag} — unlockFunds failed`));
+
+      // Only unlock if the bet was NOT already created in DB (e.g. by indexer race).
+      // If bet exists, funds should remain locked as the bet is valid.
+      const existingBetInDb = chainBetId
+        ? await betService.getBetById(BigInt(chainBetId)).catch(() => null)
+        : null;
+      if (!existingBetInDb) {
+        await vaultService.unlockFunds(makerUserId, amount).catch(unlockErr =>
+          logger.warn({ err: unlockErr, makerUserId, amount }, `${tag} — unlockFunds failed`));
+        wsService.emitBetCreateFailed(address, {
+          txHash,
+          reason: 'An unexpected error occurred. Your bet may still appear shortly.',
+        });
+      } else {
+        logger.info({ betId: chainBetId, txHash }, `${tag} — bet exists in DB despite error, skipping unlock`);
+      }
       invalidateBalanceCache(address);
-      wsService.emitBetCreateFailed(address, {
-        txHash,
-        reason: 'An unexpected error occurred. Your bet may still appear shortly.',
-      });
     }
   })();
 }
@@ -517,6 +527,13 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
     if (dbStatus === 'canceled') {
       await betService.cancelBet(betId);
     } else {
+      // If winner address couldn't be resolved to a user, defer resolution.
+      // Both maker and acceptor should exist in the DB — if not, something is wrong.
+      if (!winnerUserId && chainState.winner) {
+        logger.error({ betId: betId.toString(), winnerAddress: chainState.winner }, 'syncBetFromChain: winner not found in DB — deferring');
+        return false;
+      }
+
       await betService.resolveBet({
         betId,
         winnerUserId: winnerUserId ?? '',

@@ -43,6 +43,14 @@ export const vaultRouter = new Hono<AppEnv>();
 const balanceCache = new Map<string, { data: { available: string; locked: string }; ts: number }>();
 const BALANCE_CACHE_TTL = 5_000; // 5 seconds
 
+// Periodic cleanup of expired cache entries (prevents unbounded map growth)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of balanceCache) {
+    if (now - val.ts > BALANCE_CACHE_TTL) balanceCache.delete(key);
+  }
+}, 30_000);
+
 export async function getChainVaultBalance(address: string): Promise<{ available: string; locked: string }> {
   // Check cache first
   const cached = balanceCache.get(address);
@@ -413,7 +421,8 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
       throwRelayError(relayResult);
     }
 
-    // Success — sync balance from chain (unlock + deduct)
+    // Success — invalidate cache first, then fetch fresh balance from chain
+    invalidateBalanceCache(address);
     const newChainBalance = await getChainVaultBalance(address);
     await vaultService.syncBalanceFromChain(
       user.id,

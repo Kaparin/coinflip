@@ -97,13 +97,17 @@ authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
   });
 });
 
-// ─── Legacy Connect (backwards-compatible, also sets session token) ─────
+// ─── Legacy Connect (dev-only, production requires /auth/verify) ─────
 
-// POST /api/v1/auth/connect — Connect wallet and register session
+// POST /api/v1/auth/connect — Connect wallet (dev-only, no signature check)
+// SECURITY: In production, this endpoint ONLY returns user info without setting auth cookies.
+// Use /auth/challenge + /auth/verify for production authentication.
 authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) => {
-  const { address } = c.req.valid('json');
+  const { address: rawAddress } = c.req.valid('json');
+  const address = rawAddress.trim().toLowerCase();
+  const isProd = env.NODE_ENV === 'production';
 
-  logger.info({ address }, 'Wallet connect request');
+  logger.info({ address, isProd }, 'Wallet connect request');
 
   // Find or create user
   const user = await userService.findOrCreateUser(address);
@@ -125,14 +129,12 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
     });
   }, 5000);
 
-  // Set HMAC session token as httpOnly cookie (secure auth)
-  const sessionToken = createSessionToken(address);
-  const isProd = env.NODE_ENV === 'production';
-  const cookieOpts = getSessionCookieOptions(isProd);
-  setCookie(c, SESSION_COOKIE_NAME, sessionToken, cookieOpts);
-
-  // Legacy cookie (for backwards compatibility during transition)
+  // SECURITY: Only set session cookie in development.
+  // In production, clients MUST use /auth/challenge + /auth/verify (signature-based).
   if (!isProd) {
+    const sessionToken = createSessionToken(address);
+    const cookieOpts = getSessionCookieOptions(false);
+    setCookie(c, SESSION_COOKIE_NAME, sessionToken, cookieOpts);
     setCookie(c, 'wallet_address', address, {
       httpOnly: true,
       secure: false,

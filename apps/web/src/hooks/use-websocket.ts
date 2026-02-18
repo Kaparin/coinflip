@@ -228,6 +228,7 @@ export function useWebSocket({
 
     return () => {
       mountedRef.current = false;
+      _globalWsConnected = false; // Reset global flag on unmount
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -259,9 +260,16 @@ export function useWebSocket({
 
     if (enabled && address) {
       connectWs();
+    } else if (enabled && !address && wsRef.current) {
+      // Wallet disconnected but WS still enabled — close stale connection
+      // (was previously bound to old address; will reconnect when new address arrives)
+      wsRef.current.close();
+      wsRef.current = null;
+      _globalWsConnected = false;
     } else if (!enabled && wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+      _globalWsConnected = false;
     }
   }, [address, enabled, connectWs]);
 
