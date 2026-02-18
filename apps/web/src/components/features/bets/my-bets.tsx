@@ -144,36 +144,6 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     cancelAllAbortRef.current = true;
   }, []);
 
-  if (!isConnected) {
-    return (
-      <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('myBets.connectToView')}</p>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
-      </div>
-    );
-  }
-
-  if (myBetsError && !myBetsData) {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('bets.failedToLoad')}</p>
-        <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/v1/bets/mine'] })}
-          className="rounded-lg bg-[var(--color-surface)] px-4 py-2 text-xs font-medium"
-        >
-          {t('common.retry')}
-        </button>
-      </div>
-    );
-  }
-
   // Categorize bets (include 'canceling' with open bets so cards don't vanish instantly)
   const myOpenBets = myBets.filter(b => (b.status === 'open' || b.status === 'canceling') && b.maker?.toLowerCase() === addrLower);
   const myAccepting = myBets.filter(b => b.status === 'accepting');
@@ -223,6 +193,36 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [myResolved, forceRerender],
   );
+
+  if (!isConnected) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('myBets.connectToView')}</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+      </div>
+    );
+  }
+
+  if (myBetsError && !myBetsData) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] py-12">
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('bets.failedToLoad')}</p>
+        <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/v1/bets/mine'] })}
+          className="rounded-lg bg-[var(--color-surface)] px-4 py-2 text-xs font-medium"
+        >
+          {t('common.retry')}
+        </button>
+      </div>
+    );
+  }
 
   // Filter out pending bets that already appeared in the actual bets list (confirmed on chain)
   const confirmedTxHashes = new Set(allBets.map(b => (b as any).txhash_create).filter(Boolean));
