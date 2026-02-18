@@ -543,9 +543,22 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   }
   if (existing.makerUserId === user.id) throw Errors.selfAccept();
 
-  // Reject if bet is missing maker secret — auto-reveal would be impossible,
-  // making the outcome predetermined (acceptor always wins via timeout).
-  if (!existing.makerSecret) {
+  // Resolve maker secret — may still be in pending_bet_secrets if background task
+  // hasn't confirmed the create_bet tx yet (common with batch-created bets).
+  let makerSecret = existing.makerSecret;
+  let makerSide = existing.makerSide;
+
+  if (!makerSecret && existing.commitment) {
+    const pending = await pendingSecretsService.getByCommitment(existing.commitment);
+    if (pending) {
+      makerSecret = pending.makerSecret;
+      makerSide = pending.makerSide;
+      // Backfill to bets table so future lookups don't need this fallback
+      await betService.updateSecret(betId, makerSide, makerSecret).catch(() => {});
+    }
+  }
+
+  if (!makerSecret || !makerSide) {
     throw new AppError('BET_NO_SECRET', 'This bet cannot be accepted right now. Please try another bet.', 422);
   }
 
@@ -614,8 +627,8 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
         address,
         Number(betId),
         guess as 'heads' | 'tails',
-        existing.makerSide as 'heads' | 'tails',
-        existing.makerSecret,
+        makerSide as 'heads' | 'tails',
+        makerSecret,
         /* asyncMode */ true,
       );
     } catch (err) {

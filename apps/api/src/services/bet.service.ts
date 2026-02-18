@@ -229,6 +229,13 @@ export class BetService {
     });
   }
 
+  /** Backfill maker secret recovered from pending_bet_secrets. */
+  async updateSecret(betId: bigint, makerSide: string, makerSecret: string) {
+    await this.db.update(bets)
+      .set({ makerSide, makerSecret })
+      .where(eq(bets.betId, betId));
+  }
+
   async getOpenBets(params: { cursor?: string; limit: number; minAmount?: string; maxAmount?: string; status?: string }) {
     const limit = Math.min(params.limit, 100);
     const statusFilter = params.status ?? 'open';
