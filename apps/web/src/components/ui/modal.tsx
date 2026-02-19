@@ -28,9 +28,10 @@ function useVisualViewportStyles(open: boolean) {
   useEffect(() => {
     if (!open || typeof window === 'undefined' || !window.visualViewport) return;
 
+    const vv = window.visualViewport;
+
     const applyViewport = () => {
-      const vv = window.visualViewport;
-      if (vv && vv.height < window.innerHeight * 0.95) {
+      if (vv.height < window.innerHeight * 0.95) {
         setStyles({
           height: `${vv.height}px`,
           width: `${vv.width}px`,
@@ -43,11 +44,11 @@ function useVisualViewportStyles(open: boolean) {
     };
 
     applyViewport();
-    window.visualViewport.addEventListener('resize', applyViewport);
-    window.visualViewport.addEventListener('scroll', applyViewport);
+    vv.addEventListener('resize', applyViewport);
+    vv.addEventListener('scroll', applyViewport);
     return () => {
-      window.visualViewport.removeEventListener('resize', applyViewport);
-      window.visualViewport.removeEventListener('scroll', applyViewport);
+      vv.removeEventListener('resize', applyViewport);
+      vv.removeEventListener('scroll', applyViewport);
       setStyles({});
     };
   }, [open]);
