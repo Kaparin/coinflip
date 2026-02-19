@@ -5,7 +5,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { UserAvatar } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
-import { Users } from 'lucide-react';
+import { Users, Trophy } from 'lucide-react';
 
 interface RaffleParticipantsProps {
   eventId: string;
@@ -49,28 +49,37 @@ export function RaffleParticipants({ eventId }: RaffleParticipantsProps) {
       <p className="text-xs font-bold text-[var(--color-text-secondary)] mb-2">
         {participants.length} {t('events.participants')}
       </p>
-      {participants.map((p) => {
+      {participants.map((p, i) => {
         const addr = String(p.address ?? '');
         const nickname = p.nickname as string | null;
         const isCurrentUser = address?.toLowerCase() === addr.toLowerCase();
         const status = String(p.status ?? 'joined');
+        const isWinner = status === 'winner';
+        const staggerClass = i < 10 ? `stagger-${i + 1}` : '';
 
         return (
           <div
             key={addr}
-            className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-              isCurrentUser ? 'bg-[var(--color-primary)]/10' : ''
+            className={`animate-fade-up ${staggerClass} flex items-center justify-between rounded-lg px-3 py-2 ${
+              isWinner
+                ? 'bg-amber-500/10 border border-amber-500/20'
+                : isCurrentUser
+                  ? 'bg-amber-500/8'
+                  : ''
             }`}
           >
             <div className="flex items-center gap-2">
               <UserAvatar address={addr} size={24} />
               <span className="text-xs font-medium">
                 {nickname ?? shortAddr(addr)}
-                {isCurrentUser && <span className="ml-1 text-[var(--color-primary)]">({t('leaderboard.you')})</span>}
+                {isCurrentUser && <span className="ml-1 text-amber-400">({t('leaderboard.you')})</span>}
               </span>
             </div>
-            {status === 'winner' && (
-              <span className="text-[10px] font-bold text-[var(--color-success)]">{t('events.winner')}</span>
+            {isWinner && (
+              <div className="flex items-center gap-1">
+                <Trophy size={12} className="text-amber-400" />
+                <span className="text-[10px] font-bold text-amber-400">{t('events.winner')}</span>
+              </div>
             )}
           </div>
         );

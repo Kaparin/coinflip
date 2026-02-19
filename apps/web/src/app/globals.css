@@ -201,6 +201,79 @@ body {
   animation: borderGlow 3s ease-in-out infinite;
 }
 
+/* Event-specific animations */
+@keyframes shimmerSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes urgencyPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+@keyframes floatUp {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+@keyframes winnerReveal {
+  0%   { opacity: 0; transform: scale(0.8) translateY(10px); }
+  50%  { opacity: 1; transform: scale(1.05) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes goldSparkle {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.8; }
+}
+
+.animate-urgency-pulse { animation: urgencyPulse 1s ease-in-out infinite; }
+.animate-float-up { animation: floatUp 3s ease-in-out infinite; }
+.animate-winner-reveal { animation: winnerReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Shimmer sweep overlay for event cards (uses ::before to avoid conflict with border-glow ::after) */
+.shimmer-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  animation: shimmerSweep 3s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* Contest card gradient border (indigo/violet) */
+.border-glow-contest::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.4), transparent 50%, rgba(167,139,250,0.2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+/* Raffle card gradient border (amber/gold) */
+.border-glow-raffle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(251,191,36,0.4), transparent 50%, rgba(245,158,11,0.2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
 /* ============================
    REDUCED MOTION
    ============================ */

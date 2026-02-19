@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy } from 'lucide-react';
+import { Trophy, Info, ChevronDown } from 'lucide-react';
 import { EventList } from '@/components/features/events/event-list';
 import { useTranslation } from '@/lib/i18n';
 
@@ -19,6 +19,34 @@ export default function EventsPage() {
           <p className="text-[10px] text-[var(--color-text-secondary)]">{t('events.subtitle')}</p>
         </div>
       </div>
+
+      {/* Collapsible info section */}
+      <details className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-bold select-none">
+          <div className="flex items-center gap-2">
+            <Info size={16} className="text-[var(--color-primary)]" />
+            {t('events.info.title')}
+          </div>
+          <ChevronDown size={16} className="text-[var(--color-text-secondary)] transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="border-t border-[var(--color-border)] px-4 py-4 space-y-4 text-xs text-[var(--color-text-secondary)]">
+          {/* Contest section */}
+          <div>
+            <h3 className="mb-1 text-xs font-bold text-indigo-400">{t('events.info.contestTitle')}</h3>
+            <p className="leading-relaxed">{t('events.info.contestDesc')}</p>
+          </div>
+          {/* Raffle section */}
+          <div>
+            <h3 className="mb-1 text-xs font-bold text-amber-400">{t('events.info.raffleTitle')}</h3>
+            <p className="leading-relaxed">{t('events.info.raffleDesc')}</p>
+          </div>
+          {/* Rules */}
+          <div>
+            <h3 className="mb-1 text-xs font-bold text-[var(--color-text)]">{t('events.info.rulesTitle')}</h3>
+            <p className="leading-relaxed">{t('events.info.rulesDesc')}</p>
+          </div>
+        </div>
+      </details>
 
       <EventList />
     </div>

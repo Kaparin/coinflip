@@ -48,8 +48,8 @@ export function EventList() {
             {t('events.activeEvents')}
           </h2>
           <div className="space-y-3">
-            {activeEvents.map((event) => (
-              <EventCard key={event.id} event={event} size="large" />
+            {activeEvents.map((event, i) => (
+              <EventCard key={event.id} event={event} size="large" index={i} />
             ))}
           </div>
         </section>
@@ -62,8 +62,8 @@ export function EventList() {
             {t('events.recentResults')}
           </h2>
           <div className="space-y-2">
-            {completedEvents.map((event) => (
-              <EventCard key={event.id} event={event} size="compact" />
+            {completedEvents.map((event, i) => (
+              <EventCard key={event.id} event={event} size="compact" index={i} />
             ))}
           </div>
         </section>

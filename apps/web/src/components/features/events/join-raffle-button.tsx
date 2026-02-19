@@ -5,6 +5,7 @@ import { useJoinEvent } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { useQueryClient } from '@tanstack/react-query';
+import { CheckCircle, Sparkles } from 'lucide-react';
 
 interface JoinRaffleButtonProps {
   eventId: string;
@@ -13,20 +14,38 @@ interface JoinRaffleButtonProps {
   eventStatus: string;
 }
 
+/** Extract error message from API response or generic error */
+function extractErrorMessage(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  // customFetch throws { error: { code, message } }
+  const apiError = (err as { error?: { message?: string } }).error;
+  if (apiError?.message) return apiError.message;
+  // fallback: top-level message
+  return (err as { message?: string }).message;
+}
+
 export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }: JoinRaffleButtonProps) {
   const { t } = useTranslation();
   const { isConnected } = useWalletContext();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [justJoined, setJustJoined] = useState(false);
 
   const { mutate: join, isPending } = useJoinEvent({
     mutation: {
       onSuccess: () => {
         setError(null);
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] });
+        setJustJoined(true);
+        // Invalidate all event-related queries (query keys are full URL paths)
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey[0];
+            return typeof key === 'string' && key.startsWith('/api/v1/events');
+          },
+        });
       },
       onError: (err: unknown) => {
-        const msg = (err as { message?: string })?.message ?? t('errors.somethingWentWrong');
+        const msg = extractErrorMessage(err) ?? t('errors.somethingWentWrong');
         setError(msg);
       },
     },
@@ -38,10 +57,12 @@ export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }:
   // For auto-join contests, no button needed
   if (eventType === 'contest') return null;
 
-  if (hasJoined) {
+  if (hasJoined || justJoined) {
     return (
-      <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-4 py-2 text-center text-sm font-bold text-[var(--color-success)]">
+      <div className="animate-bounce-in flex items-center justify-center gap-2 rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-4 py-2 text-sm font-bold text-[var(--color-success)]">
+        <CheckCircle size={16} />
         {t('events.alreadyJoined')}
+        <Sparkles size={14} className="opacity-60" />
       </div>
     );
   }
@@ -52,9 +73,13 @@ export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }:
         type="button"
         onClick={() => join({ eventId })}
         disabled={isPending}
-        className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
+        className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] disabled:opacity-50 active:scale-[0.98]"
       >
-        {isPending ? t('common.processing') : t('events.joinRaffle')}
+        {/* Shimmer overlay on button */}
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+        <span className="relative">
+          {isPending ? t('common.processing') : t('events.joinRaffle')}
+        </span>
       </button>
       {error && <p className="text-xs text-[var(--color-danger)] text-center">{error}</p>}
     </div>

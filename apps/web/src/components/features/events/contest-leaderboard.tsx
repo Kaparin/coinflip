@@ -18,6 +18,19 @@ function shortAddr(addr: string): string {
 
 const RANK_ICONS = ['', '\u{1F947}', '\u{1F948}', '\u{1F949}'];
 
+function getTopRankStyle(rank: number): string {
+  if (rank === 1) return 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 border-glow-raffle';
+  if (rank === 2) return 'bg-gradient-to-r from-slate-400/8 via-slate-400/4 to-transparent border border-slate-400/15';
+  if (rank === 3) return 'bg-gradient-to-r from-amber-700/8 via-amber-700/4 to-transparent border border-amber-700/15';
+  return '';
+}
+
+function getMetricLabel(entry: Record<string, unknown>): string {
+  if (entry.metricType === 'wins') return 'wins';
+  if (entry.metricType === 'profit') return 'profit';
+  return 'turnover';
+}
+
 export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
   const { t } = useTranslation();
   const { address } = useWalletContext();
@@ -47,23 +60,31 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
 
   return (
     <div className="space-y-1">
-      {entries.map((entry) => {
+      {entries.map((entry, i) => {
         const rank = Number(entry.rank);
         const addr = String(entry.address ?? '');
         const isCurrentUser = address?.toLowerCase() === addr.toLowerCase();
         const nickname = entry.nickname as string | null;
+        const isTopThree = rank <= 3;
+        const topStyle = getTopRankStyle(rank);
+        const staggerClass = i < 10 ? `stagger-${i + 1}` : '';
+        const metricLabel = getMetricLabel(entry);
 
         return (
           <div
             key={addr}
-            className={`grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg px-3 py-2.5 ${
-              isCurrentUser ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30' : ''
+            className={`animate-fade-up ${staggerClass} grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg ${
+              isTopThree ? `${topStyle} px-3 py-3` : 'px-3 py-2.5'
+            } ${
+              isCurrentUser && !isTopThree ? 'bg-indigo-500/10 border border-indigo-500/20' : ''
             }`}
           >
             {/* Rank */}
             <div className="flex items-center justify-center">
               {rank <= 3 ? (
-                <span className="text-base">{RANK_ICONS[rank]}</span>
+                <span className={`${rank === 1 ? 'text-lg animate-float-up' : 'text-base'}`}>
+                  {RANK_ICONS[rank]}
+                </span>
               ) : (
                 <span className="text-xs font-bold text-[var(--color-text-secondary)]">{rank}</span>
               )}
@@ -71,11 +92,11 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
 
             {/* Player info */}
             <div className="flex items-center gap-2 min-w-0">
-              <UserAvatar address={addr} size={24} />
+              <UserAvatar address={addr} size={isTopThree ? 28 : 24} />
               <div className="min-w-0">
-                <p className="text-xs font-medium truncate">
+                <p className={`font-medium truncate ${rank === 1 ? 'text-sm' : 'text-xs'}`}>
                   {nickname ?? shortAddr(addr)}
-                  {isCurrentUser && <span className="ml-1 text-[var(--color-primary)]">({t('leaderboard.you')})</span>}
+                  {isCurrentUser && <span className="ml-1 text-indigo-400">({t('leaderboard.you')})</span>}
                 </p>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
                   {String(entry.games ?? 0)} games / {String(entry.wins ?? 0)} wins
@@ -85,10 +106,13 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
 
             {/* Metric value */}
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-sm font-bold tabular-nums">
-                {formatLaunch(String(entry.turnover ?? '0'))}
-              </span>
-              <LaunchTokenIcon size={32} />
+              <div className="text-right">
+                <span className={`font-bold tabular-nums ${rank === 1 ? 'text-base' : 'text-sm'}`}>
+                  {formatLaunch(String(entry.turnover ?? '0'))}
+                </span>
+                <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{metricLabel}</p>
+              </div>
+              <LaunchTokenIcon size={rank === 1 ? 36 : 32} />
             </div>
           </div>
         );

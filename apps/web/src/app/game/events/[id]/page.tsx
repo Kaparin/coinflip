@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Target, Users, Clock } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { useGetEventById } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
@@ -13,7 +13,17 @@ import { ContestLeaderboard } from '@/components/features/events/contest-leaderb
 import { RaffleParticipants } from '@/components/features/events/raffle-participants';
 import { EventResults } from '@/components/features/events/event-results';
 import { JoinRaffleButton } from '@/components/features/events/join-raffle-button';
+import { getEventTheme } from '@/components/features/events/event-theme';
 import { useTranslation } from '@/lib/i18n';
+
+function formatDateRange(startsAt: string, endsAt: string): string {
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+      ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  };
+  return `${fmt(startsAt)} \u2014 ${fmt(endsAt)}`;
+}
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -46,8 +56,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const isContest = event.type === 'contest';
+  const theme = getEventTheme(event.type);
+  const TypeIcon = isContest ? Target : Trophy;
   const isActive = event.status === 'active';
-  const isCompleted = event.status === 'completed' || event.status === 'calculating';
+  const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
+  const hasResults = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
 
   return (
@@ -59,16 +72,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       </Link>
 
       {/* Header card */}
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
-        <div className="flex items-start justify-between">
+      <div className={`relative overflow-hidden rounded-xl border border-[var(--color-border)] p-4 space-y-3 ${
+        isActive ? `${theme.bgGradient} ${theme.borderGlow}` : 'bg-[var(--color-surface)]'
+      }`}>
+        {/* Decorative icon */}
+        <TypeIcon
+          size={100}
+          className={`absolute -top-3 -right-3 opacity-[0.04] ${theme.iconColor}`}
+          strokeWidth={1}
+        />
+
+        <div className="relative flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
-              {isContest ? (
-                <Target size={14} className="text-[var(--color-primary)]" />
-              ) : (
-                <Trophy size={14} className="text-[var(--color-warning)]" />
-              )}
-              <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              <TypeIcon size={14} className={theme.iconColor} />
+              <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${theme.badgeBg}`}>
                 {isContest ? t('events.contest') : t('events.raffle')}
               </span>
             </div>
@@ -78,35 +96,50 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           {/* Status badge */}
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
             isActive ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' :
-            isCompleted ? 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]' :
-            'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+            event.status === 'completed' ? `${theme.badgeBg}` :
+            event.status === 'calculating' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
+            'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
           }`}>
             {event.status}
           </span>
         </div>
 
         {event.description && (
-          <p className="text-xs text-[var(--color-text-secondary)]">{event.description}</p>
+          <p className="relative text-xs text-[var(--color-text-secondary)]">{event.description}</p>
         )}
 
         {/* Stats row */}
-        <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+        <div className="relative flex flex-wrap items-center gap-4 text-xs text-[var(--color-text-secondary)]">
           <div className="flex items-center gap-1.5">
-            <Trophy size={12} className="text-[var(--color-warning)]" />
+            <Trophy size={12} className={theme.iconColor} />
             <span className="font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
             <LaunchTokenIcon size={32} />
           </div>
           <div className="flex items-center gap-1">
-            <Users size={12} />
+            <Users size={12} className={theme.iconColor} />
             <span>{event.participantCount} {t('events.participants')}</span>
           </div>
           {isActive && (
             <div className="flex items-center gap-1">
-              <Clock size={12} />
-              <EventTimer targetDate={event.endsAt} compact />
+              <Clock size={12} className={theme.iconColor} />
+              <EventTimer targetDate={event.endsAt} compact eventType={event.type} />
+            </div>
+          )}
+          {isEnded && (
+            <div className="flex items-center gap-1">
+              <Calendar size={12} />
+              <span>{formatDateRange(event.startsAt, event.endsAt)}</span>
             </div>
           )}
         </div>
+
+        {/* Participation badge for ended events */}
+        {isEnded && event.hasJoined && (
+          <div className="relative flex items-center gap-1.5 rounded-lg bg-[var(--color-success)]/10 px-3 py-1.5 text-xs font-bold text-[var(--color-success)]">
+            <CheckCircle size={14} />
+            {t('events.youParticipated')}
+          </div>
+        )}
       </div>
 
       {/* Prizes */}
@@ -114,10 +147,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
           {t('events.prizes')}
         </h2>
-        <PrizeDisplay prizes={prizes} />
+        <PrizeDisplay prizes={prizes} eventType={event.type} />
       </section>
 
-      {/* Join button (raffle or opt-in contest) */}
+      {/* Join button (raffle, active only) */}
       {!isContest && isActive && (
         <JoinRaffleButton
           eventId={event.id}
@@ -127,8 +160,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         />
       )}
 
+      {/* Results (ended events with results) */}
+      {hasResults && (
+        <section>
+          <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            {t('events.resultsTitle')}
+          </h2>
+          <EventResults eventId={event.id} eventType={event.type} />
+        </section>
+      )}
+
       {/* Leaderboard (contests) */}
-      {isContest && (isActive || isCompleted) && (
+      {isContest && (isActive || isEnded) && (
         <section>
           <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
             {t('events.leaderboard')}
@@ -138,19 +181,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Participants (raffles) */}
-      {!isContest && (isActive || isCompleted) && (
+      {!isContest && (isActive || isEnded) && (
         <section>
           <RaffleParticipants eventId={event.id} />
-        </section>
-      )}
-
-      {/* Results (completed) */}
-      {isCompleted && (
-        <section>
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-            {t('events.resultsTitle')}
-          </h2>
-          <EventResults eventId={event.id} />
         </section>
       )}
     </div>
