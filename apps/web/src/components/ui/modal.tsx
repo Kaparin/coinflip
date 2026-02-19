@@ -22,6 +22,39 @@ export interface ModalProps {
   children: ReactNode;
 }
 
+function useVisualViewportStyles(open: boolean) {
+  const [styles, setStyles] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined' || !window.visualViewport) return;
+
+    const applyViewport = () => {
+      const vv = window.visualViewport;
+      if (vv.height < window.innerHeight * 0.95) {
+        setStyles({
+          height: `${vv.height}px`,
+          width: `${vv.width}px`,
+          top: `${vv.offsetTop}px`,
+          left: `${vv.offsetLeft}px`,
+        });
+      } else {
+        setStyles({});
+      }
+    };
+
+    applyViewport();
+    window.visualViewport.addEventListener('resize', applyViewport);
+    window.visualViewport.addEventListener('scroll', applyViewport);
+    return () => {
+      window.visualViewport.removeEventListener('resize', applyViewport);
+      window.visualViewport.removeEventListener('scroll', applyViewport);
+      setStyles({});
+    };
+  }, [open]);
+
+  return styles;
+}
+
 export function Modal({
   open,
   onClose,
@@ -34,6 +67,7 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
+  const viewportStyles = useVisualViewportStyles(open);
   const historyPushedRef = useRef(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -110,10 +144,11 @@ export function Modal({
       aria-modal="true"
       aria-label={title ?? t('common.close')}
       onClick={handleOverlayClick}
+      style={viewportStyles}
       className={[
         'fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4',
         'bg-black/60 backdrop-blur-sm',
-        'transition-opacity duration-200',
+        'transition-[opacity,height,top] duration-200 ease-out',
         visible ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
     >
@@ -121,9 +156,11 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         className={[
-          'w-full max-h-[90vh] sm:max-h-[85vh] sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
+          'w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
           'bg-[var(--color-surface)] shadow-2xl flex flex-col',
           'transition-all duration-200',
+          // When keyboard open (viewportStyles set), use % of overlay; else vh
+          Object.keys(viewportStyles).length > 0 ? 'max-h-[90%]' : 'max-h-[90vh] sm:max-h-[85vh]',
           visible ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4 sm:translate-y-0',
         ].join(' ')}
       >

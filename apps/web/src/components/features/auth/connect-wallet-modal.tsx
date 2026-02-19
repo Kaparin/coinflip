@@ -129,6 +129,13 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
     if (step === 'unlock') setTimeout(() => pinRef.current?.focus(), 100);
   }, [step]);
 
+  // Scroll focused input into view when keyboard opens (mobile)
+  const handleInputFocus = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    requestAnimationFrame(() => {
+      e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, []);
+
   const wordCount = mnemonic.trim().split(/\s+/).filter(Boolean).length;
   const isValidWordCount = wordCount === 12 || wordCount === 24;
 
@@ -303,6 +310,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                 rows={3}
                 value={mnemonic}
                 onChange={(e) => setMnemonic(e.target.value.toLowerCase())}
+                onFocus={handleInputFocus}
                 placeholder={t('auth.phrasePlaceholder')}
                 spellCheck={false}
                 autoComplete="off"
@@ -322,6 +330,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                   inputMode="numeric"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
+                  onFocus={handleInputFocus}
                   placeholder={t('auth.minChars')}
                   className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
                 />
@@ -335,6 +344,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                   inputMode="numeric"
                   value={pinConfirm}
                   onChange={(e) => setPinConfirm(e.target.value)}
+                  onFocus={handleInputFocus}
                   placeholder={t('auth.repeatPin')}
                   className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
                 />
@@ -520,6 +530,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                     inputMode="numeric"
                     value={pin}
                     onChange={(e) => { setPin(e.target.value); setLocalError(''); }}
+                    onFocus={handleInputFocus}
                     onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
                     placeholder={t('auth.yourPin')}
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
