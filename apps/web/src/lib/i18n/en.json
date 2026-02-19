@@ -310,6 +310,7 @@
     "chooseAnotherWallet": "Choose another wallet",
     "chooseWallet": "Choose wallet",
     "chooseWalletDesc": "Select a saved wallet to unlock, or add a new one.",
+    "chooseWalletDescSingle": "Tap on your wallet to unlock it and start playing.",
     "addNewWallet": "Add new wallet",
     "backToWalletList": "Back to wallet list",
     "current": "current",

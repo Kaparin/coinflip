@@ -71,9 +71,9 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
         setSelectedWalletAddress(connectModalSwitchTo);
         setStep('unlock');
       } else if (hasSaved && savedWallets.length > 0) {
-        const showChoose = savedWallets.length > 1 || (isConnected && savedWallets.length >= 1);
-        setStep(showChoose ? 'choose' : 'unlock');
-        setSelectedWalletAddress(showChoose ? null : (savedWallets[0]?.address ?? null));
+        // Always show wallet list first — user picks which one to unlock
+        setSelectedWalletAddress(null);
+        setStep('choose');
       } else {
         setSelectedWalletAddress(null);
         setStep('import');
@@ -115,6 +115,15 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       return () => clearTimeout(timer);
     }
   }, [open, step, onClose]);
+
+  // Safety: if we're on 'unlock' but have no wallet to show, redirect
+  useEffect(() => {
+    if (step !== 'unlock' || !open) return;
+    const addr = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address;
+    if (!addr) {
+      setStep(savedWallets.length > 0 ? 'choose' : 'import');
+    }
+  }, [step, open, selectedWalletAddress, savedAddress, savedWallets]);
 
   // Focus input on step change
   useEffect(() => {
@@ -184,28 +193,32 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     setStep(remaining === 0 ? 'import' : 'choose');
   }, [forgetWallet, savedWallets]);
 
-  /** Use different wallet — go to choose (or import if adding new) */
+  /** Use different wallet — go to choose (or import if none saved) */
   const handleUseDifferent = useCallback(() => {
     setPin('');
     setSelectedWalletAddress(null);
-    setStep(savedWallets.length > 1 ? 'choose' : 'import');
+    setStep(savedWallets.length > 0 ? 'choose' : 'import');
   }, [savedWallets.length]);
 
   if (!open) return null;
 
   const canClose = !(step === 'confirm' && isConnecting);
-  const walletToUnlock = selectedWalletAddress ?? savedAddress;
+  const walletToUnlock = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address ?? null;
 
   return (
     <Modal open onClose={onClose} showCloseButton={canClose} showCloseButtonBottom>
       <div className="p-2 sm:p-5 max-w-md w-full">
 
-        {/* ==== CHOOSE WALLET (multi-wallet) ==== */}
+        {/* ==== CHOOSE WALLET ==== */}
         {step === 'choose' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold">{t('auth.chooseWallet')}</h2>
+            <h2 className="text-lg font-bold">
+              {savedWallets.length > 1 ? t('auth.chooseWallet') : t('auth.welcomeBack')}
+            </h2>
             <p className="text-xs text-[var(--color-text-secondary)]">
-              {t('auth.chooseWalletDesc')}
+              {savedWallets.length > 1
+                ? t('auth.chooseWalletDesc')
+                : t('auth.chooseWalletDescSingle')}
             </p>
 
             <div className="space-y-2 max-h-[40vh] overflow-y-auto">
