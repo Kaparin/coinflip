@@ -127,10 +127,10 @@ export function Modal({
           visible ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4 sm:translate-y-0',
         ].join(' ')}
       >
-        {/* Header: title + close button */}
-        <div className="flex items-center justify-between shrink-0 border-b border-[var(--color-border)] px-4 sm:px-6 py-3">
+        {/* Header: title + close button — compact on mobile */}
+        <div className="flex items-center justify-between shrink-0 border-b border-[var(--color-border)] px-3 sm:px-6 py-2 sm:py-3">
           {title ? (
-            <h2 className="text-lg font-semibold text-[var(--color-text)]">{title}</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-[var(--color-text)]">{title}</h2>
           ) : (
             <span />
           )}
@@ -138,22 +138,22 @@ export function Modal({
             <button
               type="button"
               onClick={handleCloseClick}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] active:scale-95 cursor-pointer"
+              className="-mr-1 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] active:scale-95 cursor-pointer touch-manipulation"
               aria-label={t('common.close')}
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           )}
         </div>
 
         {/* Body: scrollable */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 min-h-0">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-3 sm:py-4 min-h-0">
           {children}
         </div>
 
         {/* Optional bottom close button */}
         {showCloseButtonBottom && canClose && (
-          <div className="shrink-0 border-t border-[var(--color-border)] px-4 sm:px-6 py-3">
+          <div className="shrink-0 border-t border-[var(--color-border)] px-3 sm:px-6 py-2 sm:py-3">
             <button
               type="button"
               onClick={handleCloseClick}
