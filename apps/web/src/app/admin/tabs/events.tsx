@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send } from 'lucide-react';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -152,6 +152,7 @@ export function EventsTab() {
     (event: EventRow) => {
       setDetailEvent(event);
       setDetailOpen(true);
+      setWinners([]);
       if (event.status === 'completed' || event.status === 'calculating') {
         fetchWinners(event.id);
       }
@@ -382,18 +383,36 @@ export function EventsTab() {
   };
 
   const handleAction = async (eventId: string, action: string) => {
-    if (action === 'delete' && !window.confirm('Delete this event? This cannot be undone.')) return;
+    // Confirmations for destructive actions
+    if (action === 'delete' && !window.confirm('Delete this draft event? This cannot be undone.')) return;
+    if (action === 'cancel' && !window.confirm('Cancel this event and remove all participants? This cannot be undone.')) return;
+    if (action === 'activate' && !window.confirm('Activate this event? It will be visible to all users.')) return;
+    if (action === 'approve' && !window.confirm('Approve results and mark as completed? This finalizes the winners.')) return;
 
     setActionLoading(`${action}:${eventId}`);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/admin/events/${eventId}/${action}`, {
-        method: action === 'delete' ? 'DELETE' : 'POST',
+      const method = action === 'delete' ? 'DELETE' : 'POST';
+      // delete uses base path (DELETE /admin/events/:id), others use action subpath
+      const url = action === 'delete'
+        ? `${API_BASE}/api/v1/admin/events/${eventId}`
+        : `${API_BASE}/api/v1/admin/events/${eventId}/${action}`;
+      const res = await fetch(url, {
+        method,
         credentials: 'include',
         headers: { ...getAuthHeaders() },
       });
       if (res.ok) {
-        setMessage(`${action} successful!`);
+        const actionLabels: Record<string, string> = {
+          activate: 'Event activated!',
+          cancel: 'Event canceled!',
+          delete: 'Event deleted!',
+          calculate: 'Results calculated!',
+          approve: 'Event approved!',
+          archive: 'Event archived!',
+          distribute: 'Prizes distributed!',
+        };
+        setMessage(actionLabels[action] ?? `${action} successful!`);
         fetchEvents();
       } else {
         const err = await res.json();
@@ -744,9 +763,13 @@ export function EventsTab() {
                 <span className="text-xs font-medium capitalize">{detailEvent.type}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    detailEvent.status === 'completed'
-                      ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
-                      : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
+                    detailEvent.status === 'active'
+                      ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                      : detailEvent.status === 'draft'
+                        ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                        : detailEvent.status === 'completed'
+                          ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                          : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
                   }`}
                 >
                   {detailEvent.status}
@@ -766,6 +789,81 @@ export function EventsTab() {
                   <span className="font-bold">Participants:</span> {detailEvent.participantCount}
                 </div>
               </div>
+              {/* Config info */}
+              {detailEvent.config && (
+                <div className="text-[11px] text-[var(--color-text-secondary)]">
+                  <span className="font-bold">Config:</span>{' '}
+                  {formatConfig(detailEvent) ?? 'Default'}
+                </div>
+              )}
+              {/* ID for debugging */}
+              <div className="text-[10px] font-mono text-[var(--color-text-secondary)]/60">
+                ID: {detailEvent.id}
+              </div>
+            </div>
+
+            {/* Quick action buttons in detail modal */}
+            <div className="flex flex-wrap gap-2">
+              {detailEvent.status === 'draft' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'activate'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <Play size={12} /> Activate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'delete'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </>
+              )}
+              {detailEvent.status === 'active' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'calculate'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-warning)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <Calculator size={12} /> End &amp; Calculate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'cancel'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <Ban size={12} /> Cancel
+                  </button>
+                </>
+              )}
+              {detailEvent.status === 'calculating' && (
+                <button
+                  type="button"
+                  onClick={() => { handleAction(detailEvent.id, 'approve'); setDetailOpen(false); }}
+                  disabled={!!actionLoading}
+                  className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                >
+                  <CheckCircle size={12} /> Approve Results
+                </button>
+              )}
+              {detailEvent.status === 'completed' && (
+                <button
+                  type="button"
+                  onClick={() => { handleAction(detailEvent.id, 'archive'); setDetailOpen(false); }}
+                  disabled={!!actionLoading}
+                  className="flex items-center gap-1 rounded-lg bg-[var(--color-text-secondary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                >
+                  <Archive size={12} /> Archive
+                </button>
+              )}
             </div>
 
             {/* Winners table */}
@@ -836,7 +934,7 @@ export function EventsTab() {
                                   <button
                                     type="button"
                                     onClick={() => handleDistributeOne(w.userId)}
-                                    disabled={!!distLoading}
+                                    disabled={distLoading === w.userId || distLoading === 'all'}
                                     className="rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40"
                                   >
                                     {distLoading === w.userId ? '...' : 'Send'}
@@ -904,22 +1002,23 @@ export function EventsTab() {
 
                   {/* Action buttons */}
                   <div className="flex shrink-0 items-center gap-1">
-                    {(event.status === 'completed' || event.status === 'calculating') && (
-                      <button
-                        type="button"
-                        onClick={() => openDetail(event)}
-                        className="rounded-lg border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-                        title="Details"
-                      >
-                        <Eye size={12} />
-                      </button>
-                    )}
+                    {/* Detail button — available for all statuses */}
+                    <button
+                      type="button"
+                      onClick={() => openDetail(event)}
+                      className="rounded-lg border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                      title="Details"
+                    >
+                      <Eye size={12} />
+                    </button>
+
+                    {/* Draft: Activate + Delete */}
                     {event.status === 'draft' && (
                       <>
                         <button
                           type="button"
                           onClick={() => handleAction(event.id, 'activate')}
-                          disabled={actionLoading === `activate:${event.id}`}
+                          disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
                           title="Activate"
                         >
@@ -928,7 +1027,7 @@ export function EventsTab() {
                         <button
                           type="button"
                           onClick={() => handleAction(event.id, 'delete')}
-                          disabled={actionLoading === `delete:${event.id}`}
+                          disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
                           title="Delete"
                         >
@@ -936,33 +1035,61 @@ export function EventsTab() {
                         </button>
                       </>
                     )}
-                    {(event.status === 'active' || event.status === 'calculating') && (
-                      <button
-                        type="button"
-                        onClick={() => handleAction(event.id, 'calculate')}
-                        disabled={actionLoading === `calculate:${event.id}`}
-                        className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Calculate"
-                      >
-                        <Calculator size={12} />
-                      </button>
+
+                    {/* Active: Cancel + Calculate (force end) */}
+                    {event.status === 'active' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'calculate')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="End & Calculate"
+                        >
+                          <Calculator size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'cancel')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Cancel Event"
+                        >
+                          <Ban size={12} />
+                        </button>
+                      </>
                     )}
+
+                    {/* Calculating: Re-calculate + Approve */}
                     {event.status === 'calculating' && (
-                      <button
-                        type="button"
-                        onClick={() => handleAction(event.id, 'approve')}
-                        disabled={actionLoading === `approve:${event.id}`}
-                        className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Approve"
-                      >
-                        <CheckCircle size={12} />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'calculate')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Recalculate"
+                        >
+                          <Calculator size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'approve')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Approve Results"
+                        >
+                          <CheckCircle size={12} />
+                        </button>
+                      </>
                     )}
+
+                    {/* Completed: Distribute (if undistributed) + Archive */}
                     {event.status === 'completed' && (
                       <button
                         type="button"
                         onClick={() => handleAction(event.id, 'archive')}
-                        disabled={actionLoading === `archive:${event.id}`}
+                        disabled={!!actionLoading}
                         className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
                         title="Archive"
                       >

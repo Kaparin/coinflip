@@ -1,9 +1,10 @@
 import { getDb } from '../lib/db.js';
 import { events, eventParticipants, bets, users } from '@coinflip/db/schema';
-import { eq, and, sql, inArray, desc, asc, lt, gte, or, count as countFn } from 'drizzle-orm';
+import { eq, and, sql, inArray, desc, asc, lt, lte, gte, or, count as countFn } from 'drizzle-orm';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { vaultService } from './vault.service.js';
+import { wsService } from './ws.service.js';
 import { LEADERBOARD_CACHE_TTL_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
 import crypto from 'node:crypto';
@@ -156,10 +157,16 @@ class EventsService {
 
   async getPublicActiveEvents() {
     const db = getDb();
+    // Show active events + upcoming drafts (scheduled but not yet started)
     return db
       .select()
       .from(events)
-      .where(eq(events.status, 'active'))
+      .where(
+        or(
+          eq(events.status, 'active'),
+          and(eq(events.status, 'draft'), gte(events.startsAt, new Date())),
+        ),
+      )
       .orderBy(asc(events.endsAt));
   }
 
@@ -218,6 +225,11 @@ class EventsService {
     if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
     if (event.status !== 'active') {
       throw new AppError('EVENT_NOT_ACTIVE', 'Event is not currently active', 400);
+    }
+
+    // Reject joins after event has ended
+    if (new Date() > event.endsAt) {
+      throw new AppError('EVENT_ENDED', 'This event has already ended', 400);
     }
 
     // Check maxParticipants for raffles
@@ -442,6 +454,17 @@ class EventsService {
     const event = await this.getEventById(eventId);
     if (!event || event.type !== 'contest') return null;
 
+    // Idempotent: if results already calculated, return them
+    if (event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
+      logger.info({ eventId }, 'Contest results already calculated, returning existing');
+      return event.results as Array<{ rank: number; userId: string; address: string; prizeAmount: string }>;
+    }
+
+    // Clear leaderboard cache to get fresh data for final calculation
+    for (const [key] of leaderboardCache) {
+      if (key.startsWith(`${eventId}:`)) leaderboardCache.delete(key);
+    }
+
     const { data: leaderboard } = await this.getContestLeaderboard(eventId, 1000, 0);
     const prizes = event.prizes as PrizeEntry[];
 
@@ -494,6 +517,15 @@ class EventsService {
     if (!event || event.type !== 'raffle') return null;
     if (event.status !== 'calculating') {
       throw new AppError('INVALID_STATE', 'Event must be in calculating state to draw', 400);
+    }
+
+    // Idempotent: if raffle already drawn (seed exists), return existing results
+    if (event.raffleSeed && event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
+      logger.info({ eventId }, 'Raffle already drawn, returning existing results');
+      return {
+        results: event.results as Array<{ rank: number; userId: string; prizeAmount: string }>,
+        seed: event.raffleSeed,
+      };
     }
 
     const db = getDb();
@@ -638,13 +670,76 @@ class EventsService {
     return { distributed, failed };
   }
 
+  // ─── Cancel Event ─────────────────────────────────────
+
+  async cancelEvent(eventId: string) {
+    const db = getDb();
+    const event = await this.getEventById(eventId);
+    if (!event) return null;
+    if (!['draft', 'active'].includes(event.status)) {
+      throw new AppError('INVALID_STATE', `Cannot cancel event in ${event.status} status`, 400);
+    }
+
+    // If active, delete participants first (refund not needed — no funds locked for events)
+    if (event.status === 'active') {
+      await db
+        .delete(eventParticipants)
+        .where(eq(eventParticipants.eventId, eventId));
+    }
+
+    const [deleted] = await db
+      .delete(events)
+      .where(eq(events.id, eventId))
+      .returning();
+
+    if (deleted) {
+      wsService.broadcast({
+        type: 'event_canceled',
+        data: { eventId, title: event.title, type: event.type },
+      });
+      logger.info({ eventId, title: event.title, status: event.status }, 'Event canceled and deleted');
+    }
+
+    return deleted ?? null;
+  }
+
   // ─── Event Lifecycle (background) ─────────────────────
 
   async checkEventLifecycle() {
     const db = getDb();
     const now = new Date();
 
-    // Find active events that have ended
+    // 1. Auto-activate draft events whose startsAt has passed
+    const draftsToActivate = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.status, 'draft'),
+          lte(events.startsAt, now),
+        ),
+      );
+
+    for (const event of draftsToActivate) {
+      try {
+        // Don't auto-activate if endsAt is also in the past (stale event)
+        if (event.endsAt < now) {
+          logger.warn({ eventId: event.id, title: event.title }, 'Skipping auto-activate: event already expired');
+          continue;
+        }
+
+        await this.setStatus(event.id, 'active');
+        wsService.broadcast({
+          type: 'event_started',
+          data: { eventId: event.id, title: event.title, type: event.type },
+        });
+        logger.info({ eventId: event.id, type: event.type, title: event.title }, 'Event auto-activated (startsAt reached)');
+      } catch (err) {
+        logger.error({ err, eventId: event.id }, 'Event auto-activation failed');
+      }
+    }
+
+    // 2. Find active events that have ended → transition to calculating
     const endedEvents = await db
       .select()
       .from(events)
@@ -658,6 +753,7 @@ class EventsService {
     for (const event of endedEvents) {
       try {
         await this.setStatus(event.id, 'calculating');
+        wsService.emitEventEnded({ eventId: event.id, title: event.title, type: event.type });
         logger.info({ eventId: event.id, type: event.type, title: event.title }, 'Event ended → calculating');
 
         // Auto-calculate for contests
@@ -670,9 +766,6 @@ class EventsService {
         logger.error({ err, eventId: event.id }, 'Event lifecycle transition failed');
       }
     }
-
-    // Check for events that should auto-activate (starts_at passed while in draft)
-    // Note: activation is manual via admin, not auto-start
   }
 
   // ─── Format for API Response ──────────────────────────

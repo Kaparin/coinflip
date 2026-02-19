@@ -43,7 +43,10 @@ eventsRouter.get('/:id', optionalAuthMiddleware, async (c) => {
   const userId = tryGetUserId(c);
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
-  if (event.status === 'draft') throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+  // Hide drafts that aren't upcoming (past drafts that were never activated)
+  if (event.status === 'draft' && event.startsAt < new Date()) {
+    throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+  }
 
   const data = await eventsService.formatEventResponse(event, userId);
   return c.json({ data });

@@ -65,14 +65,28 @@ adminEventsRouter.post('/:id/activate', async (c) => {
     throw new AppError('INVALID_STATE', `Cannot activate event in ${event.status} status`, 400);
   }
 
+  // Validate: don't activate an event whose endsAt is already past
+  if (event.endsAt < new Date()) {
+    throw new AppError('EVENT_EXPIRED', 'Cannot activate event: end date is in the past', 400);
+  }
+
   const updated = await eventsService.setStatus(eventId, 'active');
   if (!updated) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
   wsService.broadcast({ type: 'event_started', data: { eventId, title: event.title, type: event.type } });
-  logger.info({ eventId, title: event.title }, 'Event activated');
+  logger.info({ eventId, title: event.title }, 'Event activated by admin');
 
   const data = await eventsService.formatEventResponse(updated);
   return c.json({ data });
+});
+
+// POST /admin/events/:id/cancel — Cancel draft or active event
+adminEventsRouter.post('/:id/cancel', async (c) => {
+  const eventId = c.req.param('id');
+  const event = await eventsService.cancelEvent(eventId);
+  if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found or cannot be canceled', 404);
+  logger.info({ eventId, title: event.title }, 'Event canceled by admin');
+  return c.json({ data: { canceled: true, title: event.title } });
 });
 
 // POST /admin/events/:id/calculate — Trigger calculation (for raffles)
