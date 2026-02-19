@@ -137,20 +137,20 @@ export function Header() {
                     <User size={14} />
                     {t('nav.profile')}
                   </Link>
-                  {activeEventCount > 0 && (
-                    <Link href="/game/events"
-                      className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                        pathname?.startsWith('/game/events')
-                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
-                      }`}>
-                      <Trophy size={14} />
-                      {t('nav.events')}
+                  <Link href="/game/events"
+                    className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      pathname?.startsWith('/game/events')
+                        ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                    }`}>
+                    <Trophy size={14} />
+                    {t('nav.events')}
+                    {activeEventCount > 0 && (
                       <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-warning)] px-1 text-[9px] font-bold text-white">
                         {activeEventCount}
                       </span>
-                    </Link>
-                  )}
+                    )}
+                  </Link>
                 </nav>
 
                 <StatusChips

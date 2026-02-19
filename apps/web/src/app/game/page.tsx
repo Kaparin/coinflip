@@ -27,7 +27,7 @@ const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
 export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
   const activeTabRef = useRef<Tab>('bets');
-  const [wsBannerDismissed, setWsBannerDismissed] = useState(false);
+  const [showWsBanner, setShowWsBanner] = useState(false);
   const queryClient = useQueryClient();
   const { address, isConnected } = useWalletContext();
   const { addToast } = useToast();
@@ -92,18 +92,16 @@ export default function GamePage() {
 
   const { isConnected: wsConnected } = useWebSocket({ address, enabled: isConnected, onEvent: handleWsEvent });
 
-  // Reset dismiss when ws reconnects, auto-dismiss after 5s
+  // Show WS banner only after sustained disconnection (3s delay).
+  // Prevents brief flash on page navigation when hook remounts.
   useEffect(() => {
-    if (wsConnected) setWsBannerDismissed(false);
-  }, [wsConnected]);
-
-  useEffect(() => {
-    if (!isConnected || wsConnected || wsBannerDismissed) return;
-    const timer = setTimeout(() => setWsBannerDismissed(true), 5000);
+    if (wsConnected || !isConnected) {
+      setShowWsBanner(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowWsBanner(true), 3000);
     return () => clearTimeout(timer);
-  }, [isConnected, wsConnected, wsBannerDismissed]);
-
-  const showWsBanner = isConnected && !wsConnected && !wsBannerDismissed;
+  }, [wsConnected, isConnected]);
 
   const handleTabChange = useCallback((tab: Tab) => {
     activeTabRef.current = tab;
@@ -188,7 +186,7 @@ export default function GamePage() {
             </div>
             <button
               type="button"
-              onClick={() => setWsBannerDismissed(true)}
+              onClick={() => setShowWsBanner(false)}
               className="shrink-0 rounded-md p-0.5 hover:bg-[var(--color-warning)]/20 transition-colors"
             >
               <X size={14} />

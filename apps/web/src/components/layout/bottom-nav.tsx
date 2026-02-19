@@ -53,22 +53,22 @@ export function BottomNav() {
           );
         })}
 
-        {activeCount > 0 && (
-          <Link
-            href="/game/events"
-            className={`relative flex flex-col items-center gap-0.5 px-4 py-2.5 text-[10px] font-medium transition-colors ${
-              pathname?.startsWith('/game/events')
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)]'
-            }`}
-          >
-            <Trophy size={20} />
-            <span>{t('nav.events')}</span>
+        <Link
+          href="/game/events"
+          className={`relative flex flex-col items-center gap-0.5 px-4 py-2.5 text-[10px] font-medium transition-colors ${
+            pathname?.startsWith('/game/events')
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)]'
+          }`}
+        >
+          <Trophy size={20} />
+          <span>{t('nav.events')}</span>
+          {activeCount > 0 && (
             <span className="absolute -top-0.5 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-warning)] px-1 text-[9px] font-bold text-white">
               {activeCount}
             </span>
-          </Link>
-        )}
+          )}
+        </Link>
       </div>
     </nav>
   );

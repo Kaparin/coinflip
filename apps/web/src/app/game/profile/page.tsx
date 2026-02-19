@@ -16,7 +16,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import {
   ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
-  Loader2, BarChart3,
+  Loader2, BarChart3, Gift, Target,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
 
@@ -278,6 +278,62 @@ ${t('profile.randomCodeComment7')}`}</pre>
             </div>
           )}
         </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
+function EventsInfoSection() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="pt-4 space-y-3">
+      <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] mb-4">
+        {t('profile.eventsIntro')}
+      </p>
+
+      <CollapsibleSection
+        title={t('profile.contestsTitle')}
+        icon={<Target size={18} className="text-indigo-400" />}
+        defaultOpen={false}
+        compact
+      >
+        <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          {t('profile.contestsDesc')}
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title={t('profile.rafflesTitle')}
+        icon={<Gift size={18} className="text-amber-400" />}
+        defaultOpen={false}
+        compact
+      >
+        <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          {t('profile.rafflesDesc')}
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title={t('profile.prizeFundingTitle')}
+        icon={<Coins size={18} className="text-emerald-400" />}
+        defaultOpen={false}
+        compact
+      >
+        <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          {t('profile.prizeFundingDesc')}
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title={t('profile.howToParticipateTitle')}
+        icon={<BookOpen size={18} className="text-blue-400" />}
+        defaultOpen={false}
+        compact
+      >
+        <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          {t('profile.howToParticipateDesc')}
+        </p>
       </CollapsibleSection>
     </div>
   );
@@ -978,6 +1034,14 @@ export default function ProfilePage() {
             <AboutSection />
           </CollapsibleSection>
 
+          <CollapsibleSection
+            title={t('profile.eventsSection')}
+            defaultOpen={false}
+            icon={<Trophy size={20} className="text-amber-400" />}
+          >
+            <EventsInfoSection />
+          </CollapsibleSection>
+
           {/* Language switcher */}
           <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <div className="flex items-center gap-3 mb-3">
@@ -1063,6 +1127,15 @@ export default function ProfilePage() {
         icon={<Info size={20} />}
       >
         <AboutSection />
+      </CollapsibleSection>
+
+      {/* Events & Raffles */}
+      <CollapsibleSection
+        title={t('profile.eventsSection')}
+        defaultOpen={false}
+        icon={<Trophy size={20} className="text-amber-400" />}
+      >
+        <EventsInfoSection />
       </CollapsibleSection>
 
       {/* Referral Program */}
