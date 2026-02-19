@@ -230,6 +230,15 @@ export async function signDeposit(
 
 // ---- Authz Grant ----
 
+/**
+ * Fixed gas limit for MsgGrant (authz).
+ * MsgGrant typically uses 80k-150k gas.
+ * 250k provides headroom without wasting fees.
+ * Eliminates the `simulate` RPC call that 'auto' gas requires —
+ * this avoids stale sequence issues for new accounts after deposit.
+ */
+const AUTHZ_GAS_LIMIT = 250_000;
+
 export interface AuthzGrantResult {
   txHash: string;
   height: number;
@@ -238,6 +247,9 @@ export interface AuthzGrantResult {
 /**
  * Grant Authz permission to the relayer for MsgExecuteContract.
  * This enables "1-click play" — the relayer can submit game actions on behalf of the user.
+ *
+ * Uses fixed gas and retries on sequence mismatch — new accounts often hit this
+ * when the Authz grant follows a deposit (sequence advances but RPC returns stale value).
  *
  * @param wallet - CosmJS wallet instance
  * @param address - Granter's axm1... address
@@ -276,16 +288,37 @@ export async function signAuthzGrant(
     }),
   };
 
-  const result = await client.signAndBroadcast(address, [msgGrant], 'auto', 'CoinFlip 1-click authorization');
+  const fee = calculateFee(AUTHZ_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
-  if (result.code !== 0) {
-    throw new Error(`Authz grant failed: ${result.rawLog}`);
+  try {
+    const result = await client.signAndBroadcast(address, [msgGrant], fee, 'CoinFlip 1-click authorization');
+    if (result.code !== 0) {
+      throw new Error(`Authz grant failed: ${result.rawLog}`);
+    }
+    return { txHash: result.transactionHash, height: result.height };
+  } catch (err) {
+    // Handle sequence mismatch — common for new accounts right after deposit.
+    // Parse the expected sequence from the error and retry with explicit SignerData.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const seqMatch = errMsg.match(/expected (\d+), got (\d+)/);
+    if (!seqMatch) throw err;
+
+    const expectedSeq = parseInt(seqMatch[1]!, 10);
+    const { accountNumber } = await client.getSequence(address);
+    const chainId = await client.getChainId();
+
+    const txRaw = await client.sign(
+      address, [msgGrant], fee, 'CoinFlip 1-click authorization',
+      { accountNumber, sequence: expectedSeq, chainId },
+    );
+    const txBytes = TxRaw.encode(txRaw).finish();
+    const result = await client.broadcastTx(txBytes);
+
+    if (result.code !== 0) {
+      throw new Error(`Authz grant failed: ${result.rawLog}`);
+    }
+    return { txHash: result.transactionHash, height: result.height };
   }
-
-  return {
-    txHash: result.transactionHash,
-    height: result.height,
-  };
 }
 
 // ---- Withdraw (direct, for treasury/advanced users) ----
