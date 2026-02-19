@@ -24,18 +24,10 @@ setInterval(() => {
 }, USER_CACHE_CLEANUP_INTERVAL_MS);
 
 /**
- * Auth middleware: verifies wallet ownership via cryptographic session token.
- *
- * Production mode:
- *   1. Check for `coinflip_session` httpOnly cookie (HMAC session token)
- *   2. Verify HMAC and expiration
- *   3. Extract wallet address from token
- *
- * Development mode (fallback):
- *   Also accepts `x-wallet-address` header for local testing.
- *   NEVER available in production — prevents wallet impersonation.
+ * Resolve user from session cookie or dev header.
+ * Returns true if user was found and set on context, false otherwise.
  */
-export async function authMiddleware(c: Context, next: Next) {
+async function resolveUser(c: Context): Promise<boolean> {
   const isProd = env.NODE_ENV === 'production';
   let address: string | undefined;
 
@@ -53,9 +45,7 @@ export async function authMiddleware(c: Context, next: Next) {
     address = c.req.header('x-wallet-address') ?? getCookie(c, 'wallet_address');
   }
 
-  if (!address) {
-    throw new AppError('UNAUTHORIZED', 'Authentication required. Please connect your wallet.', 401);
-  }
+  if (!address) return false;
 
   // Find or create user (with in-memory cache)
   let user: any;
@@ -71,6 +61,29 @@ export async function authMiddleware(c: Context, next: Next) {
   // Store in context for downstream handlers
   c.set('user', user);
   c.set('address', address);
+  return true;
+}
 
+/**
+ * Auth middleware: requires wallet auth. Throws 401 if not authenticated.
+ *
+ * Production: `coinflip_session` httpOnly cookie (HMAC session token).
+ * Dev fallback: `x-wallet-address` header (NEVER in production).
+ */
+export async function authMiddleware(c: Context, next: Next) {
+  const resolved = await resolveUser(c);
+  if (!resolved) {
+    throw new AppError('UNAUTHORIZED', 'Authentication required. Please connect your wallet.', 401);
+  }
+  await next();
+}
+
+/**
+ * Optional auth middleware: sets user on context if authenticated,
+ * but does NOT throw 401 — allows unauthenticated access.
+ * Use for public endpoints that optionally personalize responses (e.g. hasJoined).
+ */
+export async function optionalAuthMiddleware(c: Context, next: Next) {
+  await resolveUser(c);
   await next();
 }

@@ -1,19 +1,25 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { eventsService } from '../services/events.service.js';
 import { AppError } from '../lib/errors.js';
 import type { AppEnv } from '../types.js';
 
 export const eventsRouter = new Hono<AppEnv>();
 
-// ---- Public endpoints ----
+/** Get userId from context if optionalAuthMiddleware resolved a user */
+function tryGetUserId(c: { get: (key: string) => unknown }): string | undefined {
+  return (c.get('user') as { id: string } | undefined)?.id;
+}
+
+// ---- Public endpoints (with optional auth for hasJoined) ----
 
 // GET /events/active — Active + upcoming events
-eventsRouter.get('/active', async (c) => {
+eventsRouter.get('/active', optionalAuthMiddleware, async (c) => {
+  const userId = tryGetUserId(c);
   const activeEvents = await eventsService.getPublicActiveEvents();
-  const data = await Promise.all(activeEvents.map((e) => eventsService.formatEventResponse(e)));
+  const data = await Promise.all(activeEvents.map((e) => eventsService.formatEventResponse(e, userId)));
   return c.json({ data });
 });
 
@@ -23,21 +29,23 @@ const CompletedQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-eventsRouter.get('/completed', zValidator('query', CompletedQuerySchema), async (c) => {
+eventsRouter.get('/completed', optionalAuthMiddleware, zValidator('query', CompletedQuerySchema), async (c) => {
+  const userId = tryGetUserId(c);
   const { limit, offset } = c.req.valid('query');
   const completedEvents = await eventsService.getCompletedEvents(limit, offset);
-  const data = await Promise.all(completedEvents.map((e) => eventsService.formatEventResponse(e)));
+  const data = await Promise.all(completedEvents.map((e) => eventsService.formatEventResponse(e, userId)));
   return c.json({ data });
 });
 
 // GET /events/:id — Event details
-eventsRouter.get('/:id', async (c) => {
+eventsRouter.get('/:id', optionalAuthMiddleware, async (c) => {
   const eventId = c.req.param('id');
+  const userId = tryGetUserId(c);
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
   if (event.status === 'draft') throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
-  const data = await eventsService.formatEventResponse(event);
+  const data = await eventsService.formatEventResponse(event, userId);
   return c.json({ data });
 });
 

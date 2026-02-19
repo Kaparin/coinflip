@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Wrench,
   Trophy,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { DashboardTab } from './tabs/dashboard';
@@ -17,14 +18,16 @@ import { BetsTab } from './tabs/bets';
 import { DiagnosticsTab } from './tabs/diagnostics';
 import { ActionsTab } from './tabs/actions';
 import { EventsTab } from './tabs/events';
+import { TransactionsTab } from './tabs/transactions';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'diagnostics' | 'actions';
+type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'transactions' | 'diagnostics' | 'actions';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'users', icon: Users, label: 'Users' },
   { id: 'bets', icon: Dices, label: 'Bets' },
   { id: 'events', icon: Trophy, label: 'Events' },
+  { id: 'transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { id: 'diagnostics', icon: AlertTriangle, label: 'Diagnostics' },
   { id: 'actions', icon: Wrench, label: 'Actions' },
 ];
@@ -70,6 +73,7 @@ export default function AdminPage() {
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'bets' && <BetsTab />}
       {activeTab === 'events' && <EventsTab />}
+      {activeTab === 'transactions' && <TransactionsTab />}
       {activeTab === 'diagnostics' && <DiagnosticsTab />}
       {activeTab === 'actions' && <ActionsTab />}
     </div>

@@ -3,6 +3,7 @@ import { events, eventParticipants, bets, users } from '@coinflip/db/schema';
 import { eq, and, sql, inArray, desc, asc, lt, gte, or, count as countFn } from 'drizzle-orm';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
+import { vaultService } from './vault.service.js';
 import { LEADERBOARD_CACHE_TTL_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
 import crypto from 'node:crypto';
@@ -300,10 +301,11 @@ class EventsService {
     const db = getDb();
 
     // Build ORDER BY based on metric
+    // IMPORTANT: use raw aggregate expressions, not text aliases — text aliases sort lexicographically ("9" > "10")
     const metricOrderSql =
-      metric === 'turnover' ? sql`turnover DESC` :
-      metric === 'wins' ? sql`wins DESC` :
-      sql`profit DESC`;
+      metric === 'turnover' ? sql`SUM(pb.amount) DESC` :
+      metric === 'wins' ? sql`SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END) DESC` :
+      sql`(SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount)) DESC`;
 
     // Build participant filter for opt-in contests
     const participantFilter = config.autoJoin
@@ -387,10 +389,11 @@ class EventsService {
     const config = event.config as ContestConfig;
     const metric = config.metric;
 
+    // Use raw aggregate expressions — text aliases sort lexicographically
     const metricOrderSql =
-      metric === 'turnover' ? sql`turnover DESC` :
-      metric === 'wins' ? sql`wins DESC` :
-      sql`profit DESC`;
+      metric === 'turnover' ? sql`SUM(pb.amount) DESC` :
+      metric === 'wins' ? sql`SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END) DESC` :
+      sql`(SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount)) DESC`;
 
     const participantFilter = config.autoJoin
       ? sql`TRUE`
@@ -601,6 +604,38 @@ class EventsService {
           eq(eventParticipants.userId, userId),
         ),
       );
+  }
+
+  async distributePrize(eventId: string, userId: string): Promise<void> {
+    const winners = await this.getWinnersForDistribution(eventId);
+    const winner = winners.find((w) => w.userId === userId);
+    if (!winner) throw new AppError('WINNER_NOT_FOUND', 'Winner not found for this event', 404);
+    if (winner.prizeTxHash) throw new AppError('ALREADY_DISTRIBUTED', 'Prize already distributed', 400);
+    if (!winner.prizeAmount) throw new AppError('NO_PRIZE', 'No prize amount set', 400);
+
+    await vaultService.creditWinner(userId, winner.prizeAmount);
+    await this.markPrizeDistributed(eventId, userId, 'vault_credit');
+    logger.info({ eventId, userId, amount: winner.prizeAmount }, 'Prize distributed via vault credit');
+  }
+
+  async distributeAllPrizes(eventId: string): Promise<{ distributed: number; failed: number }> {
+    const winners = await this.getWinnersForDistribution(eventId);
+    const undistributed = winners.filter((w) => !w.prizeTxHash && w.prizeAmount);
+
+    let distributed = 0;
+    let failed = 0;
+
+    for (const winner of undistributed) {
+      try {
+        await this.distributePrize(eventId, winner.userId);
+        distributed++;
+      } catch (err) {
+        logger.error({ err, eventId, userId: winner.userId }, 'Failed to distribute prize');
+        failed++;
+      }
+    }
+
+    return { distributed, failed };
   }
 
   // ─── Event Lifecycle (background) ─────────────────────

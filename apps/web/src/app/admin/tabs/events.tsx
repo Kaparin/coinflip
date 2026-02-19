@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus } from 'lucide-react';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -31,6 +31,14 @@ interface PrizeRow {
   amount: string;
 }
 
+interface WinnerRow {
+  userId: string;
+  address: string;
+  prizeAmount: string | null;
+  prizeTxHash: string | null;
+  finalRank: number | null;
+}
+
 const DURATION_PRESETS = [
   { label: '1 hour', hours: 1 },
   { label: '24 hours', hours: 24 },
@@ -51,6 +59,9 @@ const inputCls =
   'w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none transition-colors';
 const labelCls = 'text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-1 block';
 
+const shortAddr = (addr: string) =>
+  addr.length > 15 ? `${addr.slice(0, 10)}...${addr.slice(-4)}` : addr;
+
 export function EventsTab() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +69,13 @@ export function EventsTab() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Detail modal state
+  const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [winners, setWinners] = useState<WinnerRow[]>([]);
+  const [winnersLoading, setWinnersLoading] = useState(false);
+  const [distLoading, setDistLoading] = useState<string | null>(null);
 
   // Form state
   const [formType, setFormType] = useState<'contest' | 'raffle'>('contest');
@@ -101,6 +119,97 @@ export function EventsTab() {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // --- Detail modal ---
+
+  const fetchWinners = useCallback(async (eventId: string) => {
+    setWinnersLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/admin/events/${eventId}/distribution-status`, {
+        credentials: 'include',
+        headers: { ...getAuthHeaders() },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setWinners(
+          (json.data?.winners ?? []).map((w: { userId: string; address: string; amount: string; rank: number; txHash: string | null }) => ({
+            userId: w.userId,
+            address: w.address,
+            prizeAmount: w.amount,
+            prizeTxHash: w.txHash,
+            finalRank: w.rank,
+          })),
+        );
+      }
+    } catch {
+      setMessage('Failed to load winners');
+    } finally {
+      setWinnersLoading(false);
+    }
+  }, []);
+
+  const openDetail = useCallback(
+    (event: EventRow) => {
+      setDetailEvent(event);
+      setDetailOpen(true);
+      if (event.status === 'completed' || event.status === 'calculating') {
+        fetchWinners(event.id);
+      }
+    },
+    [fetchWinners],
+  );
+
+  const handleDistributeAll = async () => {
+    if (!detailEvent) return;
+    setDistLoading('all');
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/admin/events/${detailEvent.id}/distribute`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders() },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setMessage(json.data?.message ?? 'Distributed!');
+        fetchWinners(detailEvent.id);
+        fetchEvents();
+      } else {
+        const err = await res.json();
+        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+      }
+    } catch {
+      setMessage('Failed to distribute');
+    } finally {
+      setDistLoading(null);
+    }
+  };
+
+  const handleDistributeOne = async (userId: string) => {
+    if (!detailEvent) return;
+    setDistLoading(userId);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/v1/admin/events/${detailEvent.id}/distribute/${userId}`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { ...getAuthHeaders() },
+        },
+      );
+      if (res.ok) {
+        setMessage('Prize distributed!');
+        fetchWinners(detailEvent.id);
+        fetchEvents();
+      } else {
+        const err = await res.json();
+        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+      }
+    } catch {
+      setMessage('Failed to distribute');
+    } finally {
+      setDistLoading(null);
+    }
+  };
 
   // --- Computed values ---
 
@@ -149,6 +258,8 @@ export function EventsTab() {
       return null;
     }
   }, [formStartDate, formStartTime, formEndDate, formEndTime]);
+
+  const distributedCount = useMemo(() => winners.filter((w) => w.prizeTxHash).length, [winners]);
 
   // --- Form actions ---
 
@@ -618,6 +729,133 @@ export function EventsTab() {
         </div>
       </Modal>
 
+      {/* Event Detail Modal */}
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailEvent?.title ?? 'Event Details'}>
+        {detailEvent && (
+          <div className="space-y-4">
+            {/* Event info */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {detailEvent.type === 'contest' ? (
+                  <Target size={14} className="text-[var(--color-primary)]" />
+                ) : (
+                  <Trophy size={14} className="text-[var(--color-warning)]" />
+                )}
+                <span className="text-xs font-medium capitalize">{detailEvent.type}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    detailEvent.status === 'completed'
+                      ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                      : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
+                  }`}
+                >
+                  {detailEvent.status}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                <div>
+                  <span className="font-bold">Start:</span> {fmtDate(detailEvent.startsAt)}
+                </div>
+                <div>
+                  <span className="font-bold">End:</span> {fmtDate(detailEvent.endsAt)}
+                </div>
+                <div>
+                  <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} LAUNCH
+                </div>
+                <div>
+                  <span className="font-bold">Participants:</span> {detailEvent.participantCount}
+                </div>
+              </div>
+            </div>
+
+            {/* Winners table */}
+            {(detailEvent.status === 'completed' || detailEvent.status === 'calculating') && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className={labelCls}>Winners</label>
+                    {winners.length > 0 && (
+                      <span className="text-[10px] font-bold text-[var(--color-text-secondary)]">
+                        {distributedCount}/{winners.length} distributed
+                      </span>
+                    )}
+                  </div>
+                  {detailEvent.status === 'completed' && winners.some((w) => !w.prizeTxHash) && (
+                    <button
+                      type="button"
+                      onClick={handleDistributeAll}
+                      disabled={distLoading === 'all'}
+                      className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-2.5 py-1 text-[10px] font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40"
+                    >
+                      <Send size={10} />
+                      {distLoading === 'all' ? 'Distributing...' : 'Distribute All'}
+                    </button>
+                  )}
+                </div>
+
+                {winnersLoading ? (
+                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">Loading winners...</div>
+                ) : winners.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">No winners yet</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Rank</th>
+                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Address</th>
+                          <th className="px-2 py-1.5 text-right font-bold text-[var(--color-text-secondary)]">Prize</th>
+                          <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Status</th>
+                          {detailEvent.status === 'completed' && (
+                            <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Action</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {winners.map((w) => (
+                          <tr key={w.address} className="border-b border-[var(--color-border)] last:border-b-0">
+                            <td className="px-2 py-1.5 font-bold">#{w.finalRank}</td>
+                            <td className="px-2 py-1.5 font-mono">{shortAddr(w.address)}</td>
+                            <td className="px-2 py-1.5 text-right">
+                              {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} LAUNCH` : '-'}
+                            </td>
+                            <td className="px-2 py-1.5 text-center">
+                              {w.prizeTxHash ? (
+                                <span className="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-success)]">
+                                  distributed
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-[var(--color-warning)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-warning)]">
+                                  pending
+                                </span>
+                              )}
+                            </td>
+                            {detailEvent.status === 'completed' && (
+                              <td className="px-2 py-1.5 text-center">
+                                {!w.prizeTxHash && w.userId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDistributeOne(w.userId)}
+                                    disabled={!!distLoading}
+                                    className="rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40"
+                                  >
+                                    {distLoading === w.userId ? '...' : 'Send'}
+                                  </button>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Events list */}
       {loading ? (
         <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Loading...</div>
@@ -666,6 +904,16 @@ export function EventsTab() {
 
                   {/* Action buttons */}
                   <div className="flex shrink-0 items-center gap-1">
+                    {(event.status === 'completed' || event.status === 'calculating') && (
+                      <button
+                        type="button"
+                        onClick={() => openDetail(event)}
+                        className="rounded-lg border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                        title="Details"
+                      >
+                        <Eye size={12} />
+                      </button>
+                    )}
                     {event.status === 'draft' && (
                       <>
                         <button
@@ -711,26 +959,15 @@ export function EventsTab() {
                       </button>
                     )}
                     {event.status === 'completed' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleAction(event.id, 'distribute')}
-                          disabled={actionLoading === `distribute:${event.id}`}
-                          className="rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Distribute"
-                        >
-                          Dist
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAction(event.id, 'archive')}
-                          disabled={actionLoading === `archive:${event.id}`}
-                          className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Archive"
-                        >
-                          <Archive size={12} />
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => handleAction(event.id, 'archive')}
+                        disabled={actionLoading === `archive:${event.id}`}
+                        className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                        title="Archive"
+                      >
+                        <Archive size={12} />
+                      </button>
                     )}
                   </div>
                 </div>

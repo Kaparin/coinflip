@@ -125,7 +125,7 @@ adminEventsRouter.post('/:id/approve', async (c) => {
   return c.json({ data });
 });
 
-// POST /admin/events/:id/distribute — Trigger prize distribution
+// POST /admin/events/:id/distribute — Distribute all prizes via vault credit
 adminEventsRouter.post('/:id/distribute', async (c) => {
   const eventId = c.req.param('id');
   const event = await eventsService.getEventById(eventId);
@@ -134,28 +134,36 @@ adminEventsRouter.post('/:id/distribute', async (c) => {
     throw new AppError('INVALID_STATE', 'Event must be completed to distribute prizes', 400);
   }
 
+  const { distributed, failed } = await eventsService.distributeAllPrizes(eventId);
   const winners = await eventsService.getWinnersForDistribution(eventId);
-  const undistributed = winners.filter((w) => !w.prizeTxHash);
+  const totalDistributed = winners.filter((w) => w.prizeTxHash).length;
 
-  if (undistributed.length === 0) {
-    return c.json({ data: { message: 'All prizes already distributed', total: winners.length, distributed: winners.length } });
-  }
+  logger.info({ eventId, distributed, failed }, 'Prize distribution completed');
 
-  // Distribution will happen via treasury → vault balance credit
-  // For now, return the list of winners that need distribution
-  // Actual on-chain distribution requires relayer integration (Phase 1.5)
   return c.json({
     data: {
-      message: `${undistributed.length} prizes pending distribution`,
+      message: failed > 0
+        ? `Distributed ${distributed}, failed ${failed}`
+        : `All ${distributed} prizes distributed`,
       total: winners.length,
-      distributed: winners.length - undistributed.length,
-      pending: undistributed.map((w) => ({
-        address: w.address,
-        amount: w.prizeAmount,
-        rank: w.finalRank,
-      })),
+      distributed: totalDistributed,
+      failed,
     },
   });
+});
+
+// POST /admin/events/:id/distribute/:userId — Distribute single prize
+adminEventsRouter.post('/:id/distribute/:userId', async (c) => {
+  const eventId = c.req.param('id');
+  const userId = c.req.param('userId');
+  const event = await eventsService.getEventById(eventId);
+  if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+  if (event.status !== 'completed') {
+    throw new AppError('INVALID_STATE', 'Event must be completed to distribute prizes', 400);
+  }
+
+  await eventsService.distributePrize(eventId, userId);
+  return c.json({ data: { message: 'Prize distributed' } });
 });
 
 // POST /admin/events/:id/archive — completed → archived
@@ -186,6 +194,7 @@ adminEventsRouter.get('/:id/distribution-status', async (c) => {
       distributed: distributed.length,
       pending: winners.length - distributed.length,
       winners: winners.map((w) => ({
+        userId: w.userId,
         address: w.address,
         amount: w.prizeAmount,
         rank: w.finalRank,

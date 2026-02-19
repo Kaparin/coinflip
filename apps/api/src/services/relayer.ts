@@ -28,6 +28,7 @@ import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT } from
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { SequenceManager } from './sequence-manager.js';
+import { relayerTxLogService } from './relayer-tx-log.service.js';
 
 /** Custom registry with authz + cosmwasm message types */
 function createRegistry(): Registry {
@@ -255,9 +256,22 @@ export class RelayerService {
 
     const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride);
 
+    // Log tx start (before broadcast)
+    const startTime = Date.now();
+    const logId = await relayerTxLogService.logStart({
+      userAddress,
+      contractAddress: targetContract,
+      action: actionKey,
+      actionPayload: action,
+      memo: memo || undefined,
+    });
+
     const release = await this.acquireBroadcastLock();
+    let result: RelayResult;
     try {
+    let lastAttempt = 0;
     for (let attempt = 0; attempt < 3; attempt++) {
+      lastAttempt = attempt;
       try {
         // 1. Get next sequence from our local manager
         const { accountNumber, sequence } = await this.sequenceManager.getAndIncrement();
@@ -297,7 +311,9 @@ export class RelayerService {
 
         // In async mode, return immediately — caller handles confirmation in background
         if (asyncMode) {
-          return { success: true, txHash, code: 0 };
+          result = { success: true, txHash, code: 0 };
+          await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          return result;
         }
 
         // Step 2: Poll for tx inclusion with timeout
@@ -340,7 +356,9 @@ export class RelayerService {
         if (!txResult) {
           // Timeout — tx is in mempool but not yet in block
           logger.warn({ txHash, action: actionKey }, 'Tx poll timeout — tx still in mempool');
-          return { success: true, txHash, code: 0, timeout: true };
+          result = { success: true, txHash, code: 0, timeout: true };
+          await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          return result;
         }
 
         if (txResult.code !== 0) {
@@ -362,13 +380,15 @@ export class RelayerService {
           }
 
           logger.error({ code: txResult.code, rawLog, txHash }, 'MsgExec failed on chain');
-          return {
+          result = {
             success: false,
             txHash,
             code: txResult.code,
             rawLog,
             error: rawLog || `Tx failed with code ${txResult.code}`,
           };
+          await relayerTxLogService.logComplete(logId, { txHash, success: false, code: txResult.code, rawLog, height: txResult.height, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          return result;
         }
 
         // Success
@@ -377,13 +397,15 @@ export class RelayerService {
           'MsgExec succeeded',
         );
 
-        return {
+        result = {
           success: true,
           txHash,
           height: txResult.height,
           code: 0,
           events: txResult.events as RelayResult['events'],
         };
+        await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, height: txResult.height, durationMs: Date.now() - startTime, attempt: lastAttempt });
+        return result;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         logger.error({ err, user: userAddress, action: actionKey, attempt }, 'MsgExec submission error');
@@ -411,11 +433,13 @@ export class RelayerService {
             { user: userAddress, action: actionKey },
             'Tx already in mempool — treating as pending',
           );
-          return {
+          result = {
             success: false,
             timeout: true,
             error: 'Transaction is already pending in the mempool. Please wait for it to be included.',
           };
+          await relayerTxLogService.logComplete(logId, { success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          return result;
         }
 
         // Detect timeout errors
@@ -431,20 +455,26 @@ export class RelayerService {
             { txHash: pendingTxHash, user: userAddress, action: actionKey },
             'MsgExec broadcast timeout — tx may still be included in a future block',
           );
-          return {
+          result = {
             success: false,
             timeout: true,
             txHash: pendingTxHash,
             error: 'Transaction was submitted but not yet confirmed. It may still succeed.',
           };
+          await relayerTxLogService.logComplete(logId, { txHash: pendingTxHash, success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          return result;
         }
 
-        return { success: false, error: errorMsg };
+        result = { success: false, error: errorMsg };
+        await relayerTxLogService.logComplete(logId, { success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+        return result;
       }
     }
 
     // Should not reach here, but just in case
-    return { success: false, error: 'Max retry attempts reached' };
+    result = { success: false, error: 'Max retry attempts reached' };
+    await relayerTxLogService.logComplete(logId, { success: false, durationMs: Date.now() - startTime, attempt: 2 });
+    return result;
     } finally {
       release();
     }
