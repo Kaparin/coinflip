@@ -15,20 +15,30 @@ interface ConnectWalletModalProps {
 type Step = 'choose' | 'import' | 'unlock' | 'confirm' | 'success' | 'security';
 
 /**
- * Connect Wallet modal — supports:
- * 1. Import mnemonic (new user)
- * 2. Unlock with PIN (returning user)
+ * Connect Wallet modal — thin wrapper that remounts content on each open
+ * so all useState initializers recompute (no stale step from previous session).
  */
 export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
+  if (!open) return null;
+  return <ConnectWalletContent onClose={onClose} />;
+}
+
+function ConnectWalletContent({ onClose }: { onClose: () => void }) {
   const { t, locale } = useTranslation();
   const {
     hasSaved, savedAddress, savedWallets, address: connectedAddress, isConnected, isConnecting, error,
     connectWithMnemonic, unlockWithPin, forgetWallet, connectModalSwitchTo,
   } = useWalletContext();
 
-  const [step, setStep] = useState<Step>('choose');
-  /** When multiple wallets: which one user selected to unlock */
-  const [selectedWalletAddress, setSelectedWalletAddress] = useState<string | null>(null);
+  // Computed fresh on mount — component remounts each time modal opens
+  const [step, setStep] = useState<Step>(() => {
+    if (connectModalSwitchTo) return 'unlock';
+    if (hasSaved && savedWallets.length > 0) return 'choose';
+    return 'import';
+  });
+  const [selectedWalletAddress, setSelectedWalletAddress] = useState<string | null>(
+    connectModalSwitchTo ?? null,
+  );
   const [mnemonic, setMnemonic] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -50,50 +60,10 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
   // Track whether a connect/unlock operation is in flight to prevent step resets
   const isInFlightRef = useRef(false);
 
-  // Reset state when modal opens (only reacts to `open` changing to true)
-  const prevOpenRef = useRef(false);
-  useEffect(() => {
-    if (open && !prevOpenRef.current) {
-      // Modal just opened
-      setMnemonic('');
-      setPin('');
-      setPinConfirm('');
-      setLocalError('');
-      setDerivedAddress('');
-      setInviterOpen(false);
-      setInviterAddr('');
-      setInviterStatus('idle');
-      setInviterError('');
-      setDerivedHasReferrer(false);
-      isInFlightRef.current = false;
-      // Direct switch: open to unlock a specific wallet
-      if (connectModalSwitchTo) {
-        setSelectedWalletAddress(connectModalSwitchTo);
-        setStep('unlock');
-      } else if (hasSaved && savedWallets.length > 0) {
-        // Always show wallet list first — user picks which one to unlock
-        setSelectedWalletAddress(null);
-        setStep('choose');
-      } else {
-        setSelectedWalletAddress(null);
-        setStep('import');
-      }
-    }
-    prevOpenRef.current = open;
-  }, [open, hasSaved, savedWallets, isConnected, connectModalSwitchTo]);
-
   // When wallet becomes connected during unlock/confirm, transition to success.
-  // Guards:
-  //   1. isInFlightRef must be true — prevents premature success when already connected
-  //      (e.g. adding a new wallet while connected: 'confirm' step would auto-succeed)
-  //   2. When switching wallets (selectedWalletAddress set), wait for connectedAddress to match
   useEffect(() => {
-    if (!open || !isConnected || isConnecting || (step !== 'unlock' && step !== 'confirm')) return;
-
-    // Only transition after an explicit connect/unlock action was initiated
+    if (!isConnected || isConnecting || (step !== 'unlock' && step !== 'confirm')) return;
     if (!isInFlightRef.current) return;
-
-    // When switching wallets, wait for the actual address to match the target
     if (selectedWalletAddress && connectedAddress !== selectedWalletAddress) return;
 
     isInFlightRef.current = false;
@@ -106,24 +76,24 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     setMnemonic('');
     setPin('');
     setPinConfirm('');
-  }, [open, isConnected, isConnecting, step, connectedAddress, selectedWalletAddress, inviterAddr, hasRefCode]);
+  }, [isConnected, isConnecting, step, connectedAddress, selectedWalletAddress, inviterAddr, hasRefCode]);
 
   // Auto-close when on success step
   useEffect(() => {
-    if (open && step === 'success') {
+    if (step === 'success') {
       const timer = setTimeout(onClose, 1200);
       return () => clearTimeout(timer);
     }
-  }, [open, step, onClose]);
+  }, [step, onClose]);
 
   // Safety: if we're on 'unlock' but have no wallet to show, redirect
   useEffect(() => {
-    if (step !== 'unlock' || !open) return;
+    if (step !== 'unlock') return;
     const addr = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address;
     if (!addr) {
       setStep(savedWallets.length > 0 ? 'choose' : 'import');
     }
-  }, [step, open, selectedWalletAddress, savedAddress, savedWallets]);
+  }, [step, selectedWalletAddress, savedAddress, savedWallets]);
 
   // Focus input on step change
   useEffect(() => {
@@ -199,8 +169,6 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
     setSelectedWalletAddress(null);
     setStep(savedWallets.length > 0 ? 'choose' : 'import');
   }, [savedWallets.length]);
-
-  if (!open) return null;
 
   const canClose = !(step === 'confirm' && isConnecting);
   const walletToUnlock = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address ?? null;
