@@ -1,10 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { formatLaunch, fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2 } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+
+function getAuthHeaders(): Record<string, string> {
+  const addr = typeof window !== 'undefined'
+    ? sessionStorage.getItem('coinflip_connected_address')
+    : null;
+  return addr ? { 'x-wallet-address': addr } : {};
+}
 
 interface EventRow {
   id: string;
@@ -15,36 +23,70 @@ interface EventRow {
   endsAt: string;
   totalPrizePool: string;
   participantCount: number;
+  config?: Record<string, unknown>;
 }
 
-type FormMode = 'create' | 'idle';
+interface PrizeRow {
+  place: number;
+  amount: string;
+}
+
+const DURATION_PRESETS = [
+  { label: '1 hour', hours: 1 },
+  { label: '24 hours', hours: 24 },
+  { label: '3 days', hours: 72 },
+  { label: '7 days', hours: 168 },
+] as const;
+
+const PRIZE_PRESETS = [
+  { label: 'Top 3 (50/30/20%)', distribution: [50, 30, 20] },
+  { label: 'Top 5 (40/25/15/12/8%)', distribution: [40, 25, 15, 12, 8] },
+] as const;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const toLocalTimeStr = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+const inputCls =
+  'w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none transition-colors';
+const labelCls = 'text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-1 block';
 
 export function EventsTab() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
-  const [formMode, setFormMode] = useState<FormMode>('idle');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Form state
   const [formType, setFormType] = useState<'contest' | 'raffle'>('contest');
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
-  const [formStartsAt, setFormStartsAt] = useState('');
-  const [formEndsAt, setFormEndsAt] = useState('');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formStartTime, setFormStartTime] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formEndTime, setFormEndTime] = useState('');
   const [formMetric, setFormMetric] = useState<'turnover' | 'wins' | 'profit'>('turnover');
   const [formAutoJoin, setFormAutoJoin] = useState(true);
   const [formPrizePool, setFormPrizePool] = useState('');
-  const [formPrizes, setFormPrizes] = useState('1:500\n2:300\n3:200');
+  const [prizes, setPrizes] = useState<PrizeRow[]>([
+    { place: 1, amount: '500' },
+    { place: 2, amount: '300' },
+    { place: 3, amount: '200' },
+  ]);
+  const [formMaxParticipants, setFormMaxParticipants] = useState('');
+  const [formTouched, setFormTouched] = useState(false);
 
-  const fetchEvents = async () => {
+  // --- Data fetching ---
+
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       const url = statusFilter
         ? `${API_BASE}/api/v1/admin/events?status=${statusFilter}`
         : `${API_BASE}/api/v1/admin/events`;
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch(url, { credentials: 'include', headers: { ...getAuthHeaders() } });
       if (res.ok) {
         const json = await res.json();
         setEvents(json.data ?? []);
@@ -54,49 +96,174 @@ export function EventsTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  // Initial load
-  useState(() => { fetchEvents(); });
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // --- Computed values ---
+
+  const prizesTotal = useMemo(
+    () => prizes.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+    [prizes],
+  );
+
+  const formErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (!formTitle.trim()) errors.push('Title is required');
+    if (!formStartDate || !formStartTime) errors.push('Start date/time required');
+    if (!formEndDate || !formEndTime) errors.push('End date/time required');
+    if (formStartDate && formStartTime) {
+      const start = new Date(`${formStartDate}T${formStartTime}`);
+      if (start < new Date()) errors.push('Start date is in the past');
+    }
+    if (formStartDate && formStartTime && formEndDate && formEndTime) {
+      const start = new Date(`${formStartDate}T${formStartTime}`);
+      const end = new Date(`${formEndDate}T${formEndTime}`);
+      if (end <= start) errors.push('End must be after start');
+    }
+    const pool = Number(formPrizePool);
+    if (!pool || pool <= 0) errors.push('Prize pool is required');
+    if (prizes.length === 0) errors.push('At least one prize required');
+    if (prizes.some((p) => !p.amount || Number(p.amount) <= 0)) errors.push('All prizes must have amounts');
+    if (pool > 0 && prizesTotal > 0 && prizesTotal !== pool) {
+      errors.push(`Prizes sum (${prizesTotal}) \u2260 pool (${pool})`);
+    }
+    return errors;
+  }, [formTitle, formStartDate, formStartTime, formEndDate, formEndTime, formPrizePool, prizes, prizesTotal]);
+
+  const isFormValid = formErrors.length === 0;
+
+  const dateRangePreview = useMemo(() => {
+    if (!formStartDate || !formStartTime || !formEndDate || !formEndTime) return null;
+    try {
+      const start = new Date(`${formStartDate}T${formStartTime}`);
+      const end = new Date(`${formEndDate}T${formEndTime}`);
+      const fmt = (d: Date) =>
+        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+        ' ' +
+        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return `${fmt(start)} \u2014 ${fmt(end)}`;
+    } catch {
+      return null;
+    }
+  }, [formStartDate, formStartTime, formEndDate, formEndTime]);
+
+  // --- Form actions ---
+
+  const applyDurationPreset = useCallback((hours: number) => {
+    const now = new Date();
+    const end = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    setFormStartDate(toLocalDateStr(now));
+    setFormStartTime(toLocalTimeStr(now));
+    setFormEndDate(toLocalDateStr(end));
+    setFormEndTime(toLocalTimeStr(end));
+  }, []);
+
+  const applyPrizePreset = useCallback(
+    (distribution: readonly number[]) => {
+      const pool = Number(formPrizePool);
+      if (pool <= 0) return;
+      setPrizes(
+        distribution.map((pct, i) => ({
+          place: i + 1,
+          amount: String(Math.round((pool * pct) / 100)),
+        })),
+      );
+    },
+    [formPrizePool],
+  );
+
+  const addPrize = useCallback(() => {
+    setPrizes((prev) => [...prev, { place: prev.length + 1, amount: '' }]);
+  }, []);
+
+  const removePrize = useCallback((index: number) => {
+    setPrizes((prev) => prev.filter((_, i) => i !== index).map((p, i) => ({ ...p, place: i + 1 })));
+  }, []);
+
+  const updatePrizeAmount = useCallback((index: number, amount: string) => {
+    setPrizes((prev) => prev.map((p, i) => (i === index ? { ...p, amount } : p)));
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setFormType('contest');
+    setFormTitle('');
+    setFormDesc('');
+    setFormStartDate('');
+    setFormStartTime('');
+    setFormEndDate('');
+    setFormEndTime('');
+    setFormMetric('turnover');
+    setFormAutoJoin(true);
+    setFormPrizePool('');
+    setPrizes([
+      { place: 1, amount: '500' },
+      { place: 2, amount: '300' },
+      { place: 3, amount: '200' },
+    ]);
+    setFormMaxParticipants('');
+    setFormTouched(false);
+  }, []);
+
+  const openCreateModal = useCallback(() => {
+    resetForm();
+    setModalOpen(true);
+  }, [resetForm]);
+
+  // --- API handlers ---
 
   const handleCreate = async () => {
+    setFormTouched(true);
+    if (!isFormValid) return;
+
     setActionLoading('create');
     setMessage(null);
     try {
-      const prizes = formPrizes.split('\n').filter(Boolean).map((line) => {
-        const [place, amount] = line.split(':');
-        return { place: Number(place), amount: toMicroLaunch(Number(amount)), label: `#${place}` };
-      });
+      const prizesList = prizes.map((p) => ({
+        place: p.place,
+        amount: toMicroLaunch(Number(p.amount)),
+        label: `#${p.place}`,
+      }));
 
-      const config = formType === 'contest'
-        ? { metric: formMetric, autoJoin: formAutoJoin }
-        : {};
+      const config: Record<string, unknown> = {};
+      if (formType === 'contest') {
+        config.metric = formMetric;
+        config.autoJoin = formAutoJoin;
+      }
+      if (formType === 'raffle' && formMaxParticipants) {
+        config.maxParticipants = Number(formMaxParticipants);
+      }
+
+      const startsAt = new Date(`${formStartDate}T${formStartTime}`).toISOString();
+      const endsAt = new Date(`${formEndDate}T${formEndTime}`).toISOString();
 
       const res = await fetch(`${API_BASE}/api/v1/admin/events`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           type: formType,
           title: formTitle,
           description: formDesc || undefined,
-          startsAt: new Date(formStartsAt).toISOString(),
-          endsAt: new Date(formEndsAt).toISOString(),
+          startsAt,
+          endsAt,
           config,
-          prizes,
+          prizes: prizesList,
           totalPrizePool: toMicroLaunch(Number(formPrizePool)),
         }),
       });
 
       if (res.ok) {
         setMessage('Event created!');
-        setFormMode('idle');
+        setModalOpen(false);
         fetchEvents();
       } else {
         const err = await res.json();
         setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
       }
-    } catch (err) {
+    } catch {
       setMessage('Failed to create event');
     } finally {
       setActionLoading(null);
@@ -104,12 +271,15 @@ export function EventsTab() {
   };
 
   const handleAction = async (eventId: string, action: string) => {
+    if (action === 'delete' && !window.confirm('Delete this event? This cannot be undone.')) return;
+
     setActionLoading(`${action}:${eventId}`);
     setMessage(null);
     try {
       const res = await fetch(`${API_BASE}/api/v1/admin/events/${eventId}/${action}`, {
         method: action === 'delete' ? 'DELETE' : 'POST',
         credentials: 'include',
+        headers: { ...getAuthHeaders() },
       });
       if (res.ok) {
         setMessage(`${action} successful!`);
@@ -125,6 +295,8 @@ export function EventsTab() {
     }
   };
 
+  // --- Helpers ---
+
   const fmtDate = (iso: string) => {
     try {
       return new Date(iso).toLocaleString();
@@ -133,12 +305,27 @@ export function EventsTab() {
     }
   };
 
+  const formatConfig = (event: EventRow) => {
+    if (!event.config) return null;
+    const parts: string[] = [];
+    if (event.config.metric) parts.push(`metric: ${event.config.metric}`);
+    if (event.config.autoJoin) parts.push('auto-join');
+    if (event.config.maxParticipants) parts.push(`max: ${event.config.maxParticipants}`);
+    return parts.length > 0 ? parts.join(' \u00b7 ') : null;
+  };
+
+  // --- Render ---
+
   return (
     <div className="space-y-4">
       {message && (
-        <div className={`rounded-lg px-3 py-2 text-xs font-medium ${
-          message.startsWith('Error') ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]' : 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
-        }`}>
+        <div
+          className={`rounded-lg px-3 py-2 text-xs font-medium ${
+            message.startsWith('Error') || message.startsWith('Failed')
+              ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
+              : 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+          }`}
+        >
           {message}
         </div>
       )}
@@ -148,7 +335,7 @@ export function EventsTab() {
         <div className="flex items-center gap-2">
           <select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setTimeout(fetchEvents, 0); }}
+            onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
           >
             <option value="">All statuses</option>
@@ -158,13 +345,17 @@ export function EventsTab() {
             <option value="completed">Completed</option>
             <option value="archived">Archived</option>
           </select>
-          <button type="button" onClick={fetchEvents} className="rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--color-surface)]">
+          <button
+            type="button"
+            onClick={fetchEvents}
+            className="rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+          >
             Refresh
           </button>
         </div>
         <button
           type="button"
-          onClick={() => setFormMode(formMode === 'create' ? 'idle' : 'create')}
+          onClick={openCreateModal}
           className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)]"
         >
           <Plus size={14} />
@@ -172,94 +363,260 @@ export function EventsTab() {
         </button>
       </div>
 
-      {/* Create form */}
-      {formMode === 'create' && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
-          <h3 className="text-sm font-bold">New Event</h3>
-
+      {/* Create Event Modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create Event">
+        <div className="space-y-4">
+          {/* Type & Title */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Type</label>
-              <select value={formType} onChange={(e) => setFormType(e.target.value as 'contest' | 'raffle')}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs">
+              <label className={labelCls}>Type</label>
+              <select
+                value={formType}
+                onChange={(e) => setFormType(e.target.value as 'contest' | 'raffle')}
+                className={inputCls}
+              >
                 <option value="contest">Contest</option>
                 <option value="raffle">Raffle</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Title</label>
-              <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                placeholder="Event title..." />
+              <label className={labelCls}>Title</label>
+              <input
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                className={`${inputCls} ${formTouched && !formTitle.trim() ? 'border-[var(--color-danger)]!' : ''}`}
+                placeholder="Event title..."
+              />
             </div>
           </div>
 
+          {/* Description */}
           <div>
-            <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Description</label>
-            <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2}
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-              placeholder="Optional description..." />
+            <label className={labelCls}>Description</label>
+            <textarea
+              value={formDesc}
+              onChange={(e) => setFormDesc(e.target.value)}
+              rows={2}
+              className={inputCls}
+              placeholder="Optional description..."
+            />
           </div>
 
+          {/* Duration presets */}
+          <div>
+            <label className={labelCls}>Quick Duration</label>
+            <div className="flex flex-wrap gap-1.5">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyDurationPreset(preset.hours)}
+                  className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] transition-colors"
+                >
+                  <Clock size={10} />
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date / Time inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Starts at</label>
-              <input type="datetime-local" value={formStartsAt} onChange={(e) => setFormStartsAt(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs" />
+              <label className={labelCls}>Start Date</label>
+              <input
+                type="date"
+                value={formStartDate}
+                onChange={(e) => setFormStartDate(e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Ends at</label>
-              <input type="datetime-local" value={formEndsAt} onChange={(e) => setFormEndsAt(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs" />
+              <label className={labelCls}>Start Time</label>
+              <input
+                type="time"
+                value={formStartTime}
+                onChange={(e) => setFormStartTime(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>End Date</label>
+              <input
+                type="date"
+                value={formEndDate}
+                onChange={(e) => setFormEndDate(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>End Time</label>
+              <input
+                type="time"
+                value={formEndTime}
+                onChange={(e) => setFormEndTime(e.target.value)}
+                className={inputCls}
+              />
             </div>
           </div>
 
+          {/* Date range preview */}
+          {dateRangePreview && (
+            <div className="rounded-lg bg-[var(--color-primary)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-primary)]">
+              {dateRangePreview}
+            </div>
+          )}
+
+          {/* Contest config */}
           {formType === 'contest' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Metric</label>
-                <select value={formMetric} onChange={(e) => setFormMetric(e.target.value as 'turnover' | 'wins' | 'profit')}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs">
+                <label className={labelCls}>Metric</label>
+                <select
+                  value={formMetric}
+                  onChange={(e) => setFormMetric(e.target.value as 'turnover' | 'wins' | 'profit')}
+                  className={inputCls}
+                >
                   <option value="turnover">Turnover</option>
                   <option value="wins">Wins</option>
                   <option value="profit">Profit</option>
                 </select>
               </div>
-              <div className="flex items-end gap-2">
+              <div className="flex items-end pb-0.5">
                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                  <input type="checkbox" checked={formAutoJoin} onChange={(e) => setFormAutoJoin(e.target.checked)} className="rounded" />
+                  <input
+                    type="checkbox"
+                    checked={formAutoJoin}
+                    onChange={(e) => setFormAutoJoin(e.target.checked)}
+                    className="rounded"
+                  />
                   Auto-join (all players)
                 </label>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Raffle config */}
+          {formType === 'raffle' && (
             <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Total Prize Pool (LAUNCH)</label>
-              <input value={formPrizePool} onChange={(e) => setFormPrizePool(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                placeholder="1000" />
+              <label className={labelCls}>Max Participants (optional)</label>
+              <input
+                value={formMaxParticipants}
+                onChange={(e) => setFormMaxParticipants(e.target.value)}
+                className={inputCls}
+                placeholder="Unlimited"
+                type="number"
+                min="1"
+              />
             </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">Prizes (place:LAUNCH per line)</label>
-              <textarea value={formPrizes} onChange={(e) => setFormPrizes(e.target.value)} rows={3}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs font-mono" />
+          )}
+
+          {/* Prize Pool */}
+          <div>
+            <label className={labelCls}>Total Prize Pool (LAUNCH)</label>
+            <input
+              value={formPrizePool}
+              onChange={(e) => setFormPrizePool(e.target.value)}
+              className={`${inputCls} ${formTouched && (!formPrizePool || Number(formPrizePool) <= 0) ? 'border-[var(--color-danger)]!' : ''}`}
+              placeholder="1000"
+              type="number"
+              min="1"
+            />
+          </div>
+
+          {/* Prize presets */}
+          <div>
+            <label className={labelCls}>Distribution Presets</label>
+            <div className="flex flex-wrap gap-1.5">
+              {PRIZE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPrizePreset(preset.distribution)}
+                  disabled={!formPrizePool || Number(formPrizePool) <= 0}
+                  className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium hover:border-[var(--color-warning)] hover:bg-[var(--color-warning)]/10 hover:text-[var(--color-warning)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Gift size={10} />
+                  {preset.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button type="button" onClick={handleCreate} disabled={actionLoading === 'create' || !formTitle || !formStartsAt || !formEndsAt}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
-              {actionLoading === 'create' ? 'Creating...' : 'Create Event'}
-            </button>
-            <button type="button" onClick={() => setFormMode('idle')}
-              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs">
-              Cancel
+          {/* Prizes editor */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className={labelCls}>Prizes</label>
+              <span
+                className={`text-[10px] font-bold ${
+                  prizesTotal > 0 && Number(formPrizePool) > 0 && prizesTotal !== Number(formPrizePool)
+                    ? 'text-[var(--color-danger)]'
+                    : 'text-[var(--color-text-secondary)]'
+                }`}
+              >
+                Total: {prizesTotal} / {formPrizePool || '0'} LAUNCH
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              {prizes.map((prize, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="w-6 text-center text-[10px] font-bold text-[var(--color-text-secondary)]">
+                    #{prize.place}
+                  </span>
+                  <input
+                    value={prize.amount}
+                    onChange={(e) => updatePrizeAmount(index, e.target.value)}
+                    className={`flex-1 ${inputCls}`}
+                    placeholder="Amount"
+                    type="number"
+                    min="1"
+                  />
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">LAUNCH</span>
+                  <button
+                    type="button"
+                    onClick={() => removePrize(index)}
+                    disabled={prizes.length <= 1}
+                    className="rounded-lg p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)] disabled:opacity-20 transition-colors"
+                  >
+                    <Minus size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={addPrize}
+              className="mt-1.5 flex items-center gap-1 rounded-lg border border-dashed border-[var(--color-border)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+            >
+              <Plus size={10} />
+              Add Prize
             </button>
           </div>
+
+          {/* Validation errors */}
+          {formTouched && formErrors.length > 0 && (
+            <div className="space-y-0.5 rounded-lg bg-[var(--color-danger)]/10 px-3 py-2">
+              {formErrors.map((err) => (
+                <div key={err} className="text-[11px] text-[var(--color-danger)]">
+                  &bull; {err}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={actionLoading === 'create' || (formTouched && !isFormValid)}
+            className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
+          >
+            {actionLoading === 'create' ? 'Creating...' : 'Create Event'}
+          </button>
         </div>
-      )}
+      </Modal>
 
       {/* Events list */}
       {loading ? (
@@ -268,87 +625,118 @@ export function EventsTab() {
         <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">No events found</div>
       ) : (
         <div className="space-y-2">
-          {events.map((event) => (
-            <div key={event.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    {event.type === 'contest' ? (
-                      <Target size={12} className="text-[var(--color-primary)]" />
-                    ) : (
-                      <Trophy size={12} className="text-[var(--color-warning)]" />
+          {events.map((event) => {
+            const configStr = formatConfig(event);
+            return (
+              <div key={event.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      {event.type === 'contest' ? (
+                        <Target size={12} className="text-[var(--color-primary)]" />
+                      ) : (
+                        <Trophy size={12} className="text-[var(--color-warning)]" />
+                      )}
+                      <span className="text-xs font-bold">{event.title}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          event.status === 'active'
+                            ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                            : event.status === 'draft'
+                              ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                              : event.status === 'completed'
+                                ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                                : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
+                        }`}
+                      >
+                        {event.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-secondary)]">
+                      <span>
+                        {fmtDate(event.startsAt)} &mdash; {fmtDate(event.endsAt)}
+                      </span>
+                      <span>{event.participantCount} participants</span>
+                      <span>Prize: {formatLaunch(event.totalPrizePool)} LAUNCH</span>
+                    </div>
+                    {configStr && (
+                      <div className="mt-1 text-[10px] italic text-[var(--color-text-secondary)]">{configStr}</div>
                     )}
-                    <span className="text-xs font-bold">{event.title}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      event.status === 'active' ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' :
-                      event.status === 'draft' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
-                      event.status === 'completed' ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]' :
-                      'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
-                    }`}>
-                      {event.status}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-secondary)]">
-                    <span>{fmtDate(event.startsAt)} — {fmtDate(event.endsAt)}</span>
-                    <span>{event.participantCount} participants</span>
-                    <span>Prize: {formatLaunch(event.totalPrizePool)} LAUNCH</span>
-                  </div>
-                </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {event.status === 'draft' && (
-                    <>
-                      <button type="button" onClick={() => handleAction(event.id, 'activate')}
-                        disabled={actionLoading === `activate:${event.id}`}
+                  {/* Action buttons */}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {event.status === 'draft' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'activate')}
+                          disabled={actionLoading === `activate:${event.id}`}
+                          className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Activate"
+                        >
+                          <Play size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'delete')}
+                          disabled={actionLoading === `delete:${event.id}`}
+                          className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
+                    )}
+                    {(event.status === 'active' || event.status === 'calculating') && (
+                      <button
+                        type="button"
+                        onClick={() => handleAction(event.id, 'calculate')}
+                        disabled={actionLoading === `calculate:${event.id}`}
+                        className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                        title="Calculate"
+                      >
+                        <Calculator size={12} />
+                      </button>
+                    )}
+                    {event.status === 'calculating' && (
+                      <button
+                        type="button"
+                        onClick={() => handleAction(event.id, 'approve')}
+                        disabled={actionLoading === `approve:${event.id}`}
                         className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Activate">
-                        <Play size={12} />
+                        title="Approve"
+                      >
+                        <CheckCircle size={12} />
                       </button>
-                      <button type="button" onClick={() => handleAction(event.id, 'delete')}
-                        disabled={actionLoading === `delete:${event.id}`}
-                        className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Delete">
-                        <Trash2 size={12} />
-                      </button>
-                    </>
-                  )}
-                  {(event.status === 'active' || event.status === 'calculating') && (
-                    <button type="button" onClick={() => handleAction(event.id, 'calculate')}
-                      disabled={actionLoading === `calculate:${event.id}`}
-                      className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                      title="Calculate">
-                      <Calculator size={12} />
-                    </button>
-                  )}
-                  {event.status === 'calculating' && (
-                    <button type="button" onClick={() => handleAction(event.id, 'approve')}
-                      disabled={actionLoading === `approve:${event.id}`}
-                      className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                      title="Approve">
-                      <CheckCircle size={12} />
-                    </button>
-                  )}
-                  {event.status === 'completed' && (
-                    <>
-                      <button type="button" onClick={() => handleAction(event.id, 'distribute')}
-                        disabled={actionLoading === `distribute:${event.id}`}
-                        className="rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Distribute">
-                        Dist
-                      </button>
-                      <button type="button" onClick={() => handleAction(event.id, 'archive')}
-                        disabled={actionLoading === `archive:${event.id}`}
-                        className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Archive">
-                        <Archive size={12} />
-                      </button>
-                    </>
-                  )}
+                    )}
+                    {event.status === 'completed' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'distribute')}
+                          disabled={actionLoading === `distribute:${event.id}`}
+                          className="rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Distribute"
+                        >
+                          Dist
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'archive')}
+                          disabled={actionLoading === `archive:${event.id}`}
+                          className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Archive"
+                        >
+                          <Archive size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
