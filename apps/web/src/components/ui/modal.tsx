@@ -30,7 +30,7 @@ function useVisualViewportStyles(open: boolean) {
 
     const applyViewport = () => {
       const vv = window.visualViewport;
-      if (vv.height < window.innerHeight * 0.95) {
+      if (vv && vv.height < window.innerHeight * 0.95) {
         setStyles({
           height: `${vv.height}px`,
           width: `${vv.width}px`,
