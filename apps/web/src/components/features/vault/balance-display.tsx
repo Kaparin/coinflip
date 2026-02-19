@@ -20,6 +20,7 @@ function extractTxHashFromError(err: unknown): string | null {
   return m?.[1] ?? null;
 }
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { setBalanceGracePeriod } from '@/lib/balance-grace';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 
@@ -195,7 +196,7 @@ export function BalanceDisplay() {
   const { t, locale } = useTranslation();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
   const { pendingDeduction } = usePendingBalance();
-  const { data, isLoading, refetch } = useGetVaultBalance({
+  const { data, isLoading } = useGetVaultBalance({
     query: {
       enabled: isConnected,
       refetchInterval: 15_000,
@@ -271,11 +272,15 @@ export function BalanceDisplay() {
           return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
         });
 
-        // Refetch for eventual consistency
+        // Protect optimistic update from stale WS-triggered refetches
+        setBalanceGracePeriod(8_000);
+        queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
+
+        // Refetch after grace period for eventual consistency
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-        }, 3000);
+          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+        }, 8_000);
       },
       onError: (err) => {
         const error = err as { error?: { message?: string; details?: { txHash?: string }; code?: string } };
@@ -307,11 +312,13 @@ export function BalanceDisplay() {
           queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
             return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
           });
-          // Refetch soon to get real state
+          // Protect optimistic update, refetch after grace period
+          setBalanceGracePeriod(8_000);
+          queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
           setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-            queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-          }, 5000);
+            queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+            queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+          }, 8_000);
         } else {
           setWithdrawError(getUserFriendlyError(err, t, 'withdraw'));
           setWithdrawErrorTxHash(txHash);
@@ -446,12 +453,16 @@ export function BalanceDisplay() {
         return (newBal < 0n ? 0n : newBal).toString();
       });
 
-      // Refetch for eventual consistency
+      // Protect optimistic update from stale WS-triggered refetches.
+      // Server's chain cache may briefly hold pre-deposit balance (REST node lag).
+      setBalanceGracePeriod(8_000);
+      queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
+
+      // Refetch after grace period for eventual consistency
       setTimeout(() => {
-        refetch();
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-        queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-      }, 3000);
+        queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+        queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+      }, 8_000);
     } catch (err) {
       // If optimized flow fails, try legacy full client-side deposit as fallback
       try {
@@ -474,17 +485,19 @@ export function BalanceDisplay() {
           const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
           return (newBal < 0n ? 0n : newBal).toString();
         });
+        setBalanceGracePeriod(8_000);
+        queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-        }, 3000);
+          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+        }, 8_000);
       } catch (fallbackErr) {
         setDepositError(getUserFriendlyError(fallbackErr, t, 'deposit'));
         setDepositErrorTxHash(extractTxHashFromError(fallbackErr));
         setDepositStatus('error');
       }
     }
-  }, [address, depositAmount, walletBalanceHuman, getWallet, refetch, queryClient, t]);
+  }, [address, depositAmount, walletBalanceHuman, getWallet, queryClient, t]);
 
   const resetDeposit = () => {
     setShowDeposit(false);

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WS_URL } from '@/lib/constants';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { isInBalanceGracePeriod } from '@/lib/balance-grace';
 import type { WsEvent } from '@coinflip/shared/types';
 
 interface UseWebSocketOptions {
@@ -317,7 +318,12 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
             case 'balance_updated':
-              scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              // Skip vault balance invalidation during deposit/withdraw grace period.
+              // The optimistic setQueryData has the correct value; a refetch now would
+              // overwrite it with stale data from the server's chain cache.
+              if (!isInBalanceGracePeriod()) {
+                scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              }
               break;
             case 'event_started':
             case 'event_ended':
