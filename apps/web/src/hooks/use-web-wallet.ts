@@ -92,6 +92,9 @@ export interface WebWalletState {
   /** Forget wallet (specific address, or all if none given) */
   forgetWallet: (address?: string) => void;
 
+  /** Refresh saved wallets list from storage (call when modal opens) */
+  refreshSavedWallets: () => void;
+
   /** Get the wallet instance for signing (null if not connected) */
   getWallet: () => DirectSecp256k1HdWallet | null;
 }
@@ -354,6 +357,11 @@ export function useWebWallet(): WebWalletState {
     sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
   }, []);
 
+  /** Refresh saved wallets from storage */
+  const refreshSavedWallets = useCallback(() => {
+    refreshSavedState(setHasSaved, setSavedAddress, setSavedWallets);
+  }, []);
+
   /** Forget wallet (by address) or all if no address given */
   const forgetWallet = useCallback((targetAddress?: string) => {
     const wasCurrent = !targetAddress || address === targetAddress;
@@ -391,6 +399,7 @@ export function useWebWallet(): WebWalletState {
     switchWallet,
     disconnect,
     forgetWallet,
+    refreshSavedWallets,
     getWallet,
   };
 }

@@ -27,18 +27,26 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
   const { t, locale } = useTranslation();
   const {
     hasSaved, savedAddress, savedWallets, address: connectedAddress, isConnected, isConnecting, error,
-    connectWithMnemonic, unlockWithPin, forgetWallet, connectModalSwitchTo,
+    connectWithMnemonic, unlockWithPin, forgetWallet, connectModalSwitchTo, refreshSavedWallets,
   } = useWalletContext();
+
+  // Refresh saved wallets when modal opens — ensures we have up-to-date list
+  useEffect(() => {
+    refreshSavedWallets();
+  }, [refreshSavedWallets]);
 
   // Computed fresh on mount — component remounts each time modal opens
   const [step, setStep] = useState<Step>(() => {
-    if (connectModalSwitchTo) return 'unlock';
+    // If switchTo address is invalid or not in saved list, treat as normal connect
+    const switchToValid = connectModalSwitchTo && savedWallets.some((w) => w.address === connectModalSwitchTo);
+    if (switchToValid) return 'unlock';
     if (hasSaved && savedWallets.length > 0) return 'choose';
     return 'import';
   });
-  const [selectedWalletAddress, setSelectedWalletAddress] = useState<string | null>(
-    connectModalSwitchTo ?? null,
-  );
+  const [selectedWalletAddress, setSelectedWalletAddress] = useState<string | null>(() => {
+    const switchToValid = connectModalSwitchTo && savedWallets.some((w) => w.address === connectModalSwitchTo);
+    return switchToValid ? connectModalSwitchTo : null;
+  });
   const [mnemonic, setMnemonic] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -59,6 +67,8 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
 
   // Track whether a connect/unlock operation is in flight to prevent step resets
   const isInFlightRef = useRef(false);
+  // Track if user explicitly chose "Add new wallet" — don't bounce back to choose
+  const userChoseImportRef = useRef(false);
 
   // When wallet becomes connected during unlock/confirm, transition to success.
   useEffect(() => {
@@ -85,6 +95,24 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [step, onClose]);
+
+  // Sync step when savedWallets changes (e.g. after refresh on modal open)
+  // Only fix invalid states: unlock with missing wallet, choose with no wallets,
+  // or import when we have wallets but user didn't explicitly choose to add new
+  useEffect(() => {
+    if (step === 'choose' && savedWallets.length === 0) {
+      setStep('import');
+    } else if (step === 'unlock') {
+      const addr = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address;
+      const addrValid = addr && savedWallets.some((w) => w.address === addr);
+      if (!addrValid) {
+        setSelectedWalletAddress(null);
+        setStep(savedWallets.length > 0 ? 'choose' : 'import');
+      }
+    } else if (step === 'import' && savedWallets.length > 0 && !userChoseImportRef.current) {
+      setStep('choose');
+    }
+  }, [savedWallets, step, selectedWalletAddress, savedAddress]);
 
   // Safety: if we're on 'unlock' but have no wallet to show, redirect
   useEffect(() => {
@@ -232,6 +260,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => {
+                userChoseImportRef.current = true;
                 setStep('import');
                 setMnemonic('');
                 setPin('');
