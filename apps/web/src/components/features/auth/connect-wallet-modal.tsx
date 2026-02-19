@@ -136,7 +136,9 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
     });
   }, []);
 
-  const wordCount = mnemonic.trim().split(/\s+/).filter(Boolean).length;
+  // Extract only alphabetic words — strips numbering ("1. word"), dots, commas, etc.
+  const mnemonicWords = mnemonic.trim().split(/\s+/).map(w => w.replace(/[^a-z]/g, '')).filter(Boolean);
+  const wordCount = mnemonicWords.length;
   const isValidWordCount = wordCount === 12 || wordCount === 24;
 
   /** Handle mnemonic submission — derive address first */
@@ -153,9 +155,10 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
     setLocalError('');
 
     try {
-      // Quick derivation to show address before full connect
+      // Normalize mnemonic: join only alphabetic words (strips numbering/punctuation)
+      const cleanMnemonic = mnemonicWords.join(' ');
       const { deriveWallet } = await import('@/lib/wallet-core');
-      const { address } = await deriveWallet(mnemonic);
+      const { address } = await deriveWallet(cleanMnemonic);
       setDerivedAddress(address);
 
       // Check if this wallet already has a referrer (non-blocking — don't fail on error)
@@ -167,13 +170,14 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : t('auth.invalidMnemonic'));
     }
-  }, [mnemonic, pin, pinConfirm, isValidWordCount, hasRefCode]);
+  }, [mnemonicWords, pin, pinConfirm, isValidWordCount, hasRefCode]);
 
   /** Confirm and connect — the useEffect above handles success/close */
   const handleConfirmConnect = useCallback(async () => {
     isInFlightRef.current = true;
-    await connectWithMnemonic(mnemonic, pin, rememberMe);
-  }, [mnemonic, pin, rememberMe, connectWithMnemonic]);
+    const cleanMnemonic = mnemonicWords.join(' ');
+    await connectWithMnemonic(cleanMnemonic, pin, rememberMe);
+  }, [mnemonicWords, pin, rememberMe, connectWithMnemonic]);
 
   /** Unlock saved wallet — the useEffect above handles success/close */
   const handleUnlock = useCallback(async () => {
@@ -209,7 +213,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
   const walletToUnlock = selectedWalletAddress ?? savedAddress ?? savedWallets[0]?.address ?? null;
 
   return (
-    <Modal open onClose={onClose} showCloseButton={canClose} showCloseButtonBottom>
+    <Modal open onClose={onClose} showCloseButton={canClose}>
       <div className="p-2 sm:p-5 max-w-md w-full">
 
         {/* ==== CHOOSE WALLET ==== */}
