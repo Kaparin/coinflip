@@ -99,10 +99,10 @@ app.route('/api/v1/bets', betsRouter);
 app.route('/api/v1/vault', vaultRouter);
 app.route('/api/v1/users', usersRouter);
 app.route('/api/v1/auth', authRouter);
+app.route('/api/v1/admin/events', adminEventsRouter);
 app.route('/api/v1/admin', adminRouter);
 app.route('/api/v1/referral', referralRouter);
 app.route('/api/v1/events', eventsRouter);
-app.route('/api/v1/admin/events', adminEventsRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>
