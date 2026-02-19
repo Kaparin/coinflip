@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { useQueryClient } from '@tanstack/react-query';
 import { CreateBetForm } from '@/components/features/bets/create-bet-form';
@@ -17,6 +17,7 @@ import { usePendingBets } from '@/hooks/use-pending-bets';
 import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { X } from 'lucide-react';
 import type { WsEvent } from '@coinflip/shared/types';
 
 type Tab = 'bets' | 'mybets' | 'history' | 'leaderboard';
@@ -26,6 +27,7 @@ const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
 export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
   const activeTabRef = useRef<Tab>('bets');
+  const [wsBannerDismissed, setWsBannerDismissed] = useState(false);
   const queryClient = useQueryClient();
   const { address, isConnected } = useWalletContext();
   const { addToast } = useToast();
@@ -90,6 +92,19 @@ export default function GamePage() {
 
   const { isConnected: wsConnected } = useWebSocket({ address, enabled: isConnected, onEvent: handleWsEvent });
 
+  // Reset dismiss when ws reconnects, auto-dismiss after 5s
+  useEffect(() => {
+    if (wsConnected) setWsBannerDismissed(false);
+  }, [wsConnected]);
+
+  useEffect(() => {
+    if (!isConnected || wsConnected || wsBannerDismissed) return;
+    const timer = setTimeout(() => setWsBannerDismissed(true), 5000);
+    return () => clearTimeout(timer);
+  }, [isConnected, wsConnected, wsBannerDismissed]);
+
+  const showWsBanner = isConnected && !wsConnected && !wsBannerDismissed;
+
   const handleTabChange = useCallback((tab: Tab) => {
     activeTabRef.current = tab;
     setActiveTab(tab);
@@ -119,13 +134,6 @@ export default function GamePage() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24 md:pb-6">
-      {isConnected && !wsConnected && (
-        <div className="flex items-center gap-2 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 px-3 py-2 text-xs text-[var(--color-warning)]">
-          <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
-          {t('game.reconnecting')}
-        </div>
-      )}
-
       <MobileBalanceBar />
       <div className="hidden md:block">
         <BalanceDisplay />
@@ -169,6 +177,25 @@ export default function GamePage() {
         </div>
       </div>
     </div>
+
+      {/* WebSocket reconnecting banner — fixed bottom, auto-dismiss */}
+      {showWsBanner && (
+        <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-2xl animate-fade-up">
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 px-3 py-2 text-xs text-[var(--color-warning)] backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-warning)] animate-pulse" />
+              {t('game.reconnecting')}
+            </div>
+            <button
+              type="button"
+              onClick={() => setWsBannerDismissed(true)}
+              className="shrink-0 rounded-md p-0.5 hover:bg-[var(--color-warning)]/20 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </PullToRefresh>
   );
 }
