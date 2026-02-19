@@ -6,3 +6,4 @@ export { txEvents } from './tx-events';
 export { treasuryLedger } from './treasury-ledger';
 export { referralCodes, referrals, referralRewards, referralBalances } from './referrals';
 export { pendingBetSecrets } from './pending-bet-secrets';
+export { events, eventParticipants } from './events';

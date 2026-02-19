@@ -9,6 +9,9 @@ import type {
   UserProfileResponseSchema,
   ErrorResponseSchema,
   PaginatedResponseSchema,
+  EventResponseSchema,
+  EventLeaderboardEntrySchema,
+  CreateEventRequestSchema,
 } from '../schemas/index.js';
 
 // ---- Inferred request types ----
@@ -26,9 +29,17 @@ export type PaginatedResponse<T> = z.infer<ReturnType<typeof PaginatedResponseSc
   data: T[];
 };
 
+// ---- Event types ----
+export type EventResponse = z.infer<typeof EventResponseSchema>;
+export type EventLeaderboardEntry = z.infer<typeof EventLeaderboardEntrySchema>;
+export type CreateEventRequest = z.infer<typeof CreateEventRequestSchema>;
+
 // ---- Enum types ----
 export type BetStatus = 'open' | 'accepting' | 'accepted' | 'revealed' | 'canceled' | 'timeout_claimed';
 export type Side = 'heads' | 'tails';
+export type EventType = 'contest' | 'raffle';
+export type EventStatus = 'draft' | 'active' | 'calculating' | 'completed' | 'archived';
+export type ContestMetric = 'turnover' | 'wins' | 'profit';
 
 // ---- WebSocket event types ----
 export type WsEventType =
@@ -43,7 +54,10 @@ export type WsEventType =
   | 'bet_create_failed'
   | 'accept_failed'
   | 'bet_reverted'
-  | 'balance_updated';
+  | 'balance_updated'
+  | 'event_started'
+  | 'event_ended'
+  | 'event_results_published';
 
 export type WsEvent = {
   type: WsEventType;

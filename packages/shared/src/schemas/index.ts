@@ -36,3 +36,17 @@ export {
   TreasuryWithdrawRequestSchema,
   TreasuryLedgerQuerySchema,
 } from './admin.js';
+
+export {
+  EventTypeSchema,
+  EventStatusSchema,
+  ContestMetricSchema,
+  ContestConfigSchema,
+  RaffleConfigSchema,
+  PrizeEntrySchema,
+  CreateEventRequestSchema,
+  UpdateEventRequestSchema,
+  EventResponseSchema,
+  EventLeaderboardEntrySchema,
+  EventParticipantSchema,
+} from './events.js';

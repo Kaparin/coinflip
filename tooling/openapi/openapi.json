@@ -703,6 +703,335 @@
           }
         }
       }
+    },
+    "/api/v1/events/active": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "List active events",
+        "operationId": "getActiveEvents",
+        "responses": {
+          "200": {
+            "description": "Active events list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventResponse"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/completed": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "List completed events",
+        "operationId": "getCompletedEvents",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed events list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventResponse"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get event details",
+        "operationId": "getEventById",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EventResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Event not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/leaderboard": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get contest leaderboard",
+        "operationId": "getEventLeaderboard",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventLeaderboardEntry"
+                      }
+                    },
+                    "total": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/participants": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get raffle participants",
+        "operationId": "getEventParticipants",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participants list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventParticipant"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/results": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get event results",
+        "operationId": "getEventResults",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event results"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/join": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Join event (raffle or opt-in contest)",
+        "operationId": "joinEvent",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Joined successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/my-status": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get current user event status",
+        "operationId": "getMyEventStatus",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User participation status"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1235,6 +1564,229 @@
           "authz_calls_remaining",
           "fee_grant_active",
           "fee_grant_daily_remaining"
+        ]
+      },
+      "EventResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "contest",
+              "raffle"
+            ],
+            "description": "Event type"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "calculating",
+              "completed",
+              "archived"
+            ],
+            "description": "Event lifecycle status"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "prizes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrizeEntry"
+            }
+          },
+          "totalPrizePool": {
+            "type": "string"
+          },
+          "results": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          },
+          "raffleSeed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "participantCount": {
+            "type": "integer"
+          },
+          "hasJoined": {
+            "type": "boolean"
+          },
+          "myRank": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "description",
+          "status",
+          "startsAt",
+          "endsAt",
+          "config",
+          "prizes",
+          "totalPrizePool",
+          "results",
+          "raffleSeed",
+          "participantCount",
+          "createdAt"
+        ]
+      },
+      "PrizeEntry": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Prize place (1st, 2nd, etc.)"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Prize amount in micro-LAUNCH",
+            "example": "100"
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label for this prize tier"
+          }
+        },
+        "required": [
+          "place",
+          "amount"
+        ]
+      },
+      "EventLeaderboardEntry": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turnover": {
+            "type": "string"
+          },
+          "wins": {
+            "type": "integer"
+          },
+          "profit": {
+            "type": "string"
+          },
+          "games": {
+            "type": "integer"
+          },
+          "prizeAmount": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "rank",
+          "userId",
+          "address",
+          "nickname",
+          "turnover",
+          "wins",
+          "profit",
+          "games",
+          "prizeAmount"
+        ]
+      },
+      "EventParticipant": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finalRank": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "prizeAmount": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "address",
+          "nickname",
+          "status",
+          "joinedAt",
+          "finalRank",
+          "prizeAmount"
         ]
       }
     }

@@ -474,7 +474,8 @@
   },
   "nav": {
     "play": "Play",
-    "profile": "Profile"
+    "profile": "Profile",
+    "events": "Events"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -588,6 +589,40 @@
     "totalReferralPaid": "Total referral paid",
     "rewardSourceTitle": "Where rewards come from",
     "rewardSourceDesc": "Rewards come from the platform commission (10% of each pot). When you claim, tokens are sent from the treasury vault directly to your Axiome wallet — not to your game vault. You can then deposit to play or keep them in your wallet."
+  },
+  "events": {
+    "title": "Events",
+    "subtitle": "Contests, raffles, and tournaments with prizes",
+    "contest": "Contest",
+    "raffle": "Raffle",
+    "participants": "participants",
+    "prizes": "Prizes",
+    "leaderboard": "Leaderboard",
+    "resultsTitle": "Results",
+    "notFound": "Event not found",
+    "backToEvents": "Back to events",
+    "noResults": "Results not yet available",
+    "paid": "Paid",
+    "raffleSeed": "Raffle Seed (verifiable randomness)",
+    "joinRaffle": "Join Raffle",
+    "alreadyJoined": "You have joined this event",
+    "noActiveEvents": "No active events right now",
+    "checkBackLater": "Check back later for new contests and raffles!",
+    "noCompletedEvents": "No completed events yet",
+    "active": "Active",
+    "recentResults": "Recent Results",
+    "endsIn": "Ends in",
+    "startsIn": "Starts in",
+    "ended": "Ended",
+    "rank": "Rank",
+    "player": "Player",
+    "metric": "Score",
+    "prize": "Prize",
+    "you": "(you)",
+    "noLeaderboardData": "No leaderboard data yet",
+    "participantsList": "Participants",
+    "winner": "Winner",
+    "joined": "Joined"
   },
   "walletPage": {
     "connectTitle": "Connect your wallet",

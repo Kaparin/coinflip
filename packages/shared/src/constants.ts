@@ -87,5 +87,28 @@ export const SIDE = {
   TAILS: 'tails',
 } as const;
 
+// ---- Events ----
+export const EVENT_TYPE = {
+  CONTEST: 'contest',
+  RAFFLE: 'raffle',
+} as const;
+
+export const EVENT_STATUS = {
+  DRAFT: 'draft',
+  ACTIVE: 'active',
+  CALCULATING: 'calculating',
+  COMPLETED: 'completed',
+  ARCHIVED: 'archived',
+} as const;
+
+export const CONTEST_METRIC = {
+  TURNOVER: 'turnover',
+  WINS: 'wins',
+  PROFIT: 'profit',
+} as const;
+
+/** Leaderboard cache TTL (30 seconds) */
+export const LEADERBOARD_CACHE_TTL_MS = 30_000;
+
 // ---- API versions ----
 export const API_V1_PREFIX = '/api/v1';

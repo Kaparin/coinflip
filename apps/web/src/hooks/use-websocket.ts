@@ -319,6 +319,11 @@ export function useWebSocket({
             case 'balance_updated':
               scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
               break;
+            case 'event_started':
+            case 'event_ended':
+            case 'event_results_published':
+              scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
+              break;
           }
 
           onEventRef.current?.(parsed);

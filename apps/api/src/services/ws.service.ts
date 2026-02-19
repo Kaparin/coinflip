@@ -128,6 +128,19 @@ class WsService {
     this.sendToAddress(address, { type: 'accept_failed', data });
   }
 
+  /** Emit event lifecycle updates */
+  emitEventStarted(data: Record<string, unknown>) {
+    this.broadcast({ type: 'event_started', data });
+  }
+
+  emitEventEnded(data: Record<string, unknown>) {
+    this.broadcast({ type: 'event_ended', data });
+  }
+
+  emitEventResultsPublished(data: Record<string, unknown>) {
+    this.broadcast({ type: 'event_results_published', data });
+  }
+
   getClientCount(): number {
     return this.clients.size;
   }

@@ -17,6 +17,11 @@ import {
   ErrorResponseSchema,
   ConnectRequestSchema,
   GrantStatusResponseSchema,
+  EventResponseSchema,
+  EventLeaderboardEntrySchema,
+  EventParticipantSchema,
+  CreateEventRequestSchema,
+  UpdateEventRequestSchema,
 } from '@coinflip/shared/schemas';
 
 // Wrapper helpers
@@ -318,6 +323,146 @@ const document = createDocument({
           200: {
             description: 'Grant status',
             content: { 'application/json': { schema: success(GrantStatusResponseSchema) } },
+          },
+        },
+      },
+    },
+
+    // ---- Events ----
+    '/api/v1/events/active': {
+      get: {
+        tags: ['Events'],
+        summary: 'List active events',
+        operationId: 'getActiveEvents',
+        responses: {
+          200: {
+            description: 'Active events list',
+            content: { 'application/json': { schema: success(z.array(EventResponseSchema)) } },
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/completed': {
+      get: {
+        tags: ['Events'],
+        summary: 'List completed events',
+        operationId: 'getCompletedEvents',
+        parameters: [
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: {
+          200: {
+            description: 'Completed events list',
+            content: { 'application/json': { schema: success(z.array(EventResponseSchema)) } },
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}': {
+      get: {
+        tags: ['Events'],
+        summary: 'Get event details',
+        operationId: 'getEventById',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: {
+            description: 'Event details',
+            content: { 'application/json': { schema: success(EventResponseSchema) } },
+          },
+          404: {
+            description: 'Event not found',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}/leaderboard': {
+      get: {
+        tags: ['Events'],
+        summary: 'Get contest leaderboard',
+        operationId: 'getEventLeaderboard',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: {
+          200: {
+            description: 'Leaderboard entries',
+            content: { 'application/json': { schema: z.object({ data: z.array(EventLeaderboardEntrySchema), total: z.number() }) } },
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}/participants': {
+      get: {
+        tags: ['Events'],
+        summary: 'Get raffle participants',
+        operationId: 'getEventParticipants',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 100 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: {
+          200: {
+            description: 'Participants list',
+            content: { 'application/json': { schema: success(z.array(EventParticipantSchema)) } },
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}/results': {
+      get: {
+        tags: ['Events'],
+        summary: 'Get event results',
+        operationId: 'getEventResults',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: {
+            description: 'Event results',
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}/join': {
+      post: {
+        tags: ['Events'],
+        summary: 'Join event (raffle or opt-in contest)',
+        operationId: 'joinEvent',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: {
+            description: 'Joined successfully',
+          },
+        },
+      },
+    },
+
+    '/api/v1/events/{eventId}/my-status': {
+      get: {
+        tags: ['Events'],
+        summary: 'Get current user event status',
+        operationId: 'getMyEventStatus',
+        parameters: [
+          { name: 'eventId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: {
+            description: 'User participation status',
           },
         },
       },

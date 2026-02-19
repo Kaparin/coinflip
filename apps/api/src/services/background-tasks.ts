@@ -1671,11 +1671,19 @@ export function startBackgroundSweep(): void {
         reconcileOrphanedChainBets(),
       ]);
 
-      // 7. Garbage-collect stale pending_bet_secrets (older than 1 hour)
+      // 7. Event lifecycle checks
+      try {
+        const { eventsService } = await import('./events.service.js');
+        await eventsService.checkEventLifecycle();
+      } catch (err) {
+        logger.warn({ err }, 'sweep: event lifecycle check failed');
+      }
+
+      // 8. Garbage-collect stale pending_bet_secrets (older than 1 hour)
       await pendingSecretsService.cleanup().catch(err =>
         logger.warn({ err }, 'sweep: pending secrets cleanup failed'));
 
-      // 8. Cleanup expired sessions
+      // 9. Cleanup expired sessions
       try {
         const db = (await import('../lib/db.js')).getDb();
         const { sessions } = await import('@coinflip/db/schema');

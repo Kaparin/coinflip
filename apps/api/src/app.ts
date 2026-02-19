@@ -8,6 +8,8 @@ import { usersRouter } from './routes/users.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { referralRouter } from './routes/referral.js';
+import { eventsRouter } from './routes/events.js';
+import { adminEventsRouter } from './routes/admin-events.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { ipRateLimit } from './middleware/rate-limit.js';
 import { env } from './config/env.js';
@@ -99,6 +101,8 @@ app.route('/api/v1/users', usersRouter);
 app.route('/api/v1/auth', authRouter);
 app.route('/api/v1/admin', adminRouter);
 app.route('/api/v1/referral', referralRouter);
+app.route('/api/v1/events', eventsRouter);
+app.route('/api/v1/admin/events', adminEventsRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

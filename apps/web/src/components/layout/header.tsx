@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
-import { useGetVaultBalance } from '@coinflip/api-client';
+import { useGetVaultBalance, useGetActiveEvents } from '@coinflip/api-client';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { StatusChips } from '@/components/features/auth/status-chips';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
@@ -28,6 +28,10 @@ export function Header() {
       refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     },
   });
+  const { data: activeEventsData } = useGetActiveEvents({
+    query: { staleTime: 60_000, refetchInterval: 120_000 },
+  });
+  const activeEventCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,6 +137,20 @@ export function Header() {
                     <User size={14} />
                     {t('nav.profile')}
                   </Link>
+                  {activeEventCount > 0 && (
+                    <Link href="/game/events"
+                      className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        pathname?.startsWith('/game/events')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                      }`}>
+                      <Trophy size={14} />
+                      {t('nav.events')}
+                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-warning)] px-1 text-[9px] font-bold text-white">
+                        {activeEventCount}
+                      </span>
+                    </Link>
+                  )}
                 </nav>
 
                 <StatusChips
