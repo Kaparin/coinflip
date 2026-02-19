@@ -45,3 +45,6 @@ coverage/
 
 # MCP config (contains API keys)
 .mcp.json
+
+# Claude Code local settings (may contain credentials from approved commands)
+.claude/settings.local.json
