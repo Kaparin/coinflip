@@ -43,7 +43,7 @@ const document = createDocument({
   },
   servers: [
     { url: 'http://localhost:3001', description: 'Local development' },
-    { url: 'https://coinflip.axiome-launch.com/api', description: 'Production' },
+    { url: 'https://coinflipapi-production.up.railway.app', description: 'Production' },
   ],
   paths: {
     // ---- Bets ----

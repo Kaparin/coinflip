@@ -206,14 +206,16 @@ eventsRouter.get('/:id/debug', async (c) => {
 
   // Raw SQL to count bets in the time range
   try {
+    const startsAtStr = event.startsAt.toISOString();
+    const endsAtStr = event.endsAt.toISOString();
     const betCount = await db.execute(sql`
       SELECT COUNT(*)::int AS total,
              COUNT(CASE WHEN status IN ('revealed', 'timeout_claimed') THEN 1 END)::int AS resolved,
              MIN(created_time) AS first_bet,
              MAX(created_time) AS last_bet
       FROM bets
-      WHERE created_time >= ${event.startsAt}
-        AND created_time <= ${event.endsAt}
+      WHERE created_time >= ${startsAtStr}::timestamptz
+        AND created_time <= ${endsAtStr}::timestamptz
     `);
     diagnostics.betsInRange = (betCount as unknown as unknown[])[0];
   } catch (err) {

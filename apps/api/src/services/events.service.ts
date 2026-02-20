@@ -224,21 +224,24 @@ class EventsService {
   /** Count distinct players who placed bets during the event time range (for autoJoin contests) */
   async getAutoJoinPlayerCount(event: { startsAt: Date; endsAt: Date }): Promise<number> {
     const db = getDb();
+    // postgres-js doesn't accept Date objects in sql`` templates — convert to ISO strings
+    const startsAtStr = event.startsAt.toISOString();
+    const endsAtStr = event.endsAt.toISOString();
     const result = await db.execute(sql`
       SELECT COUNT(DISTINCT user_id)::int AS count FROM (
         SELECT maker_user_id AS user_id FROM bets
-        WHERE created_time >= ${event.startsAt}
-          AND created_time <= ${event.endsAt}
+        WHERE created_time >= ${startsAtStr}::timestamptz
+          AND created_time <= ${endsAtStr}::timestamptz
         UNION
         SELECT acceptor_user_id AS user_id FROM bets
-        WHERE accepted_time >= ${event.startsAt}
-          AND accepted_time <= ${event.endsAt}
+        WHERE accepted_time >= ${startsAtStr}::timestamptz
+          AND accepted_time <= ${endsAtStr}::timestamptz
           AND acceptor_user_id IS NOT NULL
       ) AS players
     `);
     const rows = result as unknown as Array<{ count: number }>;
     const count = Number(rows[0]?.count ?? 0);
-    logger.debug({ startsAt: event.startsAt, endsAt: event.endsAt, count, rawRows: rows.length }, 'getAutoJoinPlayerCount');
+    logger.debug({ startsAt: startsAtStr, endsAt: endsAtStr, count, rawRows: rows.length }, 'getAutoJoinPlayerCount');
     return count;
   }
 
@@ -262,10 +265,12 @@ class EventsService {
   /** Check if user placed any bets during an event's time range (for autoJoin contests) */
   async hasUserPlayedDuringEvent(event: { startsAt: Date; endsAt: Date }, userId: string): Promise<boolean> {
     const db = getDb();
+    const startsAtStr = event.startsAt.toISOString();
+    const endsAtStr = event.endsAt.toISOString();
     const [row] = await db.execute(sql`
       SELECT 1 AS ok FROM bets
-      WHERE (maker_user_id = ${userId} AND created_time >= ${event.startsAt} AND created_time <= ${event.endsAt})
-         OR (acceptor_user_id = ${userId} AND accepted_time >= ${event.startsAt} AND accepted_time <= ${event.endsAt})
+      WHERE (maker_user_id = ${userId} AND created_time >= ${startsAtStr}::timestamptz AND created_time <= ${endsAtStr}::timestamptz)
+         OR (acceptor_user_id = ${userId} AND accepted_time >= ${startsAtStr}::timestamptz AND accepted_time <= ${endsAtStr}::timestamptz)
       LIMIT 1
     `) as unknown as [{ ok: number } | undefined];
     return !!row?.ok;
@@ -362,8 +367,9 @@ class EventsService {
 
     const config = event.config as ContestConfig;
     const metric = config.metric ?? 'turnover';
-    const startsAt = event.startsAt;
-    const endsAt = event.endsAt;
+    // postgres-js doesn't accept Date objects in sql`` — convert to ISO strings
+    const startsAt = event.startsAt.toISOString();
+    const endsAt = event.endsAt.toISOString();
 
     const db = getDb();
 
@@ -391,16 +397,16 @@ class EventsService {
                  COALESCE(b.payout_amount, '0')::numeric AS payout
           FROM bets b
           WHERE b.status IN ('revealed', 'timeout_claimed')
-            AND b.resolved_time >= ${startsAt}
-            AND b.resolved_time <= ${endsAt}
+            AND b.resolved_time >= ${startsAt}::timestamptz
+            AND b.resolved_time <= ${endsAt}::timestamptz
             AND ${minBetFilter}
           UNION ALL
           SELECT b.acceptor_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
                  COALESCE(b.payout_amount, '0')::numeric AS payout
           FROM bets b
           WHERE b.status IN ('revealed', 'timeout_claimed')
-            AND b.resolved_time >= ${startsAt}
-            AND b.resolved_time <= ${endsAt}
+            AND b.resolved_time >= ${startsAt}::timestamptz
+            AND b.resolved_time <= ${endsAt}::timestamptz
             AND b.acceptor_user_id IS NOT NULL
             AND ${minBetFilter}
         )
@@ -424,15 +430,15 @@ class EventsService {
           SELECT b.maker_user_id AS user_id
           FROM bets b
           WHERE b.status IN ('revealed', 'timeout_claimed')
-            AND b.resolved_time >= ${startsAt}
-            AND b.resolved_time <= ${endsAt}
+            AND b.resolved_time >= ${startsAt}::timestamptz
+            AND b.resolved_time <= ${endsAt}::timestamptz
             AND ${minBetFilter}
           UNION ALL
           SELECT b.acceptor_user_id AS user_id
           FROM bets b
           WHERE b.status IN ('revealed', 'timeout_claimed')
-            AND b.resolved_time >= ${startsAt}
-            AND b.resolved_time <= ${endsAt}
+            AND b.resolved_time >= ${startsAt}::timestamptz
+            AND b.resolved_time <= ${endsAt}::timestamptz
             AND b.acceptor_user_id IS NOT NULL
             AND ${minBetFilter}
         )
@@ -479,22 +485,24 @@ class EventsService {
       : sql`TRUE`;
 
     const db = getDb();
+    const startsAtStr = event.startsAt.toISOString();
+    const endsAtStr = event.endsAt.toISOString();
     const rows = await db.execute(sql`
       WITH player_bets AS (
         SELECT b.maker_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
                COALESCE(b.payout_amount, '0')::numeric AS payout
         FROM bets b
         WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${event.startsAt}
-          AND b.resolved_time <= ${event.endsAt}
+          AND b.resolved_time >= ${startsAtStr}::timestamptz
+          AND b.resolved_time <= ${endsAtStr}::timestamptz
           AND ${minBetFilter}
         UNION ALL
         SELECT b.acceptor_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
                COALESCE(b.payout_amount, '0')::numeric AS payout
         FROM bets b
         WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${event.startsAt}
-          AND b.resolved_time <= ${event.endsAt}
+          AND b.resolved_time >= ${startsAtStr}::timestamptz
+          AND b.resolved_time <= ${endsAtStr}::timestamptz
           AND b.acceptor_user_id IS NOT NULL
           AND ${minBetFilter}
       ),
@@ -904,8 +912,19 @@ class EventsService {
           continue;
         }
 
-        // 3b. Events with results (10+ min past end) → auto-approve to completed
+        // 3b. Events with results (10+ min past end) → auto-approve to completed + auto-distribute prizes
         if (hasResults && msSinceEnd >= EVENT_AUTO_APPROVE_GRACE_MS) {
+          // Auto-distribute prizes via CW20 transfer BEFORE marking completed
+          try {
+            const distResult = await this.distributeAllPrizes(event.id);
+            logger.info(
+              { eventId: event.id, distributed: distResult.distributed, failed: distResult.failed },
+              'Auto-distributed prizes for completed event',
+            );
+          } catch (distErr) {
+            logger.error({ err: distErr, eventId: event.id }, 'Auto-distribute prizes failed (will still mark completed)');
+          }
+
           await this.setStatus(event.id, 'completed');
           wsService.broadcast({
             type: 'event_results_published',

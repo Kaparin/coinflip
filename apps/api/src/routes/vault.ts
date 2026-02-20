@@ -109,23 +109,20 @@ export function invalidateBalanceCache(address: string): void {
 }
 
 // GET /api/v1/vault/balance — Get balance (auth required)
-// Uses chain balance (cached 5s) adjusted by server-side pending locks + off-chain bonus.
+// Uses chain balance (cached 5s) adjusted by server-side pending locks.
 // Pending locks represent funds locked in DB but not yet reflected on-chain.
-// Bonus represents off-chain prize credits that persist across chain syncs.
 vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  // Fetch chain balance + DB bonus + DB open bet count in parallel
-  const [chainBalance, dbBalance, dbOpenCount] = await Promise.all([
+  // Fetch chain balance + DB open bet count in parallel
+  const [chainBalance, dbOpenCount] = await Promise.all([
     getChainVaultBalance(address),
-    vaultService.getBalance(user.id),
     betService.getOpenBetCountForUser(user.id),
   ]);
 
   let available = BigInt(chainBalance.available);
   const chainLocked = BigInt(chainBalance.locked);
-  const bonus = BigInt(dbBalance.bonus);
 
   // Subtract pending locks that chain hasn't reflected yet
   const pendingLockAmount = getTotalPendingLocks(address);
@@ -135,8 +132,7 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   }
 
   const locked = chainLocked + pendingLockAmount;
-  // Total includes chain available + locked + off-chain bonus
-  const total = available + locked + bonus;
+  const total = available + locked;
 
   // Sync to DB in background (don't block response)
   vaultService.syncBalanceFromChain(
@@ -155,7 +151,6 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
       available: available.toString(),
       locked: locked.toString(),
       total: total.toString(),
-      bonus: bonus.toString(),
       pending_bets: pendingBets,
       open_bets_count: openBetsCount,
     },

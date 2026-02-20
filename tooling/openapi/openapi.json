@@ -11,7 +11,7 @@
       "description": "Local development"
     },
     {
-      "url": "https://coinflip.axiome-launch.com/api",
+      "url": "https://coinflipapi-production.up.railway.app",
       "description": "Production"
     }
   ],

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://coinflip.axiome-launch.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000';
 const TITLE = 'Heads or Tails — PvP on Axiome';
 const DESCRIPTION = 'Wager LAUNCH tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.';
 
