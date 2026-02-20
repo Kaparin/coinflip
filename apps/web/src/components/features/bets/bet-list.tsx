@@ -177,7 +177,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         // Don't call invalidateQueries — WS events (bet_accepting, bet_revealed)
         // will handle the full cache refresh. This avoids triple-refetch flicker.
         setAcceptTarget(null);
-        clearPending();
+        // Note: don't call clearPending() here — accept doesn't set pendingBetId,
+        // and clearing it would interfere with any concurrent cancel operation.
         addToast('success', t('bets.betAccepted'));
       },
       onError: (err: unknown, variables) => {
@@ -192,7 +193,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           }
         }
 
-        clearPending();
+        // Note: don't call clearPending() — accept doesn't set pendingBetId.
         setAcceptTarget(null);
         // Remove from recently accepted so button re-appears
         if (betId) {
@@ -265,8 +266,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     const deductionId = addDeduction(String(acceptTarget.amount), false);
     acceptDeductionRef.current.set(betId, deductionId);
 
-    setPendingBetId(betId);
-    setPendingAction('accept');
+    // Don't set pendingBetId for accepts — it blocks ALL accept buttons via isAnyPending.
+    // recentlyAcceptedIds handles per-bet blocking (hides button, shows "Accepting..." spinner).
+    // This allows the user to rapidly accept multiple bets without waiting.
     setRecentlyAcceptedIds(prev => new Set(prev).add(betId));
     // No guess needed — server picks randomly
     acceptBet({

@@ -296,8 +296,7 @@ export function BetCard({
             <button
               type="button"
               onClick={() => onAccept(id)}
-              disabled={isAnyPending}
-              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] min-h-[44px]"
             >
               {t('bets.acceptFlip')}
             </button>
