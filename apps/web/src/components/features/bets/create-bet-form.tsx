@@ -8,7 +8,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
-import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { LaunchTokenIcon } from '@/components/ui';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { useTranslation } from '@/lib/i18n';
@@ -26,12 +26,21 @@ import { extractErrorPayload, isActionInProgress, getUserFriendlyError } from '@
 interface CreateBetFormProps {
   /** Called when a bet is submitted to chain (before confirmation). Parent manages pending state. */
   onBetSubmitted?: (bet: { txHash: string; amount: string; maker: string }) => void;
+  /** Controlled amount (for FAB modal — preserves value between open/close) */
+  controlledAmount?: string;
+  /** Callback when amount changes (used with controlledAmount) */
+  onAmountChange?: (amount: string) => void;
+  /** Called after submitted phase completes (e.g. to auto-close modal) */
+  onSubmitComplete?: () => void;
+  /** 'card' = default with border/bg, 'flat' = no wrapper styling (for inside modal) */
+  variant?: 'card' | 'flat';
 }
 
-export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
-  const [amount, setAmount] = useState('');
+export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange, onSubmitComplete, variant = 'card' }: CreateBetFormProps) {
+  const [internalAmount, setInternalAmount] = useState('');
+  const amount = controlledAmount ?? internalAmount;
+  const setAmount = onAmountChange ?? setInternalAmount;
   const [phase, setPhase] = useState<'pick' | 'confirm' | 'submitted'>('pick');
-  const [mobileCollapsed, setMobileCollapsed] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { address, isConnected, connect } = useWalletContext();
   const { data: grantStatus } = useGrantStatus();
@@ -118,6 +127,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           setAmount('');
           setPhase('pick');
           setSubmitted(false);
+          onSubmitComplete?.();
         }, 2500);
       },
       onError: (err: unknown) => {
@@ -263,49 +273,9 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
     }
   }, [isValidBatch, parsedBatchCount, parsedAmount, batchMode, parsedBatchMin, parsedBatchMax, batchSubmitting, addDeduction, removeDeduction, address, onBetSubmitted, queryClient, addToast, t]);
 
-  // On mobile, show compact summary when collapsed
-  const mobileIsCollapsed = mobileCollapsed && phase === 'pick';
-
   return (
-    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-      {/* Mobile collapsible header — when expanded, show only collapse action to avoid duplicating content */}
-      <div className="md:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileCollapsed(!mobileCollapsed)}
-          className="w-full flex items-center justify-between px-4 py-3 active:bg-[var(--color-surface-hover)] transition-colors"
-        >
-          {mobileIsCollapsed ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">{t('wager.title')}</span>
-              {parsedAmount > 0 && (
-                <span className="rounded-lg bg-[var(--color-primary)]/10 px-2 py-0.5 text-xs font-bold text-[var(--color-primary)]">
-                  {parsedAmount.toLocaleString()} L
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('balance.collapse')}</span>
-          )}
-          <ChevronDown size={16} className={`text-[var(--color-text-secondary)] transition-transform duration-200 ${!mobileIsCollapsed ? 'rotate-180' : ''}`} />
-        </button>
-
-        {/* Collapsed: show quick-create button inline */}
-        {mobileIsCollapsed && isConnected && oneClickEnabled && isValidAmount && (
-          <div className="px-4 pb-3 -mt-1">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] btn-press"
-            >
-              {t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={45} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Content: always visible on desktop, collapsible on mobile */}
-      <div className={`p-5 pt-0 md:!block md:p-5 ${mobileIsCollapsed ? 'hidden' : ''}`}>
+    <div className={variant === 'card' ? 'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden' : ''}>
+      <div className={variant === 'card' ? 'p-5' : ''}>
       {/* Authz Setup Warning */}
       {isConnected && !oneClickEnabled && grantStatus !== undefined && (
         <div className="mb-4 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 p-3">
@@ -574,7 +544,7 @@ export function CreateBetForm({ onBetSubmitted }: CreateBetFormProps) {
           )}
         </>
       )}
-      </div>{/* end collapsible content */}
+      </div>
 
       <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
     </div>

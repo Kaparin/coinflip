@@ -637,7 +637,15 @@
     "youParticipated": "Вы участвовали в этом событии",
     "noParticipants": "Пока нет участников",
     "noEvents": "Событий пока нет",
+    "upcoming": "Скоро",
     "activeEvents": "Активные события",
+    "notFoundOrCanceled": "Событие не найдено или было отменено",
+    "notifications": {
+      "started": "Событие «{{title}}» началось!",
+      "ended": "Событие «{{title}}» завершилось",
+      "resultsPublished": "Результаты «{{title}}» опубликованы!",
+      "canceled": "Событие «{{title}}» отменено"
+    },
     "info": {
       "title": "Как работают события?",
       "contestTitle": "Конкурсы",

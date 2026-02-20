@@ -66,7 +66,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
     <Link
       href={`/game/events/${event.id}`}
       className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-xl border border-[var(--color-border)] p-4 card-hover ${
-        isActive
+        isActive || isUpcoming
           ? `${theme.bgGradient} ${theme.borderGlow} shimmer-overlay`
           : 'bg-[var(--color-surface)]'
       } ${isCompleted ? 'opacity-80' : ''}`}

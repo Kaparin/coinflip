@@ -150,7 +150,15 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   }, []);
 
   // Categorize bets (include 'canceling' with open bets so cards don't vanish instantly)
-  const myOpenBets = myBets.filter(b => (b.status === 'open' || b.status === 'canceling') && b.maker?.toLowerCase() === addrLower);
+  // Filter out expired bets — they'll be auto-canceled on chain, no need to show cancel button
+  const now = Date.now();
+  const myOpenBets = myBets.filter(b => {
+    if (b.status !== 'open' && b.status !== 'canceling') return false;
+    if (b.maker?.toLowerCase() !== addrLower) return false;
+    const expiresAt = (b as any).expires_at;
+    if (expiresAt && new Date(expiresAt).getTime() <= now) return false;
+    return true;
+  });
   const myAccepting = myBets.filter(b => b.status === 'accepting');
   const myInProgress = myBets.filter(b => b.status === 'accepted');
   const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || b.status === 'canceled');

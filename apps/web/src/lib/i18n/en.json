@@ -637,7 +637,15 @@
     "youParticipated": "You participated in this event",
     "noParticipants": "No participants yet",
     "noEvents": "No events at the moment",
+    "upcoming": "Upcoming",
     "activeEvents": "Active Events",
+    "notFoundOrCanceled": "Event not found or was canceled",
+    "notifications": {
+      "started": "Event \"{{title}}\" has started!",
+      "ended": "Event \"{{title}}\" has ended",
+      "resultsPublished": "Results for \"{{title}}\" are in!",
+      "canceled": "Event \"{{title}}\" was canceled"
+    },
     "info": {
       "title": "How do events work?",
       "contestTitle": "Contests",

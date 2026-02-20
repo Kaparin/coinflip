@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { useQueryClient } from '@tanstack/react-query';
 import { CreateBetForm } from '@/components/features/bets/create-bet-form';
+import { CreateBetFab } from '@/components/features/bets/create-bet-fab';
 import { BetList } from '@/components/features/bets/bet-list';
 import { MyBets } from '@/components/features/bets/my-bets';
 import { HistoryList } from '@/components/features/history/history-list';
@@ -28,6 +29,7 @@ export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
   const activeTabRef = useRef<Tab>('bets');
   const [showWsBanner, setShowWsBanner] = useState(false);
+  const [eventNotification, setEventNotification] = useState<{ message: string; variant: 'success' | 'info' | 'warning' | 'error' } | null>(null);
   const queryClient = useQueryClient();
   const { address, isConnected } = useWalletContext();
   const { addToast } = useToast();
@@ -38,6 +40,9 @@ export default function GamePage() {
       queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/events/active'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/events/completed'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] }),
     ]);
   }, [queryClient]);
 
@@ -54,39 +59,62 @@ export default function GamePage() {
       data?.acceptor?.toLowerCase() === addr
     );
 
+    // Skip stale events — don't show toasts for events older than 30s.
+    // This prevents a flood of "You won!"/"You lost" when reconnecting after being offline.
+    const eventAge = event.timestamp ? Date.now() - event.timestamp : 0;
+    const isStale = eventAge > 30_000;
+
     if (event.type === 'bet_confirmed') {
       // Only show to the maker who created the bet
-      if (addr && data?.maker?.toLowerCase() === addr) {
+      if (!isStale && addr && data?.maker?.toLowerCase() === addr) {
         addToast('success', t('game.betConfirmed'));
       }
     }
     if (event.type === 'bet_create_failed') {
-      // Targeted event — only sent to the maker's address
+      // Targeted event — only sent to the maker's address (always show errors)
       const reason = data?.reason ?? 'Transaction failed';
       addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'create'));
     }
     if (event.type === 'bet_accepted') {
       // Only show to maker and acceptor
-      if (isMyBet) {
+      if (!isStale && isMyBet) {
         addToast('info', t('game.betAcceptedWinner'));
       }
     }
     if (event.type === 'accept_failed') {
-      // Targeted event — only sent to the acceptor's address
+      // Targeted event — only sent to the acceptor's address (always show errors)
       const reason = data?.reason ?? 'Transaction failed';
       addToast('error', getUserFriendlyError({ error: { message: reason } }, t, 'accept'));
     }
     if (event.type === 'bet_reverted') {
       // Only show to maker and acceptor (not everyone watching)
-      if (isMyBet) {
+      if (!isStale && isMyBet) {
         addToast('info', t('game.betReverted'));
       }
     }
     if (event.type === 'bet_revealed') {
-      if (!isMyBet) return;
+      if (!isMyBet || isStale) return;
       const winner = data?.winner?.toLowerCase();
       const isWinner = winner && addr === winner;
       addToast(isWinner ? 'success' : 'warning', isWinner ? t('game.youWon') : t('game.youLost'));
+    }
+
+    // Event lifecycle notifications
+    if (event.type === 'event_started') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: t('events.notifications.started', { title }), variant: 'success' });
+    }
+    if (event.type === 'event_ended') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: t('events.notifications.ended', { title }), variant: 'info' });
+    }
+    if (event.type === 'event_results_published') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: t('events.notifications.resultsPublished', { title }), variant: 'success' });
+    }
+    if (event.type === 'event_canceled') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: t('events.notifications.canceled', { title }), variant: 'error' });
     }
   }, [handlePendingWsEvent, addToast, address, t]);
 
@@ -102,6 +130,13 @@ export default function GamePage() {
     const timer = setTimeout(() => setShowWsBanner(true), 3000);
     return () => clearTimeout(timer);
   }, [wsConnected, isConnected]);
+
+  // Auto-dismiss event notification after 5 seconds
+  useEffect(() => {
+    if (!eventNotification) return;
+    const timer = setTimeout(() => setEventNotification(null), 5000);
+    return () => clearTimeout(timer);
+  }, [eventNotification]);
 
   const handleTabChange = useCallback((tab: Tab) => {
     activeTabRef.current = tab;
@@ -137,7 +172,7 @@ export default function GamePage() {
         <BalanceDisplay />
       </div>
 
-      <div id="create-bet-form">
+      <div id="create-bet-form" className="hidden md:block">
         <CreateBetForm onBetSubmitted={addPending} />
       </div>
 
@@ -176,6 +211,30 @@ export default function GamePage() {
       </div>
     </div>
 
+      {/* Event notification banner — fixed bottom, auto-dismiss */}
+      {eventNotification && (
+        <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-2xl animate-fade-up">
+          <div className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs backdrop-blur-sm ${
+            eventNotification.variant === 'success'
+              ? 'bg-[var(--color-success)]/10 border-[var(--color-success)]/30 text-[var(--color-success)]'
+              : eventNotification.variant === 'error'
+                ? 'bg-[var(--color-danger)]/10 border-[var(--color-danger)]/30 text-[var(--color-danger)]'
+                : eventNotification.variant === 'warning'
+                  ? 'bg-[var(--color-warning)]/10 border-[var(--color-warning)]/30 text-[var(--color-warning)]'
+                  : 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/30 text-[var(--color-primary)]'
+          }`}>
+            <span className="font-medium">{eventNotification.message}</span>
+            <button
+              type="button"
+              onClick={() => setEventNotification(null)}
+              className="shrink-0 rounded-md p-0.5 hover:opacity-70 transition-opacity"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* WebSocket reconnecting banner — fixed bottom, auto-dismiss */}
       {showWsBanner && (
         <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-2xl animate-fade-up">
@@ -194,6 +253,8 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      <CreateBetFab onBetSubmitted={addPending} />
     </PullToRefresh>
   );
 }

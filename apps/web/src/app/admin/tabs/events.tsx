@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban } from 'lucide-react';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -18,12 +18,14 @@ interface EventRow {
   id: string;
   type: string;
   title: string;
+  description?: string | null;
   status: string;
   startsAt: string;
   endsAt: string;
   totalPrizePool: string;
   participantCount: number;
   config?: Record<string, unknown>;
+  prizes?: PrizeRow[];
 }
 
 interface PrizeRow {
@@ -95,6 +97,17 @@ export function EventsTab() {
   ]);
   const [formMaxParticipants, setFormMaxParticipants] = useState('');
   const [formTouched, setFormTouched] = useState(false);
+
+  // Edit mode state for detail modal
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Track editing event ID for create modal reuse
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   // --- Data fetching ---
 
@@ -321,54 +334,101 @@ export function EventsTab() {
 
   const openCreateModal = useCallback(() => {
     resetForm();
+    setEditingEventId(null);
     setModalOpen(true);
   }, [resetForm]);
 
+  const openEditDraftModal = useCallback((event: EventRow) => {
+    // Prefill form with event data for draft editing
+    setEditingEventId(event.id);
+    setFormType(event.type as 'contest' | 'raffle');
+    setFormTitle(event.title);
+    setFormDesc(event.description ?? '');
+    const startD = new Date(event.startsAt);
+    const endD = new Date(event.endsAt);
+    setFormStartDate(toLocalDateStr(startD));
+    setFormStartTime(toLocalTimeStr(startD));
+    setFormEndDate(toLocalDateStr(endD));
+    setFormEndTime(toLocalTimeStr(endD));
+    if (event.config?.metric) setFormMetric(event.config.metric as 'turnover' | 'wins' | 'profit');
+    if (event.config?.autoJoin !== undefined) setFormAutoJoin(Boolean(event.config.autoJoin));
+    if (event.config?.maxParticipants) setFormMaxParticipants(String(event.config.maxParticipants));
+    // Convert micro-LAUNCH back to LAUNCH for display
+    const poolInLaunch = Number(BigInt(event.totalPrizePool) / BigInt(1_000_000));
+    setFormPrizePool(String(poolInLaunch));
+    if (event.prizes && event.prizes.length > 0) {
+      setPrizes(event.prizes.map((p) => ({
+        place: p.place,
+        amount: String(Number(BigInt(p.amount) / BigInt(1_000_000))),
+      })));
+    }
+    setFormTouched(false);
+    setModalOpen(true);
+  }, []);
+
+  const startEditMode = useCallback((event: EventRow) => {
+    setEditMode(true);
+    setEditTitle(event.title);
+    setEditDesc(event.description ?? '');
+    const endD = new Date(event.endsAt);
+    setEditEndDate(toLocalDateStr(endD));
+    setEditEndTime(toLocalTimeStr(endD));
+  }, []);
+
   // --- API handlers ---
 
-  const handleCreate = async () => {
+  const buildEventBody = () => {
+    const prizesList = prizes.map((p) => ({
+      place: p.place,
+      amount: toMicroLaunch(Number(p.amount)),
+      label: `#${p.place}`,
+    }));
+
+    const config: Record<string, unknown> = {};
+    if (formType === 'contest') {
+      config.metric = formMetric;
+      config.autoJoin = formAutoJoin;
+    }
+    if (formType === 'raffle' && formMaxParticipants) {
+      config.maxParticipants = Number(formMaxParticipants);
+    }
+
+    const startsAt = new Date(`${formStartDate}T${formStartTime}`).toISOString();
+    const endsAt = new Date(`${formEndDate}T${formEndTime}`).toISOString();
+
+    return {
+      type: formType,
+      title: formTitle,
+      description: formDesc || undefined,
+      startsAt,
+      endsAt,
+      config,
+      prizes: prizesList,
+      totalPrizePool: toMicroLaunch(Number(formPrizePool)),
+    };
+  };
+
+  const handleCreate = async (activate = false) => {
     setFormTouched(true);
     if (!isFormValid) return;
 
-    setActionLoading('create');
+    const loadingKey = activate ? 'create-activate' : 'create';
+    setActionLoading(loadingKey);
     setMessage(null);
     try {
-      const prizesList = prizes.map((p) => ({
-        place: p.place,
-        amount: toMicroLaunch(Number(p.amount)),
-        label: `#${p.place}`,
-      }));
+      const endpoint = activate
+        ? `${API_BASE}/api/v1/admin/events/create-and-activate`
+        : `${API_BASE}/api/v1/admin/events`;
 
-      const config: Record<string, unknown> = {};
-      if (formType === 'contest') {
-        config.metric = formMetric;
-        config.autoJoin = formAutoJoin;
-      }
-      if (formType === 'raffle' && formMaxParticipants) {
-        config.maxParticipants = Number(formMaxParticipants);
-      }
-
-      const startsAt = new Date(`${formStartDate}T${formStartTime}`).toISOString();
-      const endsAt = new Date(`${formEndDate}T${formEndTime}`).toISOString();
-
-      const res = await fetch(`${API_BASE}/api/v1/admin/events`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({
-          type: formType,
-          title: formTitle,
-          description: formDesc || undefined,
-          startsAt,
-          endsAt,
-          config,
-          prizes: prizesList,
-          totalPrizePool: toMicroLaunch(Number(formPrizePool)),
-        }),
+        body: JSON.stringify(buildEventBody()),
       });
 
       if (res.ok) {
-        setMessage('Event created!');
+        setMessage(activate ? 'Event created & activated!' : 'Event created!');
         setModalOpen(false);
         fetchEvents();
       } else {
@@ -382,21 +442,88 @@ export function EventsTab() {
     }
   };
 
-  const handleAction = async (eventId: string, action: string) => {
+  const handleUpdateEvent = async (eventId: string) => {
+    setActionLoading('update');
+    setMessage(null);
+    try {
+      const body: Record<string, unknown> = {};
+      if (editingEventId) {
+        // Full update for draft via create modal reuse
+        body.title = formTitle;
+        body.description = formDesc || undefined;
+        body.startsAt = new Date(`${formStartDate}T${formStartTime}`).toISOString();
+        body.endsAt = new Date(`${formEndDate}T${formEndTime}`).toISOString();
+        const config: Record<string, unknown> = {};
+        if (formType === 'contest') {
+          config.metric = formMetric;
+          config.autoJoin = formAutoJoin;
+        }
+        if (formType === 'raffle' && formMaxParticipants) {
+          config.maxParticipants = Number(formMaxParticipants);
+        }
+        body.config = config;
+        body.prizes = prizes.map((p) => ({
+          place: p.place,
+          amount: toMicroLaunch(Number(p.amount)),
+          label: `#${p.place}`,
+        }));
+        body.totalPrizePool = toMicroLaunch(Number(formPrizePool));
+      } else {
+        // Inline edit for active events (limited fields)
+        if (editTitle) body.title = editTitle;
+        if (editDesc !== undefined) body.description = editDesc;
+        if (editEndDate && editEndTime) {
+          body.endsAt = new Date(`${editEndDate}T${editEndTime}`).toISOString();
+        }
+      }
+
+      const res = await fetch(`${API_BASE}/api/v1/admin/events/${eventId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setMessage('Event updated!');
+        setEditMode(false);
+        setEditingEventId(null);
+        setModalOpen(false);
+        setDetailOpen(false);
+        fetchEvents();
+      } else {
+        const err = await res.json();
+        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+      }
+    } catch {
+      setMessage('Failed to update event');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAction = async (eventId: string, action: string, opts?: { force?: boolean }) => {
     // Confirmations for destructive actions
     if (action === 'delete' && !window.confirm('Delete this draft event? This cannot be undone.')) return;
     if (action === 'cancel' && !window.confirm('Cancel this event and remove all participants? This cannot be undone.')) return;
     if (action === 'activate' && !window.confirm('Activate this event? It will be visible to all users.')) return;
     if (action === 'approve' && !window.confirm('Approve results and mark as completed? This finalizes the winners.')) return;
+    if (opts?.force && !window.confirm('Force recalculate? This will clear previous results and redo the calculation.')) return;
 
     setActionLoading(`${action}:${eventId}`);
     setMessage(null);
     try {
       const method = action === 'delete' ? 'DELETE' : 'POST';
       // delete uses base path (DELETE /admin/events/:id), others use action subpath
-      const url = action === 'delete'
+      let url = action === 'delete'
         ? `${API_BASE}/api/v1/admin/events/${eventId}`
         : `${API_BASE}/api/v1/admin/events/${eventId}/${action}`;
+
+      // Add force query param for calculate
+      if (action === 'calculate' && opts?.force) {
+        url += '?force=true';
+      }
+
       const res = await fetch(url, {
         method,
         credentials: 'include',
@@ -494,7 +621,7 @@ export function EventsTab() {
       </div>
 
       {/* Create Event Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create Event">
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Edit Event' : 'Create Event'}>
         <div className="space-y-4">
           {/* Type & Title */}
           <div className="grid grid-cols-2 gap-3">
@@ -737,73 +864,156 @@ export function EventsTab() {
           )}
 
           {/* Submit */}
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={actionLoading === 'create' || (formTouched && !isFormValid)}
-            className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
-          >
-            {actionLoading === 'create' ? 'Creating...' : 'Create Event'}
-          </button>
+          {editingEventId ? (
+            <button
+              type="button"
+              onClick={() => handleUpdateEvent(editingEventId)}
+              disabled={actionLoading === 'update' || (formTouched && !isFormValid)}
+              className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
+            >
+              {actionLoading === 'update' ? 'Saving...' : 'Save Changes'}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleCreate(false)}
+                disabled={actionLoading === 'create' || actionLoading === 'create-activate' || (formTouched && !isFormValid)}
+                className="flex-1 rounded-lg border border-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 disabled:opacity-40 transition-colors"
+              >
+                {actionLoading === 'create' ? 'Creating...' : 'Create as Draft'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCreate(true)}
+                disabled={actionLoading === 'create' || actionLoading === 'create-activate' || (formTouched && !isFormValid)}
+                className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
+              >
+                {actionLoading === 'create-activate' ? 'Creating...' : 'Create & Activate'}
+              </button>
+            </div>
+          )}
         </div>
       </Modal>
 
       {/* Event Detail Modal */}
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailEvent?.title ?? 'Event Details'}>
+      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setEditMode(false); }} title={detailEvent?.title ?? 'Event Details'}>
         {detailEvent && (
           <div className="space-y-4">
-            {/* Event info */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                {detailEvent.type === 'contest' ? (
-                  <Target size={14} className="text-[var(--color-primary)]" />
-                ) : (
-                  <Trophy size={14} className="text-[var(--color-warning)]" />
+            {/* Event info — inline edit for active events */}
+            {editMode ? (
+              <div className="space-y-3">
+                <div>
+                  <label className={labelCls}>Title</label>
+                  <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Description</label>
+                  <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} className={inputCls} />
+                </div>
+                {detailEvent.status === 'active' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>End Date</label>
+                      <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>End Time</label>
+                      <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
                 )}
-                <span className="text-xs font-medium capitalize">{detailEvent.type}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    detailEvent.status === 'active'
-                      ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
-                      : detailEvent.status === 'draft'
-                        ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
-                        : detailEvent.status === 'completed'
-                          ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
-                          : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
-                  }`}
-                >
-                  {detailEvent.status}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                <div>
-                  <span className="font-bold">Start:</span> {fmtDate(detailEvent.startsAt)}
-                </div>
-                <div>
-                  <span className="font-bold">End:</span> {fmtDate(detailEvent.endsAt)}
-                </div>
-                <div>
-                  <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} LAUNCH
-                </div>
-                <div>
-                  <span className="font-bold">Participants:</span> {detailEvent.participantCount}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateEvent(detailEvent.id)}
+                    disabled={editSaving}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    {editSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-              {/* Config info */}
-              {detailEvent.config && (
-                <div className="text-[11px] text-[var(--color-text-secondary)]">
-                  <span className="font-bold">Config:</span>{' '}
-                  {formatConfig(detailEvent) ?? 'Default'}
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {detailEvent.type === 'contest' ? (
+                    <Target size={14} className="text-[var(--color-primary)]" />
+                  ) : (
+                    <Trophy size={14} className="text-[var(--color-warning)]" />
+                  )}
+                  <span className="text-xs font-medium capitalize">{detailEvent.type}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      detailEvent.status === 'active'
+                        ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                        : detailEvent.status === 'draft'
+                          ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                          : detailEvent.status === 'completed'
+                            ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                            : 'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
+                    }`}
+                  >
+                    {detailEvent.status}
+                  </span>
                 </div>
-              )}
-              {/* ID for debugging */}
-              <div className="text-[10px] font-mono text-[var(--color-text-secondary)]/60">
-                ID: {detailEvent.id}
+                {detailEvent.description && (
+                  <div className="text-[11px] text-[var(--color-text-secondary)]">{detailEvent.description}</div>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                  <div>
+                    <span className="font-bold">Start:</span> {fmtDate(detailEvent.startsAt)}
+                  </div>
+                  <div>
+                    <span className="font-bold">End:</span> {fmtDate(detailEvent.endsAt)}
+                  </div>
+                  <div>
+                    <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} LAUNCH
+                  </div>
+                  <div>
+                    <span className="font-bold">Participants:</span> {detailEvent.participantCount}
+                  </div>
+                </div>
+                {/* Config info */}
+                {detailEvent.config && (
+                  <div className="text-[11px] text-[var(--color-text-secondary)]">
+                    <span className="font-bold">Config:</span>{' '}
+                    {formatConfig(detailEvent) ?? 'Default'}
+                  </div>
+                )}
+                {/* ID for debugging */}
+                <div className="text-[10px] font-mono text-[var(--color-text-secondary)]/60">
+                  ID: {detailEvent.id}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quick action buttons in detail modal */}
             <div className="flex flex-wrap gap-2">
+              {/* Edit button for draft and active */}
+              {(detailEvent.status === 'draft' || detailEvent.status === 'active') && !editMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (detailEvent.status === 'draft') {
+                      openEditDraftModal(detailEvent);
+                      setDetailOpen(false);
+                    } else {
+                      startEditMode(detailEvent);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
               {detailEvent.status === 'draft' && (
                 <>
                   <button
@@ -845,26 +1055,64 @@ export function EventsTab() {
                 </>
               )}
               {detailEvent.status === 'calculating' && (
-                <button
-                  type="button"
-                  onClick={() => { handleAction(detailEvent.id, 'approve'); setDetailOpen(false); }}
-                  disabled={!!actionLoading}
-                  className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-                >
-                  <CheckCircle size={12} /> Approve Results
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'calculate', { force: true }); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-warning)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <RotateCcw size={12} /> {detailEvent.type === 'raffle' ? 'Redraw Winners' : 'Force Recalculate'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'approve'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <CheckCircle size={12} /> Approve Results
+                  </button>
+                </>
               )}
               {detailEvent.status === 'completed' && (
-                <button
-                  type="button"
-                  onClick={() => { handleAction(detailEvent.id, 'archive'); setDetailOpen(false); }}
-                  disabled={!!actionLoading}
-                  className="flex items-center gap-1 rounded-lg bg-[var(--color-text-secondary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-                >
-                  <Archive size={12} /> Archive
-                </button>
+                <>
+                  {winners.some((w) => !w.prizeTxHash) && (
+                    <button
+                      type="button"
+                      onClick={handleDistributeAll}
+                      disabled={distLoading === 'all'}
+                      className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                    >
+                      <Send size={12} /> {distLoading === 'all' ? 'Distributing...' : 'Distribute All'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { handleAction(detailEvent.id, 'archive'); setDetailOpen(false); }}
+                    disabled={!!actionLoading}
+                    className="flex items-center gap-1 rounded-lg bg-[var(--color-text-secondary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    <Archive size={12} /> Archive
+                  </button>
+                </>
               )}
             </div>
+
+            {/* Distribution progress bar */}
+            {detailEvent.status === 'completed' && winners.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)]">
+                  <span className="font-bold">Prize Distribution</span>
+                  <span>{distributedCount}/{winners.length} distributed</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-[var(--color-border)]">
+                  <div
+                    className="h-1.5 rounded-full bg-[var(--color-success)] transition-all"
+                    style={{ width: `${(distributedCount / winners.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Winners table */}
             {(detailEvent.status === 'completed' || detailEvent.status === 'calculating') && (
@@ -1060,17 +1308,17 @@ export function EventsTab() {
                       </>
                     )}
 
-                    {/* Calculating: Re-calculate + Approve */}
+                    {/* Calculating: Re-calculate/Redraw + Approve */}
                     {event.status === 'calculating' && (
                       <>
                         <button
                           type="button"
-                          onClick={() => handleAction(event.id, 'calculate')}
+                          onClick={() => handleAction(event.id, 'calculate', { force: true })}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Recalculate"
+                          title={event.type === 'raffle' ? 'Redraw Winners' : 'Recalculate'}
                         >
-                          <Calculator size={12} />
+                          <RotateCcw size={12} />
                         </button>
                         <button
                           type="button"
@@ -1084,17 +1332,28 @@ export function EventsTab() {
                       </>
                     )}
 
-                    {/* Completed: Distribute (if undistributed) + Archive */}
+                    {/* Completed: Distribute + Archive */}
                     {event.status === 'completed' && (
-                      <button
-                        type="button"
-                        onClick={() => handleAction(event.id, 'archive')}
-                        disabled={!!actionLoading}
-                        className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                        title="Archive"
-                      >
-                        <Archive size={12} />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'distribute')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Distribute Prizes"
+                        >
+                          <Send size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(event.id, 'archive')}
+                          disabled={!!actionLoading}
+                          className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+                          title="Archive"
+                        >
+                          <Archive size={12} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

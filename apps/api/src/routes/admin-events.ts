@@ -38,12 +38,33 @@ adminEventsRouter.post('/', zValidator('json', CreateEventRequestSchema), async 
   return c.json({ data }, 201);
 });
 
-// PUT /admin/events/:id — Update event (draft only)
+// POST /admin/events/create-and-activate — Create event and immediately activate it
+adminEventsRouter.post('/create-and-activate', zValidator('json', CreateEventRequestSchema), async (c) => {
+  const body = c.req.valid('json');
+  const address = c.get('address');
+
+  // Validate: endsAt must be in the future
+  if (new Date(body.endsAt) < new Date()) {
+    throw new AppError('EVENT_EXPIRED', 'Cannot create active event: end date is in the past', 400);
+  }
+
+  const event = await eventsService.createEvent({ ...body, createdBy: address });
+  const activated = await eventsService.setStatus(event!.id, 'active');
+  if (!activated) throw new AppError('ACTIVATION_FAILED', 'Failed to activate event', 500);
+
+  wsService.broadcast({ type: 'event_started', data: { eventId: event!.id, title: event!.title, type: event!.type } });
+  logger.info({ eventId: event!.id, title: event!.title }, 'Event created and activated by admin');
+
+  const data = await eventsService.formatEventResponse(activated);
+  return c.json({ data }, 201);
+});
+
+// PUT /admin/events/:id — Update event (draft or active with restrictions)
 adminEventsRouter.put('/:id', zValidator('json', UpdateEventRequestSchema), async (c) => {
   const eventId = c.req.param('id');
   const body = c.req.valid('json');
   const event = await eventsService.updateEvent(eventId, body);
-  if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found or not in draft status', 404);
+  if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
   const data = await eventsService.formatEventResponse(event);
   return c.json({ data });
 });
@@ -90,8 +111,13 @@ adminEventsRouter.post('/:id/cancel', async (c) => {
 });
 
 // POST /admin/events/:id/calculate — Trigger calculation (for raffles)
-adminEventsRouter.post('/:id/calculate', async (c) => {
+const CalculateQuerySchema = z.object({
+  force: z.coerce.boolean().default(false),
+});
+
+adminEventsRouter.post('/:id/calculate', zValidator('query', CalculateQuerySchema), async (c) => {
   const eventId = c.req.param('id');
+  const { force } = c.req.valid('query');
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
@@ -106,9 +132,9 @@ adminEventsRouter.post('/:id/calculate', async (c) => {
 
   let results;
   if (event.type === 'contest') {
-    results = await eventsService.calculateContestResults(eventId);
+    results = await eventsService.calculateContestResults(eventId, force);
   } else {
-    const drawResult = await eventsService.drawRaffleWinners(eventId);
+    const drawResult = await eventsService.drawRaffleWinners(eventId, force);
     results = drawResult?.results;
   }
 
@@ -185,8 +211,8 @@ adminEventsRouter.post('/:id/archive', async (c) => {
   const eventId = c.req.param('id');
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
-  if (event.status !== 'completed') {
-    throw new AppError('INVALID_STATE', 'Event must be completed to archive', 400);
+  if (!['completed', 'calculating'].includes(event.status)) {
+    throw new AppError('INVALID_STATE', 'Event must be completed or calculating to archive', 400);
   }
 
   const updated = await eventsService.setStatus(eventId, 'archived');

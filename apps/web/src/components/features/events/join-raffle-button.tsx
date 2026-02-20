@@ -52,7 +52,7 @@ export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }:
   });
 
   if (!isConnected) return null;
-  if (eventStatus !== 'active') return null;
+  if (eventStatus !== 'active' && eventStatus !== 'draft') return null;
 
   // For auto-join contests, no button needed
   if (eventType === 'contest') return null;

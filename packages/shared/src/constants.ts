@@ -110,5 +110,11 @@ export const CONTEST_METRIC = {
 /** Leaderboard cache TTL (30 seconds) */
 export const LEADERBOARD_CACHE_TTL_MS = 30_000;
 
+/** Grace period before auto-archiving empty calculating events (5 minutes) */
+export const EMPTY_EVENT_ARCHIVE_GRACE_MS = 5 * 60 * 1000;
+
+/** Grace period before auto-approving calculating events with results (10 minutes) */
+export const EVENT_AUTO_APPROVE_GRACE_MS = 10 * 60 * 1000;
+
 // ---- API versions ----
 export const API_V1_PREFIX = '/api/v1';

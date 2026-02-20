@@ -328,6 +328,8 @@ export function useWebSocket({
             case 'event_started':
             case 'event_ended':
             case 'event_results_published':
+            case 'event_canceled':
+            case 'event_archived':
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
           }

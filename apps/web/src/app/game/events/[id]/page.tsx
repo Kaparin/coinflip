@@ -46,10 +46,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!event) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-12 text-center">
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('events.notFound')}</p>
-        <Link href="/game/events" className="mt-4 inline-block text-sm text-[var(--color-primary)] hover:underline">
-          {t('common.back')}
+      <div className="mx-auto max-w-2xl px-4 py-12 text-center space-y-3">
+        <p className="text-sm text-[var(--color-text-secondary)]">{t('events.notFoundOrCanceled')}</p>
+        <Link href="/game/events" className="inline-block text-sm text-[var(--color-primary)] hover:underline">
+          {t('events.backToEvents')}
         </Link>
       </div>
     );
@@ -59,6 +59,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const theme = getEventTheme(event.type);
   const TypeIcon = isContest ? Target : Trophy;
   const isActive = event.status === 'active';
+  const isUpcoming = event.status === 'draft' && new Date(event.startsAt) > new Date();
   const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const hasResults = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
@@ -73,7 +74,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Header card */}
       <div className={`relative overflow-hidden rounded-xl border border-[var(--color-border)] p-4 space-y-3 ${
-        isActive ? `${theme.bgGradient} ${theme.borderGlow}` : 'bg-[var(--color-surface)]'
+        isActive || isUpcoming ? `${theme.bgGradient} ${theme.borderGlow}` : 'bg-[var(--color-surface)]'
       }`}>
         {/* Decorative icon */}
         <TypeIcon
@@ -96,11 +97,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           {/* Status badge */}
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
             isActive ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' :
+            isUpcoming ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]' :
             event.status === 'completed' ? `${theme.badgeBg}` :
             event.status === 'calculating' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
             'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
           }`}>
-            {event.status}
+            {isUpcoming ? t('events.upcoming') : event.status}
           </span>
         </div>
 
@@ -119,6 +121,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <Users size={12} className={theme.iconColor} />
             <span>{event.participantCount} {t('events.participants')}</span>
           </div>
+          {isUpcoming && (
+            <div className="flex items-center gap-1">
+              <Clock size={12} className={theme.iconColor} />
+              <span className="text-[var(--color-text-secondary)]">{t('events.startsIn')}</span>
+              <EventTimer targetDate={event.startsAt} compact eventType={event.type} />
+            </div>
+          )}
           {isActive && (
             <div className="flex items-center gap-1">
               <Clock size={12} className={theme.iconColor} />
@@ -150,8 +159,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <PrizeDisplay prizes={prizes} eventType={event.type} />
       </section>
 
-      {/* Join button (raffle, active only) */}
-      {!isContest && isActive && (
+      {/* Join button (raffle, active or upcoming) */}
+      {!isContest && (isActive || isUpcoming) && (
         <JoinRaffleButton
           eventId={event.id}
           hasJoined={event.hasJoined}
@@ -181,7 +190,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Participants (raffles) */}
-      {!isContest && (isActive || isEnded) && (
+      {!isContest && (isActive || isUpcoming || isEnded) && (
         <section>
           <RaffleParticipants eventId={event.id} />
         </section>

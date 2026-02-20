@@ -5,7 +5,7 @@ import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
-import { LEADERBOARD_CACHE_TTL_MS } from '@coinflip/shared/constants';
+import { LEADERBOARD_CACHE_TTL_MS, EMPTY_EVENT_ARCHIVE_GRACE_MS, EVENT_AUTO_APPROVE_GRACE_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
 import crypto from 'node:crypto';
 
@@ -91,6 +91,27 @@ class EventsService {
 
   async updateEvent(eventId: string, params: UpdateEventParams) {
     const db = getDb();
+    const event = await this.getEventById(eventId);
+    if (!event) return null;
+
+    if (event.status === 'active') {
+      // Active events: limited editing only
+      if (params.startsAt) {
+        throw new AppError('CANNOT_CHANGE_START', 'Cannot change start date of an active event', 400);
+      }
+      if (params.config) {
+        throw new AppError('CANNOT_CHANGE_CONFIG', 'Cannot change config of an active event', 400);
+      }
+      if (params.endsAt && new Date(params.endsAt) < event.endsAt) {
+        throw new AppError('CANNOT_SHORTEN', 'Can only extend event duration, not shorten it', 400);
+      }
+      if (params.totalPrizePool && BigInt(params.totalPrizePool) < BigInt(event.totalPrizePool ?? '0')) {
+        throw new AppError('CANNOT_REDUCE_POOL', 'Can only increase prize pool, not reduce it', 400);
+      }
+    } else if (event.status !== 'draft') {
+      throw new AppError('INVALID_STATE', `Cannot edit event in ${event.status} status`, 400);
+    }
+
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (params.title !== undefined) updates.title = params.title;
     if (params.description !== undefined) updates.description = params.description;
@@ -100,12 +121,12 @@ class EventsService {
     if (params.prizes !== undefined) updates.prizes = params.prizes;
     if (params.totalPrizePool !== undefined) updates.totalPrizePool = params.totalPrizePool;
 
-    const [event] = await db
+    const [updated] = await db
       .update(events)
       .set(updates)
-      .where(and(eq(events.id, eventId), eq(events.status, 'draft')))
+      .where(eq(events.id, eventId))
       .returning();
-    return event ?? null;
+    return updated ?? null;
   }
 
   async deleteEvent(eventId: string) {
@@ -220,10 +241,11 @@ class EventsService {
   async joinEvent(eventId: string, userId: string) {
     const db = getDb();
 
-    // Check event exists and is active
+    // Check event exists and is active (or upcoming draft)
     const event = await this.getEventById(eventId);
     if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
-    if (event.status !== 'active') {
+    const isUpcomingDraft = event.status === 'draft' && event.startsAt > new Date();
+    if (event.status !== 'active' && !isUpcomingDraft) {
       throw new AppError('EVENT_NOT_ACTIVE', 'Event is not currently active', 400);
     }
 
@@ -450,12 +472,18 @@ class EventsService {
 
   // ─── Contest Finalization ──────────────────────────────
 
-  async calculateContestResults(eventId: string) {
+  async calculateContestResults(eventId: string, force = false) {
     const event = await this.getEventById(eventId);
     if (!event || event.type !== 'contest') return null;
 
+    // If force=true, clear old results before recalculating
+    if (force) {
+      await this.setStatus(eventId, 'calculating', { results: null });
+      logger.info({ eventId }, 'Force recalculate: cleared previous contest results');
+    }
+
     // Idempotent: if results already calculated, return them
-    if (event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
+    if (!force && event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
       logger.info({ eventId }, 'Contest results already calculated, returning existing');
       return event.results as Array<{ rank: number; userId: string; address: string; prizeAmount: string }>;
     }
@@ -512,15 +540,31 @@ class EventsService {
 
   // ─── Raffle Draw ───────────────────────────────────────
 
-  async drawRaffleWinners(eventId: string) {
+  async drawRaffleWinners(eventId: string, force = false) {
     const event = await this.getEventById(eventId);
     if (!event || event.type !== 'raffle') return null;
     if (event.status !== 'calculating') {
       throw new AppError('INVALID_STATE', 'Event must be in calculating state to draw', 400);
     }
 
+    // If force=true, reset previous draw results
+    if (force) {
+      const db = getDb();
+      await db
+        .update(eventParticipants)
+        .set({ status: 'joined', finalRank: null, prizeAmount: null })
+        .where(
+          and(
+            eq(eventParticipants.eventId, eventId),
+            inArray(eventParticipants.status, ['winner', 'not_selected']),
+          ),
+        );
+      await this.setStatus(eventId, 'calculating', { results: null, raffleSeed: null });
+      logger.info({ eventId }, 'Force redraw: cleared previous raffle results');
+    }
+
     // Idempotent: if raffle already drawn (seed exists), return existing results
-    if (event.raffleSeed && event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
+    if (!force && event.raffleSeed && event.results && Array.isArray(event.results) && (event.results as unknown[]).length > 0) {
       logger.info({ eventId }, 'Raffle already drawn, returning existing results');
       return {
         results: event.results as Array<{ rank: number; userId: string; prizeAmount: string }>,
@@ -540,7 +584,9 @@ class EventsService {
       );
 
     if (participants.length === 0) {
-      throw new AppError('NO_PARTICIPANTS', 'No participants in raffle', 400);
+      await this.setStatus(eventId, 'calculating', { results: [], raffleSeed: null });
+      logger.info({ eventId }, 'Raffle has 0 participants, marked as empty');
+      return { results: [], seed: null };
     }
 
     const prizes = event.prizes as PrizeEntry[];
@@ -709,7 +755,28 @@ class EventsService {
     const db = getDb();
     const now = new Date();
 
-    // 1. Auto-activate draft events whose startsAt has passed
+    // 0. Delete stale drafts — both startsAt and endsAt in the past (never activated, no participants)
+    const staleDrafts = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.status, 'draft'),
+          lt(events.startsAt, now),
+          lt(events.endsAt, now),
+        ),
+      );
+
+    for (const event of staleDrafts) {
+      try {
+        await db.delete(events).where(eq(events.id, event.id));
+        logger.info({ eventId: event.id, title: event.title }, 'Stale draft event deleted (both dates in the past)');
+      } catch (err) {
+        logger.error({ err, eventId: event.id }, 'Failed to delete stale draft event');
+      }
+    }
+
+    // 1. Auto-activate draft events whose startsAt has passed (but endsAt still in the future)
     const draftsToActivate = await db
       .select()
       .from(events)
@@ -717,17 +784,12 @@ class EventsService {
         and(
           eq(events.status, 'draft'),
           lte(events.startsAt, now),
+          gte(events.endsAt, now),
         ),
       );
 
     for (const event of draftsToActivate) {
       try {
-        // Don't auto-activate if endsAt is also in the past (stale event)
-        if (event.endsAt < now) {
-          logger.warn({ eventId: event.id, title: event.title }, 'Skipping auto-activate: event already expired');
-          continue;
-        }
-
         await this.setStatus(event.id, 'active');
         wsService.broadcast({
           type: 'event_started',
@@ -764,6 +826,46 @@ class EventsService {
         // Raffles wait for admin to trigger draw
       } catch (err) {
         logger.error({ err, eventId: event.id }, 'Event lifecycle transition failed');
+      }
+    }
+
+    // 3. Handle stuck calculating events — auto-archive empty, auto-approve with results
+    const calculatingEvents = await db
+      .select()
+      .from(events)
+      .where(eq(events.status, 'calculating'));
+
+    for (const event of calculatingEvents) {
+      try {
+        const msSinceEnd = now.getTime() - event.endsAt.getTime();
+        if (msSinceEnd < 0) continue; // endsAt still in the future (shouldn't happen but be safe)
+
+        const participantCount = await this.getParticipantCount(event.id);
+        const results = event.results as unknown[] | null;
+        const hasResults = Array.isArray(results) && results.length > 0;
+
+        // 3a. Empty events (0 participants, 5+ min past end) → auto-archive
+        if (participantCount === 0 && msSinceEnd >= EMPTY_EVENT_ARCHIVE_GRACE_MS) {
+          await this.setStatus(event.id, 'archived');
+          wsService.broadcast({
+            type: 'event_archived',
+            data: { eventId: event.id, title: event.title, type: event.type },
+          });
+          logger.info({ eventId: event.id, title: event.title }, 'Empty calculating event auto-archived');
+          continue;
+        }
+
+        // 3b. Events with results (10+ min past end) → auto-approve to completed
+        if (hasResults && msSinceEnd >= EVENT_AUTO_APPROVE_GRACE_MS) {
+          await this.setStatus(event.id, 'completed');
+          wsService.broadcast({
+            type: 'event_results_published',
+            data: { eventId: event.id, title: event.title, type: event.type },
+          });
+          logger.info({ eventId: event.id, title: event.title }, 'Calculating event auto-approved → completed');
+        }
+      } catch (err) {
+        logger.error({ err, eventId: event.id }, 'Failed to handle stuck calculating event');
       }
     }
   }

@@ -57,7 +57,9 @@ export type WsEventType =
   | 'balance_updated'
   | 'event_started'
   | 'event_ended'
-  | 'event_results_published';
+  | 'event_results_published'
+  | 'event_canceled'
+  | 'event_archived';
 
 export type WsEvent = {
   type: WsEventType;
