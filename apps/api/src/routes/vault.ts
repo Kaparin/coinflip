@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { DepositRequestSchema, WithdrawRequestSchema } from '@coinflip/shared/schemas';
 import { authMiddleware } from '../middleware/auth.js';
@@ -189,21 +190,12 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
 //   5. Server syncs balance and returns result
 //
 // This is ~3-5x faster than the old flow where everything went through Vercel proxy.
-vaultRouter.post('/deposit/broadcast', authMiddleware, async (c) => {
+const DepositBroadcastSchema = z.object({ tx_bytes: z.string().min(1).max(100_000) });
+vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', DepositBroadcastSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  let body: { tx_bytes?: string };
-  try {
-    body = await c.req.json();
-  } catch {
-    throw Errors.validationError('Invalid JSON body');
-  }
-
-  const txBytesBase64 = body.tx_bytes;
-  if (!txBytesBase64 || typeof txBytesBase64 !== 'string') {
-    throw Errors.validationError('tx_bytes (base64) is required');
-  }
+  const { tx_bytes: txBytesBase64 } = c.req.valid('json');
 
   // Pre-flight: verify user's CW20 wallet balance before broadcasting.
   // This prevents wasting gas on a tx that will fail due to insufficient balance.

@@ -645,8 +645,10 @@ class EventsService {
     const indices = participants.map((_, i) => i);
     const seedBuffer = Buffer.from(seed, 'hex');
     for (let i = indices.length - 1; i > 0; i--) {
-      // Derive deterministic random from seed + position
-      const hash = crypto.createHash('sha256').update(Buffer.concat([seedBuffer, Buffer.from([i])])).digest();
+      // Derive deterministic random from seed + 4-byte position (supports >256 participants)
+      const posBuf = Buffer.alloc(4);
+      posBuf.writeUInt32BE(i);
+      const hash = crypto.createHash('sha256').update(Buffer.concat([seedBuffer, posBuf])).digest();
       const j = hash.readUInt32BE(0) % (i + 1);
       [indices[i], indices[j]] = [indices[j]!, indices[i]!];
     }

@@ -77,9 +77,8 @@ export function validateProductionEnv(): void {
   if (missing.length > 0) {
     const msg = `\n⚠️  Missing critical environment variables:\n${missing.join('\n')}\n`;
     if (isProd) {
-      // Log prominently but don't crash — allow platform to inject vars at runtime
       console.error(msg);
-      console.error('WARNING: Running in production with missing env vars. Some features may not work correctly.\n');
+      throw new Error('FATAL: Cannot start in production with missing critical env vars. Fix the environment and restart.');
     } else {
       console.warn(msg + '(Running in dev mode — continuing with defaults)\n');
     }

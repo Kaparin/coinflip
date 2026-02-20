@@ -19,6 +19,7 @@ import { logger } from '../lib/logger.js';
 import { wsService } from './ws.service.js';
 import { eventService } from './event.service.js';
 import { referralService } from './referral.service.js';
+import { vaultService } from './vault.service.js';
 import type { Database } from '@coinflip/db';
 import type { WsEventType } from '@coinflip/shared/types';
 
@@ -360,7 +361,7 @@ export class IndexerService {
 
     try {
       const { bets, users } = await import('@coinflip/db/schema');
-      const { eq } = await import('drizzle-orm');
+      const { eq, and, inArray } = await import('drizzle-orm');
 
       switch (event.type) {
         case 'coinflip.create_bet':
@@ -420,7 +421,10 @@ export class IndexerService {
               acceptedHeight: BigInt(event.height),
               txhashAccept: event.txHash,
             })
-            .where(eq(bets.betId, BigInt(betId)));
+            .where(and(
+              eq(bets.betId, BigInt(betId)),
+              inArray(bets.status, ['open', 'accepting']),
+            ));
 
           logger.info({ betId, acceptorAddress, acceptorUserId, guess }, 'Bet accepted — DB synced');
           break;
@@ -444,6 +448,13 @@ export class IndexerService {
             }
           }
 
+          // Fetch bet BEFORE update to get maker/acceptor info for vault unlock
+          const betBeforeReveal = await this.db
+            .select({ makerUserId: bets.makerUserId, acceptorUserId: bets.acceptorUserId, amount: bets.amount, status: bets.status })
+            .from(bets)
+            .where(eq(bets.betId, BigInt(betId)))
+            .limit(1);
+
           await this.db
             .update(bets)
             .set({
@@ -455,7 +466,23 @@ export class IndexerService {
               ...(payoutAmount ? { payoutAmount } : {}),
               ...(winnerUserId ? { winnerUserId } : {}),
             })
-            .where(eq(bets.betId, BigInt(betId)));
+            .where(and(
+              eq(bets.betId, BigInt(betId)),
+              inArray(bets.status, ['accepted', 'accepting']),
+            ));
+
+          // Unlock vault funds for both maker and acceptor (chain contract handles actual payout)
+          if (betBeforeReveal.length > 0) {
+            const prev = betBeforeReveal[0]!;
+            if (['accepted', 'accepting'].includes(prev.status)) {
+              await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
+                logger.warn({ err, betId }, 'bet_revealed: unlockFunds maker failed'));
+              if (prev.acceptorUserId) {
+                await vaultService.unlockFunds(prev.acceptorUserId, prev.amount).catch(err =>
+                  logger.warn({ err, betId }, 'bet_revealed: unlockFunds acceptor failed'));
+              }
+            }
+          }
 
           // Distribute referral rewards (idempotent — safe if already called by background task)
           await this.distributeReferralRewardsForBet(BigInt(betId));
@@ -466,6 +493,13 @@ export class IndexerService {
 
         case 'coinflip.cancel_bet':
         case 'coinflip.bet_canceled': {
+          // Fetch bet BEFORE update to get maker/acceptor info for vault unlock
+          const betBeforeCancel = await this.db
+            .select({ makerUserId: bets.makerUserId, acceptorUserId: bets.acceptorUserId, amount: bets.amount, status: bets.status })
+            .from(bets)
+            .where(eq(bets.betId, BigInt(betId)))
+            .limit(1);
+
           await this.db
             .update(bets)
             .set({
@@ -474,7 +508,23 @@ export class IndexerService {
               resolvedHeight: BigInt(event.height),
               txhashResolve: event.txHash,
             })
-            .where(eq(bets.betId, BigInt(betId)));
+            .where(and(
+              eq(bets.betId, BigInt(betId)),
+              inArray(bets.status, ['open', 'canceling']),
+            ));
+
+          // Unlock vault funds for maker (and acceptor if exists)
+          if (betBeforeCancel.length > 0) {
+            const prev = betBeforeCancel[0]!;
+            if (['open', 'canceling'].includes(prev.status)) {
+              await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
+                logger.warn({ err, betId }, 'bet_canceled: unlockFunds maker failed'));
+              if (prev.acceptorUserId) {
+                await vaultService.unlockFunds(prev.acceptorUserId, prev.amount).catch(err =>
+                  logger.warn({ err, betId }, 'bet_canceled: unlockFunds acceptor failed'));
+              }
+            }
+          }
           break;
         }
 
@@ -493,6 +543,13 @@ export class IndexerService {
             }
           }
 
+          // Fetch bet BEFORE update to get maker/acceptor info for vault unlock
+          const betBeforeTimeout = await this.db
+            .select({ makerUserId: bets.makerUserId, acceptorUserId: bets.acceptorUserId, amount: bets.amount, status: bets.status })
+            .from(bets)
+            .where(eq(bets.betId, BigInt(betId)))
+            .limit(1);
+
           await this.db
             .update(bets)
             .set({
@@ -502,7 +559,23 @@ export class IndexerService {
               txhashResolve: event.txHash,
               ...(winnerUserId ? { winnerUserId } : {}),
             })
-            .where(eq(bets.betId, BigInt(betId)));
+            .where(and(
+              eq(bets.betId, BigInt(betId)),
+              inArray(bets.status, ['accepted']),
+            ));
+
+          // Unlock vault funds for both maker and acceptor (chain contract handles actual payout)
+          if (betBeforeTimeout.length > 0) {
+            const prev = betBeforeTimeout[0]!;
+            if (prev.status === 'accepted') {
+              await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
+                logger.warn({ err, betId }, 'timeout_claimed: unlockFunds maker failed'));
+              if (prev.acceptorUserId) {
+                await vaultService.unlockFunds(prev.acceptorUserId, prev.amount).catch(err =>
+                  logger.warn({ err, betId }, 'timeout_claimed: unlockFunds acceptor failed'));
+              }
+            }
+          }
 
           // Distribute referral rewards (idempotent — safe if already called by background task)
           await this.distributeReferralRewardsForBet(BigInt(betId));
@@ -576,6 +649,14 @@ export class IndexerService {
                   .update(bets)
                   .set({ status: 'canceled', resolvedTime: new Date() })
                   .where(eq(bets.betId, orphan.betId));
+
+                // Unlock vault funds for maker (and acceptor if exists)
+                await vaultService.unlockFunds(orphan.makerUserId, orphan.amount).catch(err =>
+                  logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds maker failed'));
+                if (orphan.acceptorUserId) {
+                  await vaultService.unlockFunds(orphan.acceptorUserId, orphan.amount).catch(err =>
+                    logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds acceptor failed'));
+                }
               }
             }
           }

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
+import { adminMiddleware } from '../middleware/admin.js';
 import { eventsService } from '../services/events.service.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
@@ -180,8 +181,8 @@ eventsRouter.get('/:id/my-status', authMiddleware, async (c) => {
   });
 });
 
-// GET /events/:id/debug — Diagnostic endpoint to debug leaderboard/participant count
-eventsRouter.get('/:id/debug', async (c) => {
+// GET /events/:id/debug — Diagnostic endpoint (admin only)
+eventsRouter.get('/:id/debug', adminMiddleware, async (c) => {
   const eventId = c.req.param('id');
   const event = await eventsService.getEventById(eventId);
   if (!event) return c.json({ error: 'Event not found' }, 404);

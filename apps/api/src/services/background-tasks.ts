@@ -759,6 +759,13 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
     if (dbUpdated && currentBet && (currentBet.status === 'open' || currentBet.status === 'accepting' || currentBet.status === 'accepted')) {
       try {
         if (dbStatus === 'canceled') {
+          // Canceled — unlock maker (and acceptor if exists)
+          await vaultService.unlockFunds(currentBet.makerUserId, currentBet.amount);
+          if (currentBet.acceptorUserId) {
+            await vaultService.unlockFunds(currentBet.acceptorUserId, currentBet.amount);
+          }
+        } else if (dbStatus === 'revealed' || dbStatus === 'timeout_claimed') {
+          // Resolved — unlock both maker and acceptor (chain contract handles actual payout)
           await vaultService.unlockFunds(currentBet.makerUserId, currentBet.amount);
           if (currentBet.acceptorUserId) {
             await vaultService.unlockFunds(currentBet.acceptorUserId, currentBet.amount);

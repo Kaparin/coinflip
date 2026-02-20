@@ -519,7 +519,7 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
 // Returns 202 IMMEDIATELY after tx enters mempool (~2s).
 // Bet status transitions: open → accepting → accepted (or reverts to open on failure).
 // Frontend is notified via WebSocket: bet_accepted or accept_failed.
-betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
+betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = parseBetId(c.req.param('betId'));
@@ -704,7 +704,7 @@ betsRouter.post('/:betId/accept', authMiddleware, async (c) => {
 });
 
 // POST /api/v1/bets/:betId/reveal — Reveal (auth required)
-betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealRequestSchema), async (c) => {
+betsRouter.post('/:betId/reveal', authMiddleware, walletTxRateLimit, zValidator('json', RevealRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = parseBetId(c.req.param('betId'));
@@ -774,7 +774,7 @@ betsRouter.post('/:betId/reveal', authMiddleware, zValidator('json', RevealReque
 // POST /api/v1/bets/:betId/cancel — Cancel (auth required)
 // ASYNC: marks bet as "canceling" in DB, broadcasts via WS, submits chain tx,
 // and returns 202 IMMEDIATELY. Confirmation happens in background.
-betsRouter.post('/:betId/cancel', authMiddleware, async (c) => {
+betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = parseBetId(c.req.param('betId'));
@@ -858,7 +858,7 @@ betsRouter.post('/:betId/cancel', authMiddleware, async (c) => {
 });
 
 // POST /api/v1/bets/:betId/claim-timeout — Claim timeout (auth required)
-betsRouter.post('/:betId/claim-timeout', authMiddleware, async (c) => {
+betsRouter.post('/:betId/claim-timeout', authMiddleware, walletTxRateLimit, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = parseBetId(c.req.param('betId'));
