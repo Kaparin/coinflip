@@ -3,7 +3,7 @@ import { events, eventParticipants, bets, users } from '@coinflip/db/schema';
 import { eq, and, sql, inArray, desc, asc, lt, lte, gte, or, count as countFn } from 'drizzle-orm';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { vaultService } from './vault.service.js';
+import { treasuryService } from './treasury.service.js';
 import { wsService } from './ws.service.js';
 import { LEADERBOARD_CACHE_TTL_MS, EMPTY_EVENT_ARCHIVE_GRACE_MS, EVENT_AUTO_APPROVE_GRACE_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
@@ -732,9 +732,13 @@ class EventsService {
     if (winner.prizeTxHash) throw new AppError('ALREADY_DISTRIBUTED', 'Prize already distributed', 400);
     if (!winner.prizeAmount) throw new AppError('NO_PRIZE', 'No prize amount set', 400);
 
-    await vaultService.creditWinner(userId, winner.prizeAmount);
-    await this.markPrizeDistributed(eventId, userId, 'vault_credit');
-    logger.info({ eventId, userId, amount: winner.prizeAmount }, 'Prize distributed via vault credit');
+    // Send real CW20 tokens from treasury to winner's wallet
+    const result = await treasuryService.sendPrize(winner.address, winner.prizeAmount);
+    await this.markPrizeDistributed(eventId, userId, result.txHash);
+    logger.info(
+      { eventId, userId, address: winner.address, amount: winner.prizeAmount, txHash: result.txHash },
+      'Prize distributed via CW20 transfer',
+    );
   }
 
   async distributeAllPrizes(eventId: string): Promise<{ distributed: number; failed: number }> {

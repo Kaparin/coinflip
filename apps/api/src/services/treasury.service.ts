@@ -154,6 +154,81 @@ export class TreasuryService {
 
     return { txHash: result.txHash!, amount };
   }
+
+  /**
+   * Send LAUNCH tokens from treasury wallet to a recipient address.
+   * Uses CW20 transfer. If the treasury wallet doesn't have enough,
+   * automatically withdraws from the vault first.
+   *
+   * Flow:
+   *  1. Check treasury CW20 wallet balance
+   *  2. If insufficient, withdraw the deficit from vault to wallet
+   *  3. Execute CW20 transfer from treasury to recipient
+   */
+  async sendPrize(
+    recipientAddress: string,
+    amount: string,
+  ): Promise<{ txHash: string; amount: string; withdrawTxHash?: string }> {
+    if (!relayerService.isReady()) {
+      throw Errors.relayerNotReady();
+    }
+
+    const amountBig = BigInt(amount);
+    let withdrawTxHash: string | undefined;
+
+    // Step 1: Check wallet balance, auto-withdraw from vault if needed
+    const balance = await this.getBalance();
+    const walletBig = BigInt(balance.walletBalance);
+
+    if (walletBig < amountBig) {
+      const deficit = amountBig - walletBig;
+      // Need to withdraw at least the deficit from vault
+      const vaultBig = BigInt(balance.vaultAvailable);
+      if (vaultBig + walletBig < amountBig) {
+        throw Errors.insufficientBalance(
+          amount,
+          (vaultBig + walletBig).toString(),
+        );
+      }
+
+      logger.info(
+        { deficit: deficit.toString(), vaultAvailable: balance.vaultAvailable },
+        'Treasury wallet insufficient for prize, withdrawing from vault',
+      );
+
+      const withdrawResult = await this.withdrawFromVault(deficit.toString());
+      withdrawTxHash = withdrawResult.txHash;
+    }
+
+    // Step 2: CW20 transfer from treasury to recipient
+    // Treasury IS relayer, so relayCw20Transfer(treasury, cw20, recipient, amount)
+    // uses MsgExec where grantee == sender, which works as a direct execution.
+    const result = await relayerService.relayCw20Transfer(
+      env.TREASURY_ADDRESS,
+      env.LAUNCH_CW20_ADDR,
+      recipientAddress,
+      amount,
+      'CoinFlip event prize',
+    );
+
+    if (!result.success) {
+      logger.error({ result, recipientAddress, amount }, 'Prize CW20 transfer failed');
+      if (result.timeout) {
+        throw Errors.chainTimeout(result.txHash);
+      }
+      throw Errors.chainTxFailed(
+        result.txHash ?? '',
+        result.rawLog ?? result.error,
+      );
+    }
+
+    logger.info(
+      { txHash: result.txHash, recipientAddress, amount, withdrawTxHash },
+      'Prize sent to recipient wallet',
+    );
+
+    return { txHash: result.txHash!, amount, withdrawTxHash };
+  }
 }
 
 export const treasuryService = new TreasuryService();
