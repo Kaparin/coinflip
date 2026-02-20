@@ -6,23 +6,29 @@ import { logger } from '../lib/logger.js';
 export class VaultService {
   private db = getDb();
 
+  /**
+   * Get user's balance from DB.
+   * Returns chain-synced available/locked + off-chain bonus separately.
+   */
   async getBalance(userId: string) {
     const balance = await this.db.query.vaultBalances.findFirst({
       where: eq(vaultBalances.userId, userId),
     });
 
     if (!balance) {
-      return { available: '0', locked: '0', total: '0' };
+      return { available: '0', locked: '0', total: '0', bonus: '0' };
     }
 
     const available = BigInt(balance.available);
     const locked = BigInt(balance.locked);
-    const total = available + locked;
+    const bonus = BigInt(balance.bonus);
+    const total = available + locked + bonus;
 
     return {
       available: available.toString(),
       locked: locked.toString(),
       total: total.toString(),
+      bonus: bonus.toString(),
     };
   }
 
@@ -39,6 +45,7 @@ export class VaultService {
         set: {
           available,
           locked,
+          // NOTE: bonus is NOT touched — it persists across chain syncs
           ...(isLiveQuery ? {} : { sourceHeight: height }),
           updatedAt: new Date(),
         },
@@ -53,7 +60,8 @@ export class VaultService {
 
   /**
    * Atomically lock funds: available -= amount, locked += amount.
-   * Uses WHERE available >= amount to prevent negative balances (double-spend).
+   * Only deducts from on-chain available balance (NOT bonus).
+   * Bonus is off-chain and cannot be used for on-chain operations.
    * Returns the updated row, or null if insufficient balance.
    */
   async lockFunds(userId: string, amount: string) {
@@ -109,14 +117,29 @@ export class VaultService {
     return result[0];
   }
 
+  /**
+   * Credit prize to user's bonus balance. This is separate from on-chain
+   * available and is NOT overwritten by syncBalanceFromChain.
+   * Bonus is an off-chain prize credit displayed alongside chain balance.
+   * If the user has no vault_balances row, one is created.
+   */
   async creditWinner(userId: string, amount: string) {
-    await this.db
-      .update(vaultBalances)
-      .set({
-        available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
-        updatedAt: new Date(),
+    const result = await this.db
+      .insert(vaultBalances)
+      .values({ userId, bonus: amount })
+      .onConflictDoUpdate({
+        target: vaultBalances.userId,
+        set: {
+          bonus: sql`${vaultBalances.bonus}::numeric + ${amount}::numeric`,
+          updatedAt: new Date(),
+        },
       })
-      .where(eq(vaultBalances.userId, userId));
+      .returning();
+
+    logger.info(
+      { userId, amount, newBonus: result[0]?.bonus },
+      'Prize credited to bonus balance',
+    );
   }
 }
 

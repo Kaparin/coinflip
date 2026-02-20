@@ -224,7 +224,7 @@ class EventsService {
   /** Count distinct players who placed bets during the event time range (for autoJoin contests) */
   async getAutoJoinPlayerCount(event: { startsAt: Date; endsAt: Date }): Promise<number> {
     const db = getDb();
-    const [row] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT COUNT(DISTINCT user_id)::int AS count FROM (
         SELECT maker_user_id AS user_id FROM bets
         WHERE created_time >= ${event.startsAt}
@@ -235,8 +235,11 @@ class EventsService {
           AND accepted_time <= ${event.endsAt}
           AND acceptor_user_id IS NOT NULL
       ) AS players
-    `) as unknown as [{ count: number }];
-    return Number(row?.count ?? 0);
+    `);
+    const rows = result as unknown as Array<{ count: number }>;
+    const count = Number(rows[0]?.count ?? 0);
+    logger.debug({ startsAt: event.startsAt, endsAt: event.endsAt, count, rawRows: rows.length }, 'getAutoJoinPlayerCount');
+    return count;
   }
 
   // ─── Participation ─────────────────────────────────────
@@ -923,8 +926,16 @@ class EventsService {
       participantCount = isAutoJoinContest
         ? await this.getAutoJoinPlayerCount(event)
         : await this.getParticipantCount(event.id);
+      logger.debug({ eventId: event.id, participantCount, isAutoJoinContest }, 'participantCount resolved');
     } catch (err) {
-      logger.error({ err, eventId: event.id, isAutoJoinContest }, 'participantCount query failed');
+      logger.error({
+        err,
+        eventId: event.id,
+        isAutoJoinContest,
+        startsAt: event.startsAt?.toISOString?.() ?? String(event.startsAt),
+        endsAt: event.endsAt?.toISOString?.() ?? String(event.endsAt),
+        errMessage: err instanceof Error ? err.message : String(err),
+      }, 'participantCount query failed');
     }
 
     let hasJoined: boolean | undefined;

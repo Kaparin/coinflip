@@ -5,6 +5,8 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { eventsService } from '../services/events.service.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
+import { getDb } from '../lib/db.js';
+import { sql } from 'drizzle-orm';
 import type { AppEnv } from '../types.js';
 
 export const eventsRouter = new Hono<AppEnv>();
@@ -176,4 +178,76 @@ eventsRouter.get('/:id/my-status', authMiddleware, async (c) => {
       myRank,
     },
   });
+});
+
+// GET /events/:id/debug — Diagnostic endpoint to debug leaderboard/participant count
+eventsRouter.get('/:id/debug', async (c) => {
+  const eventId = c.req.param('id');
+  const event = await eventsService.getEventById(eventId);
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+
+  const config = event.config as Record<string, unknown>;
+  const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
+  const db = getDb();
+
+  const diagnostics: Record<string, unknown> = {
+    eventId,
+    type: event.type,
+    status: event.status,
+    startsAt: event.startsAt?.toISOString?.() ?? String(event.startsAt),
+    endsAt: event.endsAt?.toISOString?.() ?? String(event.endsAt),
+    config,
+    isAutoJoinContest,
+    startsAtType: typeof event.startsAt,
+    endsAtType: typeof event.endsAt,
+    startsAtIsDate: event.startsAt instanceof Date,
+    endsAtIsDate: event.endsAt instanceof Date,
+  };
+
+  // Raw SQL to count bets in the time range
+  try {
+    const betCount = await db.execute(sql`
+      SELECT COUNT(*)::int AS total,
+             COUNT(CASE WHEN status IN ('revealed', 'timeout_claimed') THEN 1 END)::int AS resolved,
+             MIN(created_time) AS first_bet,
+             MAX(created_time) AS last_bet
+      FROM bets
+      WHERE created_time >= ${event.startsAt}
+        AND created_time <= ${event.endsAt}
+    `);
+    diagnostics.betsInRange = (betCount as unknown as unknown[])[0];
+  } catch (err) {
+    diagnostics.betsInRangeError = err instanceof Error ? err.message : String(err);
+  }
+
+  // Player count via getAutoJoinPlayerCount
+  try {
+    diagnostics.autoJoinPlayerCount = await eventsService.getAutoJoinPlayerCount(event);
+  } catch (err) {
+    diagnostics.autoJoinPlayerCountError = err instanceof Error ? err.message : String(err);
+  }
+
+  // Participant count via getParticipantCount (event_participants table)
+  try {
+    diagnostics.eventParticipantCount = await eventsService.getParticipantCount(eventId);
+  } catch (err) {
+    diagnostics.eventParticipantCountError = err instanceof Error ? err.message : String(err);
+  }
+
+  // Leaderboard
+  try {
+    const lb = await eventsService.getContestLeaderboard(eventId, 10, 0);
+    diagnostics.leaderboard = lb;
+  } catch (err) {
+    diagnostics.leaderboardError = err instanceof Error ? err.message : String(err);
+  }
+
+  // formatEventResponse
+  try {
+    diagnostics.formattedResponse = await eventsService.formatEventResponse(event);
+  } catch (err) {
+    diagnostics.formatError = err instanceof Error ? err.message : String(err);
+  }
+
+  return c.json({ data: diagnostics });
 });
