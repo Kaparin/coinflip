@@ -916,9 +916,14 @@ class EventsService {
         ? await this.hasUserPlayedDuringEvent(event, userId)
         : await this.hasUserJoined(event.id, userId)
       : undefined;
-    const myRank = userId && event.type === 'contest' && event.status === 'active'
-      ? await this.getUserRank(event.id, userId)
-      : null;
+    let myRank: number | null = null;
+    if (userId && event.type === 'contest' && event.status === 'active') {
+      try {
+        myRank = await this.getUserRank(event.id, userId);
+      } catch (err) {
+        logger.error({ err, eventId: event.id, userId }, 'getUserRank failed, returning null');
+      }
+    }
 
     return {
       id: event.id,
