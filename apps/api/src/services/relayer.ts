@@ -81,6 +81,8 @@ export class RelayerService {
   private treasuryAddress: string;
   private chainId: string;
   private initialized = false;
+  /** Whether the treasury has an active feegrant to the relayer (checked at init) */
+  private feeGrantActive = false;
 
   /** Promise-chain mutex: serializes the entire sign+broadcast+retry cycle */
   private _broadcastQueue: Promise<void> = Promise.resolve();
@@ -137,12 +139,36 @@ export class RelayerService {
       // Initialize sequence manager (fetches fresh sequence from chain)
       await this.sequenceManager.init();
 
+      // Check if treasury has an active feegrant to the relayer.
+      // Only use granter in fees if feegrant is confirmed — otherwise relayer pays its own gas.
+      if (this.treasuryAddress) {
+        try {
+          const feeUrl = `${env.AXIOME_REST_URL}/cosmos/feegrant/v1beta1/allowance/${this.treasuryAddress}/${this.relayerAddress}`;
+          const feeRes = await fetch(feeUrl, { signal: AbortSignal.timeout(5000) });
+          if (feeRes.ok) {
+            this.feeGrantActive = true;
+            logger.info(
+              { treasury: this.treasuryAddress, relayer: this.relayerAddress },
+              'Treasury feegrant to relayer is active — treasury pays gas',
+            );
+          } else {
+            logger.warn(
+              { treasury: this.treasuryAddress, relayer: this.relayerAddress },
+              'Treasury feegrant NOT found — relayer will pay its own gas',
+            );
+          }
+        } catch (err) {
+          logger.warn({ err }, 'Failed to check treasury feegrant — relayer will pay its own gas');
+        }
+      }
+
       this.initialized = true;
       logger.info(
         {
           relayer: this.relayerAddress,
           contract: this.contractAddress,
           chainId: this.chainId,
+          feeGrantActive: this.feeGrantActive,
         },
         'Relayer service initialized',
       );
@@ -206,7 +232,7 @@ export class RelayerService {
     const fee: StdFee = {
       amount: [{ denom: FEE_DENOM, amount: '12500' }],
       gas: String(DEFAULT_EXEC_GAS_LIMIT),
-      ...(this.treasuryAddress ? { granter: this.treasuryAddress } : {}),
+      ...(this.feeGrantActive && this.treasuryAddress ? { granter: this.treasuryAddress } : {}),
     };
     return { msgAny, fee };
   }
