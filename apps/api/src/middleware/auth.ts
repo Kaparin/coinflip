@@ -84,6 +84,10 @@ export async function authMiddleware(c: Context, next: Next) {
  * Use for public endpoints that optionally personalize responses (e.g. hasJoined).
  */
 export async function optionalAuthMiddleware(c: Context, next: Next) {
-  await resolveUser(c);
+  try {
+    await resolveUser(c);
+  } catch {
+    // Swallow auth errors — this middleware is optional, request continues unauthenticated
+  }
   await next();
 }

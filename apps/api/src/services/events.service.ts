@@ -221,6 +221,24 @@ class EventsService {
     return Number(row?.count ?? 0);
   }
 
+  /** Count distinct players who placed bets during the event time range (for autoJoin contests) */
+  async getAutoJoinPlayerCount(event: { startsAt: Date; endsAt: Date }): Promise<number> {
+    const db = getDb();
+    const [row] = await db.execute(sql`
+      SELECT COUNT(DISTINCT user_id)::int AS count FROM (
+        SELECT maker_user_id AS user_id FROM bets
+        WHERE created_time >= ${event.startsAt}
+          AND created_time <= ${event.endsAt}
+        UNION
+        SELECT acceptor_user_id AS user_id FROM bets
+        WHERE accepted_time >= ${event.startsAt}
+          AND accepted_time <= ${event.endsAt}
+          AND acceptor_user_id IS NOT NULL
+      ) AS players
+    `) as unknown as [{ count: number }];
+    return Number(row?.count ?? 0);
+  }
+
   // ─── Participation ─────────────────────────────────────
 
   async hasUserJoined(eventId: string, userId: string): Promise<boolean> {
@@ -236,6 +254,18 @@ class EventsService {
       )
       .limit(1);
     return !!row;
+  }
+
+  /** Check if user placed any bets during an event's time range (for autoJoin contests) */
+  async hasUserPlayedDuringEvent(event: { startsAt: Date; endsAt: Date }, userId: string): Promise<boolean> {
+    const db = getDb();
+    const [row] = await db.execute(sql`
+      SELECT 1 AS ok FROM bets
+      WHERE (maker_user_id = ${userId} AND created_time >= ${event.startsAt} AND created_time <= ${event.endsAt})
+         OR (acceptor_user_id = ${userId} AND accepted_time >= ${event.startsAt} AND accepted_time <= ${event.endsAt})
+      LIMIT 1
+    `) as unknown as [{ ok: number } | undefined];
+    return !!row?.ok;
   }
 
   async joinEvent(eventId: string, userId: string) {
@@ -873,8 +903,19 @@ class EventsService {
   // ─── Format for API Response ──────────────────────────
 
   async formatEventResponse(event: typeof events.$inferSelect, userId?: string) {
-    const participantCount = await this.getParticipantCount(event.id);
-    const hasJoined = userId ? await this.hasUserJoined(event.id, userId) : undefined;
+    const config = event.config as Record<string, unknown>;
+    const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
+
+    // For autoJoin contests, count unique players from bets table (they aren't in event_participants)
+    const participantCount = isAutoJoinContest
+      ? await this.getAutoJoinPlayerCount(event)
+      : await this.getParticipantCount(event.id);
+
+    const hasJoined = userId
+      ? isAutoJoinContest
+        ? await this.hasUserPlayedDuringEvent(event, userId)
+        : await this.hasUserJoined(event.id, userId)
+      : undefined;
     const myRank = userId && event.type === 'contest' && event.status === 'active'
       ? await this.getUserRank(event.id, userId)
       : null;

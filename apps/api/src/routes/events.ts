@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { eventsService } from '../services/events.service.js';
 import { AppError } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 import type { AppEnv } from '../types.js';
 
 export const eventsRouter = new Hono<AppEnv>();
@@ -19,7 +20,15 @@ function tryGetUserId(c: { get: (key: string) => unknown }): string | undefined 
 eventsRouter.get('/active', optionalAuthMiddleware, async (c) => {
   const userId = tryGetUserId(c);
   const activeEvents = await eventsService.getPublicActiveEvents();
-  const data = await Promise.all(activeEvents.map((e) => eventsService.formatEventResponse(e, userId)));
+  // Format each event independently — one failing event shouldn't break the entire list
+  const data: unknown[] = [];
+  for (const e of activeEvents) {
+    try {
+      data.push(await eventsService.formatEventResponse(e, userId));
+    } catch (err) {
+      logger.error({ err, eventId: e.id }, 'Failed to format event response, skipping');
+    }
+  }
   return c.json({ data });
 });
 
@@ -33,7 +42,14 @@ eventsRouter.get('/completed', optionalAuthMiddleware, zValidator('query', Compl
   const userId = tryGetUserId(c);
   const { limit, offset } = c.req.valid('query');
   const completedEvents = await eventsService.getCompletedEvents(limit, offset);
-  const data = await Promise.all(completedEvents.map((e) => eventsService.formatEventResponse(e, userId)));
+  const data: unknown[] = [];
+  for (const e of completedEvents) {
+    try {
+      data.push(await eventsService.formatEventResponse(e, userId));
+    } catch (err) {
+      logger.error({ err, eventId: e.id }, 'Failed to format event response, skipping');
+    }
+  }
   return c.json({ data });
 });
 
