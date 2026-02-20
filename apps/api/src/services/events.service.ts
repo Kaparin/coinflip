@@ -906,16 +906,26 @@ class EventsService {
     const config = event.config as Record<string, unknown>;
     const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
 
-    // For autoJoin contests, count unique players from bets table (they aren't in event_participants)
-    const participantCount = isAutoJoinContest
-      ? await this.getAutoJoinPlayerCount(event)
-      : await this.getParticipantCount(event.id);
+    let participantCount = 0;
+    try {
+      participantCount = isAutoJoinContest
+        ? await this.getAutoJoinPlayerCount(event)
+        : await this.getParticipantCount(event.id);
+    } catch (err) {
+      logger.error({ err, eventId: event.id, isAutoJoinContest }, 'participantCount query failed');
+    }
 
-    const hasJoined = userId
-      ? isAutoJoinContest
-        ? await this.hasUserPlayedDuringEvent(event, userId)
-        : await this.hasUserJoined(event.id, userId)
-      : undefined;
+    let hasJoined: boolean | undefined;
+    if (userId) {
+      try {
+        hasJoined = isAutoJoinContest
+          ? await this.hasUserPlayedDuringEvent(event, userId)
+          : await this.hasUserJoined(event.id, userId);
+      } catch (err) {
+        logger.error({ err, eventId: event.id, userId }, 'hasJoined query failed');
+      }
+    }
+
     let myRank: number | null = null;
     if (userId && event.type === 'contest' && event.status === 'active') {
       try {
@@ -925,23 +935,28 @@ class EventsService {
       }
     }
 
+    // Safely serialize dates — Drizzle may return strings or Date objects depending on adapter
+    const startsAt = event.startsAt instanceof Date ? event.startsAt.toISOString() : String(event.startsAt);
+    const endsAt = event.endsAt instanceof Date ? event.endsAt.toISOString() : String(event.endsAt);
+    const createdAt = event.createdAt instanceof Date ? event.createdAt.toISOString() : String(event.createdAt);
+
     return {
       id: event.id,
       type: event.type,
       title: event.title,
       description: event.description,
       status: event.status,
-      startsAt: event.startsAt.toISOString(),
-      endsAt: event.endsAt.toISOString(),
+      startsAt,
+      endsAt,
       config: event.config as Record<string, unknown>,
-      prizes: event.prizes as PrizeEntry[],
+      prizes: (event.prizes ?? []) as PrizeEntry[],
       totalPrizePool: event.totalPrizePool ?? '0',
-      results: event.results as Record<string, unknown> | null,
-      raffleSeed: event.raffleSeed,
+      results: (event.results as Record<string, unknown> | null) ?? null,
+      raffleSeed: event.raffleSeed ?? null,
       participantCount,
       hasJoined,
       myRank,
-      createdAt: event.createdAt.toISOString(),
+      createdAt,
     };
   }
 }
