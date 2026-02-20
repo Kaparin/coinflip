@@ -77,8 +77,13 @@ const LeaderboardQuerySchema = z.object({
 eventsRouter.get('/:id/leaderboard', zValidator('query', LeaderboardQuerySchema), async (c) => {
   const eventId = c.req.param('id');
   const { limit, offset } = c.req.valid('query');
-  const { data, total } = await eventsService.getContestLeaderboard(eventId, limit, offset);
-  return c.json({ data, total });
+  try {
+    const { data, total } = await eventsService.getContestLeaderboard(eventId, limit, offset);
+    return c.json({ data, total });
+  } catch (err) {
+    logger.error({ err, eventId }, 'Leaderboard query failed');
+    return c.json({ data: [], total: 0 });
+  }
 });
 
 // GET /events/:id/participants — Raffle participants
@@ -90,8 +95,13 @@ const ParticipantsQuerySchema = z.object({
 eventsRouter.get('/:id/participants', zValidator('query', ParticipantsQuerySchema), async (c) => {
   const eventId = c.req.param('id');
   const { limit, offset } = c.req.valid('query');
-  const data = await eventsService.getParticipants(eventId, limit, offset);
-  return c.json({ data });
+  try {
+    const data = await eventsService.getParticipants(eventId, limit, offset);
+    return c.json({ data });
+  } catch (err) {
+    logger.error({ err, eventId }, 'Participants query failed');
+    return c.json({ data: [] });
+  }
 });
 
 // GET /events/:id/results — Final results
@@ -100,14 +110,25 @@ eventsRouter.get('/:id/results', async (c) => {
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
-  const winners = await eventsService.getWinnersForDistribution(eventId);
-  return c.json({
-    data: {
-      results: event.results,
-      raffleSeed: event.raffleSeed,
-      winners,
-    },
-  });
+  try {
+    const winners = await eventsService.getWinnersForDistribution(eventId);
+    return c.json({
+      data: {
+        results: event.results,
+        raffleSeed: event.raffleSeed,
+        winners,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, eventId }, 'Results query failed');
+    return c.json({
+      data: {
+        results: event.results,
+        raffleSeed: event.raffleSeed,
+        winners: [],
+      },
+    });
+  }
 });
 
 // ---- Auth-required endpoints ----
@@ -128,10 +149,26 @@ eventsRouter.get('/:id/my-status', authMiddleware, async (c) => {
   const event = await eventsService.getEventById(eventId);
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
-  const hasJoined = await eventsService.hasUserJoined(eventId, user.id);
-  const myRank = event.type === 'contest'
-    ? await eventsService.getUserRank(eventId, user.id)
-    : null;
+  let hasJoined = false;
+  let myRank: number | null = null;
+
+  try {
+    const config = event.config as Record<string, unknown>;
+    const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
+    hasJoined = isAutoJoinContest
+      ? await eventsService.hasUserPlayedDuringEvent(event, user.id)
+      : await eventsService.hasUserJoined(eventId, user.id);
+  } catch (err) {
+    logger.error({ err, eventId, userId: user.id }, 'hasJoined check failed in my-status');
+  }
+
+  try {
+    myRank = event.type === 'contest'
+      ? await eventsService.getUserRank(eventId, user.id)
+      : null;
+  } catch (err) {
+    logger.error({ err, eventId, userId: user.id }, 'getUserRank failed in my-status');
+  }
 
   return c.json({
     data: {

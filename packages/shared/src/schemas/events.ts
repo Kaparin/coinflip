@@ -85,7 +85,7 @@ export const EventResponseSchema = z
     config: z.record(z.unknown()),
     prizes: z.array(PrizeEntrySchema),
     totalPrizePool: z.string(),
-    results: z.record(z.unknown()).nullable(),
+    results: z.union([z.array(z.record(z.unknown())), z.record(z.unknown())]).nullable(),
     raffleSeed: z.string().nullable(),
     participantCount: z.number().int(),
     hasJoined: z.boolean().optional(),
@@ -104,6 +104,7 @@ export const EventLeaderboardEntrySchema = z
     wins: z.number().int(),
     profit: z.string(),
     games: z.number().int(),
+    metric: ContestMetricSchema,
     prizeAmount: z.string().nullable(),
   })
   .openapi({ ref: 'EventLeaderboardEntry' });

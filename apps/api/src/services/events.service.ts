@@ -358,7 +358,7 @@ class EventsService {
     }
 
     const config = event.config as ContestConfig;
-    const metric = config.metric;
+    const metric = config.metric ?? 'turnover';
     const startsAt = event.startsAt;
     const endsAt = event.endsAt;
 
@@ -381,69 +381,77 @@ class EventsService {
       ? sql`b.amount::numeric >= ${config.minBetAmount}::numeric`
       : sql`TRUE`;
 
-    const rows = await db.execute(sql`
-      WITH player_bets AS (
-        SELECT b.maker_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
-               COALESCE(b.payout_amount, '0')::numeric AS payout
-        FROM bets b
-        WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${startsAt}
-          AND b.resolved_time <= ${endsAt}
-          AND ${minBetFilter}
-        UNION ALL
-        SELECT b.acceptor_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
-               COALESCE(b.payout_amount, '0')::numeric AS payout
-        FROM bets b
-        WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${startsAt}
-          AND b.resolved_time <= ${endsAt}
-          AND b.acceptor_user_id IS NOT NULL
-          AND ${minBetFilter}
-      )
-      SELECT pb.user_id, u.address, u.profile_nickname AS nickname,
-             SUM(pb.amount)::text AS turnover,
-             SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END)::int AS wins,
-             (SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount))::text AS profit,
-             COUNT(*)::int AS games,
-             ROW_NUMBER() OVER (ORDER BY ${metricOrderSql}) AS rank
-      FROM player_bets pb
-      JOIN users u ON u.id = pb.user_id
-      WHERE ${participantFilter}
-      GROUP BY pb.user_id, u.address, u.profile_nickname
-      ORDER BY ${metricOrderSql}
-      LIMIT ${limit} OFFSET ${offset}
-    `);
+    try {
+      const rows = await db.execute(sql`
+        WITH player_bets AS (
+          SELECT b.maker_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
+                 COALESCE(b.payout_amount, '0')::numeric AS payout
+          FROM bets b
+          WHERE b.status IN ('revealed', 'timeout_claimed')
+            AND b.resolved_time >= ${startsAt}
+            AND b.resolved_time <= ${endsAt}
+            AND ${minBetFilter}
+          UNION ALL
+          SELECT b.acceptor_user_id AS user_id, b.amount::numeric AS amount, b.winner_user_id,
+                 COALESCE(b.payout_amount, '0')::numeric AS payout
+          FROM bets b
+          WHERE b.status IN ('revealed', 'timeout_claimed')
+            AND b.resolved_time >= ${startsAt}
+            AND b.resolved_time <= ${endsAt}
+            AND b.acceptor_user_id IS NOT NULL
+            AND ${minBetFilter}
+        )
+        SELECT pb.user_id, u.address, u.profile_nickname AS nickname,
+               SUM(pb.amount)::text AS turnover,
+               SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END)::int AS wins,
+               (SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount))::text AS profit,
+               COUNT(*)::int AS games,
+               ROW_NUMBER() OVER (ORDER BY ${metricOrderSql}) AS rank
+        FROM player_bets pb
+        JOIN users u ON u.id = pb.user_id
+        WHERE ${participantFilter}
+        GROUP BY pb.user_id, u.address, u.profile_nickname
+        ORDER BY ${metricOrderSql}
+        LIMIT ${limit} OFFSET ${offset}
+      `);
 
-    // Get total count
-    const [totalRow] = await db.execute(sql`
-      WITH player_bets AS (
-        SELECT b.maker_user_id AS user_id
-        FROM bets b
-        WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${startsAt}
-          AND b.resolved_time <= ${endsAt}
-          AND ${minBetFilter}
-        UNION ALL
-        SELECT b.acceptor_user_id AS user_id
-        FROM bets b
-        WHERE b.status IN ('revealed', 'timeout_claimed')
-          AND b.resolved_time >= ${startsAt}
-          AND b.resolved_time <= ${endsAt}
-          AND b.acceptor_user_id IS NOT NULL
-          AND ${minBetFilter}
-      )
-      SELECT COUNT(DISTINCT pb.user_id)::int AS total
-      FROM player_bets pb
-      WHERE ${participantFilter}
-    `) as unknown as [{ total: number }];
+      // Get total count
+      const [totalRow] = await db.execute(sql`
+        WITH player_bets AS (
+          SELECT b.maker_user_id AS user_id
+          FROM bets b
+          WHERE b.status IN ('revealed', 'timeout_claimed')
+            AND b.resolved_time >= ${startsAt}
+            AND b.resolved_time <= ${endsAt}
+            AND ${minBetFilter}
+          UNION ALL
+          SELECT b.acceptor_user_id AS user_id
+          FROM bets b
+          WHERE b.status IN ('revealed', 'timeout_claimed')
+            AND b.resolved_time >= ${startsAt}
+            AND b.resolved_time <= ${endsAt}
+            AND b.acceptor_user_id IS NOT NULL
+            AND ${minBetFilter}
+        )
+        SELECT COUNT(DISTINCT pb.user_id)::int AS total
+        FROM player_bets pb
+        WHERE ${participantFilter}
+      `) as unknown as [{ total: number }];
 
-    const data = rows as unknown as unknown[];
-    const total = Number(totalRow?.total ?? 0);
+      const data = (rows as unknown as unknown[]).map((row: unknown) => ({
+        ...(row as Record<string, unknown>),
+        metric,
+      }));
+      const total = Number(totalRow?.total ?? 0);
 
-    // Cache result
-    leaderboardCache.set(cacheKey, { data, total, ts: Date.now() });
+      // Cache result
+      leaderboardCache.set(cacheKey, { data, total, ts: Date.now() });
 
-    return { data, total };
+      return { data, total };
+    } catch (err) {
+      logger.error({ err, eventId, metric, startsAt, endsAt }, 'getContestLeaderboard SQL failed');
+      throw err;
+    }
   }
 
   async getUserRank(eventId: string, userId: string): Promise<number | null> {
@@ -870,7 +878,11 @@ class EventsService {
         const msSinceEnd = now.getTime() - event.endsAt.getTime();
         if (msSinceEnd < 0) continue; // endsAt still in the future (shouldn't happen but be safe)
 
-        const participantCount = await this.getParticipantCount(event.id);
+        const config = event.config as Record<string, unknown>;
+        const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
+        const participantCount = isAutoJoinContest
+          ? await this.getAutoJoinPlayerCount(event)
+          : await this.getParticipantCount(event.id);
         const results = event.results as unknown[] | null;
         const hasResults = Array.isArray(results) && results.length > 0;
 

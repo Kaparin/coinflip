@@ -25,10 +25,11 @@ function getTopRankStyle(rank: number): string {
   return '';
 }
 
-function getMetricLabel(entry: Record<string, unknown>): string {
-  if (entry.metricType === 'wins') return 'wins';
-  if (entry.metricType === 'profit') return 'profit';
-  return 'turnover';
+function getMetricValue(entry: Record<string, unknown>): { label: string; value: string } {
+  const metric = entry.metric as string | undefined;
+  if (metric === 'wins') return { label: 'wins', value: String(entry.wins ?? '0') };
+  if (metric === 'profit') return { label: 'profit', value: String(entry.profit ?? '0') };
+  return { label: 'turnover', value: String(entry.turnover ?? '0') };
 }
 
 export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
@@ -68,7 +69,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
         const isTopThree = rank <= 3;
         const topStyle = getTopRankStyle(rank);
         const staggerClass = i < 10 ? `stagger-${i + 1}` : '';
-        const metricLabel = getMetricLabel(entry);
+        const { label: metricLabel, value: metricValue } = getMetricValue(entry);
 
         return (
           <div
@@ -108,7 +109,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
             <div className="flex items-center gap-1 shrink-0">
               <div className="text-right">
                 <span className={`font-bold tabular-nums ${rank === 1 ? 'text-base' : 'text-sm'}`}>
-                  {formatLaunch(String(entry.turnover ?? '0'))}
+                  {metricLabel === 'wins' ? metricValue : formatLaunch(metricValue)}
                 </span>
                 <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{metricLabel}</p>
               </div>
