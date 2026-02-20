@@ -25,7 +25,31 @@ const ListQuerySchema = z.object({
 adminEventsRouter.get('/', zValidator('query', ListQuerySchema), async (c) => {
   const { status } = c.req.valid('query');
   const allEvents = await eventsService.getAllEvents(status);
-  const data = await Promise.all(allEvents.map((e) => eventsService.formatEventResponse(e)));
+  const data: unknown[] = [];
+  for (const e of allEvents) {
+    try {
+      data.push(await eventsService.formatEventResponse(e));
+    } catch (err) {
+      logger.error({ err, eventId: e.id }, 'Failed to format event for admin list, skipping');
+      // Return minimal event data so admin can still see and manage it
+      data.push({
+        id: e.id,
+        type: e.type,
+        title: e.title,
+        description: e.description,
+        status: e.status,
+        startsAt: e.startsAt.toISOString(),
+        endsAt: e.endsAt.toISOString(),
+        config: e.config as Record<string, unknown>,
+        prizes: e.prizes as unknown[],
+        totalPrizePool: e.totalPrizePool ?? '0',
+        results: e.results as Record<string, unknown> | null,
+        raffleSeed: e.raffleSeed,
+        participantCount: 0,
+        createdAt: e.createdAt.toISOString(),
+      });
+    }
+  }
   return c.json({ data });
 });
 
