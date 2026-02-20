@@ -895,14 +895,32 @@ class EventsService {
 
         const config = event.config as Record<string, unknown>;
         const isAutoJoinContest = event.type === 'contest' && config.autoJoin === true;
-        const participantCount = isAutoJoinContest
-          ? await this.getAutoJoinPlayerCount(event)
-          : await this.getParticipantCount(event.id);
+        let participantCount: number;
+        if (isAutoJoinContest) {
+          const { total } = await this.getContestLeaderboard(event.id, 1, 0);
+          participantCount = total;
+        } else {
+          participantCount = await this.getParticipantCount(event.id);
+        }
         const results = event.results as unknown[] | null;
         const hasResults = Array.isArray(results) && results.length > 0;
 
-        // 3a. Empty events (0 participants, 5+ min past end) → auto-archive
-        if (participantCount === 0 && msSinceEnd >= EMPTY_EVENT_ARCHIVE_GRACE_MS) {
+        // 3a. Contests stuck without results — re-attempt calculation
+        if (!hasResults && event.type === 'contest') {
+          try {
+            const calcResults = await this.calculateContestResults(event.id);
+            if (calcResults && calcResults.length > 0) {
+              logger.info({ eventId: event.id, winnersCount: calcResults.length }, 'Re-calculated stuck contest results');
+              // Update local hasResults flag for next checks
+              continue; // Will pick up on next lifecycle tick with results populated
+            }
+          } catch (calcErr) {
+            logger.error({ err: calcErr, eventId: event.id }, 'Re-calculate contest results failed');
+          }
+        }
+
+        // 3b. Empty events (0 participants, 5+ min past end) → auto-archive
+        if (participantCount === 0 && !hasResults && msSinceEnd >= EMPTY_EVENT_ARCHIVE_GRACE_MS) {
           await this.setStatus(event.id, 'archived');
           wsService.broadcast({
             type: 'event_archived',
@@ -912,7 +930,7 @@ class EventsService {
           continue;
         }
 
-        // 3b. Events with results (10+ min past end) → auto-approve to completed + auto-distribute prizes
+        // 3c. Events with results (10+ min past end) → auto-approve to completed + auto-distribute prizes
         if (hasResults && msSinceEnd >= EVENT_AUTO_APPROVE_GRACE_MS) {
           // Auto-distribute prizes via CW20 transfer BEFORE marking completed
           try {
@@ -946,9 +964,13 @@ class EventsService {
 
     let participantCount = 0;
     try {
-      participantCount = isAutoJoinContest
-        ? await this.getAutoJoinPlayerCount(event)
-        : await this.getParticipantCount(event.id);
+      if (isAutoJoinContest) {
+        // Use leaderboard total for consistency — same resolved_time filter as leaderboard
+        const { total } = await this.getContestLeaderboard(event.id, 1, 0);
+        participantCount = total;
+      } else {
+        participantCount = await this.getParticipantCount(event.id);
+      }
       logger.debug({ eventId: event.id, participantCount, isAutoJoinContest }, 'participantCount resolved');
     } catch (err) {
       logger.error({
