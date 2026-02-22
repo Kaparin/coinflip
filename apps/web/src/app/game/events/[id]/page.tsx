@@ -3,7 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar } from 'lucide-react';
-import { useGetEventById } from '@coinflip/api-client';
+import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +11,6 @@ import { EventTimer } from '@/components/features/events/event-timer';
 import { PrizeDisplay } from '@/components/features/events/prize-display';
 import { ContestLeaderboard } from '@/components/features/events/contest-leaderboard';
 import { RaffleParticipants } from '@/components/features/events/raffle-participants';
-import { EventResults } from '@/components/features/events/event-results';
 import { JoinRaffleButton } from '@/components/features/events/join-raffle-button';
 import { getEventTheme } from '@/components/features/events/event-theme';
 import { useTranslation } from '@/lib/i18n';
@@ -34,6 +33,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const event = data?.data;
 
+  const isContest = event?.type === 'contest';
+  const hasResults = event?.status === 'completed' || event?.status === 'calculating' || event?.status === 'archived';
+
+  // Fetch results for completed events (hook must be called unconditionally)
+  const { data: resultsData } = useGetEventResults(id, {
+    query: { staleTime: 60_000, enabled: !!hasResults && !isContest },
+  });
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-6 space-y-4">
@@ -55,17 +62,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const isContest = event.type === 'contest';
   const theme = getEventTheme(event.type);
   const TypeIcon = isContest ? Target : Trophy;
   const isActive = event.status === 'active';
   const isUpcoming = event.status === 'draft' && new Date(event.startsAt) > new Date();
   const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
-  const hasResults = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
 
+  // Extract winners + seed from results
+  const resultsResponse = resultsData as unknown as { data?: { winners?: Array<Record<string, unknown>>; raffleSeed?: string } };
+  const winners = resultsResponse?.data?.winners?.map(w => ({
+    finalRank: Number(w.finalRank),
+    address: String(w.address ?? ''),
+    prizeAmount: String(w.prizeAmount ?? '0'),
+    prizeTxHash: (w.prizeTxHash as string | null) ?? null,
+    nickname: (w.nickname as string | null) ?? null,
+  }));
+  const raffleSeed = resultsResponse?.data?.raffleSeed ?? null;
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 space-y-4">
+    <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-4 overflow-y-auto">
       {/* Back link */}
       <Link href="/game/events" className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} />
@@ -151,12 +167,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {/* Prizes */}
+      {/* Unified Prizes + Winners */}
       <section>
         <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          {t('events.prizes')}
+          {hasResults && winners && winners.length > 0 ? t('events.resultsTitle') : t('events.prizes')}
         </h2>
-        <PrizeDisplay prizes={prizes} eventType={event.type} />
+        <PrizeDisplay
+          prizes={prizes}
+          winners={hasResults ? winners : undefined}
+          eventType={event.type}
+          raffleSeed={hasResults ? raffleSeed : null}
+          raffleSeedLabel={t('events.raffleSeed')}
+        />
       </section>
 
       {/* Join button (raffle, active or upcoming) */}
@@ -169,16 +191,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         />
       )}
 
-      {/* Results (ended events with results) */}
-      {hasResults && (
-        <section>
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-            {t('events.resultsTitle')}
-          </h2>
-          <EventResults eventId={event.id} eventType={event.type} />
-        </section>
-      )}
-
       {/* Leaderboard (contests) */}
       {isContest && (isActive || isEnded) && (
         <section>
@@ -189,7 +201,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </section>
       )}
 
-      {/* Participants (raffles) */}
+      {/* Participants (raffles) — collapsible */}
       {!isContest && (isActive || isUpcoming || isEnded) && (
         <section>
           <RaffleParticipants eventId={event.id} />

@@ -2,11 +2,10 @@
  * Update CoinFlip contract configuration on chain.
  *
  * Usage:
- *   cd scripts && pnpm tsx update-config.ts
+ *   pnpm --filter scripts tsx scripts/update-config.ts
  *
- * This sets:
- *   - max_open_per_user = 1000 (effectively no meaningful limit)
- *   - max_daily_amount_per_user = 999_999_999_999_999 (effectively unlimited)
+ * Updates treasury address in the contract config so that commissions
+ * go to the correct TREASURY_ADDRESS (not the relayer).
  */
 
 import { resolve } from 'node:path';
@@ -24,6 +23,7 @@ const REST_URL = process.env.AXIOME_REST_URL!;
 const CHAIN_ID = process.env.AXIOME_CHAIN_ID!;
 const MNEMONIC = process.env.RELAYER_MNEMONIC!;
 const CONTRACT = process.env.COINFLIP_CONTRACT_ADDR!;
+const TREASURY = process.env.TREASURY_ADDRESS!;
 const HD_PATH = stringToPath("m/44'/546'/0'/0/0");
 const FEE_DENOM = 'uaxm';
 
@@ -51,24 +51,47 @@ async function main() {
   const configData = (await configRes.json()) as { data: Record<string, unknown> };
   console.log('Current config:', JSON.stringify(configData.data, null, 2));
 
-  // Build UpdateConfig message
+  // Build UpdateConfig message — set treasury to the correct address
+  if (!TREASURY) {
+    console.error('TREASURY_ADDRESS not set in .env');
+    process.exit(1);
+  }
+
+  const currentTreasury = (configData.data as any)?.treasury;
+  if (currentTreasury === TREASURY) {
+    console.log(`\n✓ Treasury is already set to ${TREASURY} — no update needed.`);
+    client.disconnect();
+    return;
+  }
+
   const updateMsg = {
     update_config: {
-      max_open_per_user: 1000,
-      max_daily_amount_per_user: '999999999999999999',
+      treasury: TREASURY,
     },
   };
 
-  console.log('\nSending UpdateConfig:', JSON.stringify(updateMsg, null, 2));
+  console.log(`\nUpdating treasury: ${currentTreasury} → ${TREASURY}`);
+  console.log('Sending UpdateConfig:', JSON.stringify(updateMsg, null, 2));
 
   // Execute directly (admin is the relayer/deployer wallet)
-  const result = await client.execute(
-    adminAddr,
-    CONTRACT,
-    updateMsg,
-    'auto',
-    'Update max_open_per_user to 1000, remove daily limit',
-  );
+  const msgAny = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: adminAddr,
+      contract: CONTRACT,
+      msg: toUtf8(JSON.stringify(updateMsg)),
+      funds: [],
+    },
+  };
+
+  const result = await client.signAndBroadcast(adminAddr, [msgAny], 'auto', `Update treasury to ${TREASURY}`);
+
+  if (result.code !== 0) {
+    console.error(`\n✗ Transaction failed! Code: ${result.code}`);
+    console.error(`  Raw log: ${result.rawLog}`);
+    client.disconnect();
+    process.exit(1);
+  }
 
   console.log('\n✓ Config updated!');
   console.log(`  Tx hash: ${result.transactionHash}`);
