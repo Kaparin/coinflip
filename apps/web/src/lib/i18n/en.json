@@ -109,6 +109,11 @@
   },
   "wager": {
     "title": "Wager",
+    "newBet": "New Bet",
+    "newBetDesc": "Choose your wager and flip the coin",
+    "chooseAmount": "Choose amount",
+    "youreFlipping": "You're flipping",
+    "confirmFlip": "Confirm & Flip",
     "oneClickRequired": "1-Click Play Required",
     "oneClickDesc": "You need to enable 1-Click Play before you can create or interact with bets. This is a one-time authorization that lets our system process your game actions.",
     "enableOneClick": "Enable 1-Click Play",

@@ -299,54 +299,70 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
       )}
 
       {phase === 'submitted' ? (
-        <div className="flex flex-col items-center gap-3 py-6 animate-fade-up">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/15">
-            <span className="h-7 w-7 animate-spin rounded-full border-3 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
+        <div className="flex flex-col items-center gap-3 py-8 animate-fade-up">
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <span className="absolute inset-0 rounded-full bg-[var(--color-success)]/20 animate-[fabPing_1.5s_ease-out_infinite]" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-success)]/15">
+              <svg className="h-8 w-8 text-[var(--color-success)] animate-[scaleIn_0.3s_ease-out]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
-          <p className="text-base font-bold">{t('wager.betSubmitted')}</p>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {parsedAmount.toLocaleString()} <LaunchTokenIcon size={45} />
-          </p>
-          <p className="text-xs text-[var(--color-text-secondary)] animate-pulse">
+          <p className="text-lg font-bold">{t('wager.betSubmitted')}</p>
+          <div className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
+            <span className="font-semibold text-[var(--color-text)]">{parsedAmount.toLocaleString()}</span>
+            <LaunchTokenIcon size={45} />
+            <span>LAUNCH</span>
+          </div>
+          <p className="text-xs text-[var(--color-text-secondary)] animate-pulse mt-1">
             {t('common.confirming')}
           </p>
         </div>
       ) : phase === 'confirm' ? (
         <div className="space-y-4 animate-[fadeUp_0.2s_ease-out]">
-          <h3 className="text-lg font-bold">{t('wager.confirmBet')}</h3>
-          <div className="rounded-xl bg-[var(--color-bg)] p-4 space-y-2.5">
-            <div className="flex justify-between text-sm">
-              <span className="text-[var(--color-text-secondary)]">{t('wager.wagerLabel')}</span>
-              <span className="flex items-center gap-1.5 font-bold"><LaunchTokenIcon size={45} /> {parsedAmount.toLocaleString()}</span>
+          {/* Amount hero */}
+          <div className="flex flex-col items-center gap-1 py-2">
+            <p className="text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] font-medium">{t('wager.youreFlipping')}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-black tabular-nums">{parsedAmount.toLocaleString()}</span>
+              <LaunchTokenIcon size={60} />
             </div>
-            <div className="border-t border-[var(--color-border)]" />
+          </div>
+
+          {/* Details card */}
+          <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3.5 space-y-2.5">
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.ifYouWin')}</span>
-              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={45} /></span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-[var(--color-text-secondary)]">{t('wager.commission')}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">{t('wager.commissionValue')}</span>
+              <span className="flex items-center gap-1.5 font-bold text-[var(--color-success)]">+{winPayout.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} /></span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[var(--color-text-secondary)]">{t('wager.winChance')}</span>
               <span className="font-bold">{t('wager.winChanceValue')}</span>
             </div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-[var(--color-text-secondary)]">{t('wager.commission')}</span>
+              <span className="text-[var(--color-text-secondary)]">{t('wager.commissionValue')}</span>
+            </div>
           </div>
 
-          <div className="flex gap-3">
+          {/* Actions */}
+          <div className="flex gap-2.5">
             <button type="button" onClick={handleCancel}
-              className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold hover:bg-[var(--color-surface-hover)]">
+              className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors active:scale-[0.98]">
               {t('common.back')}
             </button>
             <button type="button" disabled={createBet.isPending || submitted} onClick={handleSubmit}
-              className="flex-1 rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold hover:bg-[var(--color-primary-hover)] disabled:opacity-50 btn-press">
+              className="flex-[2] rounded-xl bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 px-4 py-3 text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50 active:scale-[0.98]">
               {createBet.isPending || submitted ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   {t('common.submitting')}
                 </span>
-              ) : t('wager.createBet')}
+              ) : (
+                <span className="flex items-center justify-center gap-1.5">
+                  {t('wager.confirmFlip')}
+                </span>
+              )}
             </button>
           </div>
           {createBet.isError && (
@@ -357,16 +373,16 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
         <>
           {/* Amount Presets */}
           <div className="mb-3">
-            <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
-              {t('wager.wagerLabel')} <LaunchTokenIcon size={35} />
+            <label className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              {t('wager.chooseAmount')}
             </label>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {BET_PRESETS.map((preset, idx) => (
                 <button key={preset} type="button" onClick={() => setAmount(String(preset))}
-                  className={`rounded-lg px-2 py-2 text-xs font-bold transition-colors ${
+                  className={`rounded-lg px-2 py-2.5 text-xs font-bold transition-all active:scale-[0.96] ${
                     amount === String(preset)
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                      ? 'bg-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20'
+                      : 'bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-primary)]/30'
                   }`}>
                   {BET_PRESET_LABELS[idx]}
                 </button>
@@ -376,24 +392,29 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
 
           {/* Custom Amount */}
           <div className="mb-4">
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder={t('wager.customAmount')}
-              value={amount}
-              onChange={(e) => {
-                let val = e.target.value.replace(/[^0-9.]/g, '');
-                const parts = val.split('.');
-                if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                setAmount(val);
-              }}
-              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder={t('wager.customAmount')}
+                value={amount}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/[^0-9.]/g, '');
+                  const parts = val.split('.');
+                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                  setAmount(val);
+                }}
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-12 text-sm font-medium placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                <LaunchTokenIcon size={40} />
+              </span>
+            </div>
             {parsedAmount > 0 && parsedAmount < 1 && (
-              <p className="mt-1 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
+              <p className="mt-1.5 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
             )}
             {parsedAmount > availableHuman && availableHuman > 0 && (
-              <p className="mt-1 text-[10px] text-[var(--color-danger)]">
+              <p className="mt-1.5 text-[10px] text-[var(--color-danger)]">
                 {t('wager.insufficientBalance', { amount: availableHuman.toLocaleString() })}
               </p>
             )}
@@ -417,7 +438,11 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           {/* Create Button */}
           <button type="button" disabled={!isValidAmount || !isConnected || (!oneClickEnabled && isConnected) || !canCreateBet || batchSubmitting}
             onClick={isConnected ? handleConfirm : connect}
-            className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40 btn-press">
+            className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98] ${
+              isValidAmount
+                ? 'bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 text-white shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/40 hover:brightness-110'
+                : 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
+            }`}>
             {!isConnected
               ? t('common.connectWallet')
               : !oneClickEnabled
@@ -425,7 +450,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                 : !canCreateBet
                   ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
                   : isValidAmount
-                    ? <><span>{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} </span><LaunchTokenIcon size={45} /></>
+                    ? <span className="flex items-center justify-center gap-1.5">{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={45} /></span>
                     : t('wager.enterAmount')}
           </button>
 
