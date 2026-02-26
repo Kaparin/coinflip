@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
-import { Crown, Flame, Zap, Coins, Clock } from 'lucide-react';
+import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
@@ -53,7 +53,6 @@ function useCountdown(targetDate: Date | null): {
 
   useEffect(() => {
     if (!targetDate) return;
-    // Update every second when < 1 hour, every 10s otherwise
     const remaining = Math.max(0, targetDate.getTime() - Date.now());
     const ms = remaining < 3600_000 ? 1000 : 10_000;
     const interval = setInterval(() => setNow(Date.now()), ms);
@@ -65,7 +64,6 @@ function useCountdown(targetDate: Date | null): {
   const remaining = Math.max(0, Math.floor((targetDate.getTime() - now) / 1000));
   const isExpired = remaining <= 0;
 
-  // Format: hours:mm:ss for >1h, mm:ss for <1h
   let formatted: string;
   if (remaining >= 3600) {
     const hrs = Math.floor(remaining / 3600);
@@ -77,9 +75,8 @@ function useCountdown(targetDate: Date | null): {
     formatted = `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  // Urgency thresholds
   const urgency = remaining <= 30 ? 'critical'
-    : remaining <= 300 ? 'warning'  // 5 minutes
+    : remaining <= 300 ? 'warning'
     : 'normal';
 
   return { remaining, formatted, isExpired, urgency };
@@ -107,40 +104,80 @@ function getTier(humanAmount: number): {
   gradient: string;
   icon: ReactNode;
   tier: string;
+  /** Extra CSS class for animated border overlay */
+  borderGlowClass: string;
+  /** Extra CSS class for animated glow */
+  animGlowClass: string;
 } {
+  // Celestial: ≥ 5,000 LAUNCH — rainbow holographic
+  if (humanAmount >= 5000) {
+    return {
+      border: 'border-purple-400/40',
+      glow: '',
+      gradient: 'from-purple-500/8 via-pink-500/5 to-blue-500/5',
+      icon: <Sparkles size={22} className="text-purple-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]" />,
+      tier: 'celestial',
+      borderGlowClass: 'border-glow-celestial',
+      animGlowClass: 'animate-celestial-glow',
+    };
+  }
+  // Mythic: ≥ 1,000 LAUNCH — crimson/fire
+  if (humanAmount >= 1000) {
+    return {
+      border: 'border-red-400/35',
+      glow: '',
+      gradient: 'from-red-500/8 via-orange-500/5 to-red-500/3',
+      icon: <Gem size={22} className="text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]" />,
+      tier: 'mythic',
+      borderGlowClass: 'border-glow-mythic',
+      animGlowClass: 'animate-mythic-glow',
+    };
+  }
+  // Legendary: ≥ 500 LAUNCH — gold/amber
   if (humanAmount >= 500) {
     return {
       border: 'border-amber-400/40',
       glow: 'shadow-[0_0_24px_rgba(251,191,36,0.12)]',
       gradient: 'from-amber-500/8 via-transparent to-yellow-500/5',
-      icon: <Crown size={26} className="text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />,
+      icon: <Crown size={22} className="text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />,
       tier: 'legendary',
+      borderGlowClass: 'border-glow-gold',
+      animGlowClass: '',
     };
   }
+  // Epic: ≥ 100 LAUNCH — purple
   if (humanAmount >= 100) {
     return {
       border: 'border-purple-400/30',
       glow: 'shadow-[0_0_18px_rgba(168,85,247,0.1)]',
       gradient: 'from-purple-500/8 via-transparent to-indigo-500/5',
-      icon: <Flame size={26} className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]" />,
+      icon: <Flame size={22} className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]" />,
       tier: 'epic',
+      borderGlowClass: '',
+      animGlowClass: '',
     };
   }
+  // Rare: ≥ 10 LAUNCH — sky/cyan
   if (humanAmount >= 10) {
     return {
       border: 'border-sky-400/20',
       glow: 'shadow-[0_0_12px_rgba(56,189,248,0.08)]',
       gradient: 'from-sky-500/5 via-transparent to-cyan-500/3',
-      icon: <Zap size={24} className="text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.4)]" />,
+      icon: <Zap size={20} className="text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.4)]" />,
       tier: 'rare',
+      borderGlowClass: '',
+      animGlowClass: '',
     };
   }
+  // Common: < 10 LAUNCH — gray
   return {
     border: 'border-[var(--color-border)]',
     glow: '',
     gradient: 'from-white/[0.02] via-transparent to-white/[0.01]',
-    icon: <Coins size={22} className="text-zinc-400" />,
+    icon: <Coins size={18} className="text-zinc-400" />,
     tier: 'common',
+    borderGlowClass: '',
+    animGlowClass: '',
   };
 }
 
@@ -193,23 +230,29 @@ export function BetCard({
   return (
     <div
       className={`
-        group relative overflow-hidden rounded-2xl border bg-gradient-to-br
-        ${tier.gradient} ${tier.border} ${tier.glow}
-        bg-[var(--color-surface)] p-4 card-hover animate-fade-up ${staggerClass}
+        group relative overflow-hidden rounded-xl border bg-gradient-to-br
+        ${tier.gradient} ${tier.border} ${tier.glow} ${tier.animGlowClass}
+        bg-[var(--color-surface)] p-3 card-hover animate-fade-up ${staggerClass}
         transition-all duration-300
+        ${tier.borderGlowClass}
       `}
     >
       {/* Ambient glow on hover */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/0 to-[var(--color-primary)]/0 group-hover:from-[var(--color-primary)]/[0.03] group-hover:to-transparent transition-all duration-500 pointer-events-none" />
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[var(--color-primary)]/0 to-[var(--color-primary)]/0 group-hover:from-[var(--color-primary)]/[0.03] group-hover:to-transparent transition-all duration-500 pointer-events-none" />
+
+      {/* Shimmer sweep for mythic+ tiers */}
+      {(tier.tier === 'mythic' || tier.tier === 'celestial') && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-shimmer pointer-events-none" />
+      )}
 
       {/* Subtle noise texture overlay */}
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
 
       <div className="relative z-10">
         {/* Top row: Role tag + Status */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1.5">
           {(isMine || isAcceptor) ? (
-            <span className={`inline-flex rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white ${
+            <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white ${
               isMine
                 ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
                 : 'bg-gradient-to-r from-emerald-500 to-teal-500'
@@ -217,59 +260,56 @@ export function BetCard({
               {isMine ? t('bets.yourBet') : t('bets.youAccepted')}
             </span>
           ) : <span />}
-          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusInfo.bgClass}`}>
+          <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${statusInfo.bgClass}`}>
             {t(statusInfo.textKey)}
           </span>
         </div>
 
         {/* Amount row */}
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <span className="flex items-center justify-center shrink-0">{tier.icon}</span>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-              <LaunchTokenIcon size={55} />
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
+            <LaunchTokenIcon size={44} />
           </div>
         </div>
 
         {/* Middle: Maker + Timer */}
-        <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)] mb-3">
+        <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)] mb-2">
           <Link href={`/game/profile/${maker}`} className="flex items-center gap-1.5 min-w-0 group/maker" onClick={(e) => e.stopPropagation()}>
-            <UserAvatar address={maker} size={18} />
+            <UserAvatar address={maker} size={16} />
             <span className="font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors">{makerNickname || truncAddr(maker)}</span>
           </Link>
-          {/* Open bets: show expiry countdown; others: show time ago */}
           {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
             <span className={`flex items-center gap-1 font-mono tabular-nums ${
               expiryCountdown.urgency === 'critical' ? 'text-red-400 animate-pulse font-bold' :
               expiryCountdown.urgency === 'warning' ? 'text-amber-400 font-medium' :
               'opacity-60'
             }`}>
-              <Clock size={12} />
+              <Clock size={11} />
               {expiryCountdown.formatted}
             </span>
           ) : status === 'open' && expiryCountdown.isExpired ? (
-            <span className="text-red-400 font-bold text-[10px]">{t('bets.expired')}</span>
+            <span className="text-red-400 font-bold text-[9px]">{t('bets.expired')}</span>
           ) : (
             <span className="opacity-60">{timeAgo(createdAt)} ago</span>
           )}
         </div>
 
         {/* Win info bar */}
-        <div className="relative rounded-xl bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10 px-3 py-2 mb-3">
+        <div className="relative rounded-lg bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10 px-2.5 py-1.5 mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
-            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-400 tabular-nums">
+            <span className="text-[9px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
+            <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              <LaunchTokenIcon size={40} />
+              <LaunchTokenIcon size={32} />
             </span>
           </div>
         </div>
 
         {/* Canceling state */}
         {status === 'canceling' && (
-          <div className="rounded-xl bg-zinc-500/10 px-3 py-2.5 text-center text-xs text-zinc-400">
+          <div className="rounded-lg bg-zinc-500/10 px-2.5 py-2 text-center text-[11px] text-zinc-400">
             <span className="flex items-center justify-center gap-2">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400/30 border-t-zinc-400" />
               {t('bets.canceling')}
@@ -279,7 +319,7 @@ export function BetCard({
 
         {/* Accept button — accepting state */}
         {status === 'open' && !isMine && showAcceptingState && (
-          <div className="rounded-xl bg-indigo-500/10 px-3 py-2.5 text-center text-xs text-indigo-400">
+          <div className="rounded-lg bg-indigo-500/10 px-2.5 py-2 text-center text-[11px] text-indigo-400">
             <span className="flex items-center justify-center gap-2">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400/30 border-t-indigo-400" />
               {t('bets.accepting')}
@@ -290,14 +330,14 @@ export function BetCard({
         {/* Accept button — disabled if expired or expiring within 30s */}
         {status === 'open' && !isMine && onAccept && !showAcceptingState && (
           isExpiringSoon || expiryCountdown.isExpired ? (
-            <div className="w-full rounded-xl bg-zinc-500/10 border border-zinc-500/20 px-4 py-2.5 text-center text-xs text-zinc-400">
+            <div className="w-full rounded-lg bg-zinc-500/10 border border-zinc-500/20 px-3 py-2 text-center text-[11px] text-zinc-400">
               {expiryCountdown.isExpired ? t('bets.betExpired') : t('bets.expiringSoon')}
             </div>
           ) : (
             <button
               type="button"
               onClick={() => onAccept(id)}
-              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] min-h-[44px]"
+              className="w-full rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] min-h-[40px]"
             >
               {t('bets.acceptFlip')}
             </button>
@@ -310,11 +350,11 @@ export function BetCard({
             type="button"
             onClick={() => onCancel(id)}
             disabled={isAnyPending}
-            className="w-full rounded-xl border border-zinc-700/50 px-4 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-700/50 px-3 py-2 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[40px]"
           >
             {isCanceling ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
                 {t('bets.canceling')}
               </span>
             ) : t('bets.cancelBet')}
@@ -323,7 +363,7 @@ export function BetCard({
 
         {/* Processing states */}
         {status === 'accepting' && (
-          <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/10 px-3 py-2.5 text-center text-xs text-indigo-400">
+          <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/10 px-2.5 py-2 text-center text-[11px] text-indigo-400">
             <span className="flex items-center justify-center gap-2">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400/30 border-t-indigo-400" />
               {t('common.confirming')}
@@ -332,7 +372,7 @@ export function BetCard({
         )}
 
         {status === 'accepted' && (
-          <div className={`rounded-xl border px-3 py-2.5 text-xs ${
+          <div className={`rounded-lg border px-2.5 py-2 text-[11px] ${
             countdown.urgency === 'critical'
               ? 'bg-red-500/10 border-red-500/20 text-red-400'
               : countdown.urgency === 'warning'
@@ -354,7 +394,7 @@ export function BetCard({
             </div>
             {/* Progress bar */}
             {deadlineDate && countdown.remaining > 0 && (
-              <div className="mt-2 h-1 rounded-full bg-black/20 overflow-hidden">
+              <div className="mt-1.5 h-1 rounded-full bg-black/20 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ease-linear ${
                     countdown.urgency === 'critical' ? 'bg-red-500' :

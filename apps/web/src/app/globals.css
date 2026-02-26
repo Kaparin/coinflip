@@ -274,6 +274,55 @@ body {
   animation: borderGlow 3s ease-in-out infinite;
 }
 
+/* Mythic tier — pulsing crimson border glow */
+@keyframes mythicGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(239,68,68,0.12), 0 0 30px rgba(239,68,68,0.05); }
+  50%      { box-shadow: 0 0 20px rgba(239,68,68,0.2), 0 0 40px rgba(239,68,68,0.08); }
+}
+.animate-mythic-glow { animation: mythicGlow 3s ease-in-out infinite; }
+
+.border-glow-mythic::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(239,68,68,0.4), transparent 40%, rgba(249,115,22,0.25));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: borderGlow 2.5s ease-in-out infinite;
+}
+
+/* Celestial tier — rotating rainbow border + pulse */
+@keyframes celestialBorder {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes celestialGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(168,85,247,0.12), 0 0 40px rgba(99,102,241,0.06); }
+  33%      { box-shadow: 0 0 25px rgba(236,72,153,0.15), 0 0 45px rgba(168,85,247,0.08); }
+  66%      { box-shadow: 0 0 25px rgba(59,130,246,0.15), 0 0 45px rgba(99,102,241,0.08); }
+}
+.animate-celestial-glow { animation: celestialGlow 4s ease-in-out infinite; }
+
+.border-glow-celestial::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(270deg, rgba(236,72,153,0.5), rgba(168,85,247,0.5), rgba(59,130,246,0.5), rgba(34,211,238,0.4), rgba(168,85,247,0.5), rgba(236,72,153,0.5));
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: celestialBorder 4s ease infinite;
+}
+
 /* ============================
    REDUCED MOTION
    ============================ */

@@ -60,9 +60,10 @@ export const customFetch = async <T>(
     ? sessionStorage.getItem('coinflip_connected_address')
     : null;
 
-  // iOS Safari blocks third-party cookies (ITP) — send token as Bearer header
+  // iOS Safari / Telegram Mobile block third-party cookies — send token as Bearer header.
+  // Check both web wallet token and Telegram Mini App token.
   const authToken = typeof window !== 'undefined'
-    ? sessionStorage.getItem('coinflip_auth_token')
+    ? (sessionStorage.getItem('coinflip_auth_token') || sessionStorage.getItem('coinflip_tg_auth_token'))
     : null;
 
   const isGet = config.method.toUpperCase() === 'GET';

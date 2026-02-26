@@ -5,6 +5,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useTranslation } from '@/lib/i18n';
 import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { signAuthzGrant } from '@/lib/wallet-signer';
@@ -61,7 +62,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
 
     try {
       const res = await fetch(`${API_URL}/api/v1/auth/grant-msg`, {
-        headers: { 'x-wallet-address': address },
+        headers: { 'x-wallet-address': address, ...getAuthHeaders() },
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to fetch grant parameters');

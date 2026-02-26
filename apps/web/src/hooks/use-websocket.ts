@@ -341,6 +341,11 @@ export function useWebSocket({
             case 'event_archived':
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
+            case 'jackpot_updated':
+            case 'jackpot_won':
+            case 'jackpot_reset':
+              scheduleInvalidation('/api/v1/jackpot/active', '/api/v1/jackpot/history');
+              break;
           }
 
           onEventRef.current?.(parsed);

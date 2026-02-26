@@ -116,5 +116,29 @@ export const EMPTY_EVENT_ARCHIVE_GRACE_MS = 5 * 60 * 1000;
 /** Grace period before auto-approving calculating events with results (10 minutes) */
 export const EVENT_AUTO_APPROVE_GRACE_MS = 10 * 60 * 1000;
 
+// ---- Jackpot ----
+/** Total jackpot contribution from each pot in basis points (100 = 1%) */
+export const JACKPOT_TOTAL_BPS = 100;
+
+/** Number of jackpot tiers (contribution split evenly) */
+export const JACKPOT_TIER_COUNT = 5;
+
+/** Per-tier contribution in basis points = JACKPOT_TOTAL_BPS / JACKPOT_TIER_COUNT */
+export const JACKPOT_PER_TIER_BPS = JACKPOT_TOTAL_BPS / JACKPOT_TIER_COUNT; // 20
+
+export const JACKPOT_TIER_NAME = {
+  MINI: 'mini',
+  MEDIUM: 'medium',
+  LARGE: 'large',
+  MEGA: 'mega',
+  SUPER_MEGA: 'super_mega',
+} as const;
+
+export const JACKPOT_POOL_STATUS = {
+  FILLING: 'filling',
+  DRAWING: 'drawing',
+  COMPLETED: 'completed',
+} as const;
+
 // ---- API versions ----
 export const API_V1_PREFIX = '/api/v1';

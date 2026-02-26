@@ -6,6 +6,7 @@ import { env, validateProductionEnv } from './config/env.js';
 import { relayerService } from './services/relayer.js';
 import { indexerService } from './services/indexer.js';
 import { startBackgroundSweep, stopBackgroundSweep } from './services/background-tasks.js';
+import { jackpotService } from './services/jackpot.service.js';
 import { getDb } from './lib/db.js';
 
 // ─── Startup validation ──────────────────────────────────────────
@@ -41,6 +42,14 @@ async function initServices() {
     }
   } else {
     logger.info('Indexer disabled (ENABLE_INDEXER != "true"). Set ENABLE_INDEXER=true to enable.');
+  }
+
+  // Ensure all jackpot tiers have active pools
+  try {
+    await jackpotService.ensureActivePoolsExist();
+    logger.info('Jackpot pools initialized');
+  } catch (err) {
+    logger.warn({ err }, 'Jackpot pool initialization failed');
   }
 
   if (enableSweep) {

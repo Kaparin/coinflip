@@ -50,3 +50,12 @@ export {
   EventLeaderboardEntrySchema,
   EventParticipantSchema,
 } from './events.js';
+
+export {
+  JackpotTierNameSchema,
+  JackpotPoolStatusSchema,
+  JackpotTierResponseSchema,
+  JackpotPoolResponseSchema,
+  JackpotHistoryQuerySchema,
+  JackpotEligibilityResponseSchema,
+} from './jackpot.js';

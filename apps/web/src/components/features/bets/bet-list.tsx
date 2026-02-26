@@ -297,9 +297,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-36 rounded-2xl" />
+          <Skeleton key={i} className="h-32 rounded-xl" />
         ))}
       </div>
     );
@@ -348,25 +348,25 @@ export function BetList({ pendingBets = [] }: BetListProps) {
 
       {/* Pending bet cards (submitted but not yet confirmed on chain) */}
       {myPendingBets.length > 0 && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 mb-3">
+        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 mb-2">
           {myPendingBets.map((bet) => (
             <div
               key={bet.txHash}
-              className="relative rounded-2xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-surface)] p-4 overflow-hidden animate-fade-up"
+              className="relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-surface)] p-3 overflow-hidden animate-fade-up"
             >
               {/* Shimmer sweep */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-lg font-bold tabular-nums">{formatLaunch(bet.amount)}</span>
-                    <LaunchTokenIcon size={50} />
+                    <span className="text-base font-bold tabular-nums">{formatLaunch(bet.amount)}</span>
+                    <LaunchTokenIcon size={40} />
                   </div>
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold uppercase tracking-wide">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold uppercase tracking-wide">
                     {t('bets.sending')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
                   <span>{t('bets.confirmingOnChain')}</span>
                 </div>
@@ -378,7 +378,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
 
       {/* Bets grid */}
       {filteredBets.length > 0 ? (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
           {filteredBets.map((bet, idx) => {
             const isMyBet = bet.maker === address;
             const isRecentlyAccepted = recentlyAcceptedIds.has(String(bet.id));

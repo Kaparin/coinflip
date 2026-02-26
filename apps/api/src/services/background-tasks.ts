@@ -19,6 +19,7 @@ import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
+import { jackpotService } from './jackpot.service.js';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -1686,7 +1687,14 @@ export function startBackgroundSweep(): void {
         logger.warn({ err }, 'sweep: event lifecycle check failed');
       }
 
-      // 8. Garbage-collect stale pending_bet_secrets (older than 1 hour)
+      // 8. Jackpot lifecycle checks (retry stuck draws)
+      try {
+        await jackpotService.checkJackpotLifecycle();
+      } catch (err) {
+        logger.warn({ err }, 'sweep: jackpot lifecycle check failed');
+      }
+
+      // 9. Garbage-collect stale pending_bet_secrets (older than 1 hour)
       await pendingSecretsService.cleanup().catch(err =>
         logger.warn({ err }, 'sweep: pending secrets cleanup failed'));
 

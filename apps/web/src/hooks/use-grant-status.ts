@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 import { useWalletContext } from '@/contexts/wallet-context';
 
 interface GrantStatus {
@@ -19,7 +20,10 @@ export function useGrantStatus() {
     queryKey: ['/api/v1/auth/grants', address],
     queryFn: async (): Promise<GrantStatus> => {
       const res = await fetch(`${API_URL}/api/v1/auth/grants`, {
-        headers: { 'x-wallet-address': address! },
+        headers: {
+          'x-wallet-address': address!,
+          ...getAuthHeaders(),
+        },
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to fetch grant status');

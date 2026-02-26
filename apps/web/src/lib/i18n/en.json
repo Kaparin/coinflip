@@ -750,5 +750,34 @@
     "welcome": "Welcome, {name}!",
     "connectWalletHint": "Connect your Axiome wallet to start playing",
     "connectWallet": "Connect Wallet"
+  },
+  "jackpot": {
+    "title": "Jackpots",
+    "subtitle": "Win big from every bet placed",
+    "bannerTitle": "Jackpot",
+    "activePools": "Active",
+    "historyTab": "History",
+    "drawing": "Drawing...",
+    "completed": "Completed",
+    "winner": "Winner",
+    "date": "Date",
+    "seed": "Verification seed",
+    "noHistory": "No completed jackpots yet",
+    "noPools": "No active jackpot pools",
+    "loadMore": "Load more",
+    "minGames": "Min. {count} games to participate",
+    "howItWorks": "1% of every bet goes into 5 jackpot pools. When a pool fills up, a random eligible player wins the entire prize! Pools reset and start filling again automatically.",
+    "wonTitle": "Jackpot Won!",
+    "wonVerb": "won",
+    "tiers": {
+      "mini": "Mini",
+      "medium": "Medium",
+      "large": "Large",
+      "mega": "Mega",
+      "super_mega": "Super Mega"
+    },
+    "notifications": {
+      "won": "{tier} jackpot won by {winner} — {amount} LAUNCH!"
+    }
   }
 }

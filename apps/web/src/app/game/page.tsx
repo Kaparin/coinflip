@@ -12,6 +12,7 @@ import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { MobileBalanceBar } from '@/components/features/vault/mobile-balance-bar';
 import { Leaderboard } from '@/components/features/leaderboard/leaderboard';
 import { TopWinnerBanner } from '@/components/features/top-winner-banner';
+import { JackpotBanner } from '@/components/features/jackpot/jackpot-banner';
 import { TgWelcomeBanner } from '@/components/features/telegram/tg-welcome-banner';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -21,6 +22,7 @@ import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { X } from 'lucide-react';
+import { formatLaunch } from '@coinflip/shared/constants';
 import type { WsEvent } from '@coinflip/shared/types';
 
 type Tab = 'bets' | 'mybets' | 'history' | 'leaderboard';
@@ -45,6 +47,7 @@ export default function GamePage() {
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events/active'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events/completed'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/jackpot/active'] }),
     ]);
   }, [queryClient]);
 
@@ -115,6 +118,17 @@ export default function GamePage() {
       const title = data?.title ?? '';
       setEventNotification({ message: t('events.notifications.canceled', { title }), variant: 'error' });
     }
+
+    // Jackpot notifications
+    if (event.type === 'jackpot_won') {
+      const tierName = String(data?.tierName ?? '');
+      const amount = String(data?.amount ?? '0');
+      const winner = String(data?.winnerNickname || data?.winnerAddress || '');
+      setEventNotification({
+        message: t('jackpot.notifications.won', { tier: t(`jackpot.tiers.${tierName}`), winner, amount: formatLaunch(amount) }),
+        variant: 'success',
+      });
+    }
   }, [handlePendingWsEvent, addToast, address, t]);
 
   const { isConnected: wsConnected } = useWebSocket({ address, enabled: isConnected, onEvent: handleWsEvent });
@@ -173,6 +187,7 @@ export default function GamePage() {
       </div>
 
       <TopWinnerBanner />
+      <JackpotBanner />
 
       <div id="create-bet-form" className="hidden md:block">
         <CreateBetForm onBetSubmitted={addPending} />

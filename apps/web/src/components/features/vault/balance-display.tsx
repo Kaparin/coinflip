@@ -12,6 +12,7 @@ import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { signDepositTxBytes, signDeposit } from '@/lib/wallet-signer';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { API_URL, EXPLORER_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 
 /** Extract tx hash from CosmJS timeout error: "Transaction with ID 7C77... was submitted..." */
 function extractTxHashFromError(err: unknown): string | null {
@@ -409,6 +410,7 @@ export function BalanceDisplay() {
         headers: {
           'Content-Type': 'application/json',
           ...(address ? { 'x-wallet-address': address } : {}),
+          ...getAuthHeaders(),
         },
         credentials: 'include',
         body: JSON.stringify({ tx_bytes: txBytes }),

@@ -141,6 +141,19 @@ class WsService {
     this.broadcast({ type: 'event_results_published', data });
   }
 
+  /** Emit jackpot events */
+  emitJackpotUpdated(data: Record<string, unknown>) {
+    this.broadcast({ type: 'jackpot_updated', data });
+  }
+
+  emitJackpotWon(data: Record<string, unknown>) {
+    this.broadcast({ type: 'jackpot_won', data });
+  }
+
+  emitJackpotReset(data: Record<string, unknown>) {
+    this.broadcast({ type: 'jackpot_reset', data });
+  }
+
   getClientCount(): number {
     return this.clients.size;
   }

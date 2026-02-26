@@ -2,6 +2,7 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 
 export interface PlayerBet {
   id: string;
@@ -80,11 +81,7 @@ export function usePlayerProfile(address: string | null, page = 0, pageSize = 10
       });
       const res = await fetch(`${API_URL}/api/v1/users/${address}?${params}`, {
         credentials: 'include',
-        headers: {
-          ...(typeof window !== 'undefined' && sessionStorage.getItem('coinflip_auth_token')
-            ? { Authorization: `Bearer ${sessionStorage.getItem('coinflip_auth_token')}` }
-            : {}),
-        },
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error('Failed to fetch player profile');
       const json = await res.json();

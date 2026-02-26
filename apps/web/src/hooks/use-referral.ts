@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 
 const REF_STORAGE_KEY = 'coinflip_ref_code';
 
@@ -34,6 +35,7 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T | null> 
       ...opts,
       headers: {
         ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        ...getAuthHeaders(),
         ...opts?.headers,
       },
     });
@@ -83,6 +85,7 @@ export async function registerCapturedRef(): Promise<boolean> {
     headers: {
       'Content-Type': 'application/json',
       ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ code }),
   });
@@ -107,6 +110,7 @@ export async function registerByAddress(address: string): Promise<{ ok: boolean;
       headers: {
         'Content-Type': 'application/json',
         ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({ address }),
     });
@@ -163,6 +167,7 @@ export async function changeBranch(address: string): Promise<{ ok: boolean; reas
       headers: {
         'Content-Type': 'application/json',
         ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({ address }),
     });
@@ -212,6 +217,7 @@ export function useReferral(isConnected: boolean) {
         credentials: 'include',
         headers: {
           ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+          ...getAuthHeaders(),
         },
       });
       if (res.ok) {

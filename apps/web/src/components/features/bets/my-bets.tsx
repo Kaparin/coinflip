@@ -243,8 +243,8 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
       </div>
     );
   }
@@ -289,15 +289,15 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const renderPendingCard = (bet: PendingBet) => (
     <div
       key={bet.txHash}
-      className="rounded-2xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-4 animate-pulse"
+      className="rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-3 animate-pulse"
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={50} /></span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-1.5 text-base font-bold tabular-nums">{formatLaunch(bet.amount)} <LaunchTokenIcon size={40} /></span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
           {t('myBets.submitting')}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+      <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
         <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-primary)]/30 border-t-[var(--color-primary)]" />
         <span>{t('common.confirming')}</span>
       </div>
@@ -316,7 +316,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       <div
         key={bet.id}
         style={{ opacity }}
-        className={`rounded-2xl border p-4 transition-opacity duration-[2000ms] ${
+        className={`rounded-xl border p-3 transition-opacity duration-[2000ms] ${
           isRevealed
             ? isWinner
               ? 'border-green-500/40 bg-green-500/10'
@@ -325,10 +325,10 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
         }`}
       >
         <div className="flex items-center justify-between mb-1">
-          <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
-            {formatLaunch(bet.amount)} <LaunchTokenIcon size={50} />
+          <span className="flex items-center gap-1.5 text-base font-bold tabular-nums">
+            {formatLaunch(bet.amount)} <LaunchTokenIcon size={40} />
           </span>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
             isRevealed
               ? isWinner
                 ? 'bg-green-500/20 text-green-400'
@@ -341,7 +341,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
           </span>
         </div>
         {isRevealed && (
-          <p className={`text-sm font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-xs font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
             {isWinner ? `+${payout} LAUNCH` : `-${formatLaunch(bet.amount)} LAUNCH`}
           </p>
         )}
@@ -386,7 +386,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 <span className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
                 {t('myBets.submittingCount', { count: myPending.length })}
               </h3>
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
                 {myPending.map(renderPendingCard)}
               </div>
             </div>
@@ -429,7 +429,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 </div>
               )}
 
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
                 {myOpenBets.map((bet) => renderBetCard(bet, { isMine: true, withCancel: true }))}
               </div>
             </div>
@@ -444,7 +444,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
             <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
             {t('myBets.inProgress', { count: inPlayCount })}
           </h3>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {myAccepting.map((bet) => renderBetCard(bet))}
             {myInProgress.map((bet) => renderBetCard(bet))}
           </div>
@@ -457,7 +457,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
             {t('myBets.recentResults', { count: resultsCount })}
           </h3>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {visibleResolved.map(renderResolvedCard)}
           </div>
         </div>

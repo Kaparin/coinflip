@@ -12,6 +12,8 @@ import type {
   EventResponseSchema,
   EventLeaderboardEntrySchema,
   CreateEventRequestSchema,
+  JackpotPoolResponseSchema,
+  JackpotEligibilityResponseSchema,
 } from '../schemas/index.js';
 
 // ---- Inferred request types ----
@@ -33,6 +35,12 @@ export type PaginatedResponse<T> = z.infer<ReturnType<typeof PaginatedResponseSc
 export type EventResponse = z.infer<typeof EventResponseSchema>;
 export type EventLeaderboardEntry = z.infer<typeof EventLeaderboardEntrySchema>;
 export type CreateEventRequest = z.infer<typeof CreateEventRequestSchema>;
+
+// ---- Jackpot types ----
+export type JackpotPoolResponse = z.infer<typeof JackpotPoolResponseSchema>;
+export type JackpotEligibilityResponse = z.infer<typeof JackpotEligibilityResponseSchema>;
+export type JackpotTierName = 'mini' | 'medium' | 'large' | 'mega' | 'super_mega';
+export type JackpotPoolStatus = 'filling' | 'drawing' | 'completed';
 
 // ---- Enum types ----
 export type BetStatus = 'open' | 'accepting' | 'accepted' | 'revealed' | 'canceled' | 'timeout_claimed';
@@ -59,7 +67,10 @@ export type WsEventType =
   | 'event_ended'
   | 'event_results_published'
   | 'event_canceled'
-  | 'event_archived';
+  | 'event_archived'
+  | 'jackpot_updated'
+  | 'jackpot_won'
+  | 'jackpot_reset';
 
 export type WsEvent = {
   type: WsEventType;

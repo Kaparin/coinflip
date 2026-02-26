@@ -20,6 +20,7 @@ import { wsService } from './ws.service.js';
 import { eventService } from './event.service.js';
 import { referralService } from './referral.service.js';
 import { vaultService } from './vault.service.js';
+import { jackpotService } from './jackpot.service.js';
 import type { Database } from '@coinflip/db';
 import type { WsEventType } from '@coinflip/shared/types';
 
@@ -487,6 +488,9 @@ export class IndexerService {
           // Distribute referral rewards (idempotent — safe if already called by background task)
           await this.distributeReferralRewardsForBet(BigInt(betId));
 
+          // Contribute to jackpot pools (idempotent via unique constraint)
+          await this.processJackpotContribution(BigInt(betId));
+
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
         }
@@ -579,6 +583,9 @@ export class IndexerService {
 
           // Distribute referral rewards (idempotent — safe if already called by background task)
           await this.distributeReferralRewardsForBet(BigInt(betId));
+
+          // Contribute to jackpot pools (idempotent via unique constraint)
+          await this.processJackpotContribution(BigInt(betId));
 
           break;
         }
@@ -797,9 +804,10 @@ export class IndexerService {
             .set(updateData)
             .where(eq(bets.betId, bet.betId));
 
-          // If bet was resolved (revealed/timeout_claimed), distribute referral rewards
+          // If bet was resolved (revealed/timeout_claimed), distribute referral rewards + jackpot
           if (mappedStatus === 'revealed' || mappedStatus === 'timeout_claimed') {
             await this.distributeReferralRewardsForBet(bet.betId);
+            await this.processJackpotContribution(bet.betId);
           }
 
           synced++;
@@ -846,6 +854,33 @@ export class IndexerService {
       await referralService.distributeRewards(betId, totalPot, bet.makerUserId, bet.acceptorUserId);
     } catch (err) {
       logger.warn({ err, betId: betId.toString() }, 'Indexer: referral reward distribution failed');
+    }
+  }
+
+  /**
+   * Process jackpot contribution for a resolved bet.
+   * Looks up bet amount, calculates totalPot, delegates to jackpotService.
+   * Idempotent — jackpotService checks unique constraint on (pool_id, bet_id).
+   */
+  private async processJackpotContribution(betId: bigint): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      const { bets } = await import('@coinflip/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const [bet] = await this.db
+        .select({ amount: bets.amount })
+        .from(bets)
+        .where(eq(bets.betId, betId))
+        .limit(1);
+
+      if (!bet) return;
+
+      const totalPot = BigInt(bet.amount) * 2n;
+      await jackpotService.processBetContribution(betId, totalPot);
+    } catch (err) {
+      logger.warn({ err, betId: betId.toString() }, 'Indexer: jackpot contribution failed');
     }
   }
 
