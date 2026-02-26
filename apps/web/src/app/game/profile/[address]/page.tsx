@@ -20,6 +20,7 @@ import {
   GiChainLightning,
   GiChart,
   GiSwordClash,
+  GiOpenTreasureChest,
 } from 'react-icons/gi';
 import type { IconType } from 'react-icons';
 
@@ -721,6 +722,64 @@ export default function PlayerProfilePage() {
               {t('playerProfile.h2hNoGames')}
             </p>
           )}
+        </CollapsibleSection>
+      )}
+
+      {/* Jackpot Wins (if any) */}
+      {profile.jackpot_wins && profile.jackpot_wins.length > 0 && (
+        <CollapsibleSection
+          title={t('playerProfile.jackpotWins')}
+          icon={<GiOpenTreasureChest size={18} />}
+          defaultOpen={false}
+          badge={
+            <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+              {profile.jackpot_wins.length}
+            </span>
+          }
+        >
+          <div className="space-y-2">
+            {profile.jackpot_wins.map((jw, i) => {
+              const tierDisplayNames: Record<string, string> = {
+                mini: t('jackpot.tiers.mini'),
+                medium: t('jackpot.tiers.medium'),
+                large: t('jackpot.tiers.large'),
+                mega: t('jackpot.tiers.mega'),
+                super_mega: t('jackpot.tiers.super_mega'),
+              };
+              const tierColors: Record<string, string> = {
+                mini: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/20',
+                medium: 'text-blue-400 bg-blue-400/15 border-blue-400/20',
+                large: 'text-violet-400 bg-violet-400/15 border-violet-400/20',
+                mega: 'text-amber-400 bg-amber-400/15 border-amber-400/20',
+                super_mega: 'text-rose-400 bg-rose-400/15 border-rose-400/20',
+              };
+              const colors = tierColors[jw.tierName] ?? 'text-[var(--color-text-secondary)] bg-[var(--color-bg)] border-[var(--color-border)]';
+              const colorParts = colors.split(' ');
+              const textColor = colorParts[0] ?? '';
+
+              return (
+                <div key={i} className={`flex items-center gap-3 rounded-xl border p-3 ${colorParts.slice(1).join(' ')}`}>
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colorParts[1] ?? ''}`}>
+                    <GiOpenTreasureChest size={16} className={textColor} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold">{tierDisplayNames[jw.tierName] ?? jw.tierName} Jackpot</p>
+                    {jw.wonAt && (
+                      <p className="text-[10px] text-[var(--color-text-secondary)]">
+                        {new Date(jw.wonAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`text-sm font-bold tabular-nums ${textColor}`}>
+                      +{formatLaunch(Number(jw.amount))}
+                    </span>
+                    <LaunchTokenIcon size={32} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </CollapsibleSection>
       )}
 

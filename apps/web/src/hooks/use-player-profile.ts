@@ -50,6 +50,13 @@ export interface TelegramInfo {
   username: string;
 }
 
+export interface JackpotWin {
+  tierName: string;
+  amount: string;
+  wonAt: string | null;
+  cycle: number;
+}
+
 export interface PlayerProfile {
   address: string;
   nickname: string | null;
@@ -68,6 +75,7 @@ export interface PlayerProfile {
   achievements: Achievements;
   reactions: ReactionCount[];
   my_reaction: string | null;
+  jackpot_wins: JackpotWin[];
   telegram: TelegramInfo | null;
 }
 

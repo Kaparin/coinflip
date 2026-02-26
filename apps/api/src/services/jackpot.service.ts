@@ -8,7 +8,7 @@
 
 import crypto from 'node:crypto';
 import { eq, and, sql, inArray } from 'drizzle-orm';
-import { jackpotTiers, jackpotPools, jackpotContributions, users } from '@coinflip/db/schema';
+import { jackpotTiers, jackpotPools, jackpotContributions, users, userNotifications } from '@coinflip/db/schema';
 import { JACKPOT_PER_TIER_BPS } from '@coinflip/shared/constants';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
@@ -199,7 +199,7 @@ class JackpotService {
         })
         .where(eq(jackpotPools.id, poolId));
 
-      // Broadcast jackpot won
+      // Broadcast jackpot won to all clients
       wsService.broadcast({
         type: 'jackpot_won',
         data: {
@@ -210,6 +210,45 @@ class JackpotService {
           amount: prizeAmount,
           winnerAddress: winner.address,
           winnerNickname: winner.nickname,
+        },
+      });
+
+      // Insert persistent notification for the winner (survives offline)
+      const tierDisplayNames: Record<string, string> = {
+        mini: 'Mini',
+        medium: 'Medium',
+        large: 'Large',
+        mega: 'Mega',
+        super_mega: 'Super Mega',
+      };
+      const displayName = tierDisplayNames[pool.tierName] ?? pool.tierName;
+
+      await db.insert(userNotifications).values({
+        userId: winner.userId,
+        type: 'jackpot_won',
+        title: `Jackpot ${displayName} Won!`,
+        message: `You won the ${displayName} Jackpot — ${prizeAmount} LAUNCH!`,
+        metadata: {
+          poolId,
+          tierId: pool.tierId,
+          tierName: pool.tierName,
+          amount: prizeAmount,
+          cycle: pool.cycle,
+        },
+      });
+
+      // Send targeted WS to winner (for real-time modal even if they didn't see the broadcast)
+      wsService.sendToAddress(winner.address, {
+        type: 'jackpot_won',
+        data: {
+          poolId,
+          tierId: pool.tierId,
+          tierName: pool.tierName,
+          cycle: pool.cycle,
+          amount: prizeAmount,
+          winnerAddress: winner.address,
+          winnerNickname: winner.nickname,
+          isPersonal: true,
         },
       });
 

@@ -319,7 +319,8 @@
     "reactToProfile": "React to this profile",
     "removeReaction": "Remove reaction",
     "sendMessage": "Send Message",
-    "viewPublicProfile": "View public profile"
+    "viewPublicProfile": "View public profile",
+    "jackpotWins": "Jackpot Wins"
   },
   "leaderboard": {
     "wins": "Wins",
@@ -567,7 +568,8 @@
     "betReverted": "A bet is back in Open Bets — the previous accept failed.",
     "youWon": "You won!",
     "youLost": "You lost",
-    "gameResult": "Game result is in!"
+    "gameResult": "Game result is in!",
+    "activityTab": "Activity"
   },
   "nav": {
     "play": "Play",
@@ -750,6 +752,21 @@
     "welcome": "Welcome, {name}!",
     "connectWalletHint": "Connect your Axiome wallet to start playing",
     "connectWallet": "Connect Wallet"
+  },
+  "notifications": {
+    "jackpotWonTitle": "Jackpot Won!",
+    "jackpotDismiss": "Awesome!"
+  },
+  "activity": {
+    "tabAll": "All",
+    "tabGames": "Games",
+    "tabRewards": "Rewards",
+    "betWin": "Won vs {opponent}",
+    "betLoss": "Lost vs {opponent}",
+    "referralReward": "Referral reward (L{level} from {from})",
+    "jackpotWin": "{tier} Jackpot won!",
+    "loadMore": "Load more",
+    "noActivity": "No activity yet"
   },
   "jackpot": {
     "title": "Jackpots",

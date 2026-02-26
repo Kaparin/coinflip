@@ -1,9 +1,12 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { eq, sql } from 'drizzle-orm';
+import { jackpotPools, jackpotTiers } from '@coinflip/db/schema';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
+import { getDb } from '../lib/db.js';
 import { Errors } from '../lib/errors.js';
 import { verifyTelegramLogin } from '../lib/telegram-auth.js';
 import { logger } from '../lib/logger.js';
@@ -190,11 +193,24 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
 
   if (!user) throw Errors.userNotFound();
 
-  const [stats, recentBetsResult, achievements, reactions] = await Promise.all([
+  const db = getDb();
+  const [stats, recentBetsResult, achievements, reactions, jackpotWins] = await Promise.all([
     userService.getUserStats(user.id),
     userService.getPlayerRecentBets(user.id, limit, offset),
     userService.getUserAchievements(user.id),
     userService.getProfileReactions(user.id),
+    db
+      .select({
+        tierName: jackpotTiers.name,
+        amount: jackpotPools.currentAmount,
+        wonAt: jackpotPools.completedAt,
+        cycle: jackpotPools.cycle,
+      })
+      .from(jackpotPools)
+      .innerJoin(jackpotTiers, eq(jackpotTiers.id, jackpotPools.tierId))
+      .where(eq(jackpotPools.winnerUserId, user.id))
+      .orderBy(sql`${jackpotPools.completedAt} DESC NULLS LAST`)
+      .limit(10),
   ]);
 
   // H2H stats + viewer's own reaction if authenticated
@@ -221,6 +237,12 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       achievements,
       reactions,
       my_reaction: myReaction,
+      jackpot_wins: jackpotWins.map((jw) => ({
+        tierName: jw.tierName,
+        amount: jw.amount,
+        wonAt: jw.wonAt instanceof Date ? jw.wonAt.toISOString() : jw.wonAt ?? null,
+        cycle: jw.cycle,
+      })),
       telegram: user.telegramUsername ? {
         username: user.telegramUsername,
       } : null,

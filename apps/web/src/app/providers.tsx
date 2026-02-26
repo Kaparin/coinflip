@@ -8,6 +8,7 @@ import { PendingBalanceProvider } from '@/contexts/pending-balance-context';
 import { TelegramProvider, useTelegramContext } from '@/contexts/telegram-context';
 import { ConnectWalletModal } from '@/components/features/auth/connect-wallet-modal';
 import { I18nProvider } from '@/lib/i18n';
+import { NotificationProvider } from '@/components/features/notifications/notification-provider';
 import { captureRefCode, registerCapturedRef } from '@/hooks/use-referral';
 
 /** Capture referral code from URL on mount */
@@ -71,7 +72,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <WalletProvider>
             <PendingBalanceProvider>
               <ToastProvider>
-                <WalletModalBridge>{children}</WalletModalBridge>
+                <NotificationProvider>
+                  <WalletModalBridge>{children}</WalletModalBridge>
+                </NotificationProvider>
               </ToastProvider>
             </PendingBalanceProvider>
           </WalletProvider>

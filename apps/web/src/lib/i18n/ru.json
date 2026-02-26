@@ -319,7 +319,8 @@
     "reactToProfile": "Оставить реакцию",
     "removeReaction": "Убрать реакцию",
     "sendMessage": "Написать сообщение",
-    "viewPublicProfile": "Открыть публичный профиль"
+    "viewPublicProfile": "Открыть публичный профиль",
+    "jackpotWins": "Выигрыши джекпотов"
   },
   "leaderboard": {
     "wins": "Победы",
@@ -567,7 +568,8 @@
     "betReverted": "Ставка вернулась в открытые — предыдущее принятие не удалось.",
     "youWon": "Вы выиграли!",
     "youLost": "Вы проиграли",
-    "gameResult": "Результат игры получен!"
+    "gameResult": "Результат игры получен!",
+    "activityTab": "Активность"
   },
   "nav": {
     "play": "Играть",
@@ -750,6 +752,21 @@
     "welcome": "Добро пожаловать, {name}!",
     "connectWalletHint": "Подключите кошелёк Axiome чтобы начать играть",
     "connectWallet": "Подключить кошелёк"
+  },
+  "notifications": {
+    "jackpotWonTitle": "Джекпот выигран!",
+    "jackpotDismiss": "Круто!"
+  },
+  "activity": {
+    "tabAll": "Все",
+    "tabGames": "Игры",
+    "tabRewards": "Награды",
+    "betWin": "Выигрыш vs {opponent}",
+    "betLoss": "Проигрыш vs {opponent}",
+    "referralReward": "Реферальная награда (L{level} от {from})",
+    "jackpotWin": "Джекпот {tier} выигран!",
+    "loadMore": "Загрузить ещё",
+    "noActivity": "Пока нет активности"
   },
   "jackpot": {
     "title": "Джекпоты",
