@@ -508,9 +508,17 @@ export class RelayerService {
 
   // ---- Custom contract execution (for CW20 transfers, etc.) ----
 
+  /** Set of contract addresses the relayer is allowed to target (beyond the main CoinFlip contract). */
+  private get allowedContracts(): Set<string> {
+    const set = new Set<string>();
+    if (this.contractAddress) set.add(this.contractAddress);
+    if (env.LAUNCH_CW20_ADDR) set.add(env.LAUNCH_CW20_ADDR);
+    return set;
+  }
+
   /**
-   * Execute an action on ANY contract via authz MsgExec.
-   * The user must have granted GenericAuthorization for MsgExecuteContract.
+   * Execute an action on an allowed contract via authz MsgExec.
+   * Only whitelisted contract addresses are accepted (CoinFlip + LAUNCH CW20).
    */
   async submitExecOnContract(
     userAddress: string,
@@ -520,6 +528,13 @@ export class RelayerService {
   ): Promise<RelayResult> {
     if (!this.isReady()) {
       return { success: false, error: 'Relayer not initialized' };
+    }
+    if (!this.allowedContracts.has(contractAddress)) {
+      logger.error(
+        { contractAddress, allowed: [...this.allowedContracts] },
+        'submitExecOnContract called with non-whitelisted contract address',
+      );
+      return { success: false, error: 'Contract address not in whitelist' };
     }
     return this._submitExecInner(userAddress, action, memo, false, contractAddress);
   }

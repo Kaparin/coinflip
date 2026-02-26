@@ -17,18 +17,24 @@ const CHANGE_BRANCH_COST_MICRO = '1000000000';
 
 /**
  * Referral reward percentages from the TOTAL POT (2 × bet amount).
- * These come out of the 10% platform commission (20 LAUNCH on a 200 pot).
+ * These come out of the 10% platform commission (1000 bps).
  *
  * Level 1 (direct): 3% of pot  → 30% of commission
  * Level 2:          1.5% of pot → 15% of commission
  * Level 3:          0.5% of pot →  5% of commission
- * Platform keeps:   5% of pot  → 50% of commission
+ *
+ * Max per-bet referral cap: 500 BPS (5% of pot = 50% of commission).
+ * Both players' referral chains are processed, but total payout is capped
+ * to ensure the platform always retains at least 50% of commission.
  */
 const REWARD_BPS_BY_LEVEL: Record<number, bigint> = {
   1: 300n,  // 3%   (300 basis points)
   2: 150n,  // 1.5% (150 basis points)
   3: 50n,   // 0.5% (50 basis points)
 };
+
+/** Max total referral reward per bet, in BPS of the pot */
+const MAX_REFERRAL_BPS_PER_BET = 500n;
 
 const MAX_REFERRAL_DEPTH = 3;
 
@@ -80,6 +86,12 @@ export class ReferralService {
       where: eq(referrals.userId, userId),
     });
     if (existing) return false;
+
+    // Prevent cycles: walk up referrer's chain to ensure userId is not an ancestor
+    if (await this._wouldCreateCycle(userId, codeRow.ownerUserId)) {
+      logger.warn({ userId, referrerId: codeRow.ownerUserId }, 'Referral registration blocked — would create cycle');
+      return false;
+    }
 
     try {
       await this.db.insert(referrals).values({
@@ -196,6 +208,11 @@ export class ReferralService {
     });
     if (existing) {
       return { success: false, reason: 'ALREADY_HAS_REFERRER' };
+    }
+
+    // Prevent cycles: walk up referrer's chain to ensure userId is not an ancestor
+    if (await this._wouldCreateCycle(userId, referrer.id)) {
+      return { success: false, reason: 'WOULD_CREATE_CYCLE' };
     }
 
     // Get or create referrer's code
@@ -346,6 +363,25 @@ export class ReferralService {
   }
 
   /**
+   * Check if setting referrerId as the referrer of userId would create a cycle.
+   * Walks up referrerId's chain to ensure userId doesn't appear as an ancestor.
+   */
+  private async _wouldCreateCycle(userId: string, referrerId: string): Promise<boolean> {
+    let cursor = referrerId;
+    const visited = new Set<string>([userId]);
+    for (let i = 0; i < 20; i++) {
+      const ref = await this.db.query.referrals.findFirst({
+        where: eq(referrals.userId, cursor),
+      });
+      if (!ref) return false;
+      if (visited.has(ref.referrerUserId)) return true;
+      visited.add(ref.referrerUserId);
+      cursor = ref.referrerUserId;
+    }
+    return false;
+  }
+
+  /**
    * Walk up the referral chain (max 3 levels) starting from a player.
    * Returns an array of { userId, level } for each referrer in the chain.
    * Includes cycle detection to prevent infinite loops.
@@ -432,20 +468,44 @@ export class ReferralService {
 
     if (rewardMap.size === 0) return;
 
-    // Write rewards + update balances in a single transaction (all-or-nothing)
+    // Enforce per-bet cap: total referral payout ≤ MAX_REFERRAL_BPS_PER_BET of pot
+    const maxReward = (totalPot * MAX_REFERRAL_BPS_PER_BET) / 10000n;
+    let totalAllocated = 0n;
+    const cappedRewards: Array<{ key: string; referrerId: string; amount: bigint; level: number; fromPlayer: string }> = [];
+
+    for (const [key, { amount, level, fromPlayer }] of rewardMap) {
+      const referrerId = key.split(':')[0]!;
+      const remaining = maxReward - totalAllocated;
+      if (remaining <= 0n) break;
+      const capped = amount > remaining ? remaining : amount;
+      cappedRewards.push({ key, referrerId, amount: capped, level, fromPlayer });
+      totalAllocated += capped;
+    }
+
+    if (cappedRewards.length === 0) return;
+
+    // Write rewards + update balances in a single transaction (all-or-nothing).
+    // Use RETURNING on the reward insert to detect if it was actually inserted
+    // (vs. skipped due to unique constraint). Only update balance if insert succeeded.
+    // This prevents double-crediting when both indexer and background task call this concurrently.
     try {
       await this.db.transaction(async (tx) => {
-        for (const [key, { amount, level, fromPlayer }] of rewardMap) {
-          const referrerId = key.split(':')[0]!;
+        for (const { referrerId, amount, level, fromPlayer } of cappedRewards) {
 
-          // Record the reward event (unique constraint prevents duplicates from race conditions)
-          await tx.insert(referralRewards).values({
+          // Record the reward event — RETURNING tells us if it was actually inserted
+          const inserted = await tx.insert(referralRewards).values({
             recipientUserId: referrerId,
             fromPlayerUserId: fromPlayer,
             betId: betIdStr,
             amount: amount.toString(),
             level,
-          }).onConflictDoNothing();
+          }).onConflictDoNothing().returning({ id: referralRewards.id });
+
+          // Only update balance if the reward was actually inserted (not a duplicate)
+          if (inserted.length === 0) {
+            logger.debug({ referrerId, betId: betIdStr, level }, `${tag} — reward already exists, skipping balance update`);
+            continue;
+          }
 
           // Upsert referral balance (on insert: set initial values; on conflict: increment)
           await tx
@@ -604,9 +664,9 @@ export class ReferralService {
   private async _countTeamSize(userId: string): Promise<number> {
     const result = await this.db.execute(sql`
       with recursive team as (
-        select user_id from referrals where referrer_user_id = ${userId}
+        select user_id, 1 as depth from referrals where referrer_user_id = ${userId}
         union all
-        select r.user_id from referrals r join team t on r.referrer_user_id = t.user_id
+        select r.user_id, t.depth + 1 from referrals r join team t on r.referrer_user_id = t.user_id where t.depth < 10
       )
       select count(*)::int as size from team
     `);

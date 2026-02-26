@@ -23,8 +23,8 @@ import { toMicroLaunch } from '@coinflip/shared/constants';
 import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
 import { MsgExec, MsgGrant } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
-import { GenericAuthorization } from 'cosmjs-types/cosmos/authz/v1beta1/authz';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
+import { ContractExecutionAuthorization, AcceptedMessageKeysFilter } from 'cosmjs-types/cosmwasm/wasm/v1/authz';
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 
 /**
@@ -266,6 +266,44 @@ export async function signAuthzGrant(
 
   const expiration = new Date(Date.now() + expirationSeconds * 1000);
 
+  // Build scoped ContractExecutionAuthorization grants.
+  // Each grant specifies a contract address + allowed message keys.
+  // This is MUCH safer than GenericAuthorization which allows ANY contract execution.
+  const contractGrants: Array<{
+    contract: string;
+    filter: { typeUrl: string; value: Uint8Array };
+  }> = [];
+
+  // CoinFlip contract: game actions + withdraw
+  if (COINFLIP_CONTRACT) {
+    contractGrants.push({
+      contract: COINFLIP_CONTRACT,
+      filter: {
+        typeUrl: '/cosmwasm.wasm.v1.AcceptedMessageKeysFilter',
+        value: AcceptedMessageKeysFilter.encode(
+          AcceptedMessageKeysFilter.fromPartial({
+            keys: ['create_bet', 'accept_bet', 'accept_and_reveal', 'reveal', 'cancel_bet', 'claim_timeout', 'withdraw'],
+          }),
+        ).finish(),
+      },
+    });
+  }
+
+  // LAUNCH CW20 contract: transfer (needed for branch-change fee payment)
+  if (LAUNCH_CW20_CONTRACT) {
+    contractGrants.push({
+      contract: LAUNCH_CW20_CONTRACT,
+      filter: {
+        typeUrl: '/cosmwasm.wasm.v1.AcceptedMessageKeysFilter',
+        value: AcceptedMessageKeysFilter.encode(
+          AcceptedMessageKeysFilter.fromPartial({
+            keys: ['transfer'],
+          }),
+        ).finish(),
+      },
+    });
+  }
+
   const msgGrant = {
     typeUrl: '/cosmos.authz.v1beta1.MsgGrant',
     value: MsgGrant.fromPartial({
@@ -273,10 +311,10 @@ export async function signAuthzGrant(
       grantee,
       grant: {
         authorization: {
-          typeUrl: '/cosmos.authz.v1beta1.GenericAuthorization',
-          value: GenericAuthorization.encode(
-            GenericAuthorization.fromPartial({
-              msg: '/cosmwasm.wasm.v1.MsgExecuteContract',
+          typeUrl: '/cosmwasm.wasm.v1.ContractExecutionAuthorization',
+          value: ContractExecutionAuthorization.encode(
+            ContractExecutionAuthorization.fromPartial({
+              grants: contractGrants,
             }),
           ).finish(),
         },

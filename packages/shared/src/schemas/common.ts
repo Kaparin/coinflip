@@ -35,6 +35,7 @@ export const AddressSchema = z
 export const AmountSchema = z
   .string()
   .regex(/^\d+$/, 'Amount must be a numeric string')
+  .refine((val) => val.length <= 20, 'Amount exceeds maximum (10^20)')
   .openapi({ description: 'Token amount as string', example: '100' });
 
 export const TxHashSchema = z
