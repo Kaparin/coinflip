@@ -4,11 +4,13 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { JackpotProgressBar } from './jackpot-progress-bar';
 import { useTranslation } from '@/lib/i18n';
-import { Coins, Zap, Flame, Crown, Sparkles, type LucideIcon } from 'lucide-react';
+import { GiCoins, GiLightningFrequency, GiFireGem, GiCrown, GiOpenTreasureChest } from 'react-icons/gi';
 import type { JackpotPoolResponse } from '@coinflip/shared/types';
+import type { IconType } from 'react-icons';
 
 interface TierStyle {
-  icon: LucideIcon;
+  icon: IconType;
+  iconSize: number;
   border: string;
   badge: string;
   accent: string;
@@ -20,7 +22,8 @@ interface TierStyle {
 
 const TIER_STYLES: Record<string, TierStyle> = {
   mini: {
-    icon: Coins,
+    icon: GiCoins,
+    iconSize: 20,
     border: 'border-emerald-500/20 hover:border-emerald-500/40',
     badge: 'bg-emerald-500/15 text-emerald-400',
     accent: 'text-emerald-400',
@@ -30,7 +33,8 @@ const TIER_STYLES: Record<string, TierStyle> = {
     shimmerColor: 'via-emerald-400/[0.03]',
   },
   medium: {
-    icon: Zap,
+    icon: GiLightningFrequency,
+    iconSize: 20,
     border: 'border-blue-500/20 hover:border-blue-500/40',
     badge: 'bg-blue-500/15 text-blue-400',
     accent: 'text-blue-400',
@@ -40,7 +44,8 @@ const TIER_STYLES: Record<string, TierStyle> = {
     shimmerColor: 'via-blue-400/[0.03]',
   },
   large: {
-    icon: Flame,
+    icon: GiFireGem,
+    iconSize: 20,
     border: 'border-violet-500/20 hover:border-violet-500/40',
     badge: 'bg-violet-500/15 text-violet-400',
     accent: 'text-violet-400',
@@ -50,7 +55,8 @@ const TIER_STYLES: Record<string, TierStyle> = {
     shimmerColor: 'via-violet-400/[0.03]',
   },
   mega: {
-    icon: Crown,
+    icon: GiCrown,
+    iconSize: 20,
     border: 'border-amber-500/20 hover:border-amber-500/40',
     badge: 'bg-amber-500/15 text-amber-400',
     accent: 'text-amber-400',
@@ -60,14 +66,15 @@ const TIER_STYLES: Record<string, TierStyle> = {
     shimmerColor: 'via-amber-400/[0.03]',
   },
   super_mega: {
-    icon: Sparkles,
-    border: 'border-red-500/20 hover:border-red-500/40',
-    badge: 'bg-gradient-to-r from-red-500/15 to-amber-500/15 text-amber-300',
-    accent: 'text-amber-300',
-    iconBg: 'from-red-400/20 via-amber-400/15 to-yellow-400/10 border-red-500/25',
-    iconGlow: 'bg-red-400/10',
-    iconColor: 'text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]',
-    shimmerColor: 'via-red-400/[0.03]',
+    icon: GiOpenTreasureChest,
+    iconSize: 22,
+    border: 'border-rose-500/20 hover:border-rose-500/40',
+    badge: 'bg-gradient-to-r from-rose-500/15 to-amber-500/15 text-rose-300',
+    accent: 'text-rose-300',
+    iconBg: 'from-rose-400/20 via-amber-400/15 to-yellow-400/10 border-rose-500/25',
+    iconGlow: 'bg-rose-400/10',
+    iconColor: 'text-rose-300 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]',
+    shimmerColor: 'via-rose-400/[0.03]',
   },
 };
 
@@ -106,7 +113,7 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
             <div className="relative shrink-0">
               <div className={`absolute -inset-1 rounded-full ${style.iconGlow} blur-md ${isNearlyFull ? 'animate-pulse-glow' : ''}`} />
               <div className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${style.iconBg} border`}>
-                <Icon size={18} className={style.iconColor} />
+                <Icon size={style.iconSize} className={style.iconColor} />
               </div>
             </div>
             <div>

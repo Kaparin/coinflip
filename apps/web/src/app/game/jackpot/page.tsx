@@ -7,7 +7,8 @@ import { JackpotHistory } from '@/components/features/jackpot/jackpot-history';
 import { LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Trophy, History, Coins, Target, Gift, Zap, Info, ChevronDown } from 'lucide-react';
+import { ArrowLeft, History, Info } from 'lucide-react';
+import { GiOpenTreasureChest, GiCoins, GiTargeting, GiPresent, GiLightningFrequency } from 'react-icons/gi';
 import Link from 'next/link';
 
 type Tab = 'active' | 'history';
@@ -36,7 +37,7 @@ export default function JackpotPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <Trophy size={20} className="text-indigo-400 drop-shadow-[0_0_6px_rgba(129,140,248,0.4)]" />
+            <GiOpenTreasureChest size={22} className="text-rose-400 drop-shadow-[0_0_6px_rgba(251,113,133,0.5)]" />
             {t('jackpot.title')}
           </h1>
           <p className="text-xs text-[var(--color-text-secondary)]">
@@ -49,7 +50,7 @@ export default function JackpotPage() {
           onClick={() => setShowInfo(!showInfo)}
           className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
             showInfo
-              ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'
+              ? 'border-rose-500/30 bg-rose-500/10 text-rose-400'
               : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/5'
           }`}
         >
@@ -59,16 +60,16 @@ export default function JackpotPage() {
 
       {/* Collapsible how-it-works */}
       {showInfo && (
-        <div className="rounded-xl border border-indigo-500/20 bg-[var(--color-surface)] p-3.5 animate-fade-up">
+        <div className="rounded-xl border border-rose-500/20 bg-[var(--color-surface)] p-3.5 animate-fade-up">
           <div className="flex items-center gap-2 mb-2.5">
-            <Info size={14} className="text-indigo-400" />
-            <span className="text-xs font-bold text-indigo-400">{t('jackpot.howTitle')}</span>
+            <Info size={14} className="text-rose-400" />
+            <span className="text-xs font-bold text-rose-400">{t('jackpot.howTitle')}</span>
           </div>
           <div className="space-y-2">
-            <HowItWorksStep icon={Coins} text={t('jackpot.howStep1')} />
-            <HowItWorksStep icon={Target} text={t('jackpot.howStep2')} />
-            <HowItWorksStep icon={Gift} text={t('jackpot.howStep3')} />
-            <HowItWorksStep icon={Zap} text={t('jackpot.howStep4')} />
+            <HowItWorksStep icon={GiCoins} text={t('jackpot.howStep1')} />
+            <HowItWorksStep icon={GiTargeting} text={t('jackpot.howStep2')} />
+            <HowItWorksStep icon={GiPresent} text={t('jackpot.howStep3')} />
+            <HowItWorksStep icon={GiLightningFrequency} text={t('jackpot.howStep4')} />
           </div>
         </div>
       )}
@@ -82,7 +83,7 @@ export default function JackpotPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <LaunchTokenIcon size={16} />
-              <span className="text-lg font-black tabular-nums text-indigo-400">
+              <span className="text-lg font-black tabular-nums text-rose-400">
                 {formatLaunch(totalAmount.toString())}
               </span>
             </div>
@@ -96,7 +97,7 @@ export default function JackpotPage() {
                 <span className="text-lg font-black tabular-nums">
                   {t(`jackpot.tiers.${closest.tierName}`)}
                 </span>
-                <span className="text-sm font-bold text-indigo-400">{closest.progress}%</span>
+                <span className="text-sm font-bold text-rose-400">{closest.progress}%</span>
               </div>
             </div>
           )}
@@ -108,7 +109,7 @@ export default function JackpotPage() {
         <TabButton
           active={activeTab === 'active'}
           onClick={() => setActiveTab('active')}
-          icon={<Trophy size={14} />}
+          icon={<GiOpenTreasureChest size={14} />}
           label={t('jackpot.activePools')}
         />
         <TabButton
@@ -174,11 +175,11 @@ function TabButton({
   );
 }
 
-function HowItWorksStep({ icon: Icon, text }: { icon: typeof Coins; text: string }) {
+function HowItWorksStep({ icon: Icon, text }: { icon: React.ComponentType<{ size?: number; className?: string }>; text: string }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/10">
-        <Icon size={12} className="text-indigo-400" />
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-rose-500/10">
+        <Icon size={12} className="text-rose-400" />
       </div>
       <span className="text-[11px] text-[var(--color-text-secondary)] leading-snug">{text}</span>
     </div>
