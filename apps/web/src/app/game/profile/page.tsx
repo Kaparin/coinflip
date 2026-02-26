@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
-  ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User, Check,
+  ChevronDown, ChevronRight, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
   Loader2, BarChart3, Gift, Target, MessageCircle,
 } from 'lucide-react';
@@ -1238,6 +1238,18 @@ export default function ProfilePage() {
             </Link>
           )}
         </div>
+
+        {/* View public profile link */}
+        {wallet.address && (
+          <Link
+            href={`/game/profile/${wallet.address}`}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+          >
+            <Trophy size={14} />
+            {t('playerProfile.viewPublicProfile')}
+            <ChevronRight size={14} />
+          </Link>
+        )}
       </div>
 
       {/* Telegram */}

@@ -258,7 +258,8 @@
   },
   "topWinner": {
     "title": "Рекордный выигрыш",
-    "label": "Топ выигрыш:"
+    "label": "Топ выигрыш:",
+    "won": "выиграл"
   },
   "playerProfile": {
     "memberSince": "Участник с {date}",
@@ -317,7 +318,8 @@
     "reactions": "Реакции",
     "reactToProfile": "Оставить реакцию",
     "removeReaction": "Убрать реакцию",
-    "sendMessage": "Написать сообщение"
+    "sendMessage": "Написать сообщение",
+    "viewPublicProfile": "Открыть публичный профиль"
   },
   "leaderboard": {
     "wins": "Победы",

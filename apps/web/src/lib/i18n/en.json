@@ -258,7 +258,8 @@
   },
   "topWinner": {
     "title": "Record win",
-    "label": "Top win:"
+    "label": "Top win:",
+    "won": "won"
   },
   "playerProfile": {
     "memberSince": "Member since {date}",
@@ -317,7 +318,8 @@
     "reactions": "Reactions",
     "reactToProfile": "React to this profile",
     "removeReaction": "Remove reaction",
-    "sendMessage": "Send Message"
+    "sendMessage": "Send Message",
+    "viewPublicProfile": "View public profile"
   },
   "leaderboard": {
     "wins": "Wins",
