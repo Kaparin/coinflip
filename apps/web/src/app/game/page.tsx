@@ -94,9 +94,6 @@ export default function GamePage() {
     }
     if (event.type === 'bet_revealed') {
       if (!isMyBet || isStale) return;
-      const winner = data?.winner?.toLowerCase();
-      const isWinner = winner && addr === winner;
-      addToast(isWinner ? 'success' : 'warning', isWinner ? t('game.youWon') : t('game.youLost'));
     }
 
     // Event lifecycle notifications
