@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 
 export interface PlayerBet {
@@ -92,5 +92,7 @@ export function usePlayerProfile(address: string | null, page = 0, pageSize = 10
     },
     enabled: !!address,
     staleTime: 15_000,
+    // Keep previous page data visible while fetching next page (no flash/reload)
+    placeholderData: keepPreviousData,
   });
 }

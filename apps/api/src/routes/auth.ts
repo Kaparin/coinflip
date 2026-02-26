@@ -17,6 +17,7 @@ import {
   SESSION_COOKIE_NAME,
   getSessionCookieOptions,
 } from '../services/session.service.js';
+import { validateTelegramInitData } from '../lib/telegram-auth.js';
 import type { AppEnv } from '../types.js';
 
 export const authRouter = new Hono<AppEnv>();
@@ -99,6 +100,122 @@ authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
       token: sessionToken,
     },
   });
+});
+
+// ─── Telegram Mini App Authentication ─────────────────────────
+
+// POST /api/v1/auth/telegram — Authenticate via Telegram Mini App initData
+const TelegramAuthSchema = z.object({
+  initData: z.string().min(1),
+});
+
+authRouter.post('/telegram', zValidator('json', TelegramAuthSchema), async (c) => {
+  const { initData } = c.req.valid('json');
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return c.json({ error: { code: 'SERVER_ERROR', message: 'Telegram not configured' } }, 500);
+  }
+
+  let validated;
+  try {
+    validated = validateTelegramInitData(initData, botToken);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Invalid initData';
+    return c.json({ error: { code: 'INVALID_INIT_DATA', message: msg } }, 401);
+  }
+
+  const tgUser = validated.user;
+
+  // Find or create user by Telegram ID
+  const user = await userService.findOrCreateByTelegram(tgUser.id, {
+    username: tgUser.username ?? null,
+    firstName: tgUser.first_name,
+    photoUrl: tgUser.photo_url ?? null,
+  });
+
+  const hasWallet = !!user.address && !user.address.startsWith('tg_');
+
+  // If user has a real wallet address, create a full session
+  let token: string | null = null;
+  if (hasWallet) {
+    token = createSessionToken(user.address!);
+    const isProd = env.NODE_ENV === 'production';
+    setCookie(c, SESSION_COOKIE_NAME, token, getSessionCookieOptions(isProd));
+  }
+
+  // Handle referral from start_param (e.g. ?startapp=ref_axm1abc...)
+  if (validated.start_param?.startsWith('ref_')) {
+    const refAddress = validated.start_param.slice(4);
+    if (refAddress.startsWith('axm1')) {
+      try {
+        await referralService.autoAssignDefaultReferrer(user.id);
+      } catch {
+        // Ignore referral errors
+      }
+    }
+  }
+
+  logger.info({ telegramId: tgUser.id, username: tgUser.username, hasWallet }, 'Telegram Mini App auth');
+
+  return c.json({
+    data: {
+      user_id: user.id,
+      address: hasWallet ? user.address : null,
+      has_wallet: hasWallet,
+      telegram: {
+        id: tgUser.id,
+        username: tgUser.username ?? null,
+        first_name: tgUser.first_name,
+        photo_url: tgUser.photo_url ?? null,
+        is_premium: tgUser.is_premium ?? false,
+      },
+      token: token,
+    },
+  });
+});
+
+// POST /api/v1/auth/telegram/link-wallet — Link wallet to Telegram user after wallet auth
+const LinkWalletSchema = z.object({
+  telegram_user_id: z.string().min(1),
+  address: z.string().min(20).max(100),
+});
+
+authRouter.post('/telegram/link-wallet', authMiddleware, zValidator('json', LinkWalletSchema), async (c) => {
+  const { telegram_user_id, address } = c.req.valid('json');
+  const currentUser = c.get('user');
+
+  // Verify the caller's address matches
+  if (currentUser.address.toLowerCase() !== address.toLowerCase()) {
+    return c.json({ error: { code: 'MISMATCH', message: 'Address mismatch' } }, 400);
+  }
+
+  try {
+    const tgId = Number(telegram_user_id);
+    if (Number.isNaN(tgId)) {
+      return c.json({ error: { code: 'INVALID_TG_ID', message: 'Invalid Telegram user ID' } }, 400);
+    }
+
+    // Find the TG-only placeholder user (if exists) and merge into the wallet user
+    const tgUser = await userService.getUserByTelegramId(tgId);
+    if (tgUser && tgUser.id !== currentUser.id) {
+      // Merge TG placeholder into wallet user
+      await userService.linkWalletToTelegramUser(tgUser.id, address.toLowerCase());
+    } else {
+      // No TG placeholder — directly link TG data to the wallet user
+      await userService.linkTelegram(currentUser.id, {
+        telegramId: tgId,
+        username: tgUser?.telegramUsername ?? null,
+        firstName: tgUser?.telegramFirstName ?? telegram_user_id,
+        photoUrl: tgUser?.telegramPhotoUrl ?? null,
+      });
+    }
+    logger.info({ telegramUserId: telegram_user_id, address }, 'Wallet linked to Telegram user');
+  } catch (err) {
+    logger.warn({ err }, 'Failed to link wallet to Telegram user');
+  }
+
+  return c.json({ data: { linked: true } });
 });
 
 // ─── Legacy Connect (dev-only, production requires /auth/verify) ─────

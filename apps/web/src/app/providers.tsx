@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ToastProvider } from '@/components/ui/toast';
 import { WalletProvider, useWalletContext } from '@/contexts/wallet-context';
 import { PendingBalanceProvider } from '@/contexts/pending-balance-context';
+import { TelegramProvider, useTelegramContext } from '@/contexts/telegram-context';
 import { ConnectWalletModal } from '@/components/features/auth/connect-wallet-modal';
 import { I18nProvider } from '@/lib/i18n';
 import { captureRefCode, registerCapturedRef } from '@/hooks/use-referral';
@@ -17,8 +18,10 @@ function RefCodeCapture() {
 
 /** Inner component that can use wallet context */
 function WalletModalBridge({ children }: { children: React.ReactNode }) {
-  const { isConnectModalOpen, closeConnectModal, isConnected } = useWalletContext();
+  const { isConnectModalOpen, closeConnectModal, isConnected, address } = useWalletContext();
+  const { isTelegramApp, telegramUser, linkWallet } = useTelegramContext();
   const registeredRef = useRef(false);
+  const tgLinkedRef = useRef(false);
 
   useEffect(() => {
     if (isConnected && !registeredRef.current) {
@@ -26,6 +29,14 @@ function WalletModalBridge({ children }: { children: React.ReactNode }) {
       registerCapturedRef();
     }
   }, [isConnected]);
+
+  // Auto-link wallet to Telegram user when wallet connects inside TG Mini App
+  useEffect(() => {
+    if (isTelegramApp && telegramUser && isConnected && address && !tgLinkedRef.current) {
+      tgLinkedRef.current = true;
+      linkWallet(address).catch(() => {});
+    }
+  }, [isTelegramApp, telegramUser, isConnected, address, linkWallet]);
 
   return (
     <>
@@ -56,13 +67,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <I18nProvider>
       <RefCodeCapture />
       <QueryClientProvider client={queryClient}>
-        <WalletProvider>
-          <PendingBalanceProvider>
-            <ToastProvider>
-              <WalletModalBridge>{children}</WalletModalBridge>
-            </ToastProvider>
-          </PendingBalanceProvider>
-        </WalletProvider>
+        <TelegramProvider>
+          <WalletProvider>
+            <PendingBalanceProvider>
+              <ToastProvider>
+                <WalletModalBridge>{children}</WalletModalBridge>
+              </ToastProvider>
+            </PendingBalanceProvider>
+          </WalletProvider>
+        </TelegramProvider>
       </QueryClientProvider>
     </I18nProvider>
   );

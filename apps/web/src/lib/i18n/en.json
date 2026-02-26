@@ -278,6 +278,7 @@
     "h2hTitle": "Head to Head",
     "h2hYou": "You",
     "h2hThem": "Opponent",
+    "h2hWins": "wins",
     "h2hGames": "{count} games",
     "h2hNoGames": "You haven't played against this player yet",
     "playerNotFound": "Player not found",

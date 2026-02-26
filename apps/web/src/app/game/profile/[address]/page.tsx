@@ -8,7 +8,7 @@ import { useTranslation } from '@/lib/i18n';
 import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 import Link from 'next/link';
@@ -351,7 +351,7 @@ export default function PlayerProfilePage() {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
-  const { data: profile, isLoading, error } = usePlayerProfile(rawAddress, page, PAGE_SIZE);
+  const { data: profile, isLoading, error, isFetching, isPlaceholderData } = usePlayerProfile(rawAddress, page, PAGE_SIZE);
 
   const [copied, setCopied] = useState(false);
   const [reactingEmoji, setReactingEmoji] = useState<string | null>(null);
@@ -664,23 +664,59 @@ export default function PlayerProfilePage() {
           icon={<GiSwordClash size={18} />}
           defaultOpen={profile.h2h.total_games > 0}
         >
-          {profile.h2h.total_games > 0 ? (
-            <div className="flex items-center justify-between">
-              <div className="text-center flex-1">
-                <p className="text-2xl font-bold text-[var(--color-success)]">{profile.h2h.your_wins}</p>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">{t('playerProfile.h2hYou')}</p>
+          {profile.h2h.total_games > 0 ? (() => {
+            const myWins = profile.h2h!.your_wins;
+            const theirWins = profile.h2h!.their_wins;
+            const total = profile.h2h!.total_games;
+            const myPct = total > 0 ? Math.round((myWins / total) * 100) : 0;
+            const theirPct = total > 0 ? Math.round((theirWins / total) * 100) : 0;
+            const myName = t('playerProfile.h2hYou');
+            const theirName = profile.nickname || truncAddr(profile.address);
+            return (
+              <div className="space-y-3">
+                {/* Score line */}
+                <div className="flex items-center justify-between">
+                  <div className="text-center flex-1">
+                    <p className="text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">{myName}</p>
+                    <p className="text-2xl font-bold text-[var(--color-success)]">{myWins}</p>
+                    <p className="text-[9px] text-[var(--color-text-secondary)]">{t('playerProfile.h2hWins')}</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 px-3">
+                    <span className="text-lg font-bold text-[var(--color-text-secondary)]">:</span>
+                    <span className="text-[9px] text-[var(--color-text-secondary)]">
+                      {t('playerProfile.h2hGames', { count: total })}
+                    </span>
+                  </div>
+                  <div className="text-center flex-1">
+                    <p className="text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 truncate max-w-[100px] mx-auto">{theirName}</p>
+                    <p className="text-2xl font-bold text-[var(--color-danger)]">{theirWins}</p>
+                    <p className="text-[9px] text-[var(--color-text-secondary)]">{t('playerProfile.h2hWins')}</p>
+                  </div>
+                </div>
+                {/* Visual ratio bar */}
+                <div className="flex h-2 rounded-full overflow-hidden bg-[var(--color-bg)] border border-[var(--color-border)]">
+                  {myWins > 0 && (
+                    <div
+                      className="bg-[var(--color-success)] transition-all duration-300"
+                      style={{ width: `${myPct}%` }}
+                    />
+                  )}
+                  {total > myWins + theirWins && (
+                    <div
+                      className="bg-[var(--color-text-secondary)]/20"
+                      style={{ width: `${100 - myPct - theirPct}%` }}
+                    />
+                  )}
+                  {theirWins > 0 && (
+                    <div
+                      className="bg-[var(--color-danger)] transition-all duration-300"
+                      style={{ width: `${theirPct}%` }}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="text-center px-4">
-                <p className="text-xs text-[var(--color-text-secondary)] font-medium">
-                  {t('playerProfile.h2hGames', { count: profile.h2h.total_games })}
-                </p>
-              </div>
-              <div className="text-center flex-1">
-                <p className="text-2xl font-bold text-[var(--color-danger)]">{profile.h2h.their_wins}</p>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">{t('playerProfile.h2hThem')}</p>
-              </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <p className="text-xs text-[var(--color-text-secondary)] text-center py-2">
               {t('playerProfile.h2hNoGames')}
             </p>
@@ -762,19 +798,20 @@ export default function PlayerProfilePage() {
               <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
-                  disabled={page === 0}
+                  disabled={page === 0 || (isFetching && isPlaceholderData)}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-30 hover:bg-[var(--color-surface-hover)] transition-colors"
                 >
                   <ChevronLeft size={14} />
                   {t('playerProfile.prevPage')}
                 </button>
-                <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+                <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums flex items-center gap-1.5">
+                  {isFetching && isPlaceholderData && <Loader2 size={12} className="animate-spin" />}
                   {t('playerProfile.page', { page: page + 1, total: totalPages })}
                 </span>
                 <button
                   type="button"
-                  disabled={page >= totalPages - 1}
+                  disabled={page >= totalPages - 1 || (isFetching && isPlaceholderData)}
                   onClick={() => setPage((p) => p + 1)}
                   className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-30 hover:bg-[var(--color-surface-hover)] transition-colors"
                 >

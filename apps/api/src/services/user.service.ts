@@ -37,6 +37,132 @@ export class UserService {
     });
   }
 
+  /**
+   * Find user by Telegram ID. Returns the most recently linked wallet user.
+   * If multiple wallets have the same TG, returns the one with a real address first,
+   * then by most recent telegram_linked_at.
+   */
+  async getUserByTelegramId(telegramId: number) {
+    const rows = await this.db.execute(
+      sql`select * from users where telegram_id = ${telegramId}
+          order by
+            case when address not like 'tg_%' then 0 else 1 end,
+            telegram_linked_at desc nulls last
+          limit 1`
+    );
+    const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    if (!rawRows.length) return null;
+    const r = rawRows[0]!;
+    return {
+      id: String(r.id),
+      address: r.address ? String(r.address) : null,
+      profileNickname: r.profile_nickname ? String(r.profile_nickname) : null,
+      avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
+      telegramId: r.telegram_id ? Number(r.telegram_id) : null,
+      telegramUsername: r.telegram_username ? String(r.telegram_username) : null,
+      telegramFirstName: r.telegram_first_name ? String(r.telegram_first_name) : null,
+      telegramPhotoUrl: r.telegram_photo_url ? String(r.telegram_photo_url) : null,
+    };
+  }
+
+  /**
+   * Find or create user by Telegram ID (for Mini App auth).
+   * Creates a user without wallet address — address gets linked later when wallet connects.
+   */
+  async findOrCreateByTelegram(telegramId: number, data: {
+    username: string | null;
+    firstName: string;
+    photoUrl: string | null;
+  }) {
+    // Check if telegram user exists
+    const existing = await this.getUserByTelegramId(telegramId);
+    if (existing) {
+      // Update TG data if changed
+      await this.db.execute(
+        sql`update users set
+          telegram_username = ${data.username},
+          telegram_first_name = ${data.firstName},
+          telegram_photo_url = ${data.photoUrl}
+        where telegram_id = ${telegramId}`
+      );
+      return existing;
+    }
+
+    // Create new user (no address yet — will be linked when wallet connects)
+    const placeholderAddress = `tg_${telegramId}`;
+    const [user] = await this.db
+      .insert(users)
+      .values({
+        address: placeholderAddress,
+        telegramId,
+        telegramUsername: data.username,
+        telegramFirstName: data.firstName,
+        telegramPhotoUrl: data.photoUrl,
+        telegramLinkedAt: new Date(),
+        profileNickname: data.firstName,
+      })
+      .returning();
+
+    // Create vault balance
+    await this.db.insert(vaultBalances).values({
+      userId: user!.id,
+      available: '0',
+      locked: '0',
+    });
+
+    logger.info({ telegramId, username: data.username }, 'New Telegram user created');
+    return {
+      id: user!.id,
+      address: user!.address,
+      profileNickname: user!.profileNickname,
+      avatarUrl: user!.avatarUrl,
+      telegramId: user!.telegramId,
+      telegramUsername: user!.telegramUsername,
+      telegramFirstName: user!.telegramFirstName,
+      telegramPhotoUrl: user!.telegramPhotoUrl,
+    };
+  }
+
+  /**
+   * Link a wallet address to an existing Telegram-only user.
+   * Used when a Telegram Mini App user connects their wallet for the first time.
+   */
+  async linkWalletToTelegramUser(userId: string, address: string) {
+    // Check if this address is already used by another user
+    const existingByAddress = await this.getUserByAddress(address);
+    if (existingByAddress && existingByAddress.id !== userId) {
+      // Merge: transfer telegram data to the existing wallet user
+      const tgUser = await this.getUserById(userId);
+      if (tgUser) {
+        await this.db
+          .update(users)
+          .set({
+            telegramId: tgUser.telegramId,
+            telegramUsername: tgUser.telegramUsername,
+            telegramFirstName: tgUser.telegramFirstName,
+            telegramPhotoUrl: tgUser.telegramPhotoUrl,
+            telegramLinkedAt: new Date(),
+          })
+          .where(eq(users.id, existingByAddress.id));
+
+        // Delete the placeholder telegram-only user
+        // (vault balance, etc. belong to the wallet user)
+        await this.db.execute(sql`delete from vault_balances where user_id = ${userId}`);
+        await this.db.execute(sql`delete from users where id = ${userId}`);
+
+        return existingByAddress;
+      }
+    }
+
+    // Update the user's address (was tg_xxx placeholder)
+    const [updated] = await this.db
+      .update(users)
+      .set({ address })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   async getUserById(userId: string) {
     return this.db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -388,7 +514,9 @@ export class UserService {
   }
 
   /**
-   * Link a Telegram account to a user.
+   * Link a Telegram account to a user (wallet).
+   * One TG account can be linked to multiple wallets (multi-wallet users).
+   * Each wallet independently tracks its Telegram link.
    */
   async linkTelegram(userId: string, data: {
     telegramId: number;
@@ -396,15 +524,6 @@ export class UserService {
     firstName: string;
     photoUrl: string | null;
   }) {
-    // Check if this telegram_id is already linked to another user
-    const existing = await this.db.execute(
-      sql`select id from users where telegram_id = ${data.telegramId} and id != ${userId} limit 1`
-    );
-    const rows = (Array.isArray(existing) ? existing : (existing as { rows?: unknown[] }).rows ?? []) as unknown[];
-    if (rows.length > 0) {
-      throw new Error('This Telegram account is already linked to another user');
-    }
-
     const [updated] = await this.db
       .update(users)
       .set({
