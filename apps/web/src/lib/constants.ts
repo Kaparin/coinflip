@@ -28,6 +28,9 @@ export const LAUNCH_CW20_CONTRACT = process.env.NEXT_PUBLIC_LAUNCH_CW20 ?? '';
 /** Admin wallet address (for showing admin link in UI) */
 export const ADMIN_ADDRESS = process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? '';
 
+/** Telegram bot name for login widget */
+export const TELEGRAM_BOT_NAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? '';
+
 /** Local storage keys */
 export const STORAGE_KEYS = {
   CONNECTED_ADDRESS: 'coinflip_connected_address',

@@ -6,6 +6,10 @@ export interface AppUser {
   address: string;
   profileNickname: string | null;
   avatarUrl: string | null;
+  telegramId: number | null;
+  telegramUsername: string | null;
+  telegramFirstName: string | null;
+  telegramPhotoUrl: string | null;
 }
 
 /** Custom Hono variables set by middleware */

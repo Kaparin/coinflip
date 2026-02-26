@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use-referral';
 import { UserAvatar } from '@/components/ui';
@@ -16,9 +16,10 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import {
   ChevronDown, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
-  Loader2, BarChart3, Gift, Target,
+  Loader2, BarChart3, Gift, Target, MessageCircle,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
+import { TelegramLoginButton, type TelegramUser } from '@/components/features/profile/telegram-login-button';
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -981,7 +982,9 @@ function NicknameEditor({ currentNickname, address }: { currentNickname: string 
     setSaving(true);
     try {
       await customFetch({ url: '/api/v1/users/me', method: 'PATCH', data: { nickname: trimmed } });
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
+      // Invalidate all caches that display the nickname (users/me, profiles, leaderboard, top-winner, bets)
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
       addToast('success', t('profile.nicknameSaved'));
       setEditing(false);
     } catch {
@@ -1029,6 +1032,90 @@ function NicknameEditor({ currentNickname, address }: { currentNickname: string 
       <span>{currentNickname || t('profile.setNickname')}</span>
       <Pencil size={14} className="text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)] transition-colors" />
     </button>
+  );
+}
+
+function TelegramSection({ telegram }: { telegram: { id: number; username: string | null; first_name: string | null; photo_url: string | null } | null }) {
+  const { t, locale } = useTranslation();
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
+  const [linking, setLinking] = useState(false);
+
+  const handleTelegramAuth = useCallback(async (user: TelegramUser) => {
+    setLinking(true);
+    try {
+      await customFetch({
+        url: '/api/v1/users/me/telegram',
+        method: 'POST',
+        data: user,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      addToast('success', t('profile.telegramLinked'));
+    } catch {
+      addToast('error', t('profile.telegramLinkError'));
+    } finally {
+      setLinking(false);
+    }
+  }, [queryClient, addToast, t]);
+
+  const handleUnlink = useCallback(async () => {
+    try {
+      await customFetch({ url: '/api/v1/users/me/telegram', method: 'DELETE' });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      addToast('success', t('profile.telegramUnlinked'));
+    } catch {
+      addToast('error', t('profile.telegramUnlinkError'));
+    }
+  }, [queryClient, addToast, t]);
+
+  if (telegram) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2AABEE]/10">
+          <svg viewBox="0 0 24 24" fill="#2AABEE" className="h-4 w-4">
+            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">
+            {telegram.first_name || t('profile.telegramConnected')}
+          </p>
+          {telegram.username && (
+            <p className="text-[11px] text-[var(--color-text-secondary)]">@{telegram.username}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleUnlink}
+          className="rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-[10px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 transition-colors"
+        >
+          {t('profile.telegramUnlink')}
+        </button>
+      </div>
+    );
+  }
+
+  if (!TELEGRAM_BOT_NAME) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        {t('profile.telegramDesc')}
+      </p>
+      {linking ? (
+        <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          <Loader2 size={14} className="animate-spin" />
+          {t('profile.telegramLinking')}
+        </div>
+      ) : (
+        <TelegramLoginButton
+          botName={TELEGRAM_BOT_NAME}
+          onAuth={handleTelegramAuth}
+          buttonSize="medium"
+          lang={locale}
+        />
+      )}
+    </div>
   );
 }
 
@@ -1152,6 +1239,15 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Telegram */}
+      <CollapsibleSection
+        title={t('profile.telegramSection')}
+        defaultOpen={false}
+        icon={<MessageCircle size={20} className="text-[#2AABEE]" />}
+      >
+        <TelegramSection telegram={(profileData as any)?.data?.telegram ?? null} />
+      </CollapsibleSection>
 
       {/* Game Statistics */}
       <CollapsibleSection

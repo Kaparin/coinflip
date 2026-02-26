@@ -5,6 +5,8 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { Errors } from '../lib/errors.js';
+import { verifyTelegramLogin } from '../lib/telegram-auth.js';
+import { logger } from '../lib/logger.js';
 import type { AppEnv } from '../types.js';
 
 export const usersRouter = new Hono<AppEnv>();
@@ -28,6 +30,12 @@ usersRouter.get('/me', authMiddleware, async (c) => {
       authz_enabled: session?.authzEnabled ?? false,
       authz_expires_at: session?.authzExpirationTime?.toISOString() ?? null,
       fee_sponsored: session?.feeSponsored ?? false,
+      telegram: user.telegramId ? {
+        id: user.telegramId,
+        username: user.telegramUsername,
+        first_name: user.telegramFirstName,
+        photo_url: user.telegramPhotoUrl,
+      } : null,
     },
   });
 });
@@ -77,6 +85,63 @@ usersRouter.get('/leaderboard', zValidator('query', LeaderboardQuerySchema), asy
   });
 });
 
+// POST /api/v1/users/me/telegram — Link Telegram account
+const TelegramLinkSchema = z.object({
+  id: z.number(),
+  first_name: z.string(),
+  last_name: z.string().optional(),
+  username: z.string().optional(),
+  photo_url: z.string().optional(),
+  auth_date: z.number(),
+  hash: z.string(),
+});
+
+usersRouter.post('/me/telegram', authMiddleware, zValidator('json', TelegramLinkSchema), async (c) => {
+  const user = c.get('user');
+  const telegramData = c.req.valid('json');
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    logger.error('TELEGRAM_BOT_TOKEN is not configured');
+    return c.json({ error: { code: 'SERVER_ERROR', message: 'Telegram integration not configured' } }, 500);
+  }
+
+  const result = verifyTelegramLogin(telegramData, botToken);
+  if (!result.valid) {
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: result.reason } }, 400);
+  }
+
+  try {
+    const updated = await userService.linkTelegram(user.id, {
+      telegramId: telegramData.id,
+      username: telegramData.username ?? null,
+      firstName: telegramData.first_name,
+      photoUrl: telegramData.photo_url ?? null,
+    });
+
+    return c.json({
+      data: {
+        telegram: {
+          id: updated!.telegramId,
+          username: updated!.telegramUsername,
+          first_name: updated!.telegramFirstName,
+          photo_url: updated!.telegramPhotoUrl,
+        },
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ error: { code: 'CONFLICT', message: msg } }, 409);
+  }
+});
+
+// DELETE /api/v1/users/me/telegram — Unlink Telegram account
+usersRouter.delete('/me/telegram', authMiddleware, async (c) => {
+  const user = c.get('user');
+  await userService.unlinkTelegram(user.id);
+  return c.json({ data: { removed: true } });
+});
+
 // POST /api/v1/users/:address/reaction — Set reaction on a profile
 const ReactionSchema = z.object({
   emoji: z.string().min(1).max(4),
@@ -113,15 +178,21 @@ usersRouter.delete('/:address/reaction', authMiddleware, async (c) => {
 });
 
 // GET /api/v1/users/:address — Public profile with stats, recent bets, and optional H2H
-usersRouter.get('/:address', optionalAuthMiddleware, async (c) => {
+const PlayerProfileQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerProfileQuerySchema), async (c) => {
   const address = c.req.param('address');
+  const { limit, offset } = c.req.valid('query');
   const user = await userService.getUserByAddress(address);
 
   if (!user) throw Errors.userNotFound();
 
-  const [stats, recentBets, achievements, reactions] = await Promise.all([
+  const [stats, recentBetsResult, achievements, reactions] = await Promise.all([
     userService.getUserStats(user.id),
-    userService.getPlayerRecentBets(user.id, 20),
+    userService.getPlayerRecentBets(user.id, limit, offset),
     userService.getUserAchievements(user.id),
     userService.getProfileReactions(user.id),
   ]);
@@ -144,11 +215,15 @@ usersRouter.get('/:address', optionalAuthMiddleware, async (c) => {
       avatar_url: user.avatarUrl,
       created_at: user.createdAt.toISOString(),
       stats,
-      recent_bets: recentBets,
+      recent_bets: recentBetsResult.bets,
+      recent_bets_total: recentBetsResult.total,
       h2h,
       achievements,
       reactions,
       my_reaction: myReaction,
+      telegram: user.telegramUsername ? {
+        username: user.telegramUsername,
+      } : null,
     },
   });
 });

@@ -190,35 +190,46 @@ export class UserService {
     }));
   }
   /**
-   * Get recent resolved bets for a player (public profile).
+   * Get recent resolved bets for a player (public profile) with pagination.
    */
-  async getPlayerRecentBets(userId: string, limit = 20) {
-    const rows = await this.db.execute(sql`
-      select
-        b.bet_id::text as id,
-        b.amount::text as amount,
-        b.payout_amount::text as payout_amount,
-        b.status,
-        b.resolved_time,
-        b.created_time,
-        b.winner_user_id::text as winner_user_id,
-        b.maker_user_id::text as maker_user_id,
-        b.acceptor_user_id::text as acceptor_user_id,
-        maker.address as maker,
-        maker.profile_nickname as maker_nickname,
-        acceptor.address as acceptor,
-        acceptor.profile_nickname as acceptor_nickname
-      from bets b
-      join users maker on maker.id = b.maker_user_id
-      left join users acceptor on acceptor.id = b.acceptor_user_id
-      where (b.maker_user_id = ${userId} or b.acceptor_user_id = ${userId})
-        and b.status in ('revealed', 'timeout_claimed')
-      order by b.resolved_time desc nulls last
-      limit ${limit}
-    `);
+  async getPlayerRecentBets(userId: string, limit = 10, offset = 0) {
+    const [countResult, rows] = await Promise.all([
+      this.db.execute(sql`
+        select count(*)::int as total
+        from bets b
+        where (b.maker_user_id = ${userId} or b.acceptor_user_id = ${userId})
+          and b.status in ('revealed', 'timeout_claimed')
+      `),
+      this.db.execute(sql`
+        select
+          b.bet_id::text as id,
+          b.amount::text as amount,
+          b.payout_amount::text as payout_amount,
+          b.status,
+          b.resolved_time,
+          b.created_time,
+          b.winner_user_id::text as winner_user_id,
+          b.maker_user_id::text as maker_user_id,
+          b.acceptor_user_id::text as acceptor_user_id,
+          maker.address as maker,
+          maker.profile_nickname as maker_nickname,
+          acceptor.address as acceptor,
+          acceptor.profile_nickname as acceptor_nickname
+        from bets b
+        join users maker on maker.id = b.maker_user_id
+        left join users acceptor on acceptor.id = b.acceptor_user_id
+        where (b.maker_user_id = ${userId} or b.acceptor_user_id = ${userId})
+          and b.status in ('revealed', 'timeout_claimed')
+        order by b.resolved_time desc nulls last
+        limit ${limit} offset ${offset}
+      `),
+    ]);
+
+    const countRows = (Array.isArray(countResult) ? countResult : (countResult as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    const total = Number(countRows[0]?.total ?? 0);
 
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
-    return rawRows.map((r) => ({
+    const bets = rawRows.map((r) => ({
       id: String(r.id),
       amount: String(r.amount ?? '0'),
       payout_amount: String(r.payout_amount ?? '0'),
@@ -233,6 +244,8 @@ export class UserService {
       acceptor_nickname: r.acceptor_nickname ? String(r.acceptor_nickname) : null,
       is_win: r.winner_user_id === userId,
     }));
+
+    return { bets, total };
   }
 
   /**
@@ -372,6 +385,56 @@ export class UserService {
           eq(profileReactions.toUserId, toUserId),
         ),
       );
+  }
+
+  /**
+   * Link a Telegram account to a user.
+   */
+  async linkTelegram(userId: string, data: {
+    telegramId: number;
+    username: string | null;
+    firstName: string;
+    photoUrl: string | null;
+  }) {
+    // Check if this telegram_id is already linked to another user
+    const existing = await this.db.execute(
+      sql`select id from users where telegram_id = ${data.telegramId} and id != ${userId} limit 1`
+    );
+    const rows = (Array.isArray(existing) ? existing : (existing as { rows?: unknown[] }).rows ?? []) as unknown[];
+    if (rows.length > 0) {
+      throw new Error('This Telegram account is already linked to another user');
+    }
+
+    const [updated] = await this.db
+      .update(users)
+      .set({
+        telegramId: data.telegramId,
+        telegramUsername: data.username,
+        telegramFirstName: data.firstName,
+        telegramPhotoUrl: data.photoUrl,
+        telegramLinkedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Unlink Telegram account from a user.
+   */
+  async unlinkTelegram(userId: string) {
+    const [updated] = await this.db
+      .update(users)
+      .set({
+        telegramId: null,
+        telegramUsername: null,
+        telegramFirstName: null,
+        telegramPhotoUrl: null,
+        telegramLinkedAt: null,
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
   /**

@@ -45,6 +45,10 @@ export interface ReactionCount {
   count: number;
 }
 
+export interface TelegramInfo {
+  username: string;
+}
+
 export interface PlayerProfile {
   address: string;
   nickname: string | null;
@@ -58,17 +62,23 @@ export interface PlayerProfile {
     total_won: string;
   };
   recent_bets: PlayerBet[];
+  recent_bets_total: number;
   h2h: HeadToHead | null;
   achievements: Achievements;
   reactions: ReactionCount[];
   my_reaction: string | null;
+  telegram: TelegramInfo | null;
 }
 
-export function usePlayerProfile(address: string | null) {
+export function usePlayerProfile(address: string | null, page = 0, pageSize = 10) {
   return useQuery({
-    queryKey: ['/api/v1/users', address],
+    queryKey: ['/api/v1/users', address, page, pageSize],
     queryFn: async (): Promise<PlayerProfile> => {
-      const res = await fetch(`${API_URL}/api/v1/users/${address}`, {
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(page * pageSize),
+      });
+      const res = await fetch(`${API_URL}/api/v1/users/${address}?${params}`, {
         credentials: 'include',
         headers: {
           ...(typeof window !== 'undefined' && sessionStorage.getItem('coinflip_auth_token')
