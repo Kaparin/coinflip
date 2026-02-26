@@ -149,10 +149,17 @@ authRouter.post('/telegram', zValidator('json', TelegramAuthSchema), async (c) =
     const refAddress = validated.start_param.slice(4);
     if (refAddress.startsWith('axm1')) {
       try {
-        await referralService.autoAssignDefaultReferrer(user.id);
+        await referralService.registerByAddress(user.id, refAddress);
       } catch {
-        // Ignore referral errors
+        // Ignore referral errors (e.g. self-referral, already has referrer)
       }
+    }
+  } else {
+    // No referral link — auto-assign to admin referrer
+    try {
+      await referralService.autoAssignDefaultReferrer(user.id);
+    } catch {
+      // Ignore
     }
   }
 

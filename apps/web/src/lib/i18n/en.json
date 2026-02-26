@@ -743,5 +743,10 @@
   "walletPage": {
     "connectTitle": "Connect your wallet",
     "connectDesc": "Connect a wallet to view your balance, deposit, and withdraw tokens."
+  },
+  "telegram": {
+    "welcome": "Welcome, {name}!",
+    "connectWalletHint": "Connect your Axiome wallet to start playing",
+    "connectWallet": "Connect Wallet"
   }
 }

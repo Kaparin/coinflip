@@ -141,6 +141,28 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Immediately expand viewport and signal ready
+    try {
+      const tg = (window as unknown as Record<string, { WebApp?: {
+        expand?: () => void;
+        ready?: () => void;
+        enableClosingConfirmation?: () => void;
+        setHeaderColor?: (color: string) => void;
+        setBackgroundColor?: (color: string) => void;
+        isVerticalSwipesEnabled?: boolean;
+        disableVerticalSwipes?: () => void;
+      } }>).Telegram;
+      tg?.WebApp?.expand?.();
+      tg?.WebApp?.ready?.();
+      tg?.WebApp?.enableClosingConfirmation?.();
+      tg?.WebApp?.disableVerticalSwipes?.();
+      // Dark theme for TG
+      tg?.WebApp?.setHeaderColor?.('#0a0a0f');
+      tg?.WebApp?.setBackgroundColor?.('#0a0a0f');
+    } catch {
+      // ignore
+    }
+
     // Auto-authenticate with backend
     const initDataRaw = getInitDataRaw();
     if (!initDataRaw) return;
@@ -164,20 +186,20 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         setWalletAddress(data.address);
         setToken(data.token);
 
+        // Auto-set locale based on Telegram language
+        if (tgUser.language_code === 'ru') {
+          try {
+            localStorage.setItem('coinflip-locale', 'ru');
+          } catch { /* ignore */ }
+        }
+
         // Persist to sessionStorage for page refreshes
         sessionStorage.setItem(TG_USER_KEY, JSON.stringify(tgUser));
         if (data.token) sessionStorage.setItem(TG_AUTH_TOKEN_KEY, data.token);
         if (data.user_id) sessionStorage.setItem(TG_USER_ID_KEY, data.user_id);
         if (data.address) sessionStorage.setItem(TG_WALLET_KEY, data.address);
 
-        // Expand viewport if Telegram WebApp is available
-        try {
-          const tg = (window as unknown as Record<string, { WebApp?: { expand?: () => void; ready?: () => void } }>).Telegram;
-          tg?.WebApp?.expand?.();
-          tg?.WebApp?.ready?.();
-        } catch {
-          // ignore
-        }
+        // Viewport already expanded in the detection phase above
       })
       .catch((err) => {
         console.error('[TelegramProvider] Auth failed:', err);

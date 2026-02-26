@@ -12,6 +12,7 @@ import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { MobileBalanceBar } from '@/components/features/vault/mobile-balance-bar';
 import { Leaderboard } from '@/components/features/leaderboard/leaderboard';
 import { TopWinnerBanner } from '@/components/features/top-winner-banner';
+import { TgWelcomeBanner } from '@/components/features/telegram/tg-welcome-banner';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useWebSocket } from '@/hooks/use-websocket';
@@ -165,6 +166,7 @@ export default function GamePage() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24 md:pb-6">
+      <TgWelcomeBanner />
       <MobileBalanceBar />
       <div className="hidden md:block">
         <BalanceDisplay />
