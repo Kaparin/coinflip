@@ -643,19 +643,51 @@ export class IndexerService {
                   .set({ betId: BigInt(match.id) })
                   .where(eq(bets.betId, orphan.betId));
               } else {
-                // Not found in open — could be accepted/resolved. Try querying by recent bet IDs
-                logger.warn({ betId: orphan.betId.toString() }, 'Orphaned bet not found in open_bets — marking as canceled');
-                await this.db!
-                  .update(bets)
-                  .set({ status: 'canceled', resolvedTime: new Date() })
-                  .where(eq(bets.betId, orphan.betId));
+                // Not found in open_bets — query chain directly for this bet's commitment
+                // to check if it was accepted/resolved rather than blindly canceling
+                let shouldCancel = true;
+                try {
+                  // Search in a wider range of recent chain bets
+                  const allQuery = JSON.stringify({ open_bets: { limit: 200 } });
+                  const allEncoded = Buffer.from(allQuery).toString('base64');
+                  const allRes = await fetch(
+                    `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${allEncoded}`,
+                    { signal: AbortSignal.timeout(5000) },
+                  );
+                  if (allRes.ok) {
+                    const allData = await allRes.json() as { data: { bets: Array<{ id: number; commitment: string }> } };
+                    const commitBase64 = Buffer.from(orphan.commitment, 'hex').toString('base64');
+                    const widerMatch = allData.data.bets.find((cb: { commitment: string }) => cb.commitment === commitBase64);
+                    if (widerMatch) {
+                      logger.info(
+                        { oldBetId: orphan.betId.toString(), newBetId: widerMatch.id },
+                        'Orphan found in wider query — fixing bet_id instead of canceling',
+                      );
+                      await this.db!
+                        .update(bets)
+                        .set({ betId: BigInt(widerMatch.id) })
+                        .where(eq(bets.betId, orphan.betId));
+                      shouldCancel = false;
+                    }
+                  }
+                } catch (err) {
+                  logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan: wider query failed — will cancel');
+                }
 
-                // Unlock vault funds for maker (and acceptor if exists)
-                await vaultService.unlockFunds(orphan.makerUserId, orphan.amount).catch(err =>
-                  logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds maker failed'));
-                if (orphan.acceptorUserId) {
-                  await vaultService.unlockFunds(orphan.acceptorUserId, orphan.amount).catch(err =>
-                    logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds acceptor failed'));
+                if (shouldCancel) {
+                  logger.warn({ betId: orphan.betId.toString() }, 'Orphaned bet not found on chain — marking as canceled');
+                  await this.db!
+                    .update(bets)
+                    .set({ status: 'canceled', resolvedTime: new Date() })
+                    .where(eq(bets.betId, orphan.betId));
+
+                  // Unlock vault funds for maker (and acceptor if exists)
+                  await vaultService.unlockFunds(orphan.makerUserId, orphan.amount).catch(err =>
+                    logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds maker failed'));
+                  if (orphan.acceptorUserId) {
+                    await vaultService.unlockFunds(orphan.acceptorUserId, orphan.amount).catch(err =>
+                      logger.warn({ err, betId: orphan.betId.toString() }, 'Orphan cancel: unlockFunds acceptor failed'));
+                  }
                 }
               }
             }

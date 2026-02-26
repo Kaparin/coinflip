@@ -53,4 +53,7 @@ pub enum ContractError {
 
     #[error("Bet expired: bet {id} expired at timestamp {expired_at}")]
     BetExpired { id: u64, expired_at: u64 },
+
+    #[error("Invalid commitment: must be exactly 32 bytes (SHA-256 hash), got {len}")]
+    InvalidCommitmentLength { len: usize },
 }

@@ -9,6 +9,7 @@ import { relayerService } from '../services/relayer.js';
 import { Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
+import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import type { AppEnv } from '../types.js';
 
 // Inflight guard for claim/change-branch operations (prevents concurrent chain txs)
@@ -52,7 +53,7 @@ referralRouter.get('/code', authMiddleware, async (c) => {
 // POST /api/v1/referral/register — Register a referral code
 const RegisterSchema = z.object({ code: z.string().min(1).max(20) });
 
-referralRouter.post('/register', authMiddleware, zValidator('json', RegisterSchema), async (c) => {
+referralRouter.post('/register', authMiddleware, walletTxRateLimit, zValidator('json', RegisterSchema), async (c) => {
   const userId = c.get('user').id;
   const { code } = c.req.valid('json');
   const success = await referralService.registerReferral(userId, code);
@@ -66,7 +67,7 @@ referralRouter.post('/register', authMiddleware, zValidator('json', RegisterSche
 // POST /api/v1/referral/register-by-address — Register referral by wallet address
 const RegisterByAddressSchema = z.object({ address: z.string().min(1).max(100) });
 
-referralRouter.post('/register-by-address', authMiddleware, zValidator('json', RegisterByAddressSchema), async (c) => {
+referralRouter.post('/register-by-address', authMiddleware, walletTxRateLimit, zValidator('json', RegisterByAddressSchema), async (c) => {
   const userId = c.get('user').id;
   const { address } = c.req.valid('json');
   const result = await referralService.registerByAddress(userId, address);
@@ -113,8 +114,7 @@ referralRouter.get('/has-referrer', authMiddleware, async (c) => {
 //   4. Relay CW20 transfer from user → treasury wallet
 //   5. Update referral chain in DB
 //
-// If step 4 fails, the user still paid (vault decreased) but treasury didn't receive.
-// This is logged but the branch change still proceeds — the fee was charged from vault.
+// If step 4 fails, attempt to re-deposit tokens back to vault and abort the branch change.
 const ChangeBranchSchema = z.object({ address: z.string().min(1).max(100) });
 
 referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeBranchSchema), async (c) => {
@@ -198,12 +198,42 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
         'Branch change: CW20 transfer to treasury confirmed',
       );
     } else {
-      // Transfer failed — vault was already deducted, tokens are in user's CW20 wallet.
-      // Log the failure but still proceed with the branch change (user paid from vault).
+      // Transfer failed — tokens are in user's CW20 wallet (withdrawn from vault).
+      // Try to re-deposit them back to vault so the user doesn't lose funds.
       logger.error(
         { transferResult, walletAddress, treasuryAddr, cost },
-        'Branch change: CW20 transfer to treasury FAILED — tokens remain in user wallet',
+        'Branch change: CW20 transfer to treasury FAILED — aborting, attempting re-deposit',
       );
+
+      // Best-effort: deposit tokens from user's wallet back to vault
+      try {
+        // CW20 Send to CoinFlip contract triggers deposit
+        const reDepositResult = await relayerService.submitExecOnContract(
+          walletAddress,
+          cw20Addr,
+          { send: { contract: env.COINFLIP_CONTRACT_ADDR, amount: cost, msg: btoa(JSON.stringify({ deposit: {} })) } },
+          'CoinFlip branch change refund',
+        );
+        if (reDepositResult.success) {
+          logger.info({ txHash: reDepositResult.txHash, walletAddress }, 'Branch change: tokens re-deposited to vault');
+        } else {
+          logger.error(
+            { reDepositResult, walletAddress },
+            'Branch change: re-deposit ALSO failed — tokens remain in user CW20 wallet, needs manual resolution',
+          );
+        }
+      } catch (reDepositErr) {
+        logger.error({ err: reDepositErr, walletAddress }, 'Branch change: re-deposit threw — tokens in user wallet');
+      }
+
+      invalidateBalanceCache(walletAddress);
+      return c.json({
+        error: {
+          code: 'TRANSFER_FAILED',
+          message: 'Branch change payment failed. Your funds have been returned to your vault.',
+          details: { withdrawTx: withdrawResult.txHash },
+        },
+      }, 422);
     }
   }
 

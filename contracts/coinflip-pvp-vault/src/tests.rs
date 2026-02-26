@@ -706,6 +706,7 @@ fn test_update_config_admin_success() {
             reveal_timeout_secs: Some(600),
             max_open_per_user: Some(20),
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap();
     assert!(res.attributes.iter().any(|a| a.key == "action" && a.value == "update_config"));
@@ -736,6 +737,7 @@ fn test_update_config_non_admin_rejected() {
             reveal_timeout_secs: None,
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap_err();
     assert!(matches!(err, ContractError::Unauthorized));
@@ -757,6 +759,7 @@ fn test_update_config_commission_too_high() {
             reveal_timeout_secs: None,
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap_err();
     assert!(matches!(err, ContractError::InvalidCommission { .. }));
@@ -779,6 +782,7 @@ fn test_update_config_timeout_invalid() {
             reveal_timeout_secs: Some(10), // < 60
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap_err();
     assert!(matches!(err, ContractError::InvalidTimeout { .. }));
@@ -795,6 +799,7 @@ fn test_update_config_timeout_invalid() {
             reveal_timeout_secs: Some(100000), // > 86400
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap_err();
     assert!(matches!(err, ContractError::InvalidTimeout { .. }));
@@ -924,6 +929,7 @@ fn test_new_admin_can_update_config() {
             reveal_timeout_secs: None,
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap();
 
@@ -944,6 +950,7 @@ fn test_new_admin_can_update_config() {
             reveal_timeout_secs: None,
             max_open_per_user: None,
             max_daily_amount_per_user: None,
+            bet_ttl_secs: None,
         },
     ).unwrap_err();
     assert!(matches!(err, ContractError::Unauthorized));

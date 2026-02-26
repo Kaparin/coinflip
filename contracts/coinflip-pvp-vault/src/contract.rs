@@ -20,6 +20,14 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    // Validate instantiation parameters
+    if msg.commission_bps > 5000 {
+        return Err(ContractError::InvalidCommission { max_bps: 5000 });
+    }
+    if msg.reveal_timeout_secs < 60 || msg.reveal_timeout_secs > 86400 {
+        return Err(ContractError::InvalidTimeout { min: 60, max: 86400 });
+    }
+
     let config = Config {
         admin: info.sender,
         token_cw20: deps.api.addr_validate(&msg.token_cw20)?,

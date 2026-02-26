@@ -12,6 +12,13 @@ pub fn execute_create_bet(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
 
+    // Commitment must be exactly 32 bytes (SHA-256 output)
+    if commitment.len() != 32 {
+        return Err(ContractError::InvalidCommitmentLength {
+            len: commitment.len(),
+        });
+    }
+
     // Check min bet
     if amount < config.min_bet {
         return Err(ContractError::BetAmountBelowMinimum {
@@ -39,8 +46,6 @@ pub fn execute_create_bet(
             max: config.max_open_per_user,
         });
     }
-
-    // TODO: check daily usage limit
 
     // Lock funds
     balance.available -= amount;

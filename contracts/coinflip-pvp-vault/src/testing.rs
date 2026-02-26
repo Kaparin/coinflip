@@ -26,6 +26,7 @@ pub mod helpers {
             reveal_timeout_secs: 300, // 5 minutes
             max_open_per_user: 10,
             max_daily_amount_per_user: Uint128::new(10_000),
+            bet_ttl_secs: 10800, // 3 hours
         }
     }
 
