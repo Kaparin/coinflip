@@ -8,6 +8,7 @@ import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
+import Link from 'next/link';
 
 type SortBy = 'wins' | 'wagered' | 'win_rate';
 
@@ -45,7 +46,8 @@ function LeaderboardRow({
   const { t } = useTranslation();
 
   return (
-    <div
+    <Link
+      href={`/game/profile/${entry.address}`}
       className={`grid grid-cols-[2rem_1fr_auto] items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
         isCurrentUser
           ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20'
@@ -61,7 +63,7 @@ function LeaderboardRow({
       <div className="flex items-center gap-2 min-w-0">
         <UserAvatar address={entry.address} size={28} />
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">
+          <p className="text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors">
             {entry.nickname || shortAddr(entry.address)}
             {isCurrentUser && (
               <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>
@@ -100,7 +102,7 @@ function LeaderboardRow({
           </>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

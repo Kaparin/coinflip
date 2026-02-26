@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { Errors } from '../lib/errors.js';
@@ -56,6 +56,12 @@ usersRouter.patch('/me', authMiddleware, zValidator('json', UpdateProfileSchema)
   });
 });
 
+// GET /api/v1/users/top-winner — Biggest single win ever (public, cached)
+usersRouter.get('/top-winner', async (c) => {
+  const topWinner = await userService.getTopWinner();
+  return c.json({ data: topWinner });
+});
+
 // GET /api/v1/users/leaderboard — Public leaderboard
 const LeaderboardQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -71,21 +77,78 @@ usersRouter.get('/leaderboard', zValidator('query', LeaderboardQuerySchema), asy
   });
 });
 
-// GET /api/v1/users/:address — Public profile with real stats
-usersRouter.get('/:address', async (c) => {
+// POST /api/v1/users/:address/reaction — Set reaction on a profile
+const ReactionSchema = z.object({
+  emoji: z.string().min(1).max(4),
+});
+
+usersRouter.post('/:address/reaction', authMiddleware, zValidator('json', ReactionSchema), async (c) => {
+  const address = c.req.param('address');
+  const { emoji } = c.req.valid('json');
+  const viewer = c.get('user');
+
+  const targetUser = await userService.getUserByAddress(address);
+  if (!targetUser) throw Errors.userNotFound();
+
+  try {
+    await userService.setProfileReaction(viewer.id, targetUser.id, emoji);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: msg } }, 400);
+  }
+
+  return c.json({ data: { emoji } });
+});
+
+// DELETE /api/v1/users/:address/reaction — Remove reaction from a profile
+usersRouter.delete('/:address/reaction', authMiddleware, async (c) => {
+  const address = c.req.param('address');
+  const viewer = c.get('user');
+
+  const targetUser = await userService.getUserByAddress(address);
+  if (!targetUser) throw Errors.userNotFound();
+
+  await userService.removeProfileReaction(viewer.id, targetUser.id);
+  return c.json({ data: { removed: true } });
+});
+
+// GET /api/v1/users/:address — Public profile with stats, recent bets, and optional H2H
+usersRouter.get('/:address', optionalAuthMiddleware, async (c) => {
   const address = c.req.param('address');
   const user = await userService.getUserByAddress(address);
 
   if (!user) throw Errors.userNotFound();
 
-  const stats = await userService.getUserStats(user.id);
+  const [stats, recentBets, achievements, reactions] = await Promise.all([
+    userService.getUserStats(user.id),
+    userService.getPlayerRecentBets(user.id, 20),
+    userService.getUserAchievements(user.id),
+    userService.getProfileReactions(user.id),
+  ]);
+
+  // H2H stats + viewer's own reaction if authenticated
+  let h2h: { total_games: number; your_wins: number; their_wins: number } | null = null;
+  let myReaction: string | null = null;
+  const viewer = c.get('user');
+  if (viewer && viewer.id !== user.id) {
+    [h2h, myReaction] = await Promise.all([
+      userService.getHeadToHead(viewer.id, user.id),
+      userService.getMyReaction(viewer.id, user.id),
+    ]);
+  }
 
   return c.json({
     data: {
       address: user.address,
       nickname: user.profileNickname,
       avatar_url: user.avatarUrl,
+      created_at: user.createdAt.toISOString(),
       stats,
+      recent_bets: recentBets,
+      h2h,
+      achievements,
+      reactions,
+      my_reaction: myReaction,
     },
   });
 });

@@ -60,6 +60,11 @@ export const customFetch = async <T>(
     ? sessionStorage.getItem('coinflip_connected_address')
     : null;
 
+  // iOS Safari blocks third-party cookies (ITP) — send token as Bearer header
+  const authToken = typeof window !== 'undefined'
+    ? sessionStorage.getItem('coinflip_auth_token')
+    : null;
+
   const isGet = config.method.toUpperCase() === 'GET';
   const maxAttempts = isGet ? MAX_RETRIES + 1 : 1; // Only retry GET requests
 
@@ -82,6 +87,7 @@ export const customFetch = async <T>(
         headers: {
           'Content-Type': 'application/json',
           ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
           ...config.headers,
         },
         credentials: 'include',

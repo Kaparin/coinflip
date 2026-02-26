@@ -102,10 +102,18 @@ export function useWebSocket({
     debounceTimer.current = setTimeout(flushInvalidations, 800);
   }, [flushInvalidations]);
 
-  // Build current WS URL from ref
+  // Build current WS URL from ref (includes auth token for iOS Safari where cookies are blocked)
   const getWsUrl = useCallback(() => {
     const addr = addressRef.current;
-    return addr ? `${WS_URL}?address=${encodeURIComponent(addr)}` : WS_URL;
+    const params = new URLSearchParams();
+    if (addr) params.set('address', addr);
+    // iOS Safari blocks third-party cookies (ITP) — pass token as query param
+    const token = typeof window !== 'undefined'
+      ? sessionStorage.getItem('coinflip_auth_token')
+      : null;
+    if (token) params.set('token', token);
+    const qs = params.toString();
+    return qs ? `${WS_URL}?${qs}` : WS_URL;
   }, []);
 
   // Stable connect function — does NOT depend on any changing state
@@ -310,6 +318,7 @@ export function useWebSocket({
                 '/api/v1/bets/history',
                 '/api/v1/vault/balance',
                 'wallet-cw20-balance',
+                '/api/v1/users/top-winner',
               );
               break;
             }

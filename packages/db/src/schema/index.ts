@@ -8,3 +8,4 @@ export { referralCodes, referrals, referralRewards, referralBalances } from './r
 export { pendingBetSecrets } from './pending-bet-secrets';
 export { events, eventParticipants } from './events';
 export { relayerTransactions } from './relayer-transactions';
+export { profileReactions } from './profile-reactions';

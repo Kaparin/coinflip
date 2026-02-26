@@ -8,6 +8,13 @@
       "when": 1771492805095,
       "tag": "0000_typical_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772129708625,
+      "tag": "0001_fat_purifiers",
+      "breakpoints": true
     }
   ]
 }

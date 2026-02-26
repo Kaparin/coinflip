@@ -9,6 +9,7 @@ import { formatLaunch, fromMicroLaunch, OPEN_BET_TTL_SECS } from '@coinflip/shar
 import { useTranslation } from '@/lib/i18n';
 import { EXPLORER_URL } from '@/lib/constants';
 import { ChevronDown, ExternalLink, Trophy, Skull, Clock, Ban, Hourglass, Coins, Settings, History } from 'lucide-react';
+import Link from 'next/link';
 
 type HistoryTab = 'games' | 'system' | 'all';
 
@@ -70,11 +71,11 @@ function PlayerRow({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-2.5">
+    <Link href={`/game/profile/${address}`} className="flex items-center gap-2.5 group/player" onClick={(e) => e.stopPropagation()}>
       <UserAvatar address={address} size={28} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold truncate">
+          <span className="text-xs font-semibold truncate group-hover/player:text-[var(--color-primary)] transition-colors">
             {nickname || truncAddr(address)}
           </span>
           {isYou && (
@@ -88,7 +89,7 @@ function PlayerRow({
         </div>
         <p className="text-[10px] text-[var(--color-text-secondary)]">{roleLabel}</p>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -402,13 +403,13 @@ export function HistoryList() {
                     {/* Opponent info with avatar */}
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {opponentAddr ? (
-                        <>
+                        <Link href={`/game/profile/${opponentAddr}`} className="flex items-center gap-1.5 group/opp" onClick={(e) => e.stopPropagation()}>
                           <UserAvatar address={opponentAddr} size={14} />
-                          <span className="text-[10px] text-[var(--color-text-secondary)] truncate">
+                          <span className="text-[10px] text-[var(--color-text-secondary)] truncate group-hover/opp:text-[var(--color-primary)] transition-colors">
                             {t('history.vs')}{' '}
                             {opponentNick || truncAddr(opponentAddr)}
                           </span>
-                        </>
+                        </Link>
                       ) : (
                         <span className="text-[10px] text-[var(--color-text-secondary)]">
                           {isMaker ? t('history.created') : t('history.accepted')}

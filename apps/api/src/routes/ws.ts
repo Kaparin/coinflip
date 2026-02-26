@@ -53,11 +53,23 @@ export function setupWebSocket(server: HttpServer | ReturnType<typeof import('@h
     let authenticatedAddress: string | undefined;
     const queryAddress = url.searchParams.get('address') ?? undefined;
 
+    // 1. Try session cookie (works on Chrome/Android)
     const sessionToken = parseSessionCookie(req.headers.cookie ?? '');
     if (sessionToken) {
       const session = verifySessionToken(sessionToken);
       if (session) {
         authenticatedAddress = session.address;
+      }
+    }
+
+    // 2. Try token query param (works on iOS Safari where cookies are blocked by ITP)
+    if (!authenticatedAddress) {
+      const queryToken = url.searchParams.get('token');
+      if (queryToken) {
+        const session = verifySessionToken(queryToken);
+        if (session) {
+          authenticatedAddress = session.address;
+        }
       }
     }
 

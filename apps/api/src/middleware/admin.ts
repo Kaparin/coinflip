@@ -27,7 +27,7 @@ export async function adminMiddleware(c: Context, next: Next) {
   const isProd = env.NODE_ENV === 'production';
   let address: string | undefined;
 
-  // 1. Verify session token (preferred, secure) — same as authMiddleware
+  // 1. Verify session token from cookie (preferred, secure)
   const sessionToken = getCookie(c, SESSION_COOKIE_NAME);
   if (sessionToken) {
     const session = verifySessionToken(sessionToken);
@@ -36,7 +36,19 @@ export async function adminMiddleware(c: Context, next: Next) {
     }
   }
 
-  // 2. Dev fallback only: trust header/cookie (NEVER in production)
+  // 2. Try Authorization: Bearer token (iOS Safari where cookies are blocked by ITP)
+  if (!address) {
+    const authHeader = c.req.header('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const bearerToken = authHeader.slice(7);
+      const session = verifySessionToken(bearerToken);
+      if (session) {
+        address = session.address;
+      }
+    }
+  }
+
+  // 3. Dev fallback only: trust header/cookie (NEVER in production)
   if (!address && !isProd) {
     address = c.req.header('x-wallet-address') ?? getCookie(c, 'wallet_address');
   }

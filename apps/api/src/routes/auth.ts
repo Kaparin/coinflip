@@ -88,12 +88,15 @@ authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
 
   logger.info({ address: normalizedAddress }, 'Wallet authenticated via signature');
 
+  // Return token in body too — iOS Safari blocks third-party cookies (ITP),
+  // so the frontend stores this token and sends it as Authorization: Bearer header.
   return c.json({
     data: {
       session_id: session.id,
       address: user.address,
       user_id: user.id,
       authenticated: true,
+      token: sessionToken,
     },
   });
 });

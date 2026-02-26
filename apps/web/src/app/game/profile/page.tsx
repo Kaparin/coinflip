@@ -88,43 +88,85 @@ function AboutSection() {
         compact
       >
         <div className="space-y-4">
+          {/* Analogy */}
+          <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+            {t('profile.winnerExplanation')}
+          </p>
+
+          {/* 3-step flow */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1">
-              {t('profile.howWinnerDetermined')}
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
+              {t('profile.howItReallyWorks')}
             </p>
-            <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              {t('profile.winnerExplanation')}
-            </p>
+            <div className="space-y-3">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="flex gap-2">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-[10px] font-bold flex items-center justify-center">
+                    {n}
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-[var(--color-text)]">
+                      {t(`profile.fairnessStep${n}` as 'profile.fairnessStep1')}
+                    </p>
+                    <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed mt-0.5">
+                      {t(`profile.fairnessStep${n}Desc` as 'profile.fairnessStep1Desc')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Why fair */}
+          <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-500 mb-2">
+              {t('profile.whyFairTitle')}
+            </p>
+            <ul className="space-y-1.5">
+              {[1, 2, 3].map((n) => (
+                <li key={n} className="flex items-start gap-2 text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
+                  <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {t(`profile.whyFair${n}` as 'profile.whyFair1')}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Commitment formula */}
           <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 overflow-x-auto">
             <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] mb-2">
               {t('profile.randomCodeTitle')}
             </p>
             <pre className="text-[10px] font-mono leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap">{`${t('profile.randomCodeComment1')}
-import { randomBytes } from 'node:crypto';
-
-function secureCoinFlip() {
-  const byte = randomBytes(1)[0]; // 0-255
-  return byte % 2 === 0 ? 'heads' : 'tails';
-}
+SHA256("coinflip_v1" + address + side + secret)
 
 ${t('profile.randomCodeComment2')}
-const makerSide = secureCoinFlip();   ${t('profile.randomCodeComment3')}
-${t('profile.randomCodeComment4')}
-const acceptorGuess = secureCoinFlip(); ${t('profile.randomCodeComment5')}
+SHA256("coinflip_v1" + "axm1abc..." + "heads" + 0x7f3a...)
+→ a1b2c3...f9e8 ${t('profile.randomCodeComment3')}
 
-${t('profile.randomCodeComment6')}
-${t('profile.randomCodeComment7')}`}</pre>
+${t('profile.randomCodeComment4')}
+SHA256(${t('profile.randomCodeComment5')}) == ${t('profile.randomCodeComment6')}
+✓ ${t('profile.randomCodeComment7')}`}</pre>
           </div>
           <p className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
-            <code className="text-[var(--color-primary)]">crypto.randomBytes</code> {t('profile.randomCodeExplanation')}
+            <code className="text-[var(--color-primary)]">SHA-256</code> {t('profile.randomCodeExplanation')}
           </p>
+
+          {/* Summary one-liner */}
+          <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3">
+            <p className="text-xs text-[var(--color-text)] leading-relaxed font-medium">
+              {t('profile.oneLiner')}
+            </p>
+          </div>
+
+          {/* Commission */}
           <div>
             <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
               {t('profile.commissionTitle')}
             </p>
             <p className="text-xs text-[var(--color-text-secondary)]">{t('profile.commissionDesc')}</p>
           </div>
+          {/* Security */}
           <div>
             <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-0.5">
               {t('profile.securityTitle')}

@@ -11,6 +11,7 @@ import { HistoryList } from '@/components/features/history/history-list';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { MobileBalanceBar } from '@/components/features/vault/mobile-balance-bar';
 import { Leaderboard } from '@/components/features/leaderboard/leaderboard';
+import { TopWinnerBanner } from '@/components/features/top-winner-banner';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useWebSocket } from '@/hooks/use-websocket';
@@ -168,6 +169,8 @@ export default function GamePage() {
       <div className="hidden md:block">
         <BalanceDisplay />
       </div>
+
+      <TopWinnerBanner />
 
       <div id="create-bet-form" className="hidden md:block">
         <CreateBetForm onBetSubmitted={addPending} />

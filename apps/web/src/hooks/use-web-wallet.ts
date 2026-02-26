@@ -23,6 +23,8 @@ import { AXIOME_HD_PATH } from '@coinflip/shared/chain';
 // ---- Session persistence keys ----
 const SESSION_WALLET_KEY = 'coinflip_session_wallet';
 const SESSION_PWD_KEY = 'coinflip_session_pwd';
+/** Key for storing auth token (needed for iOS Safari where cookies are blocked by ITP) */
+const SESSION_AUTH_TOKEN_KEY = 'coinflip_auth_token';
 
 /** Generate a random password for session wallet serialization */
 function generateSessionPassword(): string {
@@ -61,6 +63,7 @@ async function restoreSessionWallet(): Promise<DirectSecp256k1HdWallet | null> {
 function clearSessionWallet(): void {
   sessionStorage.removeItem(SESSION_WALLET_KEY);
   sessionStorage.removeItem(SESSION_PWD_KEY);
+  sessionStorage.removeItem(SESSION_AUTH_TOKEN_KEY);
 }
 
 export interface WebWalletState {
@@ -172,6 +175,14 @@ export function useWebWallet(): WebWalletState {
               });
 
               if (verifyRes.ok) {
+                // Store token for iOS Safari (cookies blocked by ITP)
+                try {
+                  const verifyData = await verifyRes.json();
+                  const token = verifyData?.data?.token;
+                  if (token) {
+                    sessionStorage.setItem(SESSION_AUTH_TOKEN_KEY, token);
+                  }
+                } catch { /* non-fatal */ }
                 return; // Authenticated via signature
               }
             }

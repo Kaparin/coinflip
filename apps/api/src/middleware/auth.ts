@@ -31,7 +31,7 @@ async function resolveUser(c: Context): Promise<boolean> {
   const isProd = env.NODE_ENV === 'production';
   let address: string | undefined;
 
-  // 1. Try session token (preferred, secure)
+  // 1. Try session token from cookie (preferred, works on Chrome/Android)
   const sessionToken = getCookie(c, SESSION_COOKIE_NAME);
   if (sessionToken) {
     const session = verifySessionToken(sessionToken);
@@ -40,7 +40,19 @@ async function resolveUser(c: Context): Promise<boolean> {
     }
   }
 
-  // 2. Dev fallback: trust x-wallet-address header (NEVER in production)
+  // 2. Try Authorization: Bearer token (works on iOS Safari where cookies are blocked)
+  if (!address) {
+    const authHeader = c.req.header('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const bearerToken = authHeader.slice(7);
+      const session = verifySessionToken(bearerToken);
+      if (session) {
+        address = session.address;
+      }
+    }
+  }
+
+  // 3. Dev fallback: trust x-wallet-address header (NEVER in production)
   if (!address && !isProd) {
     address = c.req.header('x-wallet-address') ?? getCookie(c, 'wallet_address');
   }

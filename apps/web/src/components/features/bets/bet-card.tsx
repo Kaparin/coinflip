@@ -6,6 +6,7 @@ import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/
 import { Crown, Flame, Zap, Coins, Clock } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
+import Link from 'next/link';
 
 export interface BetCardProps {
   id: string;
@@ -234,10 +235,10 @@ export function BetCard({
 
         {/* Middle: Maker + Timer */}
         <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)] mb-3">
-          <span className="flex items-center gap-1.5 min-w-0">
+          <Link href={`/game/profile/${maker}`} className="flex items-center gap-1.5 min-w-0 group/maker" onClick={(e) => e.stopPropagation()}>
             <UserAvatar address={maker} size={18} />
-            <span className="font-mono opacity-80 truncate">{makerNickname || truncAddr(maker)}</span>
-          </span>
+            <span className="font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors">{makerNickname || truncAddr(maker)}</span>
+          </Link>
           {/* Open bets: show expiry countdown; others: show time ago */}
           {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
             <span className={`flex items-center gap-1 font-mono tabular-nums ${

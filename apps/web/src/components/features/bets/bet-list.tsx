@@ -248,9 +248,14 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     if (bet) setAcceptTarget({ id, amount: Number(bet.amount) });
   }, [bets]);
 
-  // Extract stable `mutate` references to avoid re-creating callbacks on every render
+  // Extract stable references to avoid re-creating callbacks on every render
   const cancelBet = cancelMutation.mutate;
-  const acceptBet = acceptMutation.mutate;
+  const acceptBetAsync = acceptMutation.mutateAsync;
+
+  // Sequential accept queue — prevents broadcast queue pileup on the server.
+  // Without this, rapid accepts fire N parallel API calls, each waiting for the
+  // relayer's broadcast lock (~2-3s per tx), causing later requests to timeout.
+  const acceptQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const handleCancelClick = useCallback((id: string) => {
     setPendingBetId(id);
@@ -270,13 +275,25 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     // recentlyAcceptedIds handles per-bet blocking (hides button, shows "Accepting..." spinner).
     // This allows the user to rapidly accept multiple bets without waiting.
     setRecentlyAcceptedIds(prev => new Set(prev).add(betId));
-    // No guess needed — server picks randomly
-    acceptBet({
-      betId: Number(betId),
-      data: { guess: 'heads' }, // server ignores this, picks randomly
-    });
+
+    // Close modal immediately so user can accept more bets
     setAcceptTarget(null);
-  }, [acceptTarget, acceptBet, addDeduction]);
+
+    // Queue the API call — processes one at a time to avoid overwhelming
+    // the relayer's broadcast queue (which serializes all chain transactions).
+    // Without this, N parallel requests each wait ~2-3s for the broadcast lock,
+    // causing later requests to timeout (45s frontend limit).
+    acceptQueueRef.current = acceptQueueRef.current.then(async () => {
+      try {
+        await acceptBetAsync({
+          betId: Number(betId),
+          data: { guess: 'heads' }, // server ignores this, picks randomly
+        });
+      } catch {
+        // Error already handled by mutation's onError callback
+      }
+    });
+  }, [acceptTarget, acceptBetAsync, addDeduction]);
 
   if (isLoading) {
     return (
