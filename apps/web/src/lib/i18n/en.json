@@ -754,8 +754,12 @@
   "jackpot": {
     "title": "Jackpots",
     "subtitle": "Win big from every bet placed",
-    "bannerTitle": "Jackpot",
+    "bannerTitle": "Jackpot Pools",
+    "bannerPools": "{count} active pools",
+    "bannerTotal": "Total",
     "activePools": "Active",
+    "summaryTotal": "Total Pooled",
+    "summaryClosest": "Closest to draw",
     "historyTab": "History",
     "drawing": "Drawing...",
     "completed": "Completed",

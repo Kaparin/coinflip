@@ -13,6 +13,7 @@ import { users, bets, vaultBalances, pendingBetSecrets } from '@coinflip/db/sche
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { getCoinFlipStats } from './bets.js';
+import { jackpotService } from '../services/jackpot.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
@@ -758,4 +759,49 @@ adminRouter.get('/diagnostics', async (c) => {
     logger.error({ err }, 'admin: diagnostics failed');
     return c.json({ error: { code: 'DIAGNOSTICS_FAILED', message: err.message } }, 500);
   }
+});
+
+// ─── Jackpot Admin ────────────────────────────────────
+
+// GET /admin/jackpot/tiers — all tiers with current pools
+adminRouter.get('/jackpot/tiers', async (c) => {
+  const data = await jackpotService.getTiersWithPools();
+  return c.json({ data });
+});
+
+// PUT /admin/jackpot/tiers/:tierId — update tier settings
+adminRouter.put(
+  '/jackpot/tiers/:tierId',
+  zValidator(
+    'json',
+    z.object({
+      targetAmount: z.string().optional(),
+      minGames: z.number().int().min(0).optional(),
+      isActive: z.number().int().min(0).max(1).optional(),
+    }),
+  ),
+  async (c) => {
+    const tierId = Number(c.req.param('tierId'));
+    if (Number.isNaN(tierId)) return c.json({ error: { code: 'INVALID_TIER_ID', message: 'Invalid tier ID' } }, 400);
+
+    const body = c.req.valid('json');
+    await jackpotService.updateTier(tierId, body);
+    return c.json({ data: { status: 'ok' } });
+  },
+);
+
+// POST /admin/jackpot/force-draw/:poolId — force a draw
+adminRouter.post('/jackpot/force-draw/:poolId', async (c) => {
+  const poolId = c.req.param('poolId');
+  const result = await jackpotService.forceDrawPool(poolId);
+  if (!result.success) return c.json({ error: { code: 'FORCE_DRAW_FAILED', message: result.message } }, 400);
+  return c.json({ data: result });
+});
+
+// POST /admin/jackpot/reset-pool/:poolId — reset pool to 0
+adminRouter.post('/jackpot/reset-pool/:poolId', async (c) => {
+  const poolId = c.req.param('poolId');
+  const result = await jackpotService.resetPool(poolId);
+  if (!result.success) return c.json({ error: { code: 'RESET_FAILED', message: result.message } }, 400);
+  return c.json({ data: result });
 });

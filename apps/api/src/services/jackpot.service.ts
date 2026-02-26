@@ -523,6 +523,126 @@ class JackpotService {
     return { totalBets, eligibleTiers };
   }
 
+  // ─── Admin Methods ──────────────────────────────────
+
+  /**
+   * Get all tiers with their current active pool (for admin).
+   */
+  async getTiersWithPools() {
+    const db = getDb();
+
+    const tiers = await db
+      .select({
+        id: jackpotTiers.id,
+        name: jackpotTiers.name,
+        targetAmount: jackpotTiers.targetAmount,
+        minGames: jackpotTiers.minGames,
+        contributionBps: jackpotTiers.contributionBps,
+        isActive: jackpotTiers.isActive,
+      })
+      .from(jackpotTiers)
+      .orderBy(jackpotTiers.id);
+
+    const activePools = await db
+      .select({
+        id: jackpotPools.id,
+        tierId: jackpotPools.tierId,
+        cycle: jackpotPools.cycle,
+        currentAmount: jackpotPools.currentAmount,
+        status: jackpotPools.status,
+      })
+      .from(jackpotPools)
+      .where(inArray(jackpotPools.status, ['filling', 'drawing']));
+
+    const poolMap = new Map(activePools.map((p) => [p.tierId, p]));
+
+    return tiers.map((t) => {
+      const pool = poolMap.get(t.id);
+      const current = pool ? BigInt(pool.currentAmount) : 0n;
+      const target = BigInt(t.targetAmount);
+      const progress = target > 0n ? Math.min(100, Number((current * 100n) / target)) : 0;
+
+      return {
+        ...t,
+        pool: pool
+          ? { id: pool.id, cycle: pool.cycle, currentAmount: pool.currentAmount, status: pool.status, progress }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * Update tier configuration (admin).
+   */
+  async updateTier(tierId: number, updates: { targetAmount?: string; minGames?: number; isActive?: number }): Promise<void> {
+    const db = getDb();
+
+    const setFields: Record<string, unknown> = {};
+    if (updates.targetAmount !== undefined) setFields.targetAmount = updates.targetAmount;
+    if (updates.minGames !== undefined) setFields.minGames = updates.minGames;
+    if (updates.isActive !== undefined) setFields.isActive = updates.isActive;
+
+    if (Object.keys(setFields).length === 0) return;
+
+    await db
+      .update(jackpotTiers)
+      .set(setFields as typeof jackpotTiers.$inferInsert)
+      .where(eq(jackpotTiers.id, tierId));
+
+    logger.info({ tierId, updates }, 'Admin: jackpot tier updated');
+  }
+
+  /**
+   * Force draw a pool (admin). Sets status to drawing, then draws winner.
+   */
+  async forceDrawPool(poolId: string): Promise<{ success: boolean; message: string }> {
+    const db = getDb();
+
+    const [pool] = await db
+      .select({ id: jackpotPools.id, status: jackpotPools.status, currentAmount: jackpotPools.currentAmount })
+      .from(jackpotPools)
+      .where(eq(jackpotPools.id, poolId))
+      .limit(1);
+
+    if (!pool) return { success: false, message: 'Pool not found' };
+    if (pool.status === 'completed') return { success: false, message: 'Pool already completed' };
+
+    if (pool.status === 'filling') {
+      await db
+        .update(jackpotPools)
+        .set({ status: 'drawing' })
+        .where(eq(jackpotPools.id, poolId));
+    }
+
+    await this.drawWinner(poolId);
+    logger.info({ poolId }, 'Admin: forced jackpot draw');
+    return { success: true, message: 'Draw triggered' };
+  }
+
+  /**
+   * Reset a pool to 0 (admin). Only for filling pools.
+   */
+  async resetPool(poolId: string): Promise<{ success: boolean; message: string }> {
+    const db = getDb();
+
+    const [pool] = await db
+      .select({ id: jackpotPools.id, status: jackpotPools.status })
+      .from(jackpotPools)
+      .where(eq(jackpotPools.id, poolId))
+      .limit(1);
+
+    if (!pool) return { success: false, message: 'Pool not found' };
+    if (pool.status !== 'filling') return { success: false, message: 'Can only reset filling pools' };
+
+    await db
+      .update(jackpotPools)
+      .set({ currentAmount: '0' })
+      .where(eq(jackpotPools.id, poolId));
+
+    logger.info({ poolId }, 'Admin: jackpot pool reset to 0');
+    return { success: true, message: 'Pool reset to 0' };
+  }
+
   /**
    * Format a pool DB row into the API response shape.
    */
@@ -534,6 +654,7 @@ class JackpotService {
     status: string;
     tierName: string;
     targetAmount: string;
+    minGames?: number;
     winnerAddress?: string | null;
     winnerNickname?: string | null;
     drawSeed?: string | null;
@@ -552,6 +673,7 @@ class JackpotService {
       cycle: pool.cycle,
       currentAmount: pool.currentAmount,
       targetAmount: pool.targetAmount,
+      minGames: pool.minGames ?? 0,
       progress,
       status: pool.status,
       winnerAddress: pool.winnerAddress ?? null,

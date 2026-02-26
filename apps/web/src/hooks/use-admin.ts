@@ -479,3 +479,74 @@ export function useAdminRecoverSecret() {
     },
   });
 }
+
+// ─── Jackpot Admin ────────────────────────────────────
+
+export interface AdminJackpotTier {
+  id: number;
+  name: string;
+  targetAmount: string;
+  minGames: number;
+  contributionBps: number;
+  isActive: number;
+  pool: {
+    id: string;
+    cycle: number;
+    currentAmount: string;
+    status: string;
+    progress: number;
+  } | null;
+}
+
+export function useAdminJackpotTiers() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'jackpot', 'tiers', address],
+    queryFn: () => adminFetch<AdminJackpotTier[]>('/api/v1/admin/jackpot/tiers', address!),
+    enabled: isConnected && !!address,
+    staleTime: 5_000,
+  });
+}
+
+export function useAdminUpdateTier() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tierId, ...body }: { tierId: number; targetAmount?: string; minGames?: number; isActive?: number }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/jackpot/tiers/${tierId}`, address!, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'jackpot'] });
+    },
+  });
+}
+
+export function useAdminForceDraw() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (poolId: string) =>
+      adminFetch<{ success: boolean; message: string }>(`/api/v1/admin/jackpot/force-draw/${poolId}`, address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'jackpot'] });
+    },
+  });
+}
+
+export function useAdminResetPool() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (poolId: string) =>
+      adminFetch<{ success: boolean; message: string }>(`/api/v1/admin/jackpot/reset-pool/${poolId}`, address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'jackpot'] });
+    },
+  });
+}

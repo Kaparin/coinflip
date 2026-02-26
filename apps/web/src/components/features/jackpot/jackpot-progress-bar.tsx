@@ -38,7 +38,7 @@ export function JackpotProgressBar({ progress, tierName }: JackpotProgressBarPro
   const clamped = Math.min(100, Math.max(0, progress));
 
   return (
-    <div className={`relative h-2.5 w-full rounded-full ${colors.bg} overflow-hidden`}>
+    <div className={`relative h-3 w-full rounded-full ${colors.bg} overflow-hidden`}>
       <div
         className={`absolute inset-y-0 left-0 rounded-full ${colors.bar} transition-all duration-700 ease-out ${
           clamped > 90 ? `shadow-lg ${colors.glow} animate-pulse-glow` : ''
@@ -51,6 +51,14 @@ export function JackpotProgressBar({ progress, tierName }: JackpotProgressBarPro
           className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
           style={{ width: `${clamped}%` }}
         />
+      )}
+      {/* Percentage text */}
+      {clamped >= 30 && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[8px] font-bold text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+            {clamped}%
+          </span>
+        </div>
       )}
     </div>
   );

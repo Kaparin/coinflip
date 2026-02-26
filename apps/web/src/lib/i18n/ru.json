@@ -754,8 +754,12 @@
   "jackpot": {
     "title": "Джекпоты",
     "subtitle": "Выигрывай по-крупному с каждой ставки",
-    "bannerTitle": "Джекпот",
+    "bannerTitle": "Джекпот-пулы",
+    "bannerPools": "{count} активных пулов",
+    "bannerTotal": "Всего",
     "activePools": "Активные",
+    "summaryTotal": "Всего в пулах",
+    "summaryClosest": "Ближайший к розыгрышу",
     "historyTab": "История",
     "drawing": "Розыгрыш...",
     "completed": "Разыгран",

@@ -31,6 +31,7 @@ export const JackpotPoolResponseSchema = z
     cycle: z.number().int(),
     currentAmount: z.string(),
     targetAmount: z.string(),
+    minGames: z.number().int(),
     progress: z.number(), // 0-100 percentage
     status: JackpotPoolStatusSchema,
     winnerAddress: z.string().nullable(),
