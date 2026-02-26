@@ -7,13 +7,14 @@ import { JackpotHistory } from '@/components/features/jackpot/jackpot-history';
 import { LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Trophy, History, Coins, Target, Gift, Zap } from 'lucide-react';
+import { ArrowLeft, Trophy, History, Coins, Target, Gift, Zap, Info, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 type Tab = 'active' | 'history';
 
 export default function JackpotPage() {
   const [activeTab, setActiveTab] = useState<Tab>('active');
+  const [showInfo, setShowInfo] = useState(false);
   const { data: pools, isLoading } = useJackpotActive();
   const { t } = useTranslation();
 
@@ -33,16 +34,44 @@ export default function JackpotPage() {
         >
           <ArrowLeft size={16} />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <Trophy size={20} className="text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]" />
+            <Trophy size={20} className="text-indigo-400 drop-shadow-[0_0_6px_rgba(129,140,248,0.4)]" />
             {t('jackpot.title')}
           </h1>
           <p className="text-xs text-[var(--color-text-secondary)]">
             {t('jackpot.subtitle')}
           </p>
         </div>
+        {/* Info toggle */}
+        <button
+          type="button"
+          onClick={() => setShowInfo(!showInfo)}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+            showInfo
+              ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'
+              : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/5'
+          }`}
+        >
+          <Info size={16} />
+        </button>
       </div>
+
+      {/* Collapsible how-it-works */}
+      {showInfo && (
+        <div className="rounded-xl border border-indigo-500/20 bg-[var(--color-surface)] p-3.5 animate-fade-up">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Info size={14} className="text-indigo-400" />
+            <span className="text-xs font-bold text-indigo-400">{t('jackpot.howTitle')}</span>
+          </div>
+          <div className="space-y-2">
+            <HowItWorksStep icon={Coins} text={t('jackpot.howStep1')} />
+            <HowItWorksStep icon={Target} text={t('jackpot.howStep2')} />
+            <HowItWorksStep icon={Gift} text={t('jackpot.howStep3')} />
+            <HowItWorksStep icon={Zap} text={t('jackpot.howStep4')} />
+          </div>
+        </div>
+      )}
 
       {/* Summary Stats */}
       {pools && pools.length > 0 && (
@@ -53,7 +82,7 @@ export default function JackpotPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <LaunchTokenIcon size={16} />
-              <span className="text-lg font-black tabular-nums text-amber-400">
+              <span className="text-lg font-black tabular-nums text-indigo-400">
                 {formatLaunch(totalAmount.toString())}
               </span>
             </div>
@@ -67,7 +96,7 @@ export default function JackpotPage() {
                 <span className="text-lg font-black tabular-nums">
                   {t(`jackpot.tiers.${closest.tierName}`)}
                 </span>
-                <span className="text-sm font-bold text-amber-400">{closest.progress}%</span>
+                <span className="text-sm font-bold text-indigo-400">{closest.progress}%</span>
               </div>
             </div>
           )}
@@ -93,16 +122,6 @@ export default function JackpotPage() {
       {/* Content */}
       {activeTab === 'active' && (
         <div className="space-y-3">
-          {/* How it works */}
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5">
-            <div className="space-y-2">
-              <HowItWorksStep icon={Coins} text="1% of every bet goes into 5 jackpot pools" />
-              <HowItWorksStep icon={Target} text="When a pool fills up, a random winner is drawn" />
-              <HowItWorksStep icon={Gift} text="Prize is credited to your game balance instantly" />
-              <HowItWorksStep icon={Zap} text="Pools reset and start filling again automatically" />
-            </div>
-          </div>
-
           {/* Pool cards */}
           {isLoading ? (
             <div className="space-y-3">
@@ -158,8 +177,8 @@ function TabButton({
 function HowItWorksStep({ icon: Icon, text }: { icon: typeof Coins; text: string }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10">
-        <Icon size={12} className="text-[var(--color-primary)]" />
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/10">
+        <Icon size={12} className="text-indigo-400" />
       </div>
       <span className="text-[11px] text-[var(--color-text-secondary)] leading-snug">{text}</span>
     </div>

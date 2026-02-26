@@ -771,6 +771,11 @@
     "loadMore": "Load more",
     "minGames": "Min. {count} games to participate",
     "howItWorks": "1% of every bet goes into 5 jackpot pools. When a pool fills up, a random eligible player wins the entire prize! Pools reset and start filling again automatically.",
+    "howStep1": "1% of every bet goes into 5 jackpot pools",
+    "howStep2": "When a pool fills up, a random winner is drawn",
+    "howStep3": "Prize is credited to your game balance instantly",
+    "howStep4": "Pools reset and start filling again automatically",
+    "howTitle": "How it works",
     "wonTitle": "Jackpot Won!",
     "wonVerb": "won",
     "tiers": {
