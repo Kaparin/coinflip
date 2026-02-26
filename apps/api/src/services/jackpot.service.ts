@@ -350,6 +350,47 @@ class JackpotService {
   }
 
   /**
+   * Backfill jackpot contributions for all resolved bets that have no contributions yet.
+   * Called once on startup after pools are created.
+   */
+  async backfillContributions(): Promise<void> {
+    const db = getDb();
+
+    try {
+      // Find resolved bets with NO jackpot contributions
+      const { bets } = await import('@coinflip/db/schema');
+
+      const missingBets = await db.execute(sql`
+        SELECT b.bet_id, b.amount
+        FROM bets b
+        WHERE b.status IN ('revealed', 'timeout_claimed')
+          AND NOT EXISTS (
+            SELECT 1 FROM jackpot_contributions jc WHERE jc.bet_id = b.bet_id
+          )
+        ORDER BY b.bet_id ASC
+      `) as unknown as Array<{ bet_id: string; amount: string }>;
+
+      if (missingBets.length === 0) {
+        logger.info('Jackpot backfill: no missing contributions');
+        return;
+      }
+
+      logger.info({ count: missingBets.length }, 'Jackpot backfill: processing missing contributions');
+
+      let processed = 0;
+      for (const bet of missingBets) {
+        const totalPot = BigInt(bet.amount) * 2n;
+        await this.processBetContribution(BigInt(bet.bet_id), totalPot);
+        processed++;
+      }
+
+      logger.info({ processed }, 'Jackpot backfill complete');
+    } catch (err) {
+      logger.error({ err }, 'Jackpot backfill failed');
+    }
+  }
+
+  /**
    * Background lifecycle check — retry any stuck drawing pools.
    */
   async checkJackpotLifecycle(): Promise<void> {

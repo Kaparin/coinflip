@@ -27,6 +27,17 @@ async function initServices() {
     logger.warn({ err }, 'Relayer service failed to initialize — chain operations disabled');
   }
 
+  // Ensure all jackpot tiers have active pools BEFORE indexer starts
+  // (indexer's startup sync processes pending bets → jackpot contributions need pools to exist)
+  try {
+    await jackpotService.ensureActivePoolsExist();
+    logger.info('Jackpot pools initialized');
+    // Backfill contributions for any resolved bets that were missed
+    await jackpotService.backfillContributions();
+  } catch (err) {
+    logger.warn({ err }, 'Jackpot pool initialization failed');
+  }
+
   const enableIndexer = env.ENABLE_INDEXER === 'true';
   const enableSweep = env.ENABLE_BACKGROUND_SWEEP === 'true';
 
@@ -42,14 +53,6 @@ async function initServices() {
     }
   } else {
     logger.info('Indexer disabled (ENABLE_INDEXER != "true"). Set ENABLE_INDEXER=true to enable.');
-  }
-
-  // Ensure all jackpot tiers have active pools
-  try {
-    await jackpotService.ensureActivePoolsExist();
-    logger.info('Jackpot pools initialized');
-  } catch (err) {
-    logger.warn({ err }, 'Jackpot pool initialization failed');
   }
 
   if (enableSweep) {
