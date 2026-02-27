@@ -110,28 +110,50 @@ export function invalidateBalanceCache(address: string): void {
 }
 
 // GET /api/v1/vault/balance — Get balance (auth required)
-// Uses chain balance (cached 5s) adjusted by server-side pending locks.
-// Pending locks represent funds locked in DB but not yet reflected on-chain.
+// Uses chain balance adjusted by:
+//   1. Server-side pending locks (bets being created, not yet on-chain)
+//   2. Off-chain spending (VIP, pins, announcements) tracked via offchain_spent
+//   3. Bonus balance (raffle prizes, etc.)
 vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  // Fetch chain balance + DB open bet count in parallel
-  const [chainBalance, dbOpenCount] = await Promise.all([
+  // Fetch chain balance + DB offchain columns + open bet count in parallel
+  const [chainBalance, offchain, dbOpenCount] = await Promise.all([
     getChainVaultBalance(address),
+    vaultService.getOffchainBalances(user.id),
     betService.getOpenBetCountForUser(user.id),
   ]);
 
-  let available = BigInt(chainBalance.available);
+  let chainAvailable = BigInt(chainBalance.available);
   const chainLocked = BigInt(chainBalance.locked);
 
   // Subtract pending locks that chain hasn't reflected yet
   const pendingLockAmount = getTotalPendingLocks(address);
   if (pendingLockAmount > 0n) {
-    available = available - pendingLockAmount;
-    if (available < 0n) available = 0n;
+    chainAvailable = chainAvailable - pendingLockAmount;
+    if (chainAvailable < 0n) chainAvailable = 0n;
   }
 
+  // Account for off-chain spending (VIP, pins, announcements, sponsored raffles)
+  // and bonus balance (prizes). offchain_spent is deducted from available first,
+  // overflow goes to bonus — mirrors vaultService.getBalance() logic.
+  const offchainSpent = BigInt(offchain.offchainSpent);
+  const bonus = BigInt(offchain.bonus);
+
+  let effectiveAvailable: bigint;
+  let effectiveBonus: bigint;
+
+  if (offchainSpent <= chainAvailable) {
+    effectiveAvailable = chainAvailable - offchainSpent;
+    effectiveBonus = bonus;
+  } else {
+    effectiveAvailable = 0n;
+    const overflowFromBonus = offchainSpent - chainAvailable;
+    effectiveBonus = bonus > overflowFromBonus ? bonus - overflowFromBonus : 0n;
+  }
+
+  const available = effectiveAvailable + effectiveBonus;
   const locked = chainLocked + pendingLockAmount;
   const total = available + locked;
 

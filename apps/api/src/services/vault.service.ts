@@ -194,6 +194,21 @@ export class VaultService {
   }
 
   /**
+   * Get off-chain balance columns (offchain_spent + bonus) from DB.
+   * Used by the balance endpoint to adjust chain-derived available balance.
+   */
+  async getOffchainBalances(userId: string): Promise<{ offchainSpent: string; bonus: string }> {
+    const balance = await this.db.query.vaultBalances.findFirst({
+      where: eq(vaultBalances.userId, userId),
+      columns: { offchainSpent: true, bonus: true },
+    });
+    return {
+      offchainSpent: balance?.offchainSpent ?? '0',
+      bonus: balance?.bonus ?? '0',
+    };
+  }
+
+  /**
    * Refund off-chain payment by decrementing offchain_spent.
    * Used when admin rejects a sponsored announcement/raffle, etc.
    * Clamps offchain_spent to 0 to prevent negative values.
