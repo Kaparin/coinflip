@@ -77,10 +77,15 @@ pub enum ExecuteMsg {
 
 /// Message for contract migration.
 /// v0.5.0: added optional `token_cw20` to allow switching the CW20 token address.
+/// v0.5.1: added `reset_state` to wipe all bets, vault balances and counters.
 #[cw_serde]
 pub struct MigrateMsg {
     /// New CW20 token contract address. If `None`, keeps current value.
     pub token_cw20: Option<String>,
+    /// If `true`, wipe all bets, vault balances, open-bet counts and daily usage.
+    /// Resets next_bet_id to 1. Use when switching to a new token.
+    #[serde(default)]
+    pub reset_state: bool,
 }
 
 #[cw_serde]

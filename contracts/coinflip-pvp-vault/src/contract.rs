@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
     StdResult,
 };
 use cw2::{ensure_from_older_version, set_contract_version};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::{Config, CONFIG, NEXT_BET_ID, PENDING_ADMIN};
+use crate::state::{Config, CONFIG, NEXT_BET_ID, PENDING_ADMIN, VAULT_BALANCES, BETS, USER_OPEN_BET_COUNT, DAILY_USAGE};
 
 const CONTRACT_NAME: &str = "crates.io:coinflip-pvp-vault";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -219,13 +219,56 @@ pub fn migrate(
         config.token_cw20 = deps.api.addr_validate(&new_token)?;
     }
 
+    // v0.5.1: full state reset (bets, vaults, counters)
+    let mut cleared_count: u64 = 0;
+    if msg.reset_state {
+        // Clear all vault balances
+        let vault_keys: Vec<_> = VAULT_BALANCES
+            .keys(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for key in &vault_keys {
+            VAULT_BALANCES.remove(deps.storage, key);
+        }
+
+        // Clear all bets
+        let bet_keys: Vec<_> = BETS
+            .keys(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for key in &bet_keys {
+            BETS.remove(deps.storage, *key);
+        }
+
+        // Clear open bet counts
+        let obc_keys: Vec<_> = USER_OPEN_BET_COUNT
+            .keys(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for key in &obc_keys {
+            USER_OPEN_BET_COUNT.remove(deps.storage, key);
+        }
+
+        // Clear daily usage
+        let du_keys: Vec<_> = DAILY_USAGE
+            .keys(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for key in &du_keys {
+            DAILY_USAGE.remove(deps.storage, (&key.0, key.1));
+        }
+
+        // Reset bet counter
+        NEXT_BET_ID.save(deps.storage, &1u64)?;
+
+        cleared_count = (vault_keys.len() + bet_keys.len() + obc_keys.len() + du_keys.len()) as u64;
+    }
+
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("from_version", version.to_string())
         .add_attribute("to_version", CONTRACT_VERSION)
-        .add_attribute("token_cw20", config.token_cw20.to_string()))
+        .add_attribute("token_cw20", config.token_cw20.to_string())
+        .add_attribute("state_reset", msg.reset_state.to_string())
+        .add_attribute("cleared_entries", cleared_count.to_string()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

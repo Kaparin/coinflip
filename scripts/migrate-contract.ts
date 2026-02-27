@@ -102,8 +102,13 @@ async function main() {
     codeId = uploadResult.codeId;
   }
 
-  // 5. Migrate contract — pass new token_cw20 in MigrateMsg
-  const migrateMsg = { token_cw20: NEW_TOKEN_CW20 };
+  // 5. Migrate contract — pass new token_cw20 + reset_state in MigrateMsg
+  const resetState = process.argv.includes('--reset');
+  const migrateMsg: Record<string, unknown> = { token_cw20: NEW_TOKEN_CW20 };
+  if (resetState) {
+    migrateMsg.reset_state = true;
+    log('*** STATE RESET ENABLED — all bets, vaults and counters will be wiped ***');
+  }
   log(`Migrating contract to code ID ${codeId} with: ${JSON.stringify(migrateMsg)}`);
 
   const migrateResult = await client.migrate(
