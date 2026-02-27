@@ -48,6 +48,24 @@ export function isBetGone(msg: string): boolean {
 }
 
 /**
+ * Map the sanitized chain error message to a localized string.
+ * The backend sanitizes raw chain errors into clean English messages;
+ * this maps those to i18n keys so the frontend can show the correct locale.
+ */
+function mapChainErrorMessage(msg: string, t: TFunction): string {
+  if (msg.includes('insufficient balance')) return t('errors.insufficientBalance');
+  if (msg.includes('maximum open bets')) return t('errors.tooManyOpenBets');
+  if (msg.includes('bet not found')) return t('errors.betNotFound');
+  if (msg.includes('bet has expired')) return t('errors.chainBetExpired');
+  if (msg.includes('cannot accept your own')) return t('errors.selfAccept');
+  if (msg.includes('commitment verification')) return t('errors.chainTxFailed');
+  if (msg.includes('reveal timeout')) return t('errors.chainTxFailed');
+  if (msg.includes('gas fee payment') || msg.includes('contact support')) return t('errors.gasFeeIssue');
+  if (msg.includes('transaction ordering')) return t('errors.chainTxFailed');
+  return t('errors.chainTxFailed');
+}
+
+/**
  * Get a user-friendly error message for toasts.
  * Maps known error codes and message patterns to localized strings.
  */
@@ -64,7 +82,7 @@ export function getUserFriendlyError(
     return t('errors.actionInProgress');
   }
 
-  // Map by error code first
+  // Map by error code first (CHAIN_TX_FAILED uses the backend's sanitized message directly)
   const codeMap: Record<string, string> = {
     INSUFFICIENT_BALANCE: t('errors.insufficientBalance'),
     BELOW_MIN_BET: t('errors.belowMinBet'),
@@ -76,7 +94,6 @@ export function getUserFriendlyError(
     SELF_ACCEPT: t('errors.selfAccept'),
     UNAUTHORIZED: t('errors.unauthorized'),
     RELAYER_NOT_READY: t('errors.relayerNotReady'),
-    CHAIN_TX_FAILED: t('errors.chainTxFailed'),
     CHAIN_TX_TIMEOUT: t('errors.chainTxTimeout'),
     VALIDATION_ERROR: t('errors.validationError'),
     INTERNAL_ERROR: t('errors.serverError'),
@@ -84,6 +101,11 @@ export function getUserFriendlyError(
 
   if (code && codeMap[code]) {
     return codeMap[code] as string;
+  }
+
+  // CHAIN_TX_FAILED: use the backend's sanitized message (it maps raw chain errors to user-friendly text)
+  if (code === 'CHAIN_TX_FAILED') {
+    return mapChainErrorMessage(msg, t);
   }
 
   // Map by message content (for errors that don't have code in response)

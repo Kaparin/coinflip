@@ -21,6 +21,7 @@ function sanitizeChainError(rawLog?: string): string {
   // Known user-facing error patterns → return clean message
   const userMessages: Array<[RegExp, string]> = [
     [/insufficient.*balance/i, 'Insufficient balance'],
+    [/insufficient.*fee|fee payer.*insufficient|insufficient fees|insufficient funds.*fee/i, 'Gas fee payment issue. Please contact support.'],
     [/bet.*not.*found/i, 'Bet not found'],
     [/bet.*expired/i, 'Bet has expired'],
     [/self.*accept.*not.*allowed/i, 'Cannot accept your own bet'],
@@ -29,7 +30,7 @@ function sanitizeChainError(rawLog?: string): string {
     [/invalid.*state.*transition/i, 'This action is not available for the current bet state'],
     [/reveal.*timeout.*expired/i, 'Reveal timeout has expired'],
     [/account sequence mismatch/i, 'Transaction ordering issue — please retry'],
-    [/max.*open.*bets/i, 'Maximum open bets reached'],
+    [/too many open bets|max.*open.*bets|open bets.*max/i, 'Maximum open bets reached'],
   ];
 
   for (const [pattern, message] of userMessages) {

@@ -13,6 +13,8 @@
     "unauthorized": "Connect your wallet.",
     "relayerNotReady": "Service temporarily unavailable. Try again in a minute.",
     "chainTxFailed": "Transaction failed on blockchain. Try again.",
+    "chainBetExpired": "This bet has expired and is no longer available.",
+    "gasFeeIssue": "Service temporarily unavailable (gas fee issue). Try again in a few minutes.",
     "chainTxTimeout": "Transaction was sent but not yet confirmed. Wait and check your balance.",
     "validationError": "Invalid data. Check your input.",
     "serverError": "Temporary server error. Try again later.",
