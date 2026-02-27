@@ -44,12 +44,14 @@ export function StatusChips({
           <Component
             key={chip.key}
             {...(isClickable ? { type: 'button' as const, onClick: onSetupClick } : {})}
-            className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors min-w-0 ${
+            className={`flex shrink-0 items-center justify-center gap-1 rounded-lg border text-[11px] font-medium transition-all min-w-0 ${
+              compact ? 'h-7 w-7 p-0' : 'px-2.5 py-1'
+            } ${
               chip.enabled
-                ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10 text-[var(--color-success)] shadow-[0_0_8px_rgba(34,197,94,0.15)]'
                 : isClickable
-                  ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)] cursor-pointer hover:bg-[var(--color-warning)]/25 active:scale-[0.98]'
-                  : 'bg-[var(--color-border)] text-[var(--color-text-secondary)]'
+                  ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 text-[var(--color-warning)] cursor-pointer hover:bg-[var(--color-warning)]/20 active:scale-[0.96]'
+                  : 'border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)] opacity-50'
             }`}
             title={`${chip.label}: ${chip.enabled ? t('statusChips.active') : t('statusChips.notSetUp')}`}
           >

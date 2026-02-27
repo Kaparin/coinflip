@@ -11,7 +11,7 @@ import {
   type PendingSponsored,
 } from '@/hooks/use-admin';
 import { TableWrapper, Pagination, ActionButton, timeAgo, shortAddr } from '../_shared';
-import { Megaphone, Send, AlertTriangle, Info, Trash2, Check, X, Clock, Loader2 } from 'lucide-react';
+import { Megaphone, Send, AlertTriangle, Info, Trash2, Check, X, Clock, Loader2, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 
 export function AnnouncementsTab() {
@@ -60,6 +60,36 @@ export function AnnouncementsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Pending Sponsored — show at top if any */}
+      {pending && pending.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15">
+              <Clock size={16} className="text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">Pending Review</h3>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">
+                {pending.length} sponsored announcement{pending.length > 1 ? 's' : ''} awaiting approval
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {pending.map((item) => (
+              <PendingSponsoredCard key={item.id} item={item} onResult={setLastResult} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Result feedback */}
+      {lastResult && (
+        <div className={`rounded-lg px-4 py-2 text-xs ${lastResult.startsWith('Error') ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+          {lastResult}
+        </div>
+      )}
+
       {/* Create Announcement */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-2">
@@ -133,29 +163,8 @@ export function AnnouncementsTab() {
               {sending ? 'Sending...' : 'Send to All Users'}
             </span>
           </ActionButton>
-          {lastResult && (
-            <span className={`text-xs ${lastResult.startsWith('Error') ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'}`}>
-              {lastResult}
-            </span>
-          )}
         </div>
       </div>
-
-      {/* Pending Sponsored */}
-      {pending && pending.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Clock size={18} className="text-amber-400" />
-            <h3 className="text-sm font-bold">Pending Sponsored Announcements ({pending.length})</h3>
-          </div>
-
-          <div className="space-y-3">
-            {pending.map((item) => (
-              <PendingSponsoredCard key={item.id} item={item} onResult={setLastResult} />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* History */}
       <div className="space-y-3">
@@ -193,7 +202,9 @@ export function AnnouncementsTab() {
                       <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                         a.priority === 'important'
                           ? 'bg-amber-500/15 text-amber-400'
-                          : 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                          : a.priority === 'sponsored'
+                            ? 'bg-teal-500/15 text-teal-400'
+                            : 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
                       }`}>
                         {a.priority}
                       </span>
@@ -252,11 +263,12 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
   const reject = useAdminRejectSponsored();
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const handleApprove = async () => {
     try {
       await approve.mutateAsync(item.id);
-      onResult('Sponsored announcement approved');
+      onResult('Sponsored announcement approved & published');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${msg}`);
@@ -275,42 +287,112 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
   };
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-2">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+      {/* Header — always visible */}
+      <div className="px-4 py-3 flex items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-500/15">
+          <Megaphone size={14} className="text-teal-400" />
+        </div>
+
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-bold truncate">{item.title}</h4>
-          <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 mt-1">{item.message}</p>
-          <div className="flex gap-3 mt-2 text-[10px] text-[var(--color-text-secondary)]">
-            <span>By: {item.userNickname || shortAddr(item.userAddress)}</span>
-            {item.pricePaid && <span>Paid: {formatLaunch(item.pricePaid)} LAUNCH</span>}
-            {item.scheduledAt && <span>Scheduled: {timeAgo(item.scheduledAt)}</span>}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
+            <span>From: <span className="text-[var(--color-text-primary)]">{item.userNickname || shortAddr(item.userAddress)}</span></span>
+            {item.pricePaid && <span>Paid: <span className="text-teal-400">{formatLaunch(item.pricePaid)} LAUNCH</span></span>}
             <span>{timeAgo(item.createdAt)}</span>
           </div>
         </div>
-        <div className="flex gap-1.5 shrink-0">
-          <ActionButton onClick={handleApprove} variant="success" disabled={approve.isPending}>
-            <Check size={14} />
-          </ActionButton>
-          <ActionButton onClick={() => setShowReject(!showReject)} variant="danger">
-            <X size={14} />
-          </ActionButton>
-        </div>
+
+        {/* Expand toggle */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+          title={expanded ? 'Collapse' : 'Preview full message'}
+        >
+          {expanded ? <ChevronUp size={14} /> : <Eye size={14} />}
+        </button>
       </div>
 
-      {showReject && (
-        <div className="flex gap-2 pt-2 border-t border-[var(--color-border)]">
-          <input
-            type="text"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Reason (optional)..."
-            className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none"
-          />
-          <ActionButton onClick={handleReject} variant="danger" disabled={reject.isPending}>
-            {reject.isPending ? 'Rejecting...' : 'Reject & Refund'}
-          </ActionButton>
+      {/* Expanded content — full message preview */}
+      {expanded && (
+        <div className="px-4 pb-3 space-y-3">
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5">Message Preview</p>
+            <p className="text-xs leading-relaxed whitespace-pre-wrap">{item.message}</p>
+          </div>
+
+          {item.scheduledAt && (
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-secondary)]">
+              <Clock size={12} />
+              Scheduled for: {new Date(item.scheduledAt).toLocaleString()}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Action buttons — always visible */}
+      <div className="px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg)]/50">
+        {showReject ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Rejection reason (optional)..."
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={reject.isPending}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 py-2 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50"
+              >
+                {reject.isPending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <X size={12} />
+                )}
+                Reject & Refund
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReject(false)}
+                className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={approve.isPending}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-green-500/15 border border-green-500/30 py-2 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50"
+            >
+              {approve.isPending ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Check size={14} />
+              )}
+              Approve & Publish
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReject(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 py-2 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors"
+            >
+              <X size={14} />
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -890,6 +890,11 @@
     "messagePlaceholder": "Write your announcement message...",
     "notice": "Your announcement will be reviewed by admins before publishing. If rejected, funds will be refunded to your game balance.",
     "success": "Announcement submitted! It will be published after admin review.",
+    "successTitle": "Announcement Submitted!",
+    "successDesc": "Your announcement has been sent for admin review.",
+    "successStep1": "An admin will review your announcement shortly. If approved, it will be published to all users.",
+    "successStep2": "If your announcement is rejected, the full amount will be returned to your game balance.",
+    "close": "Got it",
     "submit": "Submit"
   }
 }
