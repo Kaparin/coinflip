@@ -136,6 +136,32 @@ export class VaultService {
   }
 
   /**
+   * Forfeit locked funds after a resolved bet (revealed/timeout_claimed).
+   * Only decrements locked — does NOT add back to available (funds are gone on-chain).
+   * For the winner, chain sync will update available with the payout.
+   * For the loser, available stays at the correct post-lock value.
+   *
+   * Use this instead of unlockFunds when funds were consumed (not returned).
+   */
+  async forfeitLocked(userId: string, amount: string) {
+    const result = await this.db
+      .update(vaultBalances)
+      .set({
+        locked: sql`GREATEST(0, ${vaultBalances.locked}::numeric - ${amount}::numeric)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(vaultBalances.userId, userId))
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ userId, amount }, 'forfeitLocked: no balance row found');
+      return null;
+    }
+
+    return result[0];
+  }
+
+  /**
    * Atomically deduct from user's effective balance (available + bonus - offchain_spent).
    * Used for off-chain payments: VIP subscriptions, pin purchases, announcements, etc.
    *

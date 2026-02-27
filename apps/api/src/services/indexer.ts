@@ -473,15 +473,16 @@ export class IndexerService {
               inArray(bets.status, ['accepted', 'accepting']),
             ));
 
-          // Unlock vault funds for both maker and acceptor (chain contract handles actual payout)
+          // Forfeit locked funds for both players (do NOT restore to available).
+          // Funds were consumed on-chain: loser's stake is gone, winner received payout.
           if (betBeforeReveal.length > 0) {
             const prev = betBeforeReveal[0]!;
             if (['accepted', 'accepting'].includes(prev.status)) {
-              await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
-                logger.warn({ err, betId }, 'bet_revealed: unlockFunds maker failed'));
+              await vaultService.forfeitLocked(prev.makerUserId, prev.amount).catch(err =>
+                logger.warn({ err, betId }, 'bet_revealed: forfeitLocked maker failed'));
               if (prev.acceptorUserId) {
-                await vaultService.unlockFunds(prev.acceptorUserId, prev.amount).catch(err =>
-                  logger.warn({ err, betId }, 'bet_revealed: unlockFunds acceptor failed'));
+                await vaultService.forfeitLocked(prev.acceptorUserId, prev.amount).catch(err =>
+                  logger.warn({ err, betId }, 'bet_revealed: forfeitLocked acceptor failed'));
               }
             }
           }
@@ -572,15 +573,15 @@ export class IndexerService {
               inArray(bets.status, ['accepted']),
             ));
 
-          // Unlock vault funds for both maker and acceptor (chain contract handles actual payout)
+          // Forfeit locked funds (do NOT restore to available — stake consumed on-chain)
           if (betBeforeTimeout.length > 0) {
             const prev = betBeforeTimeout[0]!;
             if (prev.status === 'accepted') {
-              await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
-                logger.warn({ err, betId }, 'timeout_claimed: unlockFunds maker failed'));
+              await vaultService.forfeitLocked(prev.makerUserId, prev.amount).catch(err =>
+                logger.warn({ err, betId }, 'timeout_claimed: forfeitLocked maker failed'));
               if (prev.acceptorUserId) {
-                await vaultService.unlockFunds(prev.acceptorUserId, prev.amount).catch(err =>
-                  logger.warn({ err, betId }, 'timeout_claimed: unlockFunds acceptor failed'));
+                await vaultService.forfeitLocked(prev.acceptorUserId, prev.amount).catch(err =>
+                  logger.warn({ err, betId }, 'timeout_claimed: forfeitLocked acceptor failed'));
               }
             }
           }

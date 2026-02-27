@@ -10,6 +10,7 @@ import { eq, sql, and, desc, lte, isNull, or } from 'drizzle-orm';
 import { announcements, users, userNotifications } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
+import { AppError } from '../lib/errors.js';
 import { configService } from './config.service.js';
 import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
@@ -37,13 +38,13 @@ class AnnouncementService {
     const config = await this.getConfig();
 
     if (!config.isActive) {
-      throw new Error('Sponsored announcements are currently disabled');
+      throw new AppError('SPONSORED_DISABLED', 'Sponsored announcements are currently disabled', 400);
     }
     if (title.length > config.maxTitleLength) {
-      throw new Error(`Title exceeds max length of ${config.maxTitleLength}`);
+      throw new AppError('VALIDATION_ERROR', `Title exceeds max length of ${config.maxTitleLength}`, 400);
     }
     if (message.length > config.maxMessageLength) {
-      throw new Error(`Message exceeds max length of ${config.maxMessageLength}`);
+      throw new AppError('VALIDATION_ERROR', `Message exceeds max length of ${config.maxMessageLength}`, 400);
     }
 
     // Validate scheduling
@@ -51,14 +52,14 @@ class AnnouncementService {
       const scheduled = new Date(scheduledAt);
       const minTime = new Date(Date.now() + config.minDelayMinutes * 60 * 1000);
       if (scheduled < minTime) {
-        throw new Error(`Scheduled time must be at least ${config.minDelayMinutes} minutes from now`);
+        throw new AppError('VALIDATION_ERROR', `Scheduled time must be at least ${config.minDelayMinutes} minutes from now`, 400);
       }
     }
 
     // Deduct payment
     const deducted = await vaultService.deductBalance(userId, config.price);
     if (!deducted) {
-      throw new Error('Insufficient balance');
+      throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient balance', 400);
     }
 
     const db = getDb();
@@ -100,7 +101,7 @@ class AnnouncementService {
       .where(and(eq(announcements.id, announcementId), eq(announcements.status, 'pending')))
       .limit(1);
 
-    if (!ann) throw new Error('Announcement not found or not pending');
+    if (!ann) throw new AppError('NOT_FOUND', 'Announcement not found or not pending', 404);
 
     const now = new Date();
     const shouldPublishNow = !ann.scheduledAt || ann.scheduledAt <= now;
@@ -130,7 +131,7 @@ class AnnouncementService {
       .where(and(eq(announcements.id, announcementId), eq(announcements.status, 'pending')))
       .limit(1);
 
-    if (!ann) throw new Error('Announcement not found or not pending');
+    if (!ann) throw new AppError('NOT_FOUND', 'Announcement not found or not pending', 404);
 
     await db
       .update(announcements)

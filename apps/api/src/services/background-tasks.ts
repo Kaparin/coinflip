@@ -14,7 +14,7 @@ import { formatBetResponse } from '../lib/format.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
-import { removePendingLock, invalidateBalanceCache } from '../routes/vault.js';
+import { removePendingLock, invalidateBalanceCache, getChainVaultBalance } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
@@ -667,6 +667,63 @@ async function resolveUserId(address: string): Promise<string | null> {
   }
 }
 
+/** Resolve an on-chain address from a userId */
+async function resolveAddress(userId: string): Promise<string | null> {
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const { users } = await import('@coinflip/db/schema');
+    const { eq } = await import('drizzle-orm');
+    const [row] = await db.select({ address: users.address }).from(users).where(eq(users.id, userId)).limit(1);
+    return row?.address ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * After a bet resolves (revealed/timeout_claimed), sync both players' balances
+ * from chain to DB and notify via WS. This ensures DB reflects actual on-chain
+ * state (payout to winner, loss from loser) and prevents stale DB reads from
+ * allowing over-spending in subsequent pre-flight balance checks.
+ */
+async function syncPlayersBalanceFromChain(
+  makerUserId: string,
+  acceptorUserId: string | null,
+  betId: string,
+): Promise<void> {
+  try {
+    const [makerAddr, acceptorAddr] = await Promise.all([
+      resolveAddress(makerUserId),
+      acceptorUserId ? resolveAddress(acceptorUserId) : null,
+    ]);
+
+    const chainQueries: Promise<{ available: string; locked: string }>[] = [];
+    if (makerAddr) chainQueries.push(getChainVaultBalance(makerAddr));
+    if (acceptorAddr) chainQueries.push(getChainVaultBalance(acceptorAddr));
+
+    const chainBalances = await Promise.all(chainQueries);
+    let idx = 0;
+
+    if (makerAddr) {
+      const cb = chainBalances[idx++]!;
+      await vaultService.syncBalanceFromChain(makerUserId, cb.available, cb.locked, 0n);
+      invalidateBalanceCache(makerAddr);
+      wsService.emitBalanceUpdated(makerAddr, cb);
+    }
+
+    if (acceptorAddr && acceptorUserId) {
+      const cb = chainBalances[idx]!;
+      await vaultService.syncBalanceFromChain(acceptorUserId, cb.available, cb.locked, 0n);
+      invalidateBalanceCache(acceptorAddr);
+      wsService.emitBalanceUpdated(acceptorAddr, cb);
+    }
+
+    logger.debug({ betId }, 'Post-resolution balance sync completed for both players');
+  } catch (err) {
+    logger.warn({ err, betId }, 'Post-resolution balance sync failed (non-critical)');
+  }
+}
+
 /**
  * Sync a bet's DB state from chain state.
  * If chain says revealed/timeout_claimed/canceled but DB disagrees, fix DB.
@@ -756,24 +813,32 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
       }
     }
 
-    // Only unlock vault funds if we actually transitioned the bet status
+    // Only update vault funds if we actually transitioned the bet status
     if (dbUpdated && currentBet && (currentBet.status === 'open' || currentBet.status === 'accepting' || currentBet.status === 'accepted')) {
       try {
         if (dbStatus === 'canceled') {
-          // Canceled — unlock maker (and acceptor if exists)
+          // Canceled — unlock (return funds to available), stake was not consumed
           await vaultService.unlockFunds(currentBet.makerUserId, currentBet.amount);
           if (currentBet.acceptorUserId) {
             await vaultService.unlockFunds(currentBet.acceptorUserId, currentBet.amount);
           }
         } else if (dbStatus === 'revealed' || dbStatus === 'timeout_claimed') {
-          // Resolved — unlock both maker and acceptor (chain contract handles actual payout)
-          await vaultService.unlockFunds(currentBet.makerUserId, currentBet.amount);
+          // Resolved — forfeit locked for both (do NOT add back to available).
+          // Funds were consumed on-chain: loser's stake is gone, winner received payout.
+          // Using unlockFunds here would incorrectly restore the loser's stake to available.
+          await vaultService.forfeitLocked(currentBet.makerUserId, currentBet.amount);
           if (currentBet.acceptorUserId) {
-            await vaultService.unlockFunds(currentBet.acceptorUserId, currentBet.amount);
+            await vaultService.forfeitLocked(currentBet.acceptorUserId, currentBet.amount);
           }
+          // Sync actual chain balances for both players (payout for winner, loss for loser)
+          await syncPlayersBalanceFromChain(
+            currentBet.makerUserId,
+            currentBet.acceptorUserId,
+            betId.toString(),
+          );
         }
       } catch (err) {
-        logger.warn({ err, betId: betId.toString() }, `${tag} — vault unlock failed (non-critical)`);
+        logger.warn({ err, betId: betId.toString() }, `${tag} — vault update failed (non-critical)`);
       }
     }
 

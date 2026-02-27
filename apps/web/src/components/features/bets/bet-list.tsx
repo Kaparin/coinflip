@@ -5,11 +5,13 @@ import { useGetBets, useAcceptBet, useCancelBet, useGetVaultBalance } from '@coi
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { BetCard } from './bet-card';
+import { Modal } from '@/components/ui/modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import {
   fromMicroLaunch,
   formatLaunch,
+  COMMISSION_BPS,
   LAUNCH_MULTIPLIER,
 } from '@coinflip/shared/constants';
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -81,6 +83,14 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   // Map betId → deductionId for accept deductions
   const acceptDeductionRef = useRef<Map<string, string>>(new Map());
 
+  // Ref-based running total of amounts committed to pending accepts.
+  // React state batches updates, so rapid clicks would all see the same stale
+  // `availableMicro`. This ref updates synchronously on each click.
+  const pendingAcceptAmountRef = useRef(0n);
+
+  // Confirmation modal state
+  const [acceptTarget, setAcceptTarget] = useState<{ id: string; amount: number } | null>(null);
+
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
@@ -122,6 +132,13 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         if (deductionId) {
           removeDeduction(deductionId);
           acceptDeductionRef.current.delete(betId);
+        }
+
+        // Release this bet's amount from the ref-based running total
+        const betAmount = BigInt(response?.data?.amount ?? 0);
+        if (betAmount > 0n) {
+          pendingAcceptAmountRef.current -= betAmount;
+          if (pendingAcceptAmountRef.current < 0n) pendingAcceptAmountRef.current = 0n;
         }
 
         // Apply server balance from 202 response immediately via setQueryData
@@ -194,6 +211,16 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           }
         }
 
+        // Release this bet's amount from the ref-based running total
+        if (betId) {
+          const bet = bets.find(b => String(b.id) === betId);
+          if (bet) {
+            const betAmount = BigInt(bet.amount);
+            pendingAcceptAmountRef.current -= betAmount;
+            if (pendingAcceptAmountRef.current < 0n) pendingAcceptAmountRef.current = 0n;
+          }
+        }
+
         // Remove from recently accepted so card re-appears (accept failed)
         if (betId) {
           setRecentlyAcceptedIds(prev => {
@@ -259,22 +286,40 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     cancelBet({ betId: Number(id) });
   }, [cancelBet]);
 
-  // 1-click accept: card disappears instantly, API call queued in background.
-  // No confirmation modal — the card already shows wager + potential win.
+  // Open confirmation modal before accepting
   const handleAcceptClick = useCallback((id: string) => {
     const bet = bets.find(b => String(b.id) === id);
     if (!bet) return;
+    setAcceptTarget({ id, amount: Number(bet.amount) });
+  }, [bets]);
+
+  // Confirm accept: check balance (with ref-based running total), then queue API call
+  const handleConfirmAccept = useCallback(() => {
+    if (!acceptTarget) return;
+    const { id } = acceptTarget;
+    const bet = bets.find(b => String(b.id) === id);
+    if (!bet) { setAcceptTarget(null); return; }
 
     const betAmount = BigInt(bet.amount);
 
-    // Check balance before accepting
-    if (availableMicro < betAmount) {
+    // Use ref-based running total for accurate balance check during rapid accepts.
+    // availableMicro is stale within the same React render batch.
+    const effectiveAvailable = availableMicro - pendingAcceptAmountRef.current;
+
+    if (effectiveAvailable < betAmount) {
       addToast('warning', t('bets.insufficientForAccept', {
         amount: fromMicroLaunch(Number(bet.amount)).toLocaleString(),
-        available: fromMicroLaunch(Number(availableMicro)).toLocaleString(),
+        available: fromMicroLaunch(Number(effectiveAvailable < 0n ? 0n : effectiveAvailable)).toLocaleString(),
       }));
+      setAcceptTarget(null);
       return;
     }
+
+    // Reserve this amount immediately (synchronous ref update)
+    pendingAcceptAmountRef.current += betAmount;
+
+    // Close modal
+    setAcceptTarget(null);
 
     // Hide the card immediately (survives refetch race conditions)
     setRecentlyAcceptedIds(prev => new Set(prev).add(id));
@@ -295,7 +340,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         // Error already handled by mutation's onError callback
       }
     });
-  }, [bets, availableMicro, addDeduction, acceptBetAsync, addToast, t]);
+  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, addToast, t]);
 
   if (isLoading) {
     return (
@@ -416,6 +461,50 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         </div>
       ) : null}
 
+      {/* Accept confirmation modal */}
+      <Modal open={!!acceptTarget} onClose={() => setAcceptTarget(null)} title={t('bets.acceptBetTitle')}>
+        {acceptTarget && (() => {
+          const humanAmount = fromMicroLaunch(acceptTarget.amount);
+          const winAmount = humanAmount * 2 * (1 - COMMISSION_BPS / 10000);
+          return (
+            <div className="space-y-4">
+              {/* Bet amount */}
+              <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] p-3">
+                <span className="text-sm text-[var(--color-text-secondary)]">{t('history.betAmount')}</span>
+                <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
+                  {formatLaunch(acceptTarget.amount)} <LaunchTokenIcon size={40} />
+                </span>
+              </div>
+
+              {/* Potential win */}
+              <div className="flex items-center justify-between rounded-lg bg-emerald-500/5 border border-emerald-500/10 p-3">
+                <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
+                <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-emerald-400">
+                  +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} />
+                </span>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAcceptTarget(null)}
+                  className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98]"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAccept}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98]"
+                >
+                  {t('bets.acceptBetBtn')}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }
