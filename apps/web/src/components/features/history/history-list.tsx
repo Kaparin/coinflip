@@ -412,7 +412,7 @@ function BetHistoryDetail() {
                         </span>
                       )}
                       <span className="text-[10px] text-[var(--color-text-secondary)]">
-                        · {formatDate(bet.created_at, t)}
+                        · {formatDate(bet.resolved_at ?? bet.accepted_at ?? bet.created_at, t)}
                       </span>
                     </div>
                   </div>

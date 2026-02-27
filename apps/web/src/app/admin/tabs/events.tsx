@@ -1158,9 +1158,9 @@ export function EventsTab() {
                         </tr>
                       </thead>
                       <tbody>
-                        {winners.map((w) => (
-                          <tr key={w.address} className="border-b border-[var(--color-border)] last:border-b-0">
-                            <td className="px-2 py-1.5 font-bold">#{w.finalRank}</td>
+                        {[...winners].sort((a, b) => (a.finalRank ?? 999) - (b.finalRank ?? 999)).map((w, idx) => (
+                          <tr key={w.userId ?? w.address} className="border-b border-[var(--color-border)] last:border-b-0">
+                            <td className="px-2 py-1.5 font-bold">#{w.finalRank ?? idx + 1}</td>
                             <td className="px-2 py-1.5 font-mono">{shortAddr(w.address)}</td>
                             <td className="px-2 py-1.5 text-right">
                               {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} LAUNCH` : '-'}

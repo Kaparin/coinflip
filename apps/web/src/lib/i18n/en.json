@@ -92,7 +92,7 @@
     "depositStep4": "Waiting for confirmation",
     "depositInProgress": "Deposit in progress",
     "depositDoNotClose": "Don't close this window. Your transaction is being processed.",
-    "depositEstimate": "This usually takes 10–30 seconds",
+    "depositEstimate": "This usually takes 10 seconds to 1 minute, please be patient",
     "withdrawInProgress": "Withdrawal in progress",
     "withdrawSuccess": "Withdrawal Successful!",
     "withdrawTitle": "Withdraw LAUNCH",
@@ -423,7 +423,7 @@
     "authStep4": "Waiting for confirmation",
     "authInProgress": "Setting up 1-Click Play",
     "authDoNotClose": "Don't close this window. Your authorization is being processed.",
-    "authEstimate": "This usually takes 10–30 seconds",
+    "authEstimate": "This usually takes 10 seconds to 1 minute, please be patient",
     "allSet": "You're all set!",
     "allSetDesc": "1-Click play is now enabled. All game actions are instant.",
     "startPlaying": "Start Playing"

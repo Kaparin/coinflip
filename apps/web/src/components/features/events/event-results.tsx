@@ -55,9 +55,12 @@ export function EventResults({ eventId }: EventResultsProps) {
     );
   }
 
+  // Sort by rank to ensure correct display order
+  const sortedWinners = [...winners].sort((a, b) => Number(a.finalRank) - Number(b.finalRank));
+
   return (
     <div className="space-y-3">
-      {winners.map((winner, i) => {
+      {sortedWinners.map((winner, i) => {
         const rank = Number(winner.finalRank);
         const addr = String(winner.address ?? '');
         const amount = String(winner.prizeAmount ?? '0');

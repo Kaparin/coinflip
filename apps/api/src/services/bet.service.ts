@@ -287,22 +287,30 @@ export class BetService {
   async getUserBetHistory(params: { userId: string; cursor?: string; limit: number }) {
     const limit = Math.min(params.limit, 100);
 
+    // Sort by most recent interaction: resolved > accepted > created.
+    // This gives chronological order of "what happened last" rather than
+    // when the bet was originally created.
+    const sortExpr = sql`COALESCE(${bets.resolvedTime}, ${bets.acceptedTime}, ${bets.createdTime})`;
+
     const rows = await this.db
       .select()
       .from(bets)
       .where(
         and(
           sql`(${bets.makerUserId} = ${params.userId} OR ${bets.acceptorUserId} = ${params.userId})`,
-          params.cursor ? lt(bets.createdTime, new Date(params.cursor)) : undefined,
+          params.cursor
+            ? sql`${sortExpr} < ${params.cursor}::timestamptz`
+            : undefined,
         ),
       )
-      .orderBy(desc(bets.createdTime))
+      .orderBy(sql`${sortExpr} DESC`)
       .limit(limit + 1);
 
     const hasMore = rows.length > limit;
     const data = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore && data.length > 0
-      ? data[data.length - 1]!.createdTime.toISOString()
+    const lastRow = data[data.length - 1];
+    const nextCursor = hasMore && lastRow
+      ? (lastRow.resolvedTime ?? lastRow.acceptedTime ?? lastRow.createdTime).toISOString()
       : null;
 
     return { data, cursor: nextCursor, has_more: hasMore };
