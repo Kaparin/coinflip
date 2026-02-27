@@ -550,3 +550,44 @@ export function useAdminResetPool() {
     },
   });
 }
+
+// ─── Announcements ────────────────────────────────────
+
+export interface AdminAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  priority: 'normal' | 'important';
+  sentCount: number;
+  createdAt: string;
+}
+
+export function useAdminAnnouncements(page = 0, limit = 20) {
+  const { address, isConnected } = useWalletContext();
+  const offset = page * limit;
+  return useQuery({
+    queryKey: ['admin', 'announcements', address, offset, limit],
+    queryFn: () =>
+      adminFetchFull<{ data: AdminAnnouncement[]; pagination: Pagination }>(
+        `/api/v1/admin/announcements?limit=${limit}&offset=${offset}`,
+        address!,
+      ),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminSendAnnouncement() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { title: string; message: string; priority?: 'normal' | 'important' }) =>
+      adminFetch<{ id: string; sentCount: number }>('/api/v1/admin/announcements', address!, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'announcements'] });
+    },
+  });
+}

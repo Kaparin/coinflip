@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingNotifications, useMarkNotificationRead, type Notification } from '@/hooks/use-notifications';
 import { JackpotWinModal } from './jackpot-win-modal';
+import { AnnouncementModal } from './announcement-modal';
 import type { WsEvent } from '@coinflip/shared/types';
 
 interface NotificationContextValue {
@@ -22,8 +23,13 @@ export function useNotifications() {
 interface QueuedNotification {
   id: string;
   type: string;
-  tierName: string;
-  amount: string;
+  // jackpot fields
+  tierName?: string;
+  amount?: string;
+  // announcement fields
+  title?: string;
+  message?: string;
+  priority?: 'normal' | 'important';
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -41,13 +47,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const newItems: QueuedNotification[] = [];
     for (const n of pendingNotifications) {
-      if (n.type === 'jackpot_won' && !processedIds.current.has(n.id)) {
-        processedIds.current.add(n.id);
+      if (processedIds.current.has(n.id)) continue;
+      processedIds.current.add(n.id);
+
+      const meta = n.metadata as Record<string, unknown> | undefined;
+
+      if (n.type === 'jackpot_won') {
         newItems.push({
           id: n.id,
           type: n.type,
-          tierName: (n.metadata as Record<string, unknown>)?.tierName as string ?? 'mini',
-          amount: String((n.metadata as Record<string, unknown>)?.amount ?? '0'),
+          tierName: (meta?.tierName as string) ?? 'mini',
+          amount: String(meta?.amount ?? '0'),
+        });
+      } else if (n.type === 'announcement') {
+        newItems.push({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          priority: (meta?.priority as 'normal' | 'important') ?? 'normal',
         });
       }
     }
@@ -59,25 +77,41 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Handle real-time WS events
   const handleWsEvent = useCallback((event: WsEvent) => {
-    if (event.type !== 'jackpot_won') return;
-
     const data = event.data as Record<string, unknown>;
-    // Only show the modal if this is a personal notification (targeted to this user)
-    if (!data.isPersonal) return;
 
-    const wsId = `ws_${data.poolId}`;
-    if (processedIds.current.has(wsId)) return;
-    processedIds.current.add(wsId);
+    if (event.type === 'jackpot_won') {
+      // Only show the modal if this is a personal notification (targeted to this user)
+      if (!data.isPersonal) return;
 
-    setQueue((prev) => [
-      ...prev,
-      {
-        id: wsId,
-        type: 'jackpot_won',
-        tierName: String(data.tierName ?? 'mini'),
-        amount: String(data.amount ?? '0'),
-      },
-    ]);
+      const wsId = `ws_jackpot_${data.poolId}`;
+      if (processedIds.current.has(wsId)) return;
+      processedIds.current.add(wsId);
+
+      setQueue((prev) => [
+        ...prev,
+        {
+          id: wsId,
+          type: 'jackpot_won',
+          tierName: String(data.tierName ?? 'mini'),
+          amount: String(data.amount ?? '0'),
+        },
+      ]);
+    } else if (event.type === 'announcement') {
+      const wsId = `ws_ann_${data.id}`;
+      if (processedIds.current.has(wsId)) return;
+      processedIds.current.add(wsId);
+
+      setQueue((prev) => [
+        ...prev,
+        {
+          id: wsId,
+          type: 'announcement',
+          title: String(data.title ?? ''),
+          message: String(data.message ?? ''),
+          priority: (data.priority as 'normal' | 'important') ?? 'normal',
+        },
+      ]);
+    }
   }, []);
 
   // Show next in queue
@@ -112,8 +146,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         <JackpotWinModal
           open={true}
           onDismiss={handleDismiss}
-          tierName={current.tierName}
-          amount={current.amount}
+          tierName={current.tierName ?? 'mini'}
+          amount={current.amount ?? '0'}
+        />
+      )}
+      {current?.type === 'announcement' && (
+        <AnnouncementModal
+          open={true}
+          onDismiss={handleDismiss}
+          title={current.title ?? ''}
+          message={current.message ?? ''}
+          priority={current.priority ?? 'normal'}
         />
       )}
     </NotificationContext.Provider>

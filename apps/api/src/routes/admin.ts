@@ -9,11 +9,12 @@ import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
-import { users, bets, vaultBalances, pendingBetSecrets } from '@coinflip/db/schema';
+import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications } from '@coinflip/db/schema';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { getCoinFlipStats } from './bets.js';
 import { jackpotService } from '../services/jackpot.service.js';
+import { wsService } from '../services/ws.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
@@ -804,4 +805,91 @@ adminRouter.post('/jackpot/reset-pool/:poolId', async (c) => {
   const result = await jackpotService.resetPool(poolId);
   if (!result.success) return c.json({ error: { code: 'RESET_FAILED', message: result.message } }, 400);
   return c.json({ data: result });
+});
+
+// ═══════════════════════════════════════════
+// Announcements
+// ═══════════════════════════════════════════
+
+const AnnouncementCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(2000),
+  priority: z.enum(['normal', 'important']).default('normal'),
+});
+
+// POST /admin/announcements — create and broadcast announcement
+adminRouter.post('/announcements', zValidator('json', AnnouncementCreateSchema), async (c) => {
+  const { title, message, priority } = c.req.valid('json');
+  const db = getDb();
+
+  // Get all user IDs
+  const allUsers = await db.select({ id: users.id }).from(users);
+  const sentCount = allUsers.length;
+
+  // Insert announcement record
+  const [announcement] = await db.insert(announcements).values({
+    title,
+    message,
+    priority,
+    sentCount,
+  }).returning({ id: announcements.id });
+
+  // Insert notification for each user
+  if (allUsers.length > 0) {
+    const notifValues = allUsers.map((u) => ({
+      userId: u.id,
+      type: 'announcement' as const,
+      title,
+      message,
+      metadata: { announcementId: announcement!.id, priority },
+    }));
+
+    // Batch insert in chunks of 500
+    for (let i = 0; i < notifValues.length; i += 500) {
+      await db.insert(userNotifications).values(notifValues.slice(i, i + 500));
+    }
+  }
+
+  // Broadcast via WebSocket to all connected clients
+  wsService.broadcast({
+    type: 'announcement',
+    data: { id: announcement!.id, title, message, priority },
+  });
+
+  logger.info({ announcementId: announcement!.id, sentCount, admin: c.get('address') }, 'admin: announcement sent');
+
+  return c.json({ data: { id: announcement!.id, sentCount } });
+});
+
+const AnnouncementListSchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+});
+
+// GET /admin/announcements — list past announcements
+adminRouter.get('/announcements', zValidator('query', AnnouncementListSchema), async (c) => {
+  const { limit, offset } = c.req.valid('query');
+  const db = getDb();
+
+  const [rows, countResult] = await Promise.all([
+    db.select().from(announcements).orderBy(desc(announcements.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)::int` }).from(announcements),
+  ]);
+
+  return c.json({
+    data: rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      message: r.message,
+      priority: r.priority,
+      sentCount: r.sentCount,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    pagination: {
+      total: countResult[0]?.count ?? 0,
+      limit,
+      offset,
+      hasMore: offset + limit < (countResult[0]?.count ?? 0),
+    },
+  });
 });

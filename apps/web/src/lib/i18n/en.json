@@ -36,6 +36,7 @@
     "copy": "Copy",
     "copied": "Copied!",
     "close": "Close",
+    "ok": "OK",
     "launch": "LAUNCH",
     "max": "Max",
     "deposit": "Deposit",
@@ -259,7 +260,10 @@
     "side": "Side",
     "heads": "Heads",
     "tails": "Tails",
-    "noOpponent": "Waiting..."
+    "noOpponent": "Waiting...",
+    "tabAll": "All",
+    "tabGames": "Games",
+    "tabRewards": "Rewards"
   },
   "topWinner": {
     "title": "Record win",

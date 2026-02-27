@@ -36,6 +36,7 @@
     "copy": "Копировать",
     "copied": "Скопировано!",
     "close": "Закрыть",
+    "ok": "ОК",
     "launch": "LAUNCH",
     "max": "Макс",
     "deposit": "Пополнить",
@@ -259,7 +260,10 @@
     "side": "Сторона",
     "heads": "Орёл",
     "tails": "Решка",
-    "noOpponent": "Ожидание..."
+    "noOpponent": "Ожидание...",
+    "tabAll": "Все",
+    "tabGames": "Игры",
+    "tabRewards": "Награды"
   },
   "topWinner": {
     "title": "Рекордный выигрыш",

@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useActivity, type ActivityItem, type ActivityType } from '@/hooks/use-activity';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LaunchTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy, Skull, Users, History, Gift } from 'lucide-react';
+import { Trophy, Skull, Gift, History } from 'lucide-react';
 import { GiOpenTreasureChest } from 'react-icons/gi';
 import Link from 'next/link';
-
-type ActivityTab = 'all' | 'games' | 'rewards';
 
 function truncAddr(addr: string): string {
   return addr.length > 14 ? `${addr.slice(0, 8)}…${addr.slice(-4)}` : addr;
@@ -60,7 +58,7 @@ const TYPE_CONFIG: Record<ActivityType, {
     sign: '+',
   },
   jackpot_win: {
-    icon: Trophy, // placeholder — we use GiOpenTreasureChest instead
+    icon: Trophy,
     colorClass: 'text-rose-400',
     bgClass: 'bg-rose-400/15',
     borderClass: 'border-rose-400/20',
@@ -148,25 +146,18 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
   );
 }
 
-export function ActivityList() {
-  const [tab, setTab] = useState<ActivityTab>('all');
+/** Headless activity feed — pass `types` to filter, or omit for all. */
+export function ActivityFeed({ types }: { types?: string }) {
   const { isConnected } = useWalletContext();
   const { t } = useTranslation();
-
-  const typeFilter = tab === 'games'
-    ? 'bet_win,bet_loss'
-    : tab === 'rewards'
-    ? 'referral_reward,jackpot_win'
-    : undefined;
 
   const {
     data,
     isLoading,
-    error,
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = useActivity({ enabled: isConnected, types: typeFilter });
+  } = useActivity({ enabled: isConnected, types });
 
   const allItems = useMemo(
     () => data?.pages.flatMap((p) => p.data) ?? [],
@@ -189,61 +180,35 @@ export function ActivityList() {
     );
   }
 
-  const TABS: { id: ActivityTab; label: string; icon: typeof Trophy }[] = [
-    { id: 'all', label: t('activity.tabAll'), icon: History },
-    { id: 'games', label: t('activity.tabGames'), icon: Trophy },
-    { id: 'rewards', label: t('activity.tabRewards'), icon: Gift },
-  ];
+  if (allItems.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
+          <History size={32} strokeWidth={1.5} />
+        </div>
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          {t('activity.noActivity')}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {/* Tabs */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
-        {TABS.map((tabItem) => (
-          <button
-            key={tabItem.id}
-            type="button"
-            onClick={() => setTab(tabItem.id)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] ${
-              tab === tabItem.id
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-            }`}
-          >
-            <tabItem.icon size={12} />
-            {tabItem.label}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-2">
+      {allItems.map((item) => (
+        <ActivityRow key={item.id} item={item} t={t} />
+      ))}
 
-      {/* Items */}
-      {allItems.length > 0 ? (
-        <div className="space-y-2">
-          {allItems.map((item) => (
-            <ActivityRow key={item.id} item={item} t={t} />
-          ))}
-
-          {/* Load more */}
-          {hasNextPage && (
-            <button
-              type="button"
-              onClick={() => void fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="w-full rounded-xl border border-[var(--color-border)] py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-            >
-              {isFetchingNextPage ? t('common.loading') : t('activity.loadMore')}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
-            <History size={32} strokeWidth={1.5} />
-          </div>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('activity.noActivity')}
-          </p>
-        </div>
+      {/* Load more */}
+      {hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="w-full rounded-xl border border-[var(--color-border)] py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+        >
+          {isFetchingNextPage ? t('common.loading') : t('activity.loadMore')}
+        </button>
       )}
     </div>
   );

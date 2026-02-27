@@ -70,7 +70,8 @@ export type WsEventType =
   | 'event_archived'
   | 'jackpot_updated'
   | 'jackpot_won'
-  | 'jackpot_reset';
+  | 'jackpot_reset'
+  | 'announcement';
 
 export type WsEvent = {
   type: WsEventType;

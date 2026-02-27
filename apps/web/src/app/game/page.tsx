@@ -8,7 +8,6 @@ import { CreateBetFab } from '@/components/features/bets/create-bet-fab';
 import { BetList } from '@/components/features/bets/bet-list';
 import { MyBets } from '@/components/features/bets/my-bets';
 import { HistoryList } from '@/components/features/history/history-list';
-import { ActivityList } from '@/components/features/history/activity-list';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { MobileBalanceBar } from '@/components/features/vault/mobile-balance-bar';
 import { Leaderboard } from '@/components/features/leaderboard/leaderboard';
@@ -27,9 +26,9 @@ import { X } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import type { WsEvent } from '@coinflip/shared/types';
 
-type Tab = 'bets' | 'mybets' | 'history' | 'activity' | 'leaderboard';
+type Tab = 'bets' | 'mybets' | 'history' | 'leaderboard';
 
-const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'activity', 'leaderboard'];
+const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
 
 export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
@@ -172,7 +171,6 @@ export default function GamePage() {
     { id: 'bets', label: t('game.openBets') },
     { id: 'mybets', label: t('game.myBets') },
     { id: 'history', label: t('game.historyTab') },
-    { id: 'activity', label: t('game.activityTab') },
     { id: 'leaderboard', label: t('game.topPlayers') },
   ];
 
@@ -226,9 +224,6 @@ export default function GamePage() {
           </div>
           <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
             <HistoryList />
-          </div>
-          <div style={{ display: activeTab === 'activity' ? 'block' : 'none' }}>
-            <ActivityList />
           </div>
           <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
             <Leaderboard />
