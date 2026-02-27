@@ -181,7 +181,28 @@ class AnnouncementService {
 
     if (!ann) return;
 
+    // Resolve sponsor info for notifications + WS broadcast
+    let sponsorAddress: string | null = null;
+    let sponsorNickname: string | null = null;
+    if (ann.userId) {
+      const [sponsor] = await db
+        .select({ address: users.address, nickname: users.profileNickname })
+        .from(users)
+        .where(eq(users.id, ann.userId))
+        .limit(1);
+      if (sponsor) {
+        sponsorAddress = sponsor.address;
+        sponsorNickname = sponsor.nickname;
+      }
+    }
+
     // Insert notifications for all users via INSERT...SELECT (no memory load)
+    const metadata = JSON.stringify({
+      announcementId: ann.id,
+      priority: ann.priority,
+      sponsorAddress,
+      sponsorNickname,
+    });
     try {
       await db.execute(sql`
         INSERT INTO user_notifications (user_id, type, title, message, metadata)
@@ -190,7 +211,7 @@ class AnnouncementService {
           'announcement',
           ${ann.title},
           ${ann.message},
-          ${JSON.stringify({ announcementId: ann.id, priority: ann.priority })}::jsonb
+          ${metadata}::jsonb
         FROM users u
       `);
     } catch (err) {
@@ -207,21 +228,6 @@ class AnnouncementService {
       .update(announcements)
       .set({ status: 'published', sentCount, reviewedAt: new Date() })
       .where(eq(announcements.id, announcementId));
-
-    // Resolve sponsor info for WS broadcast
-    let sponsorAddress: string | null = null;
-    let sponsorNickname: string | null = null;
-    if (ann.userId) {
-      const [sponsor] = await db
-        .select({ address: users.address, nickname: users.profileNickname })
-        .from(users)
-        .where(eq(users.id, ann.userId))
-        .limit(1);
-      if (sponsor) {
-        sponsorAddress = sponsor.address;
-        sponsorNickname = sponsor.nickname;
-      }
-    }
 
     wsService.broadcast({
       type: 'announcement',

@@ -21,7 +21,7 @@ function sanitizeChainError(rawLog?: string): string {
   // Known user-facing error patterns → return clean message
   const userMessages: Array<[RegExp, string]> = [
     [/insufficient.*balance/i, 'Insufficient balance'],
-    [/insufficient.*fee|fee payer.*insufficient|insufficient fees|insufficient funds.*fee/i, 'Gas fee payment issue. Please contact support.'],
+    [/insufficient.*fee|fee payer.*insufficient|insufficient fees|insufficient funds.*fee/i, 'Insufficient AXM for gas fees. Top up your wallet with AXM to continue.'],
     [/bet.*not.*found/i, 'Bet not found'],
     [/bet.*expired/i, 'Bet has expired'],
     [/self.*accept.*not.*allowed/i, 'Cannot accept your own bet'],

@@ -30,7 +30,7 @@ interface QueuedNotification {
   // announcement fields
   title?: string;
   message?: string;
-  priority?: 'normal' | 'important';
+  priority?: 'normal' | 'important' | 'sponsored';
   sponsorAddress?: string;
   sponsorNickname?: string;
   // event_started fields
@@ -74,7 +74,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           type: n.type,
           title: n.title,
           message: n.message,
-          priority: (meta?.priority as 'normal' | 'important') ?? 'normal',
+          priority: (meta?.priority as 'normal' | 'important' | 'sponsored') ?? 'normal',
+          sponsorAddress: (meta?.sponsorAddress as string) ?? undefined,
+          sponsorNickname: (meta?.sponsorNickname as string) ?? undefined,
         });
       }
     }
@@ -117,7 +119,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           type: 'announcement',
           title: String(data.title ?? ''),
           message: String(data.message ?? ''),
-          priority: (data.priority as 'normal' | 'important') ?? 'normal',
+          priority: (data.priority as 'normal' | 'important' | 'sponsored') ?? 'normal',
           sponsorAddress: data.sponsorAddress ? String(data.sponsorAddress) : undefined,
           sponsorNickname: data.sponsorNickname ? String(data.sponsorNickname) : undefined,
         },

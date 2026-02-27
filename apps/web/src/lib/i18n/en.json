@@ -14,7 +14,7 @@
     "relayerNotReady": "Service temporarily unavailable. Try again in a minute.",
     "chainTxFailed": "Transaction failed on blockchain. Try again.",
     "chainBetExpired": "This bet has expired and is no longer available.",
-    "gasFeeIssue": "Service temporarily unavailable (gas fee issue). Try again in a few minutes.",
+    "gasFeeIssue": "Insufficient AXM for gas fees. Please top up your wallet with AXM.",
     "chainTxTimeout": "Transaction was sent but not yet confirmed. Wait and check your balance.",
     "validationError": "Invalid data. Check your input.",
     "serverError": "Temporary server error. Try again later.",
@@ -67,7 +67,8 @@
     "switchWallet": "Switch wallet",
     "savedWallets": "Saved wallets",
     "manageWallets": "Manage wallets",
-    "toggleMenu": "Toggle menu"
+    "toggleMenu": "Toggle menu",
+    "gas": "gas"
   },
   "balance": {
     "connectToPlay": "Connect wallet to start playing",

@@ -408,6 +408,25 @@ export function Header() {
                 </button>
               </div>
 
+              {/* Balances (mobile) */}
+              <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
+                  <span className="flex items-center gap-1 text-xs font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={32} /></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
+                  <span className="flex items-center gap-1 text-xs font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={32} /></span>
+                </div>
+                <div className={`flex items-center justify-between ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</span>
+                  <span className="flex items-center gap-1 text-xs font-medium tabular-nums">
+                    {nativeBalanceHuman.toFixed(2)} AXM
+                    {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
+                  </span>
+                </div>
+              </div>
+
               {/* Quick links */}
               <div className="flex gap-2">
                 <button

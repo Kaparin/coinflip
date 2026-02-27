@@ -12,7 +12,7 @@ interface AnnouncementModalProps {
   onDismiss: () => void;
   title: string;
   message: string;
-  priority: 'normal' | 'important';
+  priority: 'normal' | 'important' | 'sponsored';
   sponsorAddress?: string;
   sponsorNickname?: string;
 }
@@ -47,7 +47,7 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
   if (!mounted || !open) return null;
 
   const isImportant = priority === 'important';
-  const isSponsored = !!sponsorAddress;
+  const isSponsored = !!sponsorAddress || priority === 'sponsored';
   const Icon = isImportant ? AlertTriangle : Megaphone;
 
   return createPortal(
@@ -78,7 +78,7 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
 
         <div className="p-5 text-center space-y-4">
           {/* Sponsor badge */}
-          {isSponsored && (
+          {isSponsored && sponsorAddress && (
             <Link
               href={`/game/profile/${sponsorAddress}`}
               onClick={handleDismiss}
