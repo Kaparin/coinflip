@@ -21,7 +21,7 @@ import { AppError, Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import { resolveCreateBetInBackground, confirmAcceptAndRevealInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
-import { addPendingLock, removePendingLock, invalidateBalanceCache, getTotalPendingLocks, getChainVaultBalance } from './vault.js';
+import { addPendingLock, removePendingLock, invalidateBalanceCache, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from '../services/pending-secrets.service.js';
@@ -355,12 +355,12 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
 
   logger.info({ txHash: relayResult.txHash, address, amount }, 'Create bet submitted — confirming in background');
 
-  // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
-  // pendingAmount already includes the lock for this bet (added at addPendingLock above),
-  // so we don't subtract `amount` separately to avoid double-counting.
-  const pendingAmount = getTotalPendingLocks(address);
-  const dbAvailable = BigInt(balance.available) - pendingAmount;
-  const dbLocked = BigInt(balance.locked) + pendingAmount;
+  // Compute post-lock balance from pre-lock snapshot.
+  // balance was read BEFORE lockFunds, so subtract exactly this bet's amount.
+  // Do NOT use getTotalPendingLocks — it includes locks from prior rapid creates
+  // that are already reflected in balance, causing double-subtraction.
+  const dbAvailable = BigInt(balance.available) - BigInt(amount);
+  const dbLocked = BigInt(balance.locked) + BigInt(amount);
 
   // Return 202 Accepted — bet is not yet in DB, but tx is in mempool
   return c.json({
@@ -726,11 +726,12 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
 
   const responseData = acceptingBet ?? existing;
 
-  // Compute balance from DB data — no chain query needed (saves ~500-1500ms)
-  // pendingAmount already includes this bet's lock — don't double-subtract
-  const acceptPendingAmount = getTotalPendingLocks(address);
-  const acceptAvail = BigInt(acceptBalance.available) - acceptPendingAmount;
-  const acceptLocked = BigInt(acceptBalance.locked) + acceptPendingAmount;
+  // Compute post-lock balance from pre-lock snapshot.
+  // acceptBalance was read BEFORE lockFunds, so subtract exactly this bet's amount.
+  // Do NOT use getTotalPendingLocks — it includes locks from prior rapid accepts
+  // that are already reflected in acceptBalance, causing double-subtraction.
+  const acceptAvail = BigInt(acceptBalance.available) - BigInt(existing.amount);
+  const acceptLocked = BigInt(acceptBalance.locked) + BigInt(existing.amount);
 
   // Return 202 Accepted — confirmation in progress
   return c.json({

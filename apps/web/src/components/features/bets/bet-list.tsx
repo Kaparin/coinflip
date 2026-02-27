@@ -16,6 +16,7 @@ import {
 } from '@coinflip/shared/constants';
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { setBalanceGracePeriod } from '@/lib/balance-grace';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
@@ -141,8 +142,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           if (pendingAcceptAmountRef.current < 0n) pendingAcceptAmountRef.current = 0n;
         }
 
-        // Apply server balance from 202 response immediately via setQueryData
-        // This is always safe — the server computed it with pending locks accounted for.
+        // Apply server balance from 202 response immediately via setQueryData.
+        // The server computed it from pre-lock snapshot minus this bet's amount.
         const serverBalance = response?.balance;
         if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
@@ -153,6 +154,9 @@ export function BetList({ pendingBets = [] }: BetListProps) {
               locked: serverBalance.locked,
             },
           }));
+          // Protect this accurate balance from stale WS-triggered refetches.
+          // Chain cache may lag behind the DB state for a few seconds.
+          setBalanceGracePeriod(5_000);
         }
 
         // Optimistically remove the accepted bet from the open bets cache

@@ -77,10 +77,18 @@ export function useWebSocket({
   const isConnectedRef = useRef(false);
   const reconnectCountRef = useRef(0);
 
+  // Wire up pending balance context — isFrozen guards vault balance invalidation.
+  // When frontend deductions are active, GET /balance returns server-adjusted data
+  // (chain - pending locks) which overlaps with the frontend pendingDeduction overlay,
+  // causing double-subtraction. Skipping vault refetch during this window prevents that.
+  const { isFrozen } = usePendingBalance();
+  const isFrozenRef = useRef(false);
+
   // Update refs on every render (without triggering effects)
   addressRef.current = address;
   enabledRef.current = enabled;
   onEventRef.current = onEvent;
+  isFrozenRef.current = isFrozen;
 
   const flushInvalidations = useCallback(() => {
     const keys = pendingInvalidations.current;
@@ -93,9 +101,17 @@ export function useWebSocket({
 
   const scheduleInvalidation = useCallback((...queryKeys: string[]) => {
     for (const key of queryKeys) {
-      // Always allow vault balance invalidation — display uses (rawAvailable - pendingDeduction),
-      // so we never show inflated balance. Allowing updates ensures wins/losses from resolved
-      // bets are reflected even while other accepts are still in flight.
+      // Skip vault balance invalidation while pending deductions are active
+      // or during a balance grace period (after deposit/accept 202 response).
+      // The frontend pendingDeduction overlay already shows accurate values;
+      // a server refetch during this window returns data adjusted for server-side
+      // pending locks that overlap with frontend deductions → double-subtraction.
+      if (
+        (key === '/api/v1/vault/balance' || key === 'wallet-cw20-balance') &&
+        (isFrozenRef.current || isInBalanceGracePeriod())
+      ) {
+        continue;
+      }
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);

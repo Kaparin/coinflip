@@ -6,6 +6,7 @@ import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { setBalanceGracePeriod } from '@/lib/balance-grace';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
 import { AlertTriangle } from 'lucide-react';
@@ -99,8 +100,8 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           deductionIdRef.current = null;
         }
 
-        // Always apply server balance from 202 response — it's computed with
-        // pending locks already accounted for, so it's always accurate.
+        // Apply server balance from 202 response — computed from pre-lock
+        // snapshot minus this bet's amount, so it's always accurate.
         const serverBalance = (response as any)?.balance;
         if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
@@ -111,6 +112,8 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
               locked: serverBalance.locked,
             },
           }));
+          // Protect this accurate balance from stale WS-triggered refetches.
+          setBalanceGracePeriod(5_000);
         }
 
         // Increment local submitted counter (tracks bets between server refetches)
