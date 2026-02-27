@@ -45,6 +45,7 @@ export function getCoinFlipStats() {
 import type { AppEnv } from '../types.js';
 import type { RelayResult } from '../services/relayer.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
+import { resolveGasGranter } from '../lib/gas-granter.js';
 import { pinService } from '../services/pin.service.js';
 
 // Re-export pending bet counts from shared lib (avoids circular deps with background-tasks)
@@ -320,8 +321,11 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
     // Persist secret BEFORE broadcasting — survives background task failures & server restarts
     await pendingSecretsService.save({ commitment, makerSide, makerSecret });
 
+    // Resolve gas granter (VIP → treasury, non-VIP → user)
+    const granter = await resolveGasGranter(user.id, address);
+
     try {
-      relayResult = await relayerService.relayCreateBet(address, amount, commitment, /* asyncMode */ true);
+      relayResult = await relayerService.relayCreateBet(address, amount, commitment, /* asyncMode */ true, granter);
     } catch (err) {
       // Relay failed — unlock funds, remove pending lock, decrement pending count
       removePendingLock(address, lockId);
@@ -466,6 +470,9 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
     throw Errors.insufficientBalance(totalRequired.toString(), '0');
   }
 
+  // Resolve gas granter once for the batch (VIP → treasury, non-VIP → user)
+  const granter = await resolveGasGranter(user.id, address);
+
   // Submit bets sequentially via relayer, then resolve in batches of 3.
   // The sequence manager serializes signing correctly, but background resolution
   // (polling chain REST API) can't handle 12+ concurrent tasks — they timeout
@@ -490,7 +497,7 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
       logger.warn({ err, index: i }, 'Batch: failed to persist secret (continuing anyway)'));
 
     try {
-      const relayResult = await relayerService.relayCreateBet(address, amount, commitment, true);
+      const relayResult = await relayerService.relayCreateBet(address, amount, commitment, true, granter);
 
       if (!relayResult.success) {
         await pendingSecretsService.delete(commitment).catch(() => {});
@@ -680,6 +687,9 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
     throw new AppError('BET_ALREADY_CLAIMED', 'This bet is already being accepted by another player', 409);
   }
 
+  // Resolve gas granter (VIP → treasury, non-VIP → user)
+  const granter = await resolveGasGranter(user.id, address);
+
   try {
     // Use accept_and_reveal: single atomic tx — accept + verify + resolve in one step.
     // No separate reveal tx needed, no "accepted" intermediate state.
@@ -690,6 +700,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
       makerSide as 'heads' | 'tails',
       makerSecret,
       /* asyncMode */ true,
+      granter,
     );
   } catch (err) {
     // Relay failed — unlock and revert
@@ -802,6 +813,9 @@ betsRouter.post('/:betId/reveal', authMiddleware, walletTxRateLimit, zValidator(
     throw Errors.relayerNotReady();
   }
 
+  // Resolve gas granter (VIP → treasury, non-VIP → user)
+  const granter = await resolveGasGranter(user.id, address);
+
   // Guard: one tx at a time per user
   acquireInflight(address);
   let relayResult: RelayResult;
@@ -812,6 +826,7 @@ betsRouter.post('/:betId/reveal', authMiddleware, walletTxRateLimit, zValidator(
       side as 'heads' | 'tails',
       secret,
       /* asyncMode */ true,
+      granter,
     );
   } finally {
     releaseInflight(address);
@@ -864,10 +879,13 @@ betsRouter.post('/:betId/cancel', authMiddleware, walletTxRateLimit, async (c) =
     throw Errors.relayerNotReady();
   }
 
+  // Resolve gas granter (VIP → treasury, non-VIP → user)
+  const granter = await resolveGasGranter(user.id, address);
+
   // No inflight guard needed: markCanceling (WHERE status='open') is atomic.
   let relayResult: RelayResult;
   try {
-    relayResult = await relayerService.relayCancelBet(address, Number(betId), /* asyncMode */ true);
+    relayResult = await relayerService.relayCancelBet(address, Number(betId), /* asyncMode */ true, granter);
   } catch (err) {
     await betService.updateBetStatus(betId, 'open');
     const revBet = await betService.getBetById(betId);
@@ -956,11 +974,14 @@ betsRouter.post('/:betId/claim-timeout', authMiddleware, walletTxRateLimit, asyn
     throw Errors.relayerNotReady();
   }
 
+  // Resolve gas granter (VIP → treasury, non-VIP → user)
+  const granter = await resolveGasGranter(user.id, address);
+
   // Guard: one tx at a time per user
   acquireInflight(address);
   let relayResult: RelayResult;
   try {
-    relayResult = await relayerService.relayClaimTimeout(address, Number(betId), /* asyncMode */ true);
+    relayResult = await relayerService.relayClaimTimeout(address, Number(betId), /* asyncMode */ true, granter);
   } finally {
     releaseInflight(address);
   }

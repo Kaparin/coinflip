@@ -326,6 +326,16 @@ authRouter.get('/grants', authMiddleware, async (c) => {
     logger.warn({ err }, 'Failed to query feegrant from chain');
   }
 
+  // Query chain for feegrant: granter=user, grantee=relayer (user pays gas for non-VIP)
+  let userFeeGrantActive = false;
+  try {
+    const userFeeUrl = `${env.AXIOME_REST_URL}/cosmos/feegrant/v1beta1/allowance/${address}/${env.RELAYER_ADDRESS}`;
+    const userFeeRes = await fetch(userFeeUrl, { signal: AbortSignal.timeout(5000) });
+    if (userFeeRes.ok) userFeeGrantActive = true;
+  } catch {
+    // Ignore — user feegrant check is non-critical
+  }
+
   // Update session in DB
   if (authzGranted) {
     try {
@@ -346,6 +356,7 @@ authRouter.get('/grants', authMiddleware, async (c) => {
       authz_granted: authzGranted,
       authz_expires_at: authzExpiresAt,
       fee_grant_active: feeGrantActive,
+      user_fee_grant_active: userFeeGrantActive,
       relayer_address: env.RELAYER_ADDRESS,
       contract_address: env.COINFLIP_CONTRACT_ADDR,
     },

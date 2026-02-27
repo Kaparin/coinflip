@@ -111,6 +111,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
               {[
                 t('onboarding.onlyContract'),
                 t('onboarding.limitedActions'),
+                t('onboarding.gasAllowance'),
                 t('onboarding.expires30d'),
                 t('onboarding.signedLocally'),
               ].map((text) => (

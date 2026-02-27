@@ -9,6 +9,7 @@ interface GrantStatus {
   authz_granted: boolean;
   authz_expires_at: string | null;
   fee_grant_active: boolean;
+  user_fee_grant_active: boolean;
   relayer_address: string;
   contract_address: string;
 }

@@ -34,3 +34,30 @@ export function useWalletBalance(address?: string | null) {
     staleTime: 10_000,
   });
 }
+
+/**
+ * Fetch native AXM balance for a given wallet address.
+ * Uses the Next.js proxy (/chain-rest) to avoid CORS issues.
+ */
+async function fetchNativeBalance(address: string): Promise<string> {
+  if (!address) return '0';
+  const url = `/chain-rest/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=uaxm`;
+  const res = await fetch(url);
+  if (!res.ok) return '0';
+  const data = (await res.json()) as { balance: { amount: string } };
+  return data.balance?.amount ?? '0';
+}
+
+/**
+ * Hook to get the native AXM balance of the connected wallet.
+ * Returns the balance in uaxm (raw chain units, 1 AXM = 1_000_000 uaxm).
+ */
+export function useNativeBalance(address?: string | null) {
+  return useQuery({
+    queryKey: ['wallet-native-balance', address],
+    queryFn: () => fetchNativeBalance(address!),
+    enabled: !!address,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}

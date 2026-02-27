@@ -246,6 +246,21 @@ class EventsService {
     return count;
   }
 
+  // ─── Player Stats (for raffle eligibility) ─────────────
+
+  private async getUserResolvedBetStats(userId: string): Promise<{ betCount: number; turnover: string }> {
+    const db = getDb();
+    const rows = await db.execute(sql`
+      SELECT COUNT(*)::int AS bet_count, COALESCE(SUM(amount::numeric), 0)::text AS turnover
+      FROM (
+        SELECT amount FROM bets WHERE maker_user_id = ${userId} AND status IN ('revealed','timeout_claimed')
+        UNION ALL
+        SELECT amount FROM bets WHERE acceptor_user_id = ${userId} AND status IN ('revealed','timeout_claimed')
+      ) AS resolved
+    `) as unknown as Array<{ bet_count: number; turnover: string }>;
+    return { betCount: Number(rows[0]?.bet_count ?? 0), turnover: rows[0]?.turnover ?? '0' };
+  }
+
   // ─── Participation ─────────────────────────────────────
 
   async hasUserJoined(eventId: string, userId: string): Promise<boolean> {
@@ -293,13 +308,23 @@ class EventsService {
       throw new AppError('EVENT_ENDED', 'This event has already ended', 400);
     }
 
-    // Check maxParticipants for raffles
+    // Check raffle-specific constraints
     if (event.type === 'raffle') {
       const config = event.config as RaffleConfig;
       if (config.maxParticipants) {
         const count = await this.getParticipantCount(eventId);
         if (count >= config.maxParticipants) {
           throw new AppError('EVENT_FULL', 'Event has reached maximum participants', 400);
+        }
+      }
+      // minBets / minTurnover eligibility check
+      if (config.minBets || config.minTurnover) {
+        const stats = await this.getUserResolvedBetStats(userId);
+        if (config.minBets && stats.betCount < config.minBets) {
+          throw new AppError('INSUFFICIENT_BETS', `Minimum ${config.minBets} completed bets required. You have ${stats.betCount}.`, 400);
+        }
+        if (config.minTurnover && BigInt(stats.turnover) < BigInt(config.minTurnover)) {
+          throw new AppError('INSUFFICIENT_TURNOVER', `Minimum turnover of ${config.minTurnover} required. Yours: ${stats.turnover}.`, 400);
         }
       }
     }

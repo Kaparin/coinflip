@@ -418,6 +418,7 @@
     "limitedActions": "Limited to game actions only (no transfers)",
     "expires30d": "Expires in 30 days, revocable anytime",
     "signedLocally": "Signed locally in your browser",
+    "gasAllowance": "Gas allowance for transaction fees (10 AXM limit)",
     "later": "Later",
     "authorize": "Authorize",
     "signingTx": "Signing transaction...",

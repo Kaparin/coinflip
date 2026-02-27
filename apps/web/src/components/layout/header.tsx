@@ -9,7 +9,7 @@ import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
-import { useWalletBalance } from '@/hooks/use-wallet-balance';
+import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
 import { StatusChips } from '@/components/features/auth/status-chips';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
@@ -36,6 +36,7 @@ export function Header() {
   });
   const activeEventCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
+  const { data: nativeBalanceRaw } = useNativeBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
   const { data: currentUserData } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
@@ -52,8 +53,11 @@ export function Header() {
   const adjusted = rawAvailable - pendingDeduction;
   const availableHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
+  const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000; // uaxm → AXM
+  const isLowAxm = !vipStatus?.active && nativeBalanceHuman < 0.5;
   const oneClickEnabled = grantData?.authz_granted ?? false;
-  const gasSponsored = grantData?.fee_grant_active ?? false;
+  // Gas is ready if either: treasury feegrant exists (VIP) or user→relayer feegrant exists (non-VIP)
+  const gasSponsored = (grantData?.fee_grant_active ?? false) || (grantData?.user_fee_grant_active ?? false);
 
   const isAdmin =
     wallet.isConnected &&
@@ -118,6 +122,10 @@ export function Header() {
                   <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
                     <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={40} /></span>
+                  </div>
+                  <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM (gas)">
+                    <span className="text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} AXM</span>
+                    {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                   </div>
                 </div>
 

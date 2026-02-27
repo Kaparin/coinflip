@@ -198,12 +198,13 @@ export class RelayerService {
     action: ContractAction,
     memo = '',
     asyncMode = false,
+    granter?: string,
   ): Promise<RelayResult> {
     if (!this.isReady()) {
       return { success: false, error: 'Relayer not initialized' };
     }
 
-    return this._submitExecInner(userAddress, action, memo, asyncMode);
+    return this._submitExecInner(userAddress, action, memo, asyncMode, undefined, granter);
   }
 
   /** Build the MsgAny + fee for a given user action */
@@ -211,6 +212,7 @@ export class RelayerService {
     userAddress: string,
     action: ContractAction | Record<string, unknown>,
     contractAddr?: string,
+    granter?: string,
   ) {
     const innerMsg: MsgExecuteContract = {
       sender: userAddress,
@@ -229,10 +231,14 @@ export class RelayerService {
       typeUrl: '/cosmos.authz.v1beta1.MsgExec',
       value: execMsg,
     };
+    // Determine fee granter:
+    // 1. If explicit granter is passed (per-user VIP logic), use it
+    // 2. Fallback: treasury feegrant (legacy, for backwards compat)
+    const effectiveGranter = granter ?? (this.feeGrantActive && this.treasuryAddress ? this.treasuryAddress : undefined);
     const fee: StdFee = {
       amount: [{ denom: FEE_DENOM, amount: '12500' }],
       gas: String(DEFAULT_EXEC_GAS_LIMIT),
-      ...(this.feeGrantActive && this.treasuryAddress ? { granter: this.treasuryAddress } : {}),
+      ...(effectiveGranter ? { granter: effectiveGranter } : {}),
     };
     return { msgAny, fee };
   }
@@ -272,6 +278,7 @@ export class RelayerService {
     memo: string,
     asyncMode = false,
     contractOverride?: string,
+    granter?: string,
   ): Promise<RelayResult> {
     const actionKey = Object.keys(action)[0]!;
     const targetContract = contractOverride ?? this.contractAddress;
@@ -280,7 +287,7 @@ export class RelayerService {
       'Submitting MsgExec',
     );
 
-    const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride);
+    const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride, granter);
 
     // Log tx start (before broadcast)
     const startTime = Date.now();
@@ -525,6 +532,7 @@ export class RelayerService {
     contractAddress: string,
     action: Record<string, unknown>,
     memo = '',
+    granter?: string,
   ): Promise<RelayResult> {
     if (!this.isReady()) {
       return { success: false, error: 'Relayer not initialized' };
@@ -536,7 +544,7 @@ export class RelayerService {
       );
       return { success: false, error: 'Contract address not in whitelist' };
     }
-    return this._submitExecInner(userAddress, action, memo, false, contractAddress);
+    return this._submitExecInner(userAddress, action, memo, false, contractAddress, granter);
   }
 
   /**
@@ -549,12 +557,14 @@ export class RelayerService {
     recipient: string,
     amount: string,
     memo = '',
+    granter?: string,
   ): Promise<RelayResult> {
     return this.submitExecOnContract(
       userAddress,
       cw20Contract,
       { transfer: { recipient, amount } },
       memo || 'CoinFlip fee transfer',
+      granter,
     );
   }
 
@@ -564,8 +574,8 @@ export class RelayerService {
     return this.submitExec(userAddress, { deposit: {} });
   }
 
-  async relayWithdraw(userAddress: string, amount: string, asyncMode = false): Promise<RelayResult> {
-    return this.submitExec(userAddress, { withdraw: { amount } }, '', asyncMode);
+  async relayWithdraw(userAddress: string, amount: string, asyncMode = false, granter?: string): Promise<RelayResult> {
+    return this.submitExec(userAddress, { withdraw: { amount } }, '', asyncMode, granter);
   }
 
   async relayCreateBet(
@@ -573,9 +583,10 @@ export class RelayerService {
     amount: string,
     commitmentHex: string,
     asyncMode = false,
+    granter?: string,
   ): Promise<RelayResult> {
     const commitmentBase64 = toBase64(fromHex(commitmentHex));
-    return this.submitExec(userAddress, { create_bet: { amount, commitment: commitmentBase64 } }, '', asyncMode);
+    return this.submitExec(userAddress, { create_bet: { amount, commitment: commitmentBase64 } }, '', asyncMode, granter);
   }
 
   async relayAcceptBet(
@@ -583,8 +594,9 @@ export class RelayerService {
     betId: number,
     guess: 'heads' | 'tails',
     asyncMode = false,
+    granter?: string,
   ): Promise<RelayResult> {
-    return this.submitExec(userAddress, { accept_bet: { bet_id: betId, guess } }, '', asyncMode);
+    return this.submitExec(userAddress, { accept_bet: { bet_id: betId, guess } }, '', asyncMode, granter);
   }
 
   async relayAcceptAndReveal(
@@ -594,6 +606,7 @@ export class RelayerService {
     makerSide: 'heads' | 'tails',
     makerSecretHex: string,
     asyncMode = false,
+    granter?: string,
   ): Promise<RelayResult> {
     const secretBase64 = toBase64(fromHex(makerSecretHex));
     return this.submitExec(
@@ -601,6 +614,7 @@ export class RelayerService {
       { accept_and_reveal: { bet_id: betId, guess, side: makerSide, secret: secretBase64 } },
       '',
       asyncMode,
+      granter,
     );
   }
 
@@ -610,17 +624,18 @@ export class RelayerService {
     side: 'heads' | 'tails',
     secretHex: string,
     asyncMode = false,
+    granter?: string,
   ): Promise<RelayResult> {
     const secretBase64 = toBase64(fromHex(secretHex));
-    return this.submitExec(userAddress, { reveal: { bet_id: betId, side, secret: secretBase64 } }, '', asyncMode);
+    return this.submitExec(userAddress, { reveal: { bet_id: betId, side, secret: secretBase64 } }, '', asyncMode, granter);
   }
 
-  async relayCancelBet(userAddress: string, betId: number, asyncMode = false): Promise<RelayResult> {
-    return this.submitExec(userAddress, { cancel_bet: { bet_id: betId } }, '', asyncMode);
+  async relayCancelBet(userAddress: string, betId: number, asyncMode = false, granter?: string): Promise<RelayResult> {
+    return this.submitExec(userAddress, { cancel_bet: { bet_id: betId } }, '', asyncMode, granter);
   }
 
-  async relayClaimTimeout(userAddress: string, betId: number, asyncMode = false): Promise<RelayResult> {
-    return this.submitExec(userAddress, { claim_timeout: { bet_id: betId } }, '', asyncMode);
+  async relayClaimTimeout(userAddress: string, betId: number, asyncMode = false, granter?: string): Promise<RelayResult> {
+    return this.submitExec(userAddress, { claim_timeout: { bet_id: betId } }, '', asyncMode, granter);
   }
 
   /** Get relayer account balance (for monitoring) */

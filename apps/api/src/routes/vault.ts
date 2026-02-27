@@ -16,6 +16,7 @@ import { getPendingBetCount } from '../lib/pending-counts.js';
 import { betService } from '../services/bet.service.js';
 import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
+import { resolveGasGranter } from '../lib/gas-granter.js';
 
 /** Throw an appropriate AppError for a failed relay result */
 function throwRelayError(relayResult: RelayResult): never {
@@ -417,8 +418,11 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
       throw Errors.insufficientBalance(amount, '0');
     }
 
+    // Resolve gas granter (VIP → treasury, non-VIP → user)
+    const granter = await resolveGasGranter(user.id, address);
+
     try {
-      relayResult = await relayerService.relayWithdraw(address, amount);
+      relayResult = await relayerService.relayWithdraw(address, amount, false, granter);
     } catch (err) {
       // Relay failed — unlock funds
       await vaultService.unlockFunds(user.id, amount).catch(e =>
