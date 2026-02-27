@@ -42,11 +42,11 @@ const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'jackpot', icon: Gem, label: 'Jackpot' },
   { id: 'vip', icon: Crown, label: 'VIP' },
   { id: 'commission', icon: PieChart, label: 'Commission' },
-  { id: 'transactions', icon: ArrowLeftRight, label: 'Transactions' },
-  { id: 'announcements', icon: Megaphone, label: 'Announcements' },
+  { id: 'transactions', icon: ArrowLeftRight, label: 'Txns' },
+  { id: 'announcements', icon: Megaphone, label: 'Announce' },
   { id: 'news', icon: Newspaper, label: 'News' },
   { id: 'config', icon: Settings, label: 'Config' },
-  { id: 'diagnostics', icon: AlertTriangle, label: 'Diagnostics' },
+  { id: 'diagnostics', icon: AlertTriangle, label: 'Diag' },
   { id: 'actions', icon: Wrench, label: 'Actions' },
 ];
 
@@ -55,33 +55,34 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+    <div className="mx-auto max-w-6xl px-4 py-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)]/15">
-          <ShieldCheck size={20} className="text-[var(--color-primary)]" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)]/15">
+          <ShieldCheck size={18} className="text-[var(--color-primary)]" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">{t('admin.title')}</h1>
-          <p className="text-xs text-[var(--color-text-secondary)]">{t('admin.subtitle')}</p>
+          <h1 className="text-lg font-bold">{t('admin.title')}</h1>
+          <p className="text-[10px] text-[var(--color-text-secondary)]">{t('admin.subtitle')}</p>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+      {/* Tab Navigation — scrollable, no-scrollbar, compact */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
         {TABS.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors ${
               activeTab === id
                 ? 'bg-[var(--color-primary)] text-white'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
             }`}
+            title={label}
           >
-            <Icon size={16} />
-            {label}
+            <Icon size={14} />
+            <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>

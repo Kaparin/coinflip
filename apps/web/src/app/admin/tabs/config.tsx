@@ -9,6 +9,33 @@ import {
   type ConfigEntry,
 } from '@/hooks/use-admin';
 import { ActionButton } from '../_shared';
+import { LAUNCH_MULTIPLIER } from '@coinflip/shared/constants';
+
+/**
+ * Keys whose values are stored as micro-LAUNCH (6 decimals).
+ * The UI shows human-readable LAUNCH and converts back on save.
+ */
+const MICRO_LAUNCH_KEYS = new Set([
+  'MIN_BET_AMOUNT',
+  'MAX_DAILY_AMOUNT',
+  'PIN_MIN_PRICE',
+  'BIG_WIN_THRESHOLD',
+  'SPONSORED_PRICE',
+]);
+
+/** Convert micro string to human-readable LAUNCH number string */
+function microToHuman(micro: string): string {
+  const n = Number(micro);
+  if (Number.isNaN(n)) return micro;
+  return String(n / LAUNCH_MULTIPLIER);
+}
+
+/** Convert human LAUNCH number string back to micro string */
+function humanToMicro(human: string): string {
+  const n = Number(human);
+  if (Number.isNaN(n)) return human;
+  return String(Math.round(n * LAUNCH_MULTIPLIER));
+}
 
 const CATEGORY_ORDER = ['game', 'display', 'commission', 'sponsored', 'maintenance', 'general'];
 const CATEGORY_LABELS: Record<string, string> = {
@@ -20,12 +47,41 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: 'General',
 };
 
+/** Human-readable labels for config keys */
+const KEY_LABELS: Record<string, string> = {
+  OPEN_BET_TTL_SECS: 'Open Bet TTL (seconds)',
+  REVEAL_TIMEOUT_SECS: 'Reveal Timeout (seconds)',
+  MIN_BET_AMOUNT: 'Min Bet (LAUNCH)',
+  MAX_DAILY_AMOUNT: 'Max Daily Volume (LAUNCH)',
+  MAX_OPEN_BETS_PER_USER: 'Max Open Bets Per User',
+  MAX_BATCH_SIZE: 'Max Batch Size',
+  BET_PRESETS: 'Bet Presets (LAUNCH)',
+  LEADERBOARD_CACHE_TTL_MS: 'Leaderboard Cache TTL (ms)',
+  PIN_SLOTS: 'Pin Slots',
+  PIN_MIN_PRICE: 'Pin Min Price (LAUNCH)',
+  PIN_OUTBID_MULTIPLIER: 'Pin Outbid Multiplier',
+  BIG_WIN_THRESHOLD: 'Big Win Threshold (LAUNCH)',
+  MAINTENANCE_MODE: 'Maintenance Mode',
+  MAINTENANCE_MESSAGE: 'Maintenance Message',
+  SPONSORED_PRICE: 'Sponsored Price (LAUNCH)',
+  SPONSORED_IS_ACTIVE: 'Sponsored Active',
+  SPONSORED_MIN_DELAY_MIN: 'Min Delay (minutes)',
+  SPONSORED_MAX_TITLE: 'Max Title Length',
+  SPONSORED_MAX_MESSAGE: 'Max Message Length',
+  COMMISSION_BPS: 'Commission (BPS)',
+  REFERRAL_BPS_LEVEL_1: 'Referral L1 (BPS)',
+  REFERRAL_BPS_LEVEL_2: 'Referral L2 (BPS)',
+  REFERRAL_BPS_LEVEL_3: 'Referral L3 (BPS)',
+  MAX_REFERRAL_BPS_PER_BET: 'Max Referral Cap (BPS)',
+  JACKPOT_TOTAL_BPS: 'Jackpot (BPS)',
+};
+
 export function ConfigTab() {
   const { data: configs, isLoading } = useAdminConfig();
   const bulkUpdate = useAdminBulkUpdateConfig();
   const toggleMaintenance = useAdminToggleMaintenance();
 
-  // Local editable state
+  // Local editable state — stores display values (human-readable for LAUNCH keys)
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saveResult, setSaveResult] = useState<string | null>(null);
 
@@ -39,12 +95,12 @@ export function ConfigTab() {
     return map;
   }, [configs]);
 
-  // Reset edits when config loads
+  // Reset edits when config loads — convert micro to human where needed
   useEffect(() => {
     if (configs) {
       const map: Record<string, string> = {};
       for (const c of configs) {
-        map[c.key] = c.value;
+        map[c.key] = MICRO_LAUNCH_KEYS.has(c.key) ? microToHuman(c.value) : c.value;
       }
       setEdits(map);
     }
@@ -60,6 +116,10 @@ export function ConfigTab() {
 
   const maintenanceEnabled = edits['MAINTENANCE_MODE'] === 'true';
 
+  // Get the original display value for a config key
+  const getOriginalDisplay = (key: string, rawValue: string) =>
+    MICRO_LAUNCH_KEYS.has(key) ? microToHuman(rawValue) : rawValue;
+
   const handleToggleMaintenance = async () => {
     setSaveResult(null);
     try {
@@ -71,12 +131,17 @@ export function ConfigTab() {
     }
   };
 
-  // Collect changed entries
+  // Collect changed entries — convert human back to micro where needed
   const getChangedEntries = (category: string) => {
     if (!configs) return [];
     return configs
-      .filter((c) => c.category === category && edits[c.key] !== c.value)
-      .map((c) => ({ key: c.key, value: edits[c.key] ?? c.value }));
+      .filter((c) => c.category === category && edits[c.key] !== getOriginalDisplay(c.key, c.value))
+      .map((c) => ({
+        key: c.key,
+        value: MICRO_LAUNCH_KEYS.has(c.key)
+          ? humanToMicro(edits[c.key] ?? microToHuman(c.value))
+          : edits[c.key] ?? c.value,
+      }));
   };
 
   const handleSaveCategory = async (category: string) => {
@@ -98,9 +163,9 @@ export function ConfigTab() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Maintenance Quick Toggle */}
-      <div className={`rounded-xl border p-5 ${maintenanceEnabled ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
+      <div className={`rounded-xl border p-4 ${maintenanceEnabled ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className={maintenanceEnabled ? 'text-red-400' : 'text-[var(--color-text-secondary)]'} />
@@ -108,7 +173,7 @@ export function ConfigTab() {
               <h3 className="text-sm font-bold">Maintenance Mode</h3>
               <p className="text-[11px] text-[var(--color-text-secondary)]">
                 {maintenanceEnabled
-                  ? 'Platform is DOWN for maintenance. Users see 503.'
+                  ? 'Platform is DOWN. Users see 503.'
                   : 'Platform is running normally.'}
               </p>
             </div>
@@ -145,7 +210,7 @@ export function ConfigTab() {
           const changedCount = getChangedEntries(category).length;
 
           return (
-            <div key={category} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
+            <div key={category} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Settings size={16} className="text-[var(--color-primary)]" />
@@ -159,20 +224,21 @@ export function ConfigTab() {
                   >
                     <span className="flex items-center gap-1">
                       <Save size={12} />
-                      Save {changedCount} change{changedCount > 1 ? 's' : ''}
+                      Save {changedCount}
                     </span>
                   </ActionButton>
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-2">
                 {items.map((cfg) => (
                   <ConfigField
                     key={cfg.key}
                     config={cfg}
-                    value={edits[cfg.key] ?? cfg.value}
+                    value={edits[cfg.key] ?? getOriginalDisplay(cfg.key, cfg.value)}
                     onChange={(val) => setEdits((prev) => ({ ...prev, [cfg.key]: val }))}
-                    isDirty={edits[cfg.key] !== cfg.value}
+                    isDirty={edits[cfg.key] !== getOriginalDisplay(cfg.key, cfg.value)}
+                    isMicroLaunch={MICRO_LAUNCH_KEYS.has(cfg.key)}
                   />
                 ))}
               </div>
@@ -188,27 +254,31 @@ function ConfigField({
   value,
   onChange,
   isDirty,
+  isMicroLaunch,
 }: {
   config: ConfigEntry;
   value: string;
   onChange: (v: string) => void;
   isDirty: boolean;
+  isMicroLaunch: boolean;
 }) {
-  const label = config.key.replace(/_/g, ' ');
+  const label = KEY_LABELS[config.key] ?? config.key.replace(/_/g, ' ');
 
   if (config.valueType === 'boolean') {
     return (
-      <div className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5">
-        <div>
-          <p className="text-xs font-medium">{label}</p>
+      <div className={`flex items-center justify-between rounded-lg border bg-[var(--color-bg)] px-3 py-2.5 ${
+        isDirty ? 'border-amber-500/50' : 'border-[var(--color-border)]'
+      }`}>
+        <div className="min-w-0">
+          <p className="text-xs font-medium truncate">{label}</p>
           {config.description && (
-            <p className="text-[10px] text-[var(--color-text-secondary)]">{config.description}</p>
+            <p className="text-[10px] text-[var(--color-text-secondary)] truncate">{config.description}</p>
           )}
         </div>
         <button
           type="button"
           onClick={() => onChange(value === 'true' ? 'false' : 'true')}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
             value === 'true' ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
           }`}
         >
@@ -243,18 +313,22 @@ function ConfigField({
 
   return (
     <div>
-      <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 uppercase tracking-wider">
-        {label}
-        {config.description && <span className="normal-case tracking-normal ml-1">— {config.description}</span>}
+      <label className="flex items-baseline gap-1 text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 uppercase tracking-wider">
+        <span className="truncate">{label}</span>
+        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">LAUNCH</span>}
       </label>
       <input
-        type={config.valueType === 'number' ? 'number' : 'text'}
+        type={config.valueType === 'number' || isMicroLaunch ? 'number' : 'text'}
+        step={isMicroLaunch ? 'any' : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`w-full rounded-lg border bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none ${
           isDirty ? 'border-amber-500/50' : 'border-[var(--color-border)]'
         }`}
       />
+      {config.description && (
+        <p className="text-[9px] text-[var(--color-text-secondary)] mt-0.5">{config.description}</p>
+      )}
     </div>
   );
 }
