@@ -8,7 +8,11 @@ import {
   useAdminTreasuryLedger,
   useAdminPlatformStats,
   useAdminWithdraw,
+  useAdminSweepPreview,
+  useAdminSweepExecute,
+  useAdminSweepStatus,
 } from '@/hooks/use-admin';
+import type { SweepSummary } from '@/hooks/use-admin';
 import { useTranslation } from '@/lib/i18n';
 import { StatCard, shortHash, timeAgo } from '../_shared';
 
@@ -29,6 +33,13 @@ export function DashboardTab() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
   const [withdrawSuccess, setWithdrawSuccess] = useState('');
+
+  // Sweep state
+  const sweepPreview = useAdminSweepPreview();
+  const sweepExecute = useAdminSweepExecute();
+  const sweepStatus = useAdminSweepStatus();
+  const [sweepMaxUsers, setSweepMaxUsers] = useState(20);
+  const [sweepResult, setSweepResult] = useState<SweepSummary | null>(null);
 
   const handleWithdraw = async () => {
     setWithdrawError('');
@@ -132,6 +143,126 @@ export function DashboardTab() {
           </div>
           {withdrawError && <p className="text-xs text-[var(--color-danger)]">{withdrawError}</p>}
           {withdrawSuccess && <p className="text-xs text-[var(--color-success)]">{withdrawSuccess}</p>}
+        </div>
+      </section>
+
+      {/* Treasury Sweep */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+          Treasury Sweep
+        </h2>
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-4">
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Collect offchain_spent tokens from users&apos; vaults to treasury. Users paid for VIP/pins/announcements/raffles in DB,
+            but tokens remain in the contract.
+          </p>
+
+          {/* Preview */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold">
+                Candidates: {sweepPreview.data?.candidates.length ?? '...'}
+              </span>
+              <span className="text-xs font-bold text-[var(--color-primary)]">
+                Total sweepable: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} LAUNCH
+              </span>
+            </div>
+
+            {sweepPreview.data && sweepPreview.data.candidates.length > 0 && (
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--color-border)]">
+                <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-bg)] border-b border-[var(--color-border)]">
+                  <span>Address</span>
+                  <span>Debt</span>
+                  <span>Chain Avail</span>
+                  <span>Sweepable</span>
+                </div>
+                {sweepPreview.data.candidates.map((c) => (
+                  <div key={c.userId} className="grid grid-cols-4 gap-2 px-3 py-1.5 text-xs border-b border-[var(--color-border)]/30 last:border-0">
+                    <span className="font-mono truncate" title={c.address}>
+                      {c.nickname || shortHash(c.address)}
+                    </span>
+                    <span className="font-mono">{fmtLaunch(c.offchainSpent)}</span>
+                    <span className="font-mono">{fmtLaunch(c.chainAvailable)}</span>
+                    <span className="font-mono font-bold text-[var(--color-primary)]">{fmtLaunch(c.sweepable)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Execute */}
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-[var(--color-text-secondary)]">Max users:</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={sweepMaxUsers}
+              onChange={(e) => setSweepMaxUsers(Number(e.target.value) || 20)}
+              className="w-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={sweepExecute.isPending || sweepStatus.data?.running}
+              onClick={async () => {
+                setSweepResult(null);
+                try {
+                  const result = await sweepExecute.mutateAsync(sweepMaxUsers);
+                  setSweepResult(result);
+                  sweepPreview.refetch();
+                } catch {
+                  // error shown via mutation state
+                }
+              }}
+              className="rounded-xl bg-[var(--color-primary)] px-6 py-2 text-xs font-bold disabled:opacity-40 whitespace-nowrap"
+            >
+              {sweepExecute.isPending || sweepStatus.data?.running ? 'Sweeping...' : 'Start Sweep'}
+            </button>
+            <button
+              type="button"
+              onClick={() => sweepPreview.refetch()}
+              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs hover:bg-[var(--color-border)]/30 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {sweepExecute.error && (
+            <p className="text-xs text-[var(--color-danger)]">
+              {sweepExecute.error instanceof Error ? sweepExecute.error.message : 'Sweep failed'}
+            </p>
+          )}
+
+          {/* Results */}
+          {sweepResult && (
+            <div className="space-y-2">
+              <div className="flex gap-4 text-xs">
+                <span className="text-[var(--color-success)]">Succeeded: {sweepResult.succeeded}</span>
+                <span className="text-[var(--color-danger)]">Failed: {sweepResult.failed}</span>
+                <span className="text-[var(--color-text-secondary)]">Skipped: {sweepResult.skipped}</span>
+                <span className="font-bold">Total swept: {fmtLaunch(sweepResult.totalSwept)} LAUNCH</span>
+              </div>
+              {sweepResult.results.filter((r) => r.status !== 'skipped').length > 0 && (
+                <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--color-border)]">
+                  {sweepResult.results
+                    .filter((r) => r.status !== 'skipped')
+                    .map((r, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-3 px-3 py-1.5 text-xs border-b border-[var(--color-border)]/30 last:border-0 ${
+                          r.status === 'success' ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'
+                        }`}
+                      >
+                        <span>{r.status === 'success' ? '+' : 'x'}</span>
+                        <span className="font-mono truncate">{shortHash(r.address)}</span>
+                        <span className="font-mono">{fmtLaunch(r.amount)}</span>
+                        {r.error && <span className="text-[var(--color-danger)] truncate">{r.error}</span>}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

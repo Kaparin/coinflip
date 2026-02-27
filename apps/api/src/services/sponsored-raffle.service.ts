@@ -8,7 +8,7 @@
  */
 
 import { eq, sql, and, desc, gte } from 'drizzle-orm';
-import { events, eventParticipants, users } from '@coinflip/db/schema';
+import { events, eventParticipants, users, treasuryLedger } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
@@ -123,6 +123,14 @@ class SponsoredRaffleService {
       throw err;
     }
 
+    // Record service fee in treasury ledger (only the fee, not the prize pool)
+    await db.insert(treasuryLedger).values({
+      txhash: `raffle_${eventRow!.id}`,
+      amount: config.price,
+      denom: 'LAUNCH',
+      source: 'sponsored_raffle',
+    });
+
     logger.info({ eventId: eventRow!.id, userId, totalCost }, 'Sponsored raffle submitted');
     return { id: eventRow!.id, totalCost };
   }
@@ -188,6 +196,15 @@ class SponsoredRaffleService {
     // Refund the full amount (service fee + prize pool)
     if (event.userId && event.pricePaid) {
       await vaultService.creditAvailable(event.userId, event.pricePaid);
+
+      // Record refund in treasury ledger
+      await db.insert(treasuryLedger).values({
+        txhash: `refund_raffle_${eventId}`,
+        amount: event.pricePaid,
+        denom: 'LAUNCH',
+        source: 'sponsored_raffle_refund',
+      });
+
       logger.info({ eventId, userId: event.userId, refund: event.pricePaid }, 'Sponsored raffle rejected, refunded');
     }
 
@@ -229,6 +246,15 @@ class SponsoredRaffleService {
     // Full refund
     if (event.pricePaid) {
       await vaultService.creditAvailable(userId, event.pricePaid);
+
+      // Record refund in treasury ledger
+      await db.insert(treasuryLedger).values({
+        txhash: `refund_raffle_${eventId}`,
+        amount: event.pricePaid,
+        denom: 'LAUNCH',
+        source: 'sponsored_raffle_refund',
+      });
+
       logger.info({ eventId, userId, refund: event.pricePaid }, 'Sponsored raffle canceled by creator, refunded');
     }
 

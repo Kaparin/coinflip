@@ -453,6 +453,17 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     releaseInflight(address);
   }
 
+  // Fire-and-forget: sweep user's offchain_spent to treasury in background
+  vaultService.getOffchainBalances(user.id).then(async ({ offchainSpent }) => {
+    if (BigInt(offchainSpent) <= 0n) return;
+    try {
+      const { treasurySweepService } = await import('../services/treasury-sweep.service.js');
+      await treasurySweepService.sweepSingleUser(user.id, address, offchainSpent);
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, 'Auto-sweep after withdrawal failed (non-critical)');
+    }
+  }).catch(() => {});
+
   return c.json({
     data: {
       status: 'confirmed',

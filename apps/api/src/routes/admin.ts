@@ -20,6 +20,7 @@ import { configService } from '../services/config.service.js';
 import { partnerService } from '../services/partner.service.js';
 import { newsService } from '../services/news.service.js';
 import { announcementService } from '../services/announcement.service.js';
+import { treasurySweepService } from '../services/treasury-sweep.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
@@ -1211,4 +1212,35 @@ adminRouter.delete('/news/:id', async (c) => {
   await newsService.deletePost(id);
   logger.info({ postId: id, admin: c.get('address') }, 'admin: news post deleted');
   return c.json({ data: { status: 'ok' } });
+});
+
+// ═══════════════════════════════════════════
+// Treasury Sweep — collect offchain_spent from users
+// ═══════════════════════════════════════════
+
+// GET /admin/treasury/sweep/preview — show candidates for sweep
+adminRouter.get('/treasury/sweep/preview', async (c) => {
+  const preview = await treasurySweepService.getSweepPreview();
+  return c.json({ data: preview });
+});
+
+// POST /admin/treasury/sweep/execute — start sweep
+adminRouter.post(
+  '/treasury/sweep/execute',
+  zValidator('json', z.object({ maxUsers: z.number().int().min(1).max(100).default(20) })),
+  async (c) => {
+    if (treasurySweepService.isRunning()) {
+      return c.json({ error: { message: 'Sweep already in progress' } }, 409);
+    }
+
+    const { maxUsers } = c.req.valid('json');
+    logger.info({ admin: c.get('address'), maxUsers }, 'admin: treasury sweep started');
+    const summary = await treasurySweepService.executeSweep(maxUsers);
+    return c.json({ data: summary });
+  },
+);
+
+// GET /admin/treasury/sweep/status — check if sweep is running
+adminRouter.get('/treasury/sweep/status', async (c) => {
+  return c.json({ data: { running: treasurySweepService.isRunning() } });
 });

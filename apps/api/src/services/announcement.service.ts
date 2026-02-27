@@ -7,7 +7,7 @@
  */
 
 import { eq, sql, and, desc, lte, isNull, or } from 'drizzle-orm';
-import { announcements, users, userNotifications } from '@coinflip/db/schema';
+import { announcements, users, userNotifications, treasuryLedger } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
@@ -87,6 +87,14 @@ class AnnouncementService {
       throw err;
     }
 
+    // Record in treasury ledger
+    await db.insert(treasuryLedger).values({
+      txhash: `announcement_${ann!.id}`,
+      amount: config.price,
+      denom: 'LAUNCH',
+      source: 'sponsored_announcement',
+    });
+
     logger.info({ announcementId: ann!.id, userId, price: config.price }, 'Sponsored announcement submitted');
     return { id: ann!.id, price: config.price };
   }
@@ -145,6 +153,15 @@ class AnnouncementService {
     // Refund to available balance (user paid from available, refund goes back there)
     if (ann.userId && ann.pricePaid) {
       await vaultService.creditAvailable(ann.userId, ann.pricePaid);
+
+      // Record refund in treasury ledger
+      await db.insert(treasuryLedger).values({
+        txhash: `refund_announcement_${announcementId}`,
+        amount: ann.pricePaid,
+        denom: 'LAUNCH',
+        source: 'sponsored_announcement_refund',
+      });
+
       logger.info({ announcementId, userId: ann.userId, refund: ann.pricePaid }, 'Sponsored announcement rejected, refunded to available');
     }
 

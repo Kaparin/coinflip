@@ -985,6 +985,77 @@ export function useAdminRejectSponsored() {
   });
 }
 
+// ─── Treasury Sweep ──────────────────────────────────────────────
+
+export interface SweepCandidate {
+  userId: string;
+  address: string;
+  nickname: string | null;
+  offchainSpent: string;
+  chainAvailable: string;
+  sweepable: string;
+}
+
+export interface SweepPreview {
+  candidates: SweepCandidate[];
+  totalSweepable: string;
+}
+
+export interface SweepResult {
+  userId: string;
+  address: string;
+  amount: string;
+  status: 'success' | 'failed' | 'skipped';
+  error?: string;
+  withdrawTxHash?: string;
+  transferTxHash?: string;
+}
+
+export interface SweepSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  totalSwept: string;
+  results: SweepResult[];
+}
+
+export function useAdminSweepPreview() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'treasury', 'sweep', 'preview', address],
+    queryFn: () => adminFetch<SweepPreview>('/api/v1/admin/treasury/sweep/preview', address!),
+    enabled: isConnected && !!address,
+    staleTime: 15_000,
+  });
+}
+
+export function useAdminSweepExecute() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (maxUsers: number) =>
+      adminFetch<SweepSummary>('/api/v1/admin/treasury/sweep/execute', address!, {
+        method: 'POST',
+        body: JSON.stringify({ maxUsers }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'treasury'] });
+    },
+  });
+}
+
+export function useAdminSweepStatus() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'treasury', 'sweep', 'status', address],
+    queryFn: () => adminFetch<{ running: boolean }>('/api/v1/admin/treasury/sweep/status', address!),
+    enabled: isConnected && !!address,
+    staleTime: 5_000,
+    refetchInterval: 5_000,
+  });
+}
+
 // ─── Sponsored Raffle Admin ──────────────────────────────────────
 
 export interface PendingSponsoredRaffle {
