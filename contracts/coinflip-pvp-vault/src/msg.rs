@@ -75,9 +75,13 @@ pub enum ExecuteMsg {
     AcceptAdmin {},
 }
 
-/// Message for contract migration
+/// Message for contract migration.
+/// v0.5.0: added optional `token_cw20` to allow switching the CW20 token address.
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    /// New CW20 token contract address. If `None`, keeps current value.
+    pub token_cw20: Option<String>,
+}
 
 #[cw_serde]
 pub enum ReceiveMsg {

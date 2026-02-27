@@ -208,21 +208,24 @@ fn execute_accept_admin(
 pub fn migrate(
     deps: DepsMut,
     _env: Env,
-    _msg: MigrateMsg,
+    msg: MigrateMsg,
 ) -> Result<Response, ContractError> {
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // Re-save config so new fields / wider types are persisted.
-    // v0.2→v0.3: max_open_per_user widened from u8 to u16.
-    let config = CONFIG.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
+
+    // v0.5.0: allow switching CW20 token address during migration
+    if let Some(new_token) = msg.token_cw20 {
+        config.token_cw20 = deps.api.addr_validate(&new_token)?;
+    }
+
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("from_version", version.to_string())
         .add_attribute("to_version", CONTRACT_VERSION)
-        .add_attribute("max_open_per_user", config.max_open_per_user.to_string())
-        .add_attribute("bet_ttl_secs", config.bet_ttl_secs.to_string()))
+        .add_attribute("token_cw20", config.token_cw20.to_string()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

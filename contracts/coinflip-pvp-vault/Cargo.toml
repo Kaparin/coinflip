@@ -1,6 +1,6 @@
 [package]
 name = "coinflip-pvp-vault"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["CoinFlip Team"]
 description = "PvP CoinFlip smart contract with vault model for Axiome Chain"
