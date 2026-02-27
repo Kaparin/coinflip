@@ -8,7 +8,10 @@ export class VaultService {
 
   /**
    * Get user's balance from DB.
-   * Returns chain-synced available/locked + off-chain bonus separately.
+   * Returns effective balances after accounting for off-chain spending.
+   *
+   * offchain_spent is deducted from available first, then from bonus if needed.
+   * This ensures chain sync (which overwrites `available`) never "restores" spent funds.
    */
   async getBalance(userId: string) {
     const balance = await this.db.query.vaultBalances.findFirst({
@@ -19,16 +22,31 @@ export class VaultService {
       return { available: '0', locked: '0', total: '0', bonus: '0' };
     }
 
-    const available = BigInt(balance.available);
+    const chainAvailable = BigInt(balance.available);
     const locked = BigInt(balance.locked);
     const bonus = BigInt(balance.bonus);
-    const total = available + locked + bonus;
+    const spent = BigInt(balance.offchainSpent);
+
+    // Deduct offchain_spent from available first, overflow goes to bonus
+    let effectiveAvailable: bigint;
+    let effectiveBonus: bigint;
+
+    if (spent <= chainAvailable) {
+      effectiveAvailable = chainAvailable - spent;
+      effectiveBonus = bonus;
+    } else {
+      effectiveAvailable = 0n;
+      const overflowFromBonus = spent - chainAvailable;
+      effectiveBonus = bonus > overflowFromBonus ? bonus - overflowFromBonus : 0n;
+    }
+
+    const total = effectiveAvailable + locked + effectiveBonus;
 
     return {
-      available: available.toString(),
+      available: effectiveAvailable.toString(),
       locked: locked.toString(),
       total: total.toString(),
-      bonus: bonus.toString(),
+      bonus: effectiveBonus.toString(),
     };
   }
 
@@ -45,7 +63,7 @@ export class VaultService {
         set: {
           available,
           locked,
-          // NOTE: bonus is NOT touched — it persists across chain syncs
+          // NOTE: bonus and offchain_spent are NOT touched — they persist across chain syncs
           ...(isLiveQuery ? {} : { sourceHeight: height }),
           updatedAt: new Date(),
         },
@@ -61,7 +79,7 @@ export class VaultService {
   /**
    * Atomically lock funds: available -= amount, locked += amount.
    * Only deducts from on-chain available balance (NOT bonus).
-   * Bonus is off-chain and cannot be used for on-chain operations.
+   * Checks (available - offchain_spent) >= amount to prevent double-spending.
    * Returns the updated row, or null if insufficient balance.
    */
   async lockFunds(userId: string, amount: string) {
@@ -75,7 +93,7 @@ export class VaultService {
       .where(
         and(
           eq(vaultBalances.userId, userId),
-          sql`${vaultBalances.available}::numeric >= ${amount}::numeric`,
+          sql`(${vaultBalances.available}::numeric - ${vaultBalances.offchainSpent}::numeric) >= ${amount}::numeric`,
         ),
       )
       .returning();
@@ -118,27 +136,31 @@ export class VaultService {
   }
 
   /**
-   * Atomically deduct from available balance (no locked increase).
-   * Used for off-chain payments: VIP subscriptions, pin purchases, etc.
+   * Atomically deduct from user's effective balance (available + bonus - offchain_spent).
+   * Used for off-chain payments: VIP subscriptions, pin purchases, announcements, etc.
+   *
+   * Instead of decrementing `available` (which gets overwritten by chain sync),
+   * we increment `offchain_spent` — a persistent counter that survives chain sync.
+   *
    * Returns the updated row, or null if insufficient balance.
    */
   async deductBalance(userId: string, amount: string) {
     const result = await this.db
       .update(vaultBalances)
       .set({
-        available: sql`${vaultBalances.available}::numeric - ${amount}::numeric`,
+        offchainSpent: sql`${vaultBalances.offchainSpent}::numeric + ${amount}::numeric`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(vaultBalances.userId, userId),
-          sql`${vaultBalances.available}::numeric >= ${amount}::numeric`,
+          sql`(${vaultBalances.available}::numeric + ${vaultBalances.bonus}::numeric - ${vaultBalances.offchainSpent}::numeric) >= ${amount}::numeric`,
         ),
       )
       .returning();
 
     if (result.length === 0) {
-      logger.warn({ userId, amount }, 'deductBalance: insufficient available balance');
+      logger.warn({ userId, amount }, 'deductBalance: insufficient effective balance');
       return null;
     }
 
@@ -146,25 +168,29 @@ export class VaultService {
   }
 
   /**
-   * Credit back to user's available balance (for refunds).
-   * Unlike creditWinner, this restores money to available (on-chain) balance.
+   * Refund off-chain payment by decrementing offchain_spent.
+   * Used when admin rejects a sponsored announcement/raffle, etc.
+   * Clamps offchain_spent to 0 to prevent negative values.
    */
   async creditAvailable(userId: string, amount: string) {
     const result = await this.db
-      .insert(vaultBalances)
-      .values({ userId, available: amount })
-      .onConflictDoUpdate({
-        target: vaultBalances.userId,
-        set: {
-          available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
-          updatedAt: new Date(),
-        },
+      .update(vaultBalances)
+      .set({
+        offchainSpent: sql`GREATEST(0, ${vaultBalances.offchainSpent}::numeric - ${amount}::numeric)`,
+        updatedAt: new Date(),
       })
+      .where(eq(vaultBalances.userId, userId))
       .returning();
 
+    if (result.length === 0) {
+      // User has no balance row — nothing to refund (edge case)
+      logger.warn({ userId, amount }, 'creditAvailable: no balance row found for refund');
+      return;
+    }
+
     logger.info(
-      { userId, amount, newAvailable: result[0]?.available },
-      'Refund credited to available balance',
+      { userId, amount, offchainSpent: result[0]?.offchainSpent },
+      'Refund: offchain_spent decremented',
     );
   }
 
