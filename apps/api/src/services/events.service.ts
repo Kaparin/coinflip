@@ -812,6 +812,7 @@ class EventsService {
     const now = new Date();
 
     // 0. Delete stale drafts — both startsAt and endsAt in the past (never activated, no participants)
+    //    Skip pending sponsored raffles (awaiting admin review)
     const staleDrafts = await db
       .select()
       .from(events)
@@ -820,6 +821,10 @@ class EventsService {
           eq(events.status, 'draft'),
           lt(events.startsAt, now),
           lt(events.endsAt, now),
+          or(
+            sql`${events.sponsoredStatus} IS NULL`,
+            sql`${events.sponsoredStatus} != 'pending'`,
+          ),
         ),
       );
 
@@ -833,6 +838,7 @@ class EventsService {
     }
 
     // 1. Auto-activate draft events whose startsAt has passed (but endsAt still in the future)
+    //    Only activate admin events (sponsoredStatus IS NULL) or approved sponsored events
     const draftsToActivate = await db
       .select()
       .from(events)
@@ -841,6 +847,10 @@ class EventsService {
           eq(events.status, 'draft'),
           lte(events.startsAt, now),
           gte(events.endsAt, now),
+          or(
+            sql`${events.sponsoredStatus} IS NULL`,
+            sql`${events.sponsoredStatus} = 'approved'`,
+          ),
         ),
       );
 
@@ -1011,6 +1021,26 @@ class EventsService {
     const endsAt = event.endsAt instanceof Date ? event.endsAt.toISOString() : String(event.endsAt);
     const createdAt = event.createdAt instanceof Date ? event.createdAt.toISOString() : String(event.createdAt);
 
+    // Resolve sponsor info if sponsored event
+    let sponsorAddress: string | null = null;
+    let sponsorNickname: string | null = null;
+    if (event.userId) {
+      try {
+        const db = getDb();
+        const [sponsor] = await db
+          .select({ address: users.address, nickname: users.profileNickname })
+          .from(users)
+          .where(eq(users.id, event.userId))
+          .limit(1);
+        if (sponsor) {
+          sponsorAddress = sponsor.address;
+          sponsorNickname = sponsor.nickname;
+        }
+      } catch (err) {
+        logger.error({ err, eventId: event.id }, 'Failed to resolve sponsor info');
+      }
+    }
+
     return {
       id: event.id,
       type: event.type,
@@ -1028,6 +1058,8 @@ class EventsService {
       hasJoined,
       myRank,
       createdAt,
+      sponsorAddress,
+      sponsorNickname,
     };
   }
 }

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/admin.js';
 import { eventsService } from '../services/events.service.js';
+import { sponsoredRaffleService } from '../services/sponsored-raffle.service.js';
 import { wsService } from '../services/ws.service.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
@@ -51,6 +52,14 @@ adminEventsRouter.get('/', zValidator('query', ListQuerySchema), async (c) => {
     }
   }
   return c.json({ data });
+});
+
+// ---- Sponsored raffle admin routes (before /:id to avoid collision) ----
+
+// GET /admin/events/sponsored/pending — Pending sponsored raffles
+adminEventsRouter.get('/sponsored/pending', async (c) => {
+  const pending = await sponsoredRaffleService.getPending();
+  return c.json({ data: pending });
 });
 
 // POST /admin/events — Create event
@@ -267,3 +276,25 @@ adminEventsRouter.get('/:id/distribution-status', async (c) => {
     },
   });
 });
+
+// POST /admin/events/:id/approve-sponsored — Approve a sponsored raffle
+adminEventsRouter.post('/:id/approve-sponsored', async (c) => {
+  const eventId = c.req.param('id');
+  const result = await sponsoredRaffleService.approveSponsored(eventId);
+  logger.info({ eventId, result }, 'Sponsored raffle approved by admin');
+  return c.json({ data: result });
+});
+
+// POST /admin/events/:id/reject-sponsored — Reject a sponsored raffle + refund
+const RejectSponsoredSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
+adminEventsRouter.post('/:id/reject-sponsored', zValidator('json', RejectSponsoredSchema), async (c) => {
+  const eventId = c.req.param('id');
+  const { reason } = c.req.valid('json');
+  const result = await sponsoredRaffleService.rejectSponsored(eventId, reason);
+  logger.info({ eventId, reason, result }, 'Sponsored raffle rejected by admin');
+  return c.json({ data: result });
+});
+

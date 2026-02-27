@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User } from 'lucide-react';
 import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
@@ -124,6 +124,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
         {event.description && (
           <p className="relative text-xs text-[var(--color-text-secondary)]">{event.description}</p>
+        )}
+
+        {/* Sponsor badge */}
+        {(event as unknown as Record<string, unknown>).sponsorAddress && (
+          <div className="relative flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+            <User size={12} />
+            <span className="font-medium">
+              {t('sponsoredRaffle.sponsoredBy')}{' '}
+              <span className="font-bold">
+                {String((event as unknown as Record<string, unknown>).sponsorNickname ?? '') ||
+                  `${String((event as unknown as Record<string, unknown>).sponsorAddress).slice(0, 10)}...`}
+              </span>
+            </span>
+          </div>
         )}
 
         {/* Stats row */}

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { adminMiddleware } from '../middleware/admin.js';
 import { eventsService } from '../services/events.service.js';
+import { sponsoredRaffleService } from '../services/sponsored-raffle.service.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { getDb } from '../lib/db.js';
@@ -55,6 +56,39 @@ eventsRouter.get('/completed', optionalAuthMiddleware, zValidator('query', Compl
   }
   return c.json({ data });
 });
+
+// ---- Sponsored raffle endpoints (must be before /:id to avoid collision) ----
+
+// GET /events/sponsored/config — Public config for the form
+eventsRouter.get('/sponsored/config', async (c) => {
+  const config = await sponsoredRaffleService.getConfig();
+  return c.json({ data: config });
+});
+
+// POST /events/sponsored — Submit a sponsored raffle (auth required)
+const SubmitSponsoredRaffleSchema = z.object({
+  title: z.string().min(3).max(100),
+  description: z.string().min(3).max(500),
+  prizeAmount: z.string().regex(/^\d+$/, 'Must be a numeric string'),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+});
+
+eventsRouter.post('/sponsored', authMiddleware, zValidator('json', SubmitSponsoredRaffleSchema), async (c) => {
+  const user = c.get('user');
+  const body = c.req.valid('json');
+  const result = await sponsoredRaffleService.submitSponsored(
+    user.id,
+    body.title,
+    body.description,
+    body.prizeAmount,
+    body.startsAt,
+    body.endsAt,
+  );
+  return c.json({ data: result }, 201);
+});
+
+// ---- Public event details ----
 
 // GET /events/:id — Event details
 eventsRouter.get('/:id', optionalAuthMiddleware, async (c) => {

@@ -912,5 +912,24 @@
   },
   "announcement": {
     "sponsor": "Sponsor"
+  },
+  "sponsoredRaffle": {
+    "title": "Create Raffle",
+    "button": "Create Raffle",
+    "serviceFee": "Service fee",
+    "prizePool": "Prize pool",
+    "total": "Total",
+    "fieldTitle": "Title",
+    "titlePlaceholder": "Raffle title...",
+    "fieldDescription": "Description",
+    "descPlaceholder": "Describe what this raffle is about...",
+    "fieldPrize": "Prize Amount (LAUNCH)",
+    "fieldStartTime": "Start Time",
+    "fieldDuration": "Duration",
+    "submit": "Submit Raffle",
+    "submitted": "Raffle Submitted!",
+    "submittedDesc": "Your raffle has been sent for admin review. If approved, it will appear in the events list. If rejected, funds will be refunded to your game balance.",
+    "errorMinPrize": "Minimum prize is 1 LAUNCH",
+    "sponsoredBy": "Sponsored by"
   }
 }

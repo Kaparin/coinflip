@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, Users, Target } from 'lucide-react';
+import { Trophy, Users, Target, User } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
@@ -20,6 +20,8 @@ interface EventCardProps {
     totalPrizePool: string;
     participantCount: number;
     hasJoined?: boolean;
+    sponsorAddress?: string | null;
+    sponsorNickname?: string | null;
   };
   size?: 'large' | 'medium' | 'compact';
   index?: number;
@@ -119,6 +121,14 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
           )}
         </div>
       </div>
+
+      {/* Sponsor badge */}
+      {event.sponsorAddress && (
+        <div className="relative flex items-center gap-1 mt-1 text-[10px] text-amber-400">
+          <User size={10} />
+          <span>{t('sponsoredRaffle.sponsoredBy')} {event.sponsorNickname || `${event.sponsorAddress.slice(0, 8)}...`}</span>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="relative mt-3 flex items-center justify-between">

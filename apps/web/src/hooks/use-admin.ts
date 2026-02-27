@@ -984,3 +984,58 @@ export function useAdminRejectSponsored() {
     },
   });
 }
+
+// ─── Sponsored Raffle Admin ──────────────────────────────────────
+
+export interface PendingSponsoredRaffle {
+  id: string;
+  title: string;
+  description: string | null;
+  totalPrizePool: string;
+  startsAt: string;
+  endsAt: string;
+  sponsorAddress: string | null;
+  sponsorNickname: string | null;
+  pricePaid: string | null;
+  createdAt: string;
+}
+
+export function useAdminPendingSponsoredRaffles() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'events', 'sponsored', 'pending', address],
+    queryFn: () => adminFetch<PendingSponsoredRaffle[]>('/api/v1/admin/events/sponsored/pending', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminApproveSponsoredRaffle() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/events/${eventId}/approve-sponsored`, address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'events'] });
+    },
+  });
+}
+
+export function useAdminRejectSponsoredRaffle() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, reason }: { eventId: string; reason?: string }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/events/${eventId}/reject-sponsored`, address!, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'events'] });
+    },
+  });
+}

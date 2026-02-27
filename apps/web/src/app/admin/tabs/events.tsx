@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw } from 'lucide-react';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw, User } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
+import { useAdminPendingSponsoredRaffles, useAdminApproveSponsoredRaffle, useAdminRejectSponsoredRaffle } from '@/hooks/use-admin';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -63,6 +64,99 @@ const labelCls = 'text-[10px] font-bold uppercase text-[var(--color-text-seconda
 
 const shortAddr = (addr: string) =>
   addr.length > 15 ? `${addr.slice(0, 10)}...${addr.slice(-4)}` : addr;
+
+function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => void }) {
+  const { data: pending, isLoading } = useAdminPendingSponsoredRaffles();
+  const approveMut = useAdminApproveSponsoredRaffle();
+  const rejectMut = useAdminRejectSponsoredRaffle();
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  if (isLoading || !pending || pending.length === 0) return null;
+
+  const handleApprove = async (eventId: string) => {
+    if (!window.confirm('Approve this sponsored raffle? It will be activated (or scheduled).')) return;
+    await approveMut.mutateAsync(eventId);
+    onRefreshEvents();
+  };
+
+  const handleReject = async (eventId: string) => {
+    await rejectMut.mutateAsync({ eventId, reason: rejectReason || undefined });
+    setRejectingId(null);
+    setRejectReason('');
+    onRefreshEvents();
+  };
+
+  const fmtDate = (iso: string) => {
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  };
+
+  return (
+    <div className="rounded-xl border-2 border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+      <div className="flex items-center gap-2 mb-1">
+        <Trophy size={14} className="text-amber-400" />
+        <span className="text-xs font-bold text-amber-400">Pending Sponsored Raffles ({pending.length})</span>
+      </div>
+      {pending.map((r) => (
+        <div key={r.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold">{r.title}</div>
+              {r.description && <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{r.description}</div>}
+              <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] text-[var(--color-text-secondary)]">
+                <span>{fmtDate(r.startsAt)} — {fmtDate(r.endsAt)}</span>
+                <span className="font-bold text-[var(--color-success)]">Prize: {formatLaunch(r.totalPrizePool)} LAUNCH</span>
+                {r.pricePaid && <span>Paid: {formatLaunch(r.pricePaid)} LAUNCH</span>}
+              </div>
+              {(r.sponsorNickname || r.sponsorAddress) && (
+                <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--color-text-secondary)]">
+                  <User size={10} />
+                  <span>Sponsor: {r.sponsorNickname || shortAddr(r.sponsorAddress ?? '')}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleApprove(r.id)}
+                disabled={approveMut.isPending}
+                className="rounded-lg bg-[var(--color-success)] px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+              >
+                {approveMut.isPending ? '...' : 'Approve'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRejectingId(rejectingId === r.id ? null : r.id)}
+                disabled={rejectMut.isPending}
+                className="rounded-lg bg-[var(--color-danger)] px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-40"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+          {rejectingId === r.id && (
+            <div className="flex items-center gap-2">
+              <input
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Rejection reason (optional)"
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleReject(r.id)}
+                disabled={rejectMut.isPending}
+                className="rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-40"
+              >
+                {rejectMut.isPending ? '...' : 'Confirm Reject'}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function EventsTab() {
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -619,6 +713,9 @@ export function EventsTab() {
           Create Event
         </button>
       </div>
+
+      {/* Pending Sponsored Raffles */}
+      <PendingSponsoredRaffles onRefreshEvents={fetchEvents} />
 
       {/* Create Event Modal */}
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Edit Event' : 'Create Event'}>

@@ -912,5 +912,24 @@
   },
   "announcement": {
     "sponsor": "Спонсор"
+  },
+  "sponsoredRaffle": {
+    "title": "Создать розыгрыш",
+    "button": "Создать розыгрыш",
+    "serviceFee": "Комиссия",
+    "prizePool": "Призовой фонд",
+    "total": "Итого",
+    "fieldTitle": "Заголовок",
+    "titlePlaceholder": "Название розыгрыша...",
+    "fieldDescription": "Описание",
+    "descPlaceholder": "Опишите, о чём этот розыгрыш...",
+    "fieldPrize": "Сумма приза (LAUNCH)",
+    "fieldStartTime": "Время начала",
+    "fieldDuration": "Длительность",
+    "submit": "Отправить розыгрыш",
+    "submitted": "Розыгрыш отправлен!",
+    "submittedDesc": "Ваш розыгрыш передан на проверку администратору. Если одобрен — появится в списке событий. Если отклонён — средства вернутся на игровой баланс.",
+    "errorMinPrize": "Минимальный приз — 1 LAUNCH",
+    "sponsoredBy": "Спонсор"
   }
 }

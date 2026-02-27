@@ -17,6 +17,11 @@ export const events = pgTable(
     results: jsonb('results'),
     raffleSeed: text('raffle_seed'),
     createdBy: text('created_by').notNull(), // admin address
+    userId: uuid('user_id').references(() => users.id), // sponsor user (null = admin event)
+    sponsoredStatus: text('sponsored_status'), // null | 'pending' | 'approved' | 'rejected'
+    pricePaid: numeric('price_paid', { precision: 38, scale: 0 }),
+    rejectedReason: text('rejected_reason'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
