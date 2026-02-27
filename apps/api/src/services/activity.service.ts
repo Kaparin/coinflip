@@ -54,6 +54,10 @@ class ActivityService {
             'opponentNickname', CASE WHEN b.winner_user_id = b.maker_user_id
               THEN (SELECT profile_nickname FROM users WHERE id = b.acceptor_user_id)
               ELSE (SELECT profile_nickname FROM users WHERE id = b.maker_user_id)
+            END,
+            'opponentVipTier', CASE WHEN b.winner_user_id = b.maker_user_id
+              THEN (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.acceptor_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1)
+              ELSE (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.maker_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1)
             END
           ) AS metadata
         FROM bets b
@@ -80,6 +84,10 @@ class ActivityService {
             'opponentNickname', CASE WHEN b.winner_user_id = b.maker_user_id
               THEN (SELECT profile_nickname FROM users WHERE id = b.maker_user_id)
               ELSE (SELECT profile_nickname FROM users WHERE id = b.acceptor_user_id)
+            END,
+            'opponentVipTier', CASE WHEN b.winner_user_id = b.maker_user_id
+              THEN (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.maker_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1)
+              ELSE (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.acceptor_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1)
             END
           ) AS metadata
         FROM bets b
@@ -102,6 +110,7 @@ class ActivityService {
             'level', rr.level,
             'fromPlayerAddress', (SELECT address FROM users WHERE id = rr.from_player_user_id),
             'fromPlayerNickname', (SELECT profile_nickname FROM users WHERE id = rr.from_player_user_id),
+            'fromPlayerVipTier', (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = rr.from_player_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1),
             'betId', rr.bet_id
           ) AS metadata
         FROM referral_rewards rr

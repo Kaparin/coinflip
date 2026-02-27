@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGetEventParticipants } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 import { Users, ChevronDown } from 'lucide-react';
@@ -87,8 +88,10 @@ export function RaffleParticipants({ eventId }: RaffleParticipantsProps) {
                   <span className="text-[10px] text-[var(--color-text-secondary)] w-5 text-right shrink-0">
                     {i + 1}
                   </span>
-                  <UserAvatar address={addr} size={24} />
-                  <span className="text-xs font-medium">
+                  <VipAvatarFrame tier={p.vip_tier as string | null}>
+                    <UserAvatar address={addr} size={24} />
+                  </VipAvatarFrame>
+                  <span className={`text-xs font-medium ${getVipNameClass(p.vip_tier as string | null)}`}>
                     {nickname ?? shortAddr(addr)}
                     {isCurrentUser && <span className="ml-1 text-amber-400">({t('leaderboard.you')})</span>}
                   </span>

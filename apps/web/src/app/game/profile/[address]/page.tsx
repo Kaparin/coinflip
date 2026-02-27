@@ -7,6 +7,8 @@ import { useUserAnnouncements } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
+import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
 import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone } from 'lucide-react';
@@ -490,15 +492,18 @@ export default function PlayerProfilePage() {
       {/* Hero card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">
-          <div className="relative shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]">
+          <VipAvatarFrame tier={profile.vip_tier} className="relative shrink-0">
             <div className="rounded-full overflow-hidden bg-[var(--color-bg)]">
               <UserAvatar address={profile.address} size={56} />
             </div>
-          </div>
+          </VipAvatarFrame>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold truncate">
-              {profile.nickname || truncAddr(profile.address)}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className={`text-lg font-bold truncate ${getVipNameClass(profile.vip_tier)}`}>
+                {profile.nickname || truncAddr(profile.address)}
+              </h1>
+              <VipBadge tier={profile.vip_tier} />
+            </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-[var(--color-text-secondary)] font-mono truncate">
                 {truncAddr(profile.address)}
@@ -844,6 +849,7 @@ export default function PlayerProfilePage() {
               const isMaker = bet.maker_user_id === rawAddress || bet.maker.toLowerCase() === rawAddress.toLowerCase();
               const opponentAddr = isMaker ? bet.acceptor : bet.maker;
               const opponentNick = isMaker ? bet.acceptor_nickname : bet.maker_nickname;
+              const opponentVipTier = isMaker ? bet.acceptor_vip_tier : bet.maker_vip_tier;
 
               return (
                 <div
@@ -872,8 +878,10 @@ export default function PlayerProfilePage() {
                         href={`/game/profile/${opponentAddr}`}
                         className="flex items-center gap-1 mt-0.5 group/opponent"
                       >
-                        <UserAvatar address={opponentAddr} size={12} />
-                        <span className="text-[10px] text-[var(--color-text-secondary)] group-hover/opponent:text-[var(--color-text)] transition-colors truncate">
+                        <VipAvatarFrame tier={opponentVipTier}>
+                          <UserAvatar address={opponentAddr} size={12} />
+                        </VipAvatarFrame>
+                        <span className={`text-[10px] text-[var(--color-text-secondary)] group-hover/opponent:text-[var(--color-text)] transition-colors truncate ${getVipNameClass(opponentVipTier)}`}>
                           {t('playerProfile.vs')} {opponentNick || truncAddr(opponentAddr)}
                         </span>
                       </Link>

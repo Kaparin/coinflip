@@ -5,6 +5,7 @@ import { useLeaderboard, type LeaderboardEntry } from '@/hooks/use-leaderboard';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -61,9 +62,11 @@ function LeaderboardRow({
 
       {/* Player info */}
       <div className="flex items-center gap-2 min-w-0">
-        <UserAvatar address={entry.address} size={28} />
+        <VipAvatarFrame tier={entry.vip_tier}>
+          <UserAvatar address={entry.address} size={28} />
+        </VipAvatarFrame>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors">
+          <p className={`text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors ${getVipNameClass(entry.vip_tier)}`}>
             {entry.nickname || shortAddr(entry.address)}
             {isCurrentUser && (
               <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>

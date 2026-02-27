@@ -3,6 +3,7 @@
 import { useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 import { Trophy, CheckCircle, Crown } from 'lucide-react';
@@ -88,8 +89,12 @@ export function EventResults({ eventId }: EventResultsProps) {
             <div className="relative flex items-center gap-3">
               <span className={isFirst ? 'text-xl' : 'text-lg'}>{RANK_ICONS[rank] ?? `#${rank}`}</span>
               <div className="flex items-center gap-2">
-                <UserAvatar address={addr} size={isFirst ? 32 : 28} />
-                <span className={`font-medium ${isFirst ? 'text-base' : 'text-sm'}`}>{shortAddr(addr)}</span>
+                <VipAvatarFrame tier={winner.vip_tier as string | null}>
+                  <UserAvatar address={addr} size={isFirst ? 32 : 28} />
+                </VipAvatarFrame>
+                <span className={`font-medium ${isFirst ? 'text-base' : 'text-sm'} ${getVipNameClass(winner.vip_tier as string | null)}`}>
+                  {(winner.nickname as string) || shortAddr(addr)}
+                </span>
               </div>
             </div>
             <div className="relative flex items-center gap-2">

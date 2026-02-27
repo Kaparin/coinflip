@@ -15,8 +15,10 @@ export interface PlayerBet {
   maker_user_id: string;
   maker: string;
   maker_nickname: string | null;
+  maker_vip_tier: string | null;
   acceptor: string | null;
   acceptor_nickname: string | null;
+  acceptor_vip_tier: string | null;
   is_win: boolean;
 }
 
@@ -61,6 +63,7 @@ export interface PlayerProfile {
   address: string;
   nickname: string | null;
   avatar_url: string | null;
+  vip_tier: string | null;
   created_at: string;
   stats: {
     total_bets: number;

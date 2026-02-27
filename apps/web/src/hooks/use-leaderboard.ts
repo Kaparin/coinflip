@@ -11,6 +11,7 @@ export interface LeaderboardEntry {
   wins: number;
   total_wagered: string;
   win_rate: number;
+  vip_tier: string | null;
 }
 
 type SortBy = 'wins' | 'wagered' | 'win_rate';

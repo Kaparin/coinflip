@@ -37,6 +37,17 @@ export class UserService {
     });
   }
 
+  /** Get active VIP tier for a user (null if no active subscription) */
+  async getVipTier(userId: string): Promise<string | null> {
+    const rows = await this.db.execute(sql`
+      SELECT tier FROM vip_subscriptions
+      WHERE user_id = ${userId} AND expires_at > NOW() AND canceled_at IS NULL
+      ORDER BY expires_at DESC LIMIT 1
+    `);
+    const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<{ tier: string }>;
+    return rawRows[0]?.tier ?? null;
+  }
+
   /**
    * Find user by Telegram ID. Returns the most recently linked wallet user.
    * If multiple wallets have the same TG, returns the one with a real address first,
@@ -277,6 +288,7 @@ export class UserService {
       select
         u.address,
         u.profile_nickname as nickname,
+        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
         count(*)::int as total_bets,
         sum(p.is_win)::int as wins,
         sum(p.amount)::text as total_wagered,
@@ -299,6 +311,7 @@ export class UserService {
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<{
       address: string;
       nickname: string | null;
+      vip_tier: string | null;
       total_bets: number;
       wins: number;
       total_wagered: string;
@@ -309,6 +322,7 @@ export class UserService {
       rank: i + 1,
       address: row.address,
       nickname: row.nickname,
+      vip_tier: row.vip_tier ?? null,
       total_bets: Number(row.total_bets),
       wins: Number(row.wins),
       total_wagered: row.total_wagered ?? '0',
@@ -339,8 +353,10 @@ export class UserService {
           b.acceptor_user_id::text as acceptor_user_id,
           maker.address as maker,
           maker.profile_nickname as maker_nickname,
+          (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.maker_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS maker_vip_tier,
           acceptor.address as acceptor,
-          acceptor.profile_nickname as acceptor_nickname
+          acceptor.profile_nickname as acceptor_nickname,
+          (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.acceptor_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS acceptor_vip_tier
         from bets b
         join users maker on maker.id = b.maker_user_id
         left join users acceptor on acceptor.id = b.acceptor_user_id
@@ -366,8 +382,10 @@ export class UserService {
       maker_user_id: String(r.maker_user_id),
       maker: String(r.maker),
       maker_nickname: r.maker_nickname ? String(r.maker_nickname) : null,
+      maker_vip_tier: r.maker_vip_tier ? String(r.maker_vip_tier) : null,
       acceptor: r.acceptor ? String(r.acceptor) : null,
       acceptor_nickname: r.acceptor_nickname ? String(r.acceptor_nickname) : null,
+      acceptor_vip_tier: r.acceptor_vip_tier ? String(r.acceptor_vip_tier) : null,
       is_win: r.winner_user_id === userId,
     }));
 
@@ -408,6 +426,7 @@ export class UserService {
   async getTopWinner(): Promise<{
     address: string;
     nickname: string | null;
+    vip_tier: string | null;
     amount: string;
     payout: string;
     resolved_at: string | null;
@@ -416,6 +435,7 @@ export class UserService {
       select
         u.address,
         u.profile_nickname as nickname,
+        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
         b.amount::text as amount,
         b.payout_amount::text as payout,
         b.resolved_time as resolved_at
@@ -431,6 +451,7 @@ export class UserService {
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<{
       address: string;
       nickname: string | null;
+      vip_tier: string | null;
       amount: string;
       payout: string;
       resolved_at: string | null;
@@ -441,6 +462,7 @@ export class UserService {
     return {
       address: row.address,
       nickname: row.nickname,
+      vip_tier: row.vip_tier ?? null,
       amount: row.amount,
       payout: row.payout,
       resolved_at: row.resolved_at ? String(row.resolved_at) : null,

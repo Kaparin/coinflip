@@ -328,22 +328,22 @@ class EventsService {
 
   async getParticipants(eventId: string, limit = 100, offset = 0) {
     const db = getDb();
-    return db
-      .select({
-        userId: eventParticipants.userId,
-        address: users.address,
-        nickname: users.profileNickname,
-        status: eventParticipants.status,
-        joinedAt: eventParticipants.joinedAt,
-        finalRank: eventParticipants.finalRank,
-        prizeAmount: eventParticipants.prizeAmount,
-      })
-      .from(eventParticipants)
-      .innerJoin(users, eq(users.id, eventParticipants.userId))
-      .where(eq(eventParticipants.eventId, eventId))
-      .orderBy(asc(eventParticipants.joinedAt))
-      .limit(limit)
-      .offset(offset);
+    return db.execute(sql`
+      SELECT
+        ep.user_id AS "userId",
+        u.address,
+        u.profile_nickname AS nickname,
+        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        ep.status,
+        ep.joined_at AS "joinedAt",
+        ep.final_rank AS "finalRank",
+        ep.prize_amount AS "prizeAmount"
+      FROM event_participants ep
+      INNER JOIN users u ON u.id = ep.user_id
+      WHERE ep.event_id = ${eventId}
+      ORDER BY ep.joined_at ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
   }
 
   // ─── Contest Leaderboard ───────────────────────────────
@@ -411,6 +411,7 @@ class EventsService {
             AND ${minBetFilter}
         )
         SELECT pb.user_id, u.address, u.profile_nickname AS nickname,
+               (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
                SUM(pb.amount)::text AS turnover,
                SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END)::int AS wins,
                (SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount))::text AS profit,

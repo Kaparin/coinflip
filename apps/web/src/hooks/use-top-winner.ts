@@ -9,6 +9,7 @@ export interface TopWinner {
   amount: string;
   payout: string;
   resolved_at: string | null;
+  vip_tier: string | null;
 }
 
 export function useTopWinner() {

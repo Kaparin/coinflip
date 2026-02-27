@@ -2,7 +2,8 @@
 
 import { useTopWinner } from '@/hooks/use-top-winner';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
 import { Crown, ChevronRight } from 'lucide-react';
@@ -34,12 +35,14 @@ export function TopWinnerBanner() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/[0.04] to-transparent animate-shimmer pointer-events-none" />
 
         <div className="relative flex items-center gap-3 px-3.5 py-2.5">
-          {/* Crown icon with glow */}
+          {/* Avatar with VIP frame */}
           <div className="relative shrink-0">
             <div className="absolute -inset-1.5 rounded-full bg-amber-400/10 blur-md" />
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/10 border border-amber-500/25">
-              <Crown size={17} className="text-amber-400" />
-            </div>
+            <VipAvatarFrame tier={winner.vip_tier}>
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-full overflow-hidden">
+                <UserAvatar address={winner.address} size={36} />
+              </div>
+            </VipAvatarFrame>
           </div>
 
           {/* Content */}
@@ -48,7 +51,7 @@ export function TopWinnerBanner() {
               {t('topWinner.title')}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold truncate max-w-[120px] group-hover:text-amber-400 transition-colors">
+              <span className={`text-sm font-bold truncate max-w-[120px] group-hover:text-amber-400 transition-colors ${getVipNameClass(winner.vip_tier)}`}>
                 {displayName}
               </span>
               <span className="text-[10px] text-[var(--color-text-secondary)]">

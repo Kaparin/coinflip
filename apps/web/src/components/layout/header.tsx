@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useGetVaultBalance, useGetActiveEvents } from '@coinflip/api-client';
@@ -203,7 +204,11 @@ export function Header() {
               <div className="relative" ref={dropdownRef}>
                 <button type="button" onClick={() => setWalletDropdownOpen(!walletDropdownOpen)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
-                  {wallet.address && <UserAvatar address={wallet.address} size={24} />}
+                  {wallet.address && (
+                    <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null}>
+                      <UserAvatar address={wallet.address} size={24} />
+                    </VipAvatarFrame>
+                  )}
                   <span className="font-mono text-xs">{wallet.shortAddress ?? ''}</span>
                   <ChevronDown size={12} className={`text-[var(--color-text-secondary)] transition-transform ${walletDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -214,7 +219,11 @@ export function Header() {
                     {/* Profile header */}
                     <div className="px-4 py-3 border-b border-[var(--color-border)]">
                       <div className="flex items-center gap-3">
-                        {wallet.address && <UserAvatar address={wallet.address} size={36} />}
+                        {wallet.address && (
+                          <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null}>
+                            <UserAvatar address={wallet.address} size={36} />
+                          </VipAvatarFrame>
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-mono break-all leading-relaxed">{wallet.address}</p>
                         </div>

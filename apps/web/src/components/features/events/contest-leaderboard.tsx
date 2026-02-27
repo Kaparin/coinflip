@@ -4,6 +4,7 @@ import { useGetEventLeaderboard } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 
@@ -93,9 +94,11 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
 
             {/* Player info */}
             <div className="flex items-center gap-2 min-w-0">
-              <UserAvatar address={addr} size={isTopThree ? 28 : 24} />
+              <VipAvatarFrame tier={entry.vip_tier as string | null}>
+                <UserAvatar address={addr} size={isTopThree ? 28 : 24} />
+              </VipAvatarFrame>
               <div className="min-w-0">
-                <p className={`font-medium truncate ${rank === 1 ? 'text-sm' : 'text-xs'}`}>
+                <p className={`font-medium truncate ${rank === 1 ? 'text-sm' : 'text-xs'} ${getVipNameClass(entry.vip_tier as string | null)}`}>
                   {nickname ?? shortAddr(addr)}
                   {isCurrentUser && <span className="ml-1 text-indigo-400">({t('leaderboard.you')})</span>}
                 </p>

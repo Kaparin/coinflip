@@ -18,10 +18,11 @@ export const usersRouter = new Hono<AppEnv>();
 // GET /api/v1/users/me — Current user profile with real stats (auth required)
 usersRouter.get('/me', authMiddleware, async (c) => {
   const user = c.get('user');
-  const [session, balance, stats] = await Promise.all([
+  const [session, balance, stats, vipTier] = await Promise.all([
     userService.getActiveSession(user.id),
     vaultService.getBalance(user.id),
     userService.getUserStats(user.id),
+    userService.getVipTier(user.id),
   ]);
 
   return c.json({
@@ -29,6 +30,7 @@ usersRouter.get('/me', authMiddleware, async (c) => {
       address: user.address,
       nickname: user.profileNickname,
       avatar_url: user.avatarUrl,
+      vip_tier: vipTier,
       stats,
       vault: balance,
       authz_enabled: session?.authzEnabled ?? false,
@@ -202,11 +204,12 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
   if (!user) throw Errors.userNotFound();
 
   const db = getDb();
-  const [stats, recentBetsResult, achievements, reactions, jackpotWins] = await Promise.all([
+  const [stats, recentBetsResult, achievements, reactions, vipTier, jackpotWins] = await Promise.all([
     userService.getUserStats(user.id),
     userService.getPlayerRecentBets(user.id, limit, offset),
     userService.getUserAchievements(user.id),
     userService.getProfileReactions(user.id),
+    userService.getVipTier(user.id),
     db
       .select({
         tierName: jackpotTiers.name,
@@ -237,6 +240,7 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       address: user.address,
       nickname: user.profileNickname,
       avatar_url: user.avatarUrl,
+      vip_tier: vipTier,
       created_at: user.createdAt.toISOString(),
       stats,
       recent_bets: recentBetsResult.bets,
