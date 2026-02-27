@@ -62,6 +62,8 @@ function mapChainErrorMessage(msg: string, t: TFunction): string {
   if (msg.includes('reveal timeout')) return t('errors.chainTxFailed');
   if (msg.includes('gas fee payment') || msg.includes('contact support')) return t('errors.gasFeeIssue');
   if (msg.includes('transaction ordering')) return t('errors.chainTxFailed');
+  if (msg.includes('gas authorization expired') || msg.includes('re-authorize 1-click') || msg.includes('fee-grant') || msg.includes('fee grant')) return t('errors.gasAuthExpired');
+  if (msg.includes('authorization expired') || msg.includes('grant not found') || msg.includes('grant expired')) return t('errors.authzExpired');
   return t('errors.chainTxFailed');
 }
 

@@ -31,6 +31,8 @@ function sanitizeChainError(rawLog?: string): string {
     [/reveal.*timeout.*expired/i, 'Reveal timeout has expired'],
     [/account sequence mismatch/i, 'Transaction ordering issue — please retry'],
     [/too many open bets|max.*open.*bets|open bets.*max/i, 'Maximum open bets reached'],
+    [/fee-grant not found|fee grant.*not found|not allowed.*fee grant|granter.*does not allow/i, 'Gas authorization expired. Please re-authorize 1-Click Play in your wallet settings.'],
+    [/grant not found|authorization not found|grant.*expired/i, 'Authorization expired. Please re-authorize 1-Click Play.'],
   ];
 
   for (const [pattern, message] of userMessages) {
