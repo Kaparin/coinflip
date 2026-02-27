@@ -43,6 +43,8 @@ export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }:
             return typeof key === 'string' && key.startsWith('/api/v1/events');
           },
         });
+        // Invalidate balance cache — joining a raffle may deduct entry fee
+        queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
       },
       onError: (err: unknown) => {
         const msg = extractErrorMessage(err) ?? t('errors.somethingWentWrong');

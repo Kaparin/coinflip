@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
-import { Coins } from 'lucide-react';
+import { Coins, Zap, Pin } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
 import { useTranslation } from '@/lib/i18n';
 import { useBoostBet, usePinBet, useVipStatus, usePinSlots } from '@/hooks/use-vip';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
@@ -38,6 +39,10 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const { data: pinSlots } = usePinSlots();
   const boostMutation = useBoostBet();
   const pinMutation = usePinBet();
+
+  // Confirmation modal state for boost/pin
+  const [boostTarget, setBoostTarget] = useState<string | null>(null);
+  const [pinTarget, setPinTarget] = useState<{ betId: string; slot: number; price: string } | null>(null);
 
   // Smart polling: slow (30s) when WS connected, faster (15s) when WS down
   const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
@@ -478,8 +483,8 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                   return renderBetCard(bet, {
                     isMine: true,
                     withCancel: true,
-                    onBoost: (id) => boostMutation.mutate(id),
-                    onPin: cheapestSlot ? (id) => pinMutation.mutate({ betId: id, slot: cheapestSlot.slot }) : undefined,
+                    onBoost: (id) => setBoostTarget(id),
+                    onPin: cheapestSlot ? (id) => setPinTarget({ betId: id, slot: cheapestSlot.slot, price: cheapestSlot.outbidPrice }) : undefined,
                     canBoost,
                     pinPrice: cheapestSlot?.outbidPrice ?? null,
                     isBoostPending: boostMutation.isPending,
@@ -527,6 +532,90 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
           <p className="text-xs text-[var(--color-text-secondary)]/60">{t('myBets.createToStart')}</p>
         </div>
       )}
+
+      {/* Boost confirmation modal */}
+      <Modal open={!!boostTarget} onClose={() => setBoostTarget(null)} title={t('boost.title')}>
+        {boostTarget && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10 p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-400">
+                <Zap size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{t('boost.title')}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {vipStatus?.boostLimit === null
+                    ? t('boost.unlimited')
+                    : t('boost.remaining', { used: vipStatus?.boostsUsedToday ?? 0, limit: vipStatus?.boostLimit ?? 3 })}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBoostTarget(null)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98]"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={boostMutation.isPending}
+                onClick={() => {
+                  boostMutation.mutate(boostTarget);
+                  setBoostTarget(null);
+                }}
+                className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-3 text-sm font-bold text-white transition-all hover:from-indigo-400 hover:to-violet-400 hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] active:scale-[0.98]"
+              >
+                {t('boost.title')}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Pin confirmation modal */}
+      <Modal open={!!pinTarget} onClose={() => setPinTarget(null)} title={t('pin.title')}>
+        {pinTarget && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+                <Pin size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{t('pin.title')}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {t('pin.outbidPrice', { price: formatLaunch(pinTarget.price) })}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+              <p>• {t('pin.noRefund')}</p>
+              <p>• {t('pin.expireRefund')}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPinTarget(null)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98]"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={pinMutation.isPending}
+                onClick={() => {
+                  pinMutation.mutate({ betId: pinTarget.betId, slot: pinTarget.slot });
+                  setPinTarget(null);
+                }}
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] active:scale-[0.98]"
+              >
+                {formatLaunch(pinTarget.price)} LAUNCH
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

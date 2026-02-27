@@ -165,20 +165,26 @@ class AnnouncementService {
     if (!ann) return;
 
     // Insert notifications for all users via INSERT...SELECT (no memory load)
-    await db.execute(sql`
-      INSERT INTO user_notifications (user_id, type, title, message, metadata)
-      SELECT
-        u.id,
-        'announcement',
-        ${ann.title},
-        ${ann.message},
-        ${JSON.stringify({ announcementId: ann.id, priority: ann.priority })}::jsonb
-      FROM users u
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO user_notifications (user_id, type, title, message, metadata)
+        SELECT
+          u.id,
+          'announcement',
+          ${ann.title},
+          ${ann.message},
+          ${JSON.stringify({ announcementId: ann.id, priority: ann.priority })}::jsonb
+        FROM users u
+      `);
+    } catch (err) {
+      logger.error({ err, announcementId }, 'Failed to insert announcement notifications');
+    }
 
-    // Get count separately
-    const [countRow] = await db.execute(sql`SELECT count(*)::int AS cnt FROM users`) as unknown as [{ cnt: number }];
-    const sentCount = countRow?.cnt ?? 0;
+    // Get count via Drizzle type-safe query (avoids raw SQL casting issues)
+    const countResult = await db
+      .select({ cnt: sql<number>`count(*)::int` })
+      .from(users);
+    const sentCount = countResult[0]?.cnt ?? 0;
 
     await db
       .update(announcements)
@@ -243,13 +249,23 @@ class AnnouncementService {
     return pending.length;
   }
 
-  /** Soft delete an announcement (admin) */
+  /** Soft delete an announcement (admin) + mark related notifications as read */
   async deleteAnnouncement(announcementId: string) {
     const db = getDb();
     await db
       .update(announcements)
       .set({ status: 'deleted' })
       .where(eq(announcements.id, announcementId));
+
+    // Mark all unread notifications for this announcement as read
+    // so users don't see deleted announcement popups
+    await db.execute(sql`
+      UPDATE user_notifications
+      SET read = true
+      WHERE type = 'announcement'
+        AND read = false
+        AND metadata->>'announcementId' = ${announcementId}
+    `);
   }
 
   /** Get published announcements by user address (for profile page) */
