@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Puzzle, User, Trophy } from 'lucide-react';
+import { Puzzle, User, Trophy, Newspaper } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetActiveEvents } from '@coinflip/api-client';
 import { useTranslation } from '@/lib/i18n';
@@ -12,6 +12,11 @@ const NAV_ITEMS = [
     href: '/game',
     labelKey: 'nav.play' as const,
     icon: <Puzzle size={20} />,
+  },
+  {
+    href: '/game/news',
+    labelKey: 'nav.news' as const,
+    icon: <Newspaper size={20} />,
   },
   {
     href: '/game/profile',

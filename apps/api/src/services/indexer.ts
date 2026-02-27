@@ -21,6 +21,7 @@ import { eventService } from './event.service.js';
 import { referralService } from './referral.service.js';
 import { vaultService } from './vault.service.js';
 import { jackpotService } from './jackpot.service.js';
+import { partnerService } from './partner.service.js';
 import type { Database } from '@coinflip/db';
 import type { WsEventType } from '@coinflip/shared/types';
 
@@ -491,6 +492,9 @@ export class IndexerService {
           // Contribute to jackpot pools (idempotent via unique constraint)
           await this.processJackpotContribution(BigInt(betId));
 
+          // Distribute partner commission (idempotent via unique constraint)
+          await this.processPartnerCommission(BigInt(betId));
+
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
         }
@@ -586,6 +590,9 @@ export class IndexerService {
 
           // Contribute to jackpot pools (idempotent via unique constraint)
           await this.processJackpotContribution(BigInt(betId));
+
+          // Distribute partner commission (idempotent via unique constraint)
+          await this.processPartnerCommission(BigInt(betId));
 
           break;
         }
@@ -804,10 +811,11 @@ export class IndexerService {
             .set(updateData)
             .where(eq(bets.betId, bet.betId));
 
-          // If bet was resolved (revealed/timeout_claimed), distribute referral rewards + jackpot
+          // If bet was resolved (revealed/timeout_claimed), distribute referral rewards + jackpot + partner
           if (mappedStatus === 'revealed' || mappedStatus === 'timeout_claimed') {
             await this.distributeReferralRewardsForBet(bet.betId);
             await this.processJackpotContribution(bet.betId);
+            await this.processPartnerCommission(bet.betId);
           }
 
           synced++;
@@ -881,6 +889,32 @@ export class IndexerService {
       await jackpotService.processBetContribution(betId, totalPot);
     } catch (err) {
       logger.warn({ err, betId: betId.toString() }, 'Indexer: jackpot contribution failed');
+    }
+  }
+
+  /**
+   * Process partner commission for a resolved bet.
+   * Idempotent — partnerService checks unique constraint on (partner_id, bet_id).
+   */
+  private async processPartnerCommission(betId: bigint): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      const { bets } = await import('@coinflip/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const [bet] = await this.db
+        .select({ amount: bets.amount })
+        .from(bets)
+        .where(eq(bets.betId, betId))
+        .limit(1);
+
+      if (!bet) return;
+
+      const totalPot = BigInt(bet.amount) * 2n;
+      await partnerService.processBetCommission(betId, totalPot);
+    } catch (err) {
+      logger.warn({ err, betId: betId.toString() }, 'Indexer: partner commission failed');
     }
   }
 

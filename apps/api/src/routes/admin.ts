@@ -16,6 +16,10 @@ import { getCoinFlipStats } from './bets.js';
 import { jackpotService } from '../services/jackpot.service.js';
 import { vipService } from '../services/vip.service.js';
 import { wsService } from '../services/ws.service.js';
+import { configService } from '../services/config.service.js';
+import { partnerService } from '../services/partner.service.js';
+import { newsService } from '../services/news.service.js';
+import { announcementService } from '../services/announcement.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
@@ -867,14 +871,16 @@ const AnnouncementListSchema = z.object({
   offset: z.coerce.number().min(0).default(0),
 });
 
-// GET /admin/announcements — list past announcements
+// GET /admin/announcements — list past announcements (exclude deleted)
 adminRouter.get('/announcements', zValidator('query', AnnouncementListSchema), async (c) => {
   const { limit, offset } = c.req.valid('query');
   const db = getDb();
 
+  const notDeleted = sql`${announcements.status} != 'deleted'`;
+
   const [rows, countResult] = await Promise.all([
-    db.select().from(announcements).orderBy(desc(announcements.createdAt)).limit(limit).offset(offset),
-    db.select({ count: sql<number>`count(*)::int` }).from(announcements),
+    db.select().from(announcements).where(notDeleted).orderBy(desc(announcements.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)::int` }).from(announcements).where(notDeleted),
   ]);
 
   return c.json({
@@ -883,7 +889,11 @@ adminRouter.get('/announcements', zValidator('query', AnnouncementListSchema), a
       title: r.title,
       message: r.message,
       priority: r.priority,
+      status: r.status,
       sentCount: r.sentCount,
+      userId: r.userId,
+      scheduledAt: r.scheduledAt?.toISOString() ?? null,
+      pricePaid: r.pricePaid,
       createdAt: r.createdAt.toISOString(),
     })),
     pagination: {
@@ -894,6 +904,41 @@ adminRouter.get('/announcements', zValidator('query', AnnouncementListSchema), a
     },
   });
 });
+
+// DELETE /admin/announcements/:id — soft delete
+adminRouter.delete('/announcements/:id', async (c) => {
+  const id = c.req.param('id');
+  await announcementService.deleteAnnouncement(id);
+  logger.info({ announcementId: id, admin: c.get('address') }, 'admin: announcement deleted');
+  return c.json({ data: { status: 'ok' } });
+});
+
+// GET /admin/announcements/pending — pending sponsored requests
+adminRouter.get('/announcements/pending', async (c) => {
+  const pending = await announcementService.getPending();
+  return c.json({ data: pending });
+});
+
+// POST /admin/announcements/:id/approve — approve sponsored
+adminRouter.post('/announcements/:id/approve', async (c) => {
+  const id = c.req.param('id');
+  const result = await announcementService.approveSponsored(id);
+  logger.info({ announcementId: id, admin: c.get('address') }, 'admin: sponsored announcement approved');
+  return c.json({ data: result });
+});
+
+// POST /admin/announcements/:id/reject — reject sponsored
+adminRouter.post(
+  '/announcements/:id/reject',
+  zValidator('json', z.object({ reason: z.string().optional() })),
+  async (c) => {
+    const id = c.req.param('id');
+    const { reason } = c.req.valid('json');
+    const result = await announcementService.rejectSponsored(id, reason);
+    logger.info({ announcementId: id, reason, admin: c.get('address') }, 'admin: sponsored announcement rejected');
+    return c.json({ data: result });
+  },
+);
 
 // ═══════════════════════════════════════════
 // VIP Administration
@@ -954,5 +999,216 @@ adminRouter.put('/vip/config', zValidator('json', AdminUpdateVipConfigSchema), a
   const body = c.req.valid('json');
   await vipService.updateConfig(body.tier, { price: body.price, isActive: body.isActive });
   logger.info({ ...body, admin: c.get('address') }, 'admin: VIP config updated');
+  return c.json({ data: { status: 'ok' } });
+});
+
+// ═══════════════════════════════════════════
+// Platform Config
+// ═══════════════════════════════════════════
+
+// GET /admin/config — all config entries
+adminRouter.get('/config', async (c) => {
+  const entries = await configService.getAll();
+  return c.json({ data: entries });
+});
+
+// GET /admin/config/:category — config by category
+adminRouter.get('/config/:category', async (c) => {
+  const category = c.req.param('category');
+  const entries = await configService.getByCategory(category);
+  return c.json({ data: entries });
+});
+
+// PUT /admin/config/:key — update single config value
+adminRouter.put(
+  '/config/:key',
+  zValidator('json', z.object({ value: z.string() })),
+  async (c) => {
+    const key = c.req.param('key');
+    const { value } = c.req.valid('json');
+    await configService.set(key, value, c.get('address'));
+    return c.json({ data: { status: 'ok' } });
+  },
+);
+
+// PUT /admin/config — bulk update config
+adminRouter.put(
+  '/config',
+  zValidator('json', z.object({
+    entries: z.array(z.object({ key: z.string(), value: z.string() })),
+  })),
+  async (c) => {
+    const { entries } = c.req.valid('json');
+    await configService.bulkSet(entries, c.get('address'));
+    return c.json({ data: { status: 'ok', updated: entries.length } });
+  },
+);
+
+// POST /admin/maintenance/toggle — toggle maintenance mode
+adminRouter.post('/maintenance/toggle', async (c) => {
+  const current = await configService.isMaintenanceMode();
+  await configService.set('MAINTENANCE_MODE', String(!current), c.get('address'));
+  logger.info({ enabled: !current, admin: c.get('address') }, 'admin: maintenance mode toggled');
+  return c.json({ data: { enabled: !current } });
+});
+
+// ═══════════════════════════════════════════
+// Commission Distribution + Partners
+// ═══════════════════════════════════════════
+
+// GET /admin/commission/breakdown — current commission distribution
+adminRouter.get('/commission/breakdown', async (c) => {
+  const result = await configService.validateCommissionDistribution();
+  return c.json({ data: result });
+});
+
+// GET /admin/partners — list all partners
+adminRouter.get('/partners', async (c) => {
+  const partners = await partnerService.getAllPartners();
+  return c.json({ data: partners });
+});
+
+// POST /admin/partners — add new partner
+adminRouter.post(
+  '/partners',
+  zValidator('json', z.object({
+    name: z.string().min(1).max(100),
+    address: z.string().min(1),
+    bps: z.number().int().min(0).max(1000),
+  })),
+  async (c) => {
+    const { name, address, bps } = c.req.valid('json');
+    const partner = await partnerService.addPartner(name, address, bps);
+
+    // Validate commission distribution after adding
+    const validation = await configService.validateCommissionDistribution();
+    if (!validation.valid) {
+      // Rollback — deactivate the partner
+      await partnerService.deactivatePartner(partner.id);
+      return c.json({ error: { code: 'COMMISSION_OVERFLOW', message: validation.error } }, 400);
+    }
+
+    logger.info({ partnerId: partner.id, name, bps, admin: c.get('address') }, 'admin: partner added');
+    return c.json({ data: { id: partner.id, status: 'ok' } });
+  },
+);
+
+// PUT /admin/partners/:id — update partner
+adminRouter.put(
+  '/partners/:id',
+  zValidator('json', z.object({
+    name: z.string().min(1).max(100).optional(),
+    address: z.string().min(1).optional(),
+    bps: z.number().int().min(0).max(1000).optional(),
+    isActive: z.number().int().min(0).max(1).optional(),
+  })),
+  async (c) => {
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    await partnerService.updatePartner(id, body);
+
+    // Validate after update
+    const validation = await configService.validateCommissionDistribution();
+    if (!validation.valid) {
+      return c.json({ error: { code: 'COMMISSION_OVERFLOW', message: validation.error } }, 400);
+    }
+
+    logger.info({ partnerId: id, ...body, admin: c.get('address') }, 'admin: partner updated');
+    return c.json({ data: { status: 'ok' } });
+  },
+);
+
+// DELETE /admin/partners/:id — deactivate partner
+adminRouter.delete('/partners/:id', async (c) => {
+  const id = c.req.param('id');
+  await partnerService.deactivatePartner(id);
+  logger.info({ partnerId: id, admin: c.get('address') }, 'admin: partner deactivated');
+  return c.json({ data: { status: 'ok' } });
+});
+
+// GET /admin/partners/:id/ledger — partner earnings ledger
+adminRouter.get(
+  '/partners/:id/ledger',
+  zValidator('query', z.object({
+    limit: z.coerce.number().min(1).max(100).default(50),
+    offset: z.coerce.number().min(0).default(0),
+  })),
+  async (c) => {
+    const id = c.req.param('id');
+    const { limit, offset } = c.req.valid('query');
+    const result = await partnerService.getPartnerLedger(id, limit, offset);
+    return c.json({
+      data: result.rows,
+      pagination: { total: result.total, limit, offset, hasMore: offset + limit < result.total },
+    });
+  },
+);
+
+// GET /admin/partners/:id/stats — partner stats
+adminRouter.get('/partners/:id/stats', async (c) => {
+  const id = c.req.param('id');
+  const stats = await partnerService.getPartnerStats(id);
+  return c.json({ data: stats });
+});
+
+// ═══════════════════════════════════════════
+// News Posts
+// ═══════════════════════════════════════════
+
+const NewsListSchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+});
+
+// GET /admin/news — list all posts
+adminRouter.get('/news', zValidator('query', NewsListSchema), async (c) => {
+  const { limit, offset } = c.req.valid('query');
+  const result = await newsService.listPosts(limit, offset);
+  return c.json({
+    data: result.rows,
+    pagination: { total: result.total, limit, offset, hasMore: offset + limit < result.total },
+  });
+});
+
+// POST /admin/news — create news post
+adminRouter.post(
+  '/news',
+  zValidator('json', z.object({
+    type: z.enum(['update', 'announcement']).default('update'),
+    title: z.string().min(1).max(300),
+    content: z.string().min(1).max(5000),
+    priority: z.enum(['normal', 'important']).default('normal'),
+  })),
+  async (c) => {
+    const body = c.req.valid('json');
+    const post = await newsService.createPost(body);
+    logger.info({ postId: post.id, admin: c.get('address') }, 'admin: news post created');
+    return c.json({ data: { id: post.id } }, 201);
+  },
+);
+
+// PUT /admin/news/:id — update news post
+adminRouter.put(
+  '/news/:id',
+  zValidator('json', z.object({
+    title: z.string().min(1).max(300).optional(),
+    content: z.string().min(1).max(5000).optional(),
+    priority: z.enum(['normal', 'important']).optional(),
+    isPublished: z.number().int().min(0).max(1).optional(),
+  })),
+  async (c) => {
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    await newsService.updatePost(id, body);
+    logger.info({ postId: id, admin: c.get('address') }, 'admin: news post updated');
+    return c.json({ data: { status: 'ok' } });
+  },
+);
+
+// DELETE /admin/news/:id — delete news post
+adminRouter.delete('/news/:id', async (c) => {
+  const id = c.req.param('id');
+  await newsService.deletePost(id);
+  logger.info({ postId: id, admin: c.get('address') }, 'admin: news post deleted');
   return c.json({ data: { status: 'ok' } });
 });

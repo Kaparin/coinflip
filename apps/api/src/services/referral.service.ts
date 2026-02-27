@@ -11,6 +11,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import { randomBytes } from 'node:crypto';
+import { configService } from './config.service.js';
 
 /** Cost to change referral branch, in micro-LAUNCH (1000 LAUNCH = 1_000_000_000 micro) */
 const CHANGE_BRANCH_COST_MICRO = '1000000000';
@@ -18,25 +19,30 @@ const CHANGE_BRANCH_COST_MICRO = '1000000000';
 /**
  * Referral reward percentages from the TOTAL POT (2 × bet amount).
  * These come out of the 10% platform commission (1000 bps).
- *
- * Level 1 (direct): 3% of pot  → 30% of commission
- * Level 2:          1.5% of pot → 15% of commission
- * Level 3:          0.5% of pot →  5% of commission
- *
- * Max per-bet referral cap: 500 BPS (5% of pot = 50% of commission).
- * Both players' referral chains are processed, but total payout is capped
- * to ensure the platform always retains at least 50% of commission.
+ * Now configurable via platform_config table. Fallbacks below.
  */
-const REWARD_BPS_BY_LEVEL: Record<number, bigint> = {
-  1: 300n,  // 3%   (300 basis points)
-  2: 150n,  // 1.5% (150 basis points)
-  3: 50n,   // 0.5% (50 basis points)
+const DEFAULT_REWARD_BPS_BY_LEVEL: Record<number, bigint> = {
+  1: 300n,
+  2: 150n,
+  3: 50n,
 };
-
-/** Max total referral reward per bet, in BPS of the pot */
-const MAX_REFERRAL_BPS_PER_BET = 500n;
+const DEFAULT_MAX_REFERRAL_BPS = 500n;
 
 const MAX_REFERRAL_DEPTH = 3;
+
+/** Load referral config from configService (cached 60s) */
+async function getRewardConfig(): Promise<{ bpsByLevel: Record<number, bigint>; maxBps: bigint }> {
+  const [l1, l2, l3, maxBps] = await Promise.all([
+    configService.getNumber('REFERRAL_BPS_LEVEL_1', 300),
+    configService.getNumber('REFERRAL_BPS_LEVEL_2', 150),
+    configService.getNumber('REFERRAL_BPS_LEVEL_3', 50),
+    configService.getNumber('MAX_REFERRAL_BPS_PER_BET', 500),
+  ]);
+  return {
+    bpsByLevel: { 1: BigInt(l1), 2: BigInt(l2), 3: BigInt(l3) },
+    maxBps: BigInt(maxBps),
+  };
+}
 
 function generateCode(): string {
   return randomBytes(4).toString('hex').toUpperCase();
@@ -446,13 +452,16 @@ export class ReferralService {
 
     const players = [makerUserId, acceptorUserId];
 
+    // Load reward config from DB (cached 60s)
+    const rewardConfig = await getRewardConfig();
+
     // Deduplicate referrers — a referrer who invited both players should only earn once per bet per level
     const rewardMap = new Map<string, { amount: bigint; level: number; fromPlayer: string }>();
 
     for (const playerId of players) {
       const chain = await this.getReferralChain(playerId);
       for (const { userId: referrerId, level } of chain) {
-        const bps = REWARD_BPS_BY_LEVEL[level];
+        const bps = rewardConfig.bpsByLevel[level];
         if (!bps) continue;
 
         const reward = (totalPot * bps) / 10000n;
@@ -468,8 +477,8 @@ export class ReferralService {
 
     if (rewardMap.size === 0) return;
 
-    // Enforce per-bet cap: total referral payout ≤ MAX_REFERRAL_BPS_PER_BET of pot
-    const maxReward = (totalPot * MAX_REFERRAL_BPS_PER_BET) / 10000n;
+    // Enforce per-bet cap: total referral payout ≤ configurable MAX BPS of pot
+    const maxReward = (totalPot * rewardConfig.maxBps) / 10000n;
     let totalAllocated = 0n;
     const cappedRewards: Array<{ key: string; referrerId: string; amount: bigint; level: number; fromPlayer: string }> = [];
 

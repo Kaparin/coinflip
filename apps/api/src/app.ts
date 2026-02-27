@@ -13,10 +13,14 @@ import { jackpotRouter } from './routes/jackpot.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { activityRouter } from './routes/activity.js';
 import { vipRouter } from './routes/vip.js';
+import { newsRouter } from './routes/news.js';
+import { announcementsRouter } from './routes/announcements.js';
 import { adminEventsRouter } from './routes/admin-events.js';
 import { adminTransactionsRouter } from './routes/admin-transactions.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { ipRateLimit } from './middleware/rate-limit.js';
+import { maintenanceMiddleware } from './middleware/maintenance.js';
+import { configService } from './services/config.service.js';
 import { env } from './config/env.js';
 import { getDb } from './lib/db.js';
 import { sql } from 'drizzle-orm';
@@ -99,6 +103,27 @@ app.get('/openapi.json', async (c) => {
   }
 });
 
+// ---- Maintenance mode middleware ----
+app.use('/api/v1/*', maintenanceMiddleware);
+
+// ---- Public config endpoint ----
+app.get('/api/v1/config/public', async (c) => {
+  const [betPresets, minBetAmount, maintenance, maintenanceMessage] = await Promise.all([
+    configService.getJson<number[]>('BET_PRESETS', [1, 5, 10, 50, 100, 500]),
+    configService.getString('MIN_BET_AMOUNT', '1000000'),
+    configService.isMaintenanceMode(),
+    configService.getMaintenanceMessage(),
+  ]);
+  return c.json({
+    data: {
+      betPresets,
+      minBetAmount,
+      maintenance,
+      maintenanceMessage: maintenance ? maintenanceMessage : '',
+    },
+  });
+});
+
 // ---- API routes ----
 app.route('/api/v1/bets', betsRouter);
 app.route('/api/v1/vault', vaultRouter);
@@ -113,6 +138,8 @@ app.route('/api/v1/jackpot', jackpotRouter);
 app.route('/api/v1/notifications', notificationsRouter);
 app.route('/api/v1/activity', activityRouter);
 app.route('/api/v1/vip', vipRouter);
+app.route('/api/v1/news', newsRouter);
+app.route('/api/v1/announcements', announcementsRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

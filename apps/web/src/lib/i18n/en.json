@@ -585,7 +585,8 @@
   "nav": {
     "play": "Play",
     "profile": "Profile",
-    "events": "Events"
+    "events": "Events",
+    "news": "News"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -854,5 +855,29 @@
     "noRefund": "No refund if outbid",
     "expireRefund": "50% refund if bet expires",
     "success": "Bet pinned!"
+  },
+  "news": {
+    "title": "News",
+    "subtitle": "Updates, announcements, big wins & jackpots",
+    "empty": "No news yet. Check back later!",
+    "loadMore": "Load more",
+    "filterAll": "All",
+    "filterUpdates": "Updates",
+    "filterAnnouncements": "Announcements",
+    "filterBigWins": "Big Wins",
+    "filterJackpots": "Jackpots"
+  },
+  "sponsored": {
+    "button": "Advertise",
+    "title": "Sponsored Announcement",
+    "price": "Price",
+    "disabled": "Sponsored announcements are currently disabled.",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Your announcement title...",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Write your announcement message...",
+    "notice": "Your announcement will be reviewed by admins before publishing. If rejected, funds will be refunded to your game balance.",
+    "success": "Announcement submitted! It will be published after admin review.",
+    "submit": "Submit"
   }
 }

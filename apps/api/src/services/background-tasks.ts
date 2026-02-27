@@ -1715,6 +1715,17 @@ export function startBackgroundSweep(): void {
       } catch (err) {
         logger.warn({ err }, 'sweep: session cleanup failed');
       }
+
+      // 12. Publish scheduled sponsored announcements
+      try {
+        const { announcementService } = await import('./announcement.service.js');
+        const published = await announcementService.publishScheduled();
+        if (published > 0) {
+          logger.info({ count: published }, 'sweep: published scheduled announcements');
+        }
+      } catch (err) {
+        logger.warn({ err }, 'sweep: announcement publish failed');
+      }
     } catch (err) {
       logger.error({ err }, 'Background sweep error');
     } finally {

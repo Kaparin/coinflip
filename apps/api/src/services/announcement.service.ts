@@ -1,0 +1,269 @@
+/**
+ * Announcement Service — sponsored announcements + admin deletion.
+ *
+ * Players pay a configurable price to submit announcements for admin review.
+ * On approval, announcements are auto-published at the scheduled time.
+ * On rejection, the price is refunded to the user's bonus balance.
+ */
+
+import { eq, sql, and, desc, lte, isNull, or } from 'drizzle-orm';
+import { announcements, users, userNotifications } from '@coinflip/db/schema';
+import { getDb } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
+import { configService } from './config.service.js';
+import { vaultService } from './vault.service.js';
+import { wsService } from './ws.service.js';
+
+class AnnouncementService {
+  /** Get sponsored announcement config */
+  async getConfig() {
+    const [price, isActive, minDelay, maxTitle, maxMessage] = await Promise.all([
+      configService.getString('SPONSORED_PRICE', '100000000'),
+      configService.getBoolean('SPONSORED_IS_ACTIVE', true),
+      configService.getNumber('SPONSORED_MIN_DELAY_MIN', 60),
+      configService.getNumber('SPONSORED_MAX_TITLE', 200),
+      configService.getNumber('SPONSORED_MAX_MESSAGE', 1000),
+    ]);
+    return { price, isActive, minDelayMinutes: minDelay, maxTitleLength: maxTitle, maxMessageLength: maxMessage };
+  }
+
+  /** Submit a sponsored announcement request (player-initiated) */
+  async submitSponsored(
+    userId: string,
+    title: string,
+    message: string,
+    scheduledAt: string | null,
+  ) {
+    const config = await this.getConfig();
+
+    if (!config.isActive) {
+      throw new Error('Sponsored announcements are currently disabled');
+    }
+    if (title.length > config.maxTitleLength) {
+      throw new Error(`Title exceeds max length of ${config.maxTitleLength}`);
+    }
+    if (message.length > config.maxMessageLength) {
+      throw new Error(`Message exceeds max length of ${config.maxMessageLength}`);
+    }
+
+    // Validate scheduling
+    if (scheduledAt) {
+      const scheduled = new Date(scheduledAt);
+      const minTime = new Date(Date.now() + config.minDelayMinutes * 60 * 1000);
+      if (scheduled < minTime) {
+        throw new Error(`Scheduled time must be at least ${config.minDelayMinutes} minutes from now`);
+      }
+    }
+
+    // Deduct payment
+    const deducted = await vaultService.deductBalance(userId, config.price);
+    if (!deducted) {
+      throw new Error('Insufficient balance');
+    }
+
+    const db = getDb();
+
+    // Insert announcement with pending status
+    const [ann] = await db
+      .insert(announcements)
+      .values({
+        title,
+        message,
+        priority: 'sponsored',
+        userId,
+        status: 'pending',
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        pricePaid: config.price,
+      })
+      .returning({ id: announcements.id });
+
+    logger.info({ announcementId: ann!.id, userId, price: config.price }, 'Sponsored announcement submitted');
+    return { id: ann!.id, price: config.price };
+  }
+
+  /** Approve a pending sponsored announcement (admin) */
+  async approveSponsored(announcementId: string) {
+    const db = getDb();
+
+    const [ann] = await db
+      .select()
+      .from(announcements)
+      .where(and(eq(announcements.id, announcementId), eq(announcements.status, 'pending')))
+      .limit(1);
+
+    if (!ann) throw new Error('Announcement not found or not pending');
+
+    const now = new Date();
+    const shouldPublishNow = !ann.scheduledAt || ann.scheduledAt <= now;
+
+    if (shouldPublishNow) {
+      // Publish immediately
+      await this.publishAnnouncement(announcementId);
+    } else {
+      // Mark as approved, will be published by background sweep
+      await db
+        .update(announcements)
+        .set({ status: 'approved', reviewedAt: now })
+        .where(eq(announcements.id, announcementId));
+    }
+
+    logger.info({ announcementId, immediate: shouldPublishNow }, 'Sponsored announcement approved');
+    return { status: shouldPublishNow ? 'published' : 'approved' };
+  }
+
+  /** Reject a pending sponsored announcement (admin) */
+  async rejectSponsored(announcementId: string, reason?: string) {
+    const db = getDb();
+
+    const [ann] = await db
+      .select()
+      .from(announcements)
+      .where(and(eq(announcements.id, announcementId), eq(announcements.status, 'pending')))
+      .limit(1);
+
+    if (!ann) throw new Error('Announcement not found or not pending');
+
+    await db
+      .update(announcements)
+      .set({
+        status: 'rejected',
+        reviewedAt: new Date(),
+        rejectedReason: reason ?? null,
+      })
+      .where(eq(announcements.id, announcementId));
+
+    // Refund to bonus balance
+    if (ann.userId && ann.pricePaid) {
+      await vaultService.creditWinner(ann.userId, ann.pricePaid);
+      logger.info({ announcementId, userId: ann.userId, refund: ann.pricePaid }, 'Sponsored announcement rejected, refunded');
+    }
+
+    return { status: 'rejected' };
+  }
+
+  /** Publish a specific announcement — creates notifications + WS broadcast */
+  private async publishAnnouncement(announcementId: string) {
+    const db = getDb();
+
+    const allUsers = await db.select({ id: users.id }).from(users);
+    const sentCount = allUsers.length;
+
+    await db
+      .update(announcements)
+      .set({ status: 'published', sentCount, reviewedAt: new Date() })
+      .where(eq(announcements.id, announcementId));
+
+    const [ann] = await db
+      .select()
+      .from(announcements)
+      .where(eq(announcements.id, announcementId))
+      .limit(1);
+
+    if (!ann) return;
+
+    // Insert notification for each user
+    if (allUsers.length > 0) {
+      const notifValues = allUsers.map((u) => ({
+        userId: u.id,
+        type: 'announcement' as const,
+        title: ann.title,
+        message: ann.message,
+        metadata: { announcementId: ann.id, priority: ann.priority },
+      }));
+
+      for (let i = 0; i < notifValues.length; i += 500) {
+        await db.insert(userNotifications).values(notifValues.slice(i, i + 500));
+      }
+    }
+
+    wsService.broadcast({
+      type: 'announcement',
+      data: { id: ann.id, title: ann.title, message: ann.message, priority: ann.priority },
+    });
+  }
+
+  /** Background sweep: publish approved announcements whose scheduledAt has passed */
+  async publishScheduled(): Promise<number> {
+    const db = getDb();
+    const now = new Date();
+
+    const pending = await db
+      .select({ id: announcements.id })
+      .from(announcements)
+      .where(
+        and(
+          eq(announcements.status, 'approved'),
+          or(
+            lte(announcements.scheduledAt, now),
+            isNull(announcements.scheduledAt),
+          ),
+        ),
+      );
+
+    for (const ann of pending) {
+      try {
+        await this.publishAnnouncement(ann.id);
+        logger.info({ announcementId: ann.id }, 'Scheduled announcement published');
+      } catch (err) {
+        logger.error({ err, announcementId: ann.id }, 'Failed to publish scheduled announcement');
+      }
+    }
+
+    return pending.length;
+  }
+
+  /** Soft delete an announcement (admin) */
+  async deleteAnnouncement(announcementId: string) {
+    const db = getDb();
+    await db
+      .update(announcements)
+      .set({ status: 'deleted' })
+      .where(eq(announcements.id, announcementId));
+  }
+
+  /** Get pending sponsored announcements (admin) */
+  async getPending() {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: announcements.id,
+        title: announcements.title,
+        message: announcements.message,
+        userId: announcements.userId,
+        scheduledAt: announcements.scheduledAt,
+        pricePaid: announcements.pricePaid,
+        createdAt: announcements.createdAt,
+      })
+      .from(announcements)
+      .where(eq(announcements.status, 'pending'))
+      .orderBy(desc(announcements.createdAt));
+
+    // Resolve user addresses
+    const userIds = rows.filter((r) => r.userId).map((r) => r.userId!);
+    const userMap = new Map<string, { address: string; nickname: string | null }>();
+
+    if (userIds.length > 0) {
+      const userRows = await db
+        .select({ id: users.id, address: users.address, nickname: users.profileNickname })
+        .from(users)
+        .where(sql`${users.id} = ANY(${userIds})`);
+      for (const u of userRows) {
+        userMap.set(u.id, { address: u.address, nickname: u.nickname });
+      }
+    }
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      message: r.message,
+      userId: r.userId,
+      userAddress: r.userId ? userMap.get(r.userId)?.address : null,
+      userNickname: r.userId ? userMap.get(r.userId)?.nickname : null,
+      scheduledAt: r.scheduledAt?.toISOString() ?? null,
+      pricePaid: r.pricePaid,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+}
+
+export const announcementService = new AnnouncementService();

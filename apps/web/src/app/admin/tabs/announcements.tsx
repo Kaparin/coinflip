@@ -1,9 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useAdminAnnouncements, useAdminSendAnnouncement } from '@/hooks/use-admin';
-import { TableWrapper, Pagination, ActionButton, timeAgo } from '../_shared';
-import { Megaphone, Send, AlertTriangle, Info } from 'lucide-react';
+import {
+  useAdminAnnouncements,
+  useAdminSendAnnouncement,
+  useAdminDeleteAnnouncement,
+  useAdminPendingSponsored,
+  useAdminApproveSponsored,
+  useAdminRejectSponsored,
+  type PendingSponsored,
+} from '@/hooks/use-admin';
+import { TableWrapper, Pagination, ActionButton, timeAgo, shortAddr } from '../_shared';
+import { Megaphone, Send, AlertTriangle, Info, Trash2, Check, X, Clock, Loader2 } from 'lucide-react';
+import { formatLaunch } from '@coinflip/shared/constants';
 
 export function AnnouncementsTab() {
   const [page, setPage] = useState(0);
@@ -14,7 +23,9 @@ export function AnnouncementsTab() {
   const [lastResult, setLastResult] = useState<string | null>(null);
 
   const { data } = useAdminAnnouncements(page);
+  const { data: pending, isLoading: pendingLoading } = useAdminPendingSponsored();
   const sendMutation = useAdminSendAnnouncement();
+  const deleteMutation = useAdminDeleteAnnouncement();
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) return;
@@ -26,10 +37,21 @@ export function AnnouncementsTab() {
       setTitle('');
       setMessage('');
       setPriority('normal');
-    } catch (err: any) {
-      setLastResult(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setLastResult(`Error: ${msg}`);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      setLastResult('Announcement deleted');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setLastResult(`Error: ${msg}`);
     }
   };
 
@@ -119,6 +141,22 @@ export function AnnouncementsTab() {
         </div>
       </div>
 
+      {/* Pending Sponsored */}
+      {pending && pending.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Clock size={18} className="text-amber-400" />
+            <h3 className="text-sm font-bold">Pending Sponsored Announcements ({pending.length})</h3>
+          </div>
+
+          <div className="space-y-3">
+            {pending.map((item) => (
+              <PendingSponsoredCard key={item.id} item={item} onResult={setLastResult} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* History */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold">Announcement History</h3>
@@ -135,15 +173,22 @@ export function AnnouncementsTab() {
                   <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Title</th>
                   <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Message</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Priority</th>
+                  <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Status</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Sent</th>
                   <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Date</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((a) => (
                   <tr key={a.id} className="border-b border-[var(--color-border)] last:border-0">
-                    <td className="px-3 py-2 font-medium max-w-[200px] truncate">{a.title}</td>
-                    <td className="px-3 py-2 text-[var(--color-text-secondary)] max-w-[300px] truncate">{a.message}</td>
+                    <td className="px-3 py-2 font-medium max-w-[180px] truncate">
+                      {a.title}
+                      {a.userId && (
+                        <span className="ml-1 text-[10px] text-teal-400">[sponsored]</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-[var(--color-text-secondary)] max-w-[250px] truncate">{a.message}</td>
                     <td className="px-3 py-2 text-center">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                         a.priority === 'important'
@@ -153,8 +198,20 @@ export function AnnouncementsTab() {
                         {a.priority}
                       </span>
                     </td>
+                    <td className="px-3 py-2 text-center">
+                      <StatusBadge status={a.status} />
+                    </td>
                     <td className="px-3 py-2 text-center tabular-nums">{a.sentCount}</td>
                     <td className="px-3 py-2 text-right text-[var(--color-text-secondary)]">{timeAgo(a.createdAt)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <ActionButton
+                        onClick={() => handleDelete(a.id)}
+                        variant="danger"
+                        disabled={deleteMutation.isPending || a.status === 'deleted'}
+                      >
+                        <Trash2 size={12} />
+                      </ActionButton>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -171,6 +228,89 @@ export function AnnouncementsTab() {
           </TableWrapper>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    published: 'bg-green-500/15 text-green-400',
+    pending: 'bg-amber-500/15 text-amber-400',
+    approved: 'bg-blue-500/15 text-blue-400',
+    rejected: 'bg-red-500/15 text-red-400',
+    deleted: 'bg-gray-500/15 text-gray-400',
+  };
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${colors[status] ?? 'bg-gray-500/15 text-gray-400'}`}>
+      {status}
+    </span>
+  );
+}
+
+function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onResult: (msg: string) => void }) {
+  const approve = useAdminApproveSponsored();
+  const reject = useAdminRejectSponsored();
+  const [rejectReason, setRejectReason] = useState('');
+  const [showReject, setShowReject] = useState(false);
+
+  const handleApprove = async () => {
+    try {
+      await approve.mutateAsync(item.id);
+      onResult('Sponsored announcement approved');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      onResult(`Error: ${msg}`);
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      await reject.mutateAsync({ id: item.id, reason: rejectReason || undefined });
+      setShowReject(false);
+      onResult('Sponsored announcement rejected, funds refunded');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      onResult(`Error: ${msg}`);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-bold truncate">{item.title}</h4>
+          <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 mt-1">{item.message}</p>
+          <div className="flex gap-3 mt-2 text-[10px] text-[var(--color-text-secondary)]">
+            <span>By: {item.userNickname || shortAddr(item.userAddress)}</span>
+            {item.pricePaid && <span>Paid: {formatLaunch(item.pricePaid)} LAUNCH</span>}
+            {item.scheduledAt && <span>Scheduled: {timeAgo(item.scheduledAt)}</span>}
+            <span>{timeAgo(item.createdAt)}</span>
+          </div>
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          <ActionButton onClick={handleApprove} variant="success" disabled={approve.isPending}>
+            <Check size={14} />
+          </ActionButton>
+          <ActionButton onClick={() => setShowReject(!showReject)} variant="danger">
+            <X size={14} />
+          </ActionButton>
+        </div>
+      </div>
+
+      {showReject && (
+        <div className="flex gap-2 pt-2 border-t border-[var(--color-border)]">
+          <input
+            type="text"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Reason (optional)..."
+            className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none"
+          />
+          <ActionButton onClick={handleReject} variant="danger" disabled={reject.isPending}>
+            {reject.isPending ? 'Rejecting...' : 'Reject & Refund'}
+          </ActionButton>
+        </div>
+      )}
     </div>
   );
 }

@@ -557,8 +557,12 @@ export interface AdminAnnouncement {
   id: string;
   title: string;
   message: string;
-  priority: 'normal' | 'important';
+  priority: string;
+  status: string;
   sentCount: number;
+  userId: string | null;
+  scheduledAt: string | null;
+  pricePaid: string | null;
   createdAt: string;
 }
 
@@ -678,6 +682,305 @@ export function useAdminUpdateVipConfig() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vip/config'] });
+    },
+  });
+}
+
+// ─── Platform Config ──────────────────────────────────────
+
+export interface ConfigEntry {
+  key: string;
+  value: string;
+  valueType: string;
+  description: string | null;
+  category: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export function useAdminConfig() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'config', address],
+    queryFn: () => adminFetch<ConfigEntry[]>('/api/v1/admin/config', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminUpdateConfig() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; value: string }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/config/${body.key}`, address!, {
+        method: 'PUT',
+        body: JSON.stringify({ value: body.value }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'config'] });
+    },
+  });
+}
+
+export function useAdminBulkUpdateConfig() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entries: Array<{ key: string; value: string }>) =>
+      adminFetch<{ status: string }>('/api/v1/admin/config', address!, {
+        method: 'PUT',
+        body: JSON.stringify({ entries }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'config'] });
+    },
+  });
+}
+
+export function useAdminToggleMaintenance() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      adminFetch<{ enabled: boolean }>('/api/v1/admin/maintenance/toggle', address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'config'] });
+    },
+  });
+}
+
+// ─── Commission + Partners ──────────────────────────────────
+
+export interface CommissionBreakdown {
+  valid: boolean;
+  breakdown: {
+    commissionBps: number;
+    referralMaxBps: number;
+    jackpotBps: number;
+    partnerBps: number;
+    treasuryBps: number;
+    totalAllocated: number;
+  };
+  error?: string;
+}
+
+export function useAdminCommissionBreakdown() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'commission', 'breakdown', address],
+    queryFn: () => adminFetch<CommissionBreakdown>('/api/v1/admin/commission/breakdown', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export interface AdminPartner {
+  id: string;
+  name: string;
+  address: string;
+  bps: number;
+  isActive: number;
+  totalEarned: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useAdminPartners() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'partners', address],
+    queryFn: () => adminFetch<AdminPartner[]>('/api/v1/admin/partners', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminAddPartner() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; address: string; bps: number }) =>
+      adminFetch<{ id: string; status: string }>('/api/v1/admin/partners', address!, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'commission'] });
+    },
+  });
+}
+
+export function useAdminUpdatePartner() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; address?: string; bps?: number; isActive?: number }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/partners/${id}`, address!, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'commission'] });
+    },
+  });
+}
+
+export function useAdminDeletePartner() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/partners/${id}`, address!, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'commission'] });
+    },
+  });
+}
+
+// ─── News Admin ──────────────────────────────────────
+
+export interface AdminNewsPost {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  priority: string;
+  isPublished: number;
+  publishedAt: string;
+  createdAt: string;
+}
+
+export function useAdminNews(page = 0, limit = 20) {
+  const { address, isConnected } = useWalletContext();
+  const offset = page * limit;
+  return useQuery({
+    queryKey: ['admin', 'news', address, offset, limit],
+    queryFn: () =>
+      adminFetchFull<{ data: AdminNewsPost[]; pagination: Pagination }>(
+        `/api/v1/admin/news?limit=${limit}&offset=${offset}`,
+        address!,
+      ),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminCreateNews() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { type?: string; title: string; content: string; priority?: string }) =>
+      adminFetch<{ id: string }>('/api/v1/admin/news', address!, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'news'] });
+    },
+  });
+}
+
+export function useAdminUpdateNews() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; title?: string; content?: string; priority?: string; isPublished?: number }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/news/${id}`, address!, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'news'] });
+    },
+  });
+}
+
+export function useAdminDeleteNews() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/news/${id}`, address!, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'news'] });
+    },
+  });
+}
+
+// ─── Announcement Management (delete, pending, approve, reject) ──────
+
+export function useAdminDeleteAnnouncement() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/announcements/${id}`, address!, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'announcements'] });
+    },
+  });
+}
+
+export interface PendingSponsored {
+  id: string;
+  title: string;
+  message: string;
+  userId: string | null;
+  userAddress: string | null;
+  userNickname: string | null;
+  scheduledAt: string | null;
+  pricePaid: string | null;
+  createdAt: string;
+}
+
+export function useAdminPendingSponsored() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'announcements', 'pending', address],
+    queryFn: () => adminFetch<PendingSponsored[]>('/api/v1/admin/announcements/pending', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminApproveSponsored() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/announcements/${id}/approve`, address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'announcements'] });
+    },
+  });
+}
+
+export function useAdminRejectSponsored() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      adminFetch<{ status: string }>(`/api/v1/admin/announcements/${id}/reject`, address!, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'announcements'] });
     },
   });
 }

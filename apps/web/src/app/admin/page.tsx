@@ -13,6 +13,9 @@ import {
   Gem,
   Megaphone,
   Crown,
+  Settings,
+  PieChart,
+  Newspaper,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { DashboardTab } from './tabs/dashboard';
@@ -25,8 +28,11 @@ import { TransactionsTab } from './tabs/transactions';
 import { JackpotTab } from './tabs/jackpot';
 import { AnnouncementsTab } from './tabs/announcements';
 import { VipTab } from './tabs/vip';
+import { ConfigTab } from './tabs/config';
+import { CommissionTab } from './tabs/commission';
+import { NewsTab } from './tabs/news';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements';
+type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -35,10 +41,13 @@ const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'events', icon: Trophy, label: 'Events' },
   { id: 'jackpot', icon: Gem, label: 'Jackpot' },
   { id: 'vip', icon: Crown, label: 'VIP' },
+  { id: 'commission', icon: PieChart, label: 'Commission' },
   { id: 'transactions', icon: ArrowLeftRight, label: 'Transactions' },
+  { id: 'announcements', icon: Megaphone, label: 'Announcements' },
+  { id: 'news', icon: Newspaper, label: 'News' },
+  { id: 'config', icon: Settings, label: 'Config' },
   { id: 'diagnostics', icon: AlertTriangle, label: 'Diagnostics' },
   { id: 'actions', icon: Wrench, label: 'Actions' },
-  { id: 'announcements', icon: Megaphone, label: 'Announcements' },
 ];
 
 export default function AdminPage() {
@@ -88,6 +97,9 @@ export default function AdminPage() {
       {activeTab === 'diagnostics' && <DiagnosticsTab />}
       {activeTab === 'actions' && <ActionsTab />}
       {activeTab === 'announcements' && <AnnouncementsTab />}
+      {activeTab === 'config' && <ConfigTab />}
+      {activeTab === 'commission' && <CommissionTab />}
+      {activeTab === 'news' && <NewsTab />}
     </div>
   );
 }
