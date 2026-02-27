@@ -24,7 +24,7 @@ import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
 import { MsgExec, MsgGrant } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
-import { ContractExecutionAuthorization, AcceptedMessageKeysFilter } from 'cosmjs-types/cosmwasm/wasm/v1/authz';
+import { ContractExecutionAuthorization, AcceptedMessageKeysFilter, MaxCallsLimit } from 'cosmjs-types/cosmwasm/wasm/v1/authz';
 import { MsgGrantAllowance } from 'cosmjs-types/cosmos/feegrant/v1beta1/tx';
 import { BasicAllowance } from 'cosmjs-types/cosmos/feegrant/v1beta1/feegrant';
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
@@ -270,10 +270,19 @@ export async function signAuthzGrant(
   const expiration = new Date(Date.now() + expirationSeconds * 1000);
 
   // Build scoped ContractExecutionAuthorization grants.
-  // Each grant specifies a contract address + allowed message keys.
+  // Each grant specifies a contract address + allowed message keys + call limit.
   // This is MUCH safer than GenericAuthorization which allows ANY contract execution.
+  // `limit` is REQUIRED by wasmd — omitting it causes "limit: undefined limit: invalid type".
+  const maxCallsLimit = {
+    typeUrl: '/cosmwasm.wasm.v1.MaxCallsLimit',
+    value: MaxCallsLimit.encode(
+      MaxCallsLimit.fromPartial({ remaining: BigInt(999_999) }),
+    ).finish(),
+  };
+
   const contractGrants: Array<{
     contract: string;
+    limit: { typeUrl: string; value: Uint8Array };
     filter: { typeUrl: string; value: Uint8Array };
   }> = [];
 
@@ -281,6 +290,7 @@ export async function signAuthzGrant(
   if (COINFLIP_CONTRACT) {
     contractGrants.push({
       contract: COINFLIP_CONTRACT,
+      limit: maxCallsLimit,
       filter: {
         typeUrl: '/cosmwasm.wasm.v1.AcceptedMessageKeysFilter',
         value: AcceptedMessageKeysFilter.encode(
@@ -296,6 +306,7 @@ export async function signAuthzGrant(
   if (LAUNCH_CW20_CONTRACT) {
     contractGrants.push({
       contract: LAUNCH_CW20_CONTRACT,
+      limit: maxCallsLimit,
       filter: {
         typeUrl: '/cosmwasm.wasm.v1.AcceptedMessageKeysFilter',
         value: AcceptedMessageKeysFilter.encode(
