@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
-import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles } from 'lucide-react';
+import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles, Pin } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
@@ -50,6 +50,18 @@ export interface BetCardProps {
   pinSlot?: number | null;
   onAccept?: (id: string) => void;
   onCancel?: (id: string) => void;
+  /** Boost action handler (only for own open bets) */
+  onBoost?: (id: string) => void;
+  /** Pin action handler (only for own open bets) */
+  onPin?: (id: string) => void;
+  /** Whether boost is currently available */
+  canBoost?: boolean;
+  /** Pin price in micro-LAUNCH (null = no slot available) */
+  pinPrice?: string | null;
+  /** Boost mutation in-flight */
+  isBoostPending?: boolean;
+  /** Pin mutation in-flight */
+  isPinPending?: boolean;
 }
 
 /** Live countdown hook — updates every second */
@@ -208,6 +220,7 @@ export function BetCard({
   isAccepting: isAcceptingProp = false,
   makerVipTier, isBoosted, isPinned, pinSlot,
   onAccept, onCancel,
+  onBoost, onPin, canBoost: canBoostProp, pinPrice, isBoostPending, isPinPending,
 }: BetCardProps) {
   const { t } = useTranslation();
   const humanAmount = fromMicroLaunch(amount);
@@ -260,17 +273,58 @@ export function BetCard({
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
 
       <div className="relative z-10">
-        {/* Top row: Role tag + Status */}
+        {/* Top row: Role tag + Boost/Pin icons + Status */}
         <div className="flex items-center justify-between mb-1.5">
-          {(isMine || isAcceptor) ? (
-            <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white ${
-              isMine
-                ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-500'
-            }`}>
-              {isMine ? t('bets.yourBet') : t('bets.youAccepted')}
-            </span>
-          ) : <span />}
+          <div className="flex items-center gap-1.5">
+            {(isMine || isAcceptor) ? (
+              <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white ${
+                isMine
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500'
+              }`}>
+                {isMine ? t('bets.yourBet') : t('bets.youAccepted')}
+              </span>
+            ) : <span />}
+            {/* Boost/Pin icon buttons — only for own open bets */}
+            {status === 'open' && (onBoost || onPin) && (
+              <div className="flex items-center gap-1">
+                {onBoost && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onBoost(id); }}
+                    disabled={!canBoostProp || isBoostPending}
+                    title={isBoosted ? (t('myBets.boosted') ?? 'Boosted') : 'Boost'}
+                    className={`h-6 w-6 flex items-center justify-center rounded-md transition-colors ${
+                      canBoostProp && !isBoosted
+                        ? 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
+                        : 'bg-zinc-500/10 text-zinc-500 cursor-not-allowed opacity-40'
+                    }`}
+                  >
+                    <Zap size={12} />
+                  </button>
+                )}
+                {onPin && pinPrice && !isPinned && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onPin(id); }}
+                    disabled={isPinPending}
+                    title={`Pin · ${formatLaunch(pinPrice)} LAUNCH`}
+                    className="h-6 w-6 flex items-center justify-center rounded-md bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors disabled:opacity-40"
+                  >
+                    <Pin size={12} />
+                  </button>
+                )}
+                {isPinned && (onBoost || onPin) && (
+                  <span
+                    className="h-6 w-6 flex items-center justify-center rounded-md bg-amber-500/15 text-amber-400"
+                    title={t('myBets.pinned') ?? 'Pinned'}
+                  >
+                    <Pin size={12} />
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${statusInfo.bgClass}`}>
             {t(statusInfo.textKey)}
           </span>
@@ -293,8 +347,9 @@ export function BetCard({
             </VipAvatarFrame>
             <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier)}`}>{makerNickname || truncAddr(maker)}</span>
             <VipBadge tier={makerVipTier} />
-            {isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">PIN</span>}
-            {isBoosted && !isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">&uarr;</span>}
+            {/* Text badges only on cards without action buttons (other people's bets) */}
+            {!(onBoost || onPin) && isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">PIN</span>}
+            {!(onBoost || onPin) && isBoosted && !isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">&uarr;</span>}
           </Link>
           {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
             <span className={`flex items-center gap-1 font-mono tabular-nums ${

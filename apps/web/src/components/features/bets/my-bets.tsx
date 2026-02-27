@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
-import { Coins, Zap, Pin } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { useBoostBet, usePinBet, useVipStatus, usePinSlots } from '@/hooks/use-vip';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
@@ -271,7 +271,16 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   }
 
   // ─── Render helpers ───
-  const renderBetCard = (bet: any, opts?: { isMine?: boolean; withCancel?: boolean }) => (
+  const renderBetCard = (bet: any, opts?: {
+    isMine?: boolean;
+    withCancel?: boolean;
+    onBoost?: (id: string) => void;
+    onPin?: (id: string) => void;
+    canBoost?: boolean;
+    pinPrice?: string | null;
+    isBoostPending?: boolean;
+    isPinPending?: boolean;
+  }) => (
     <BetCard
       key={bet.id}
       id={String(bet.id)}
@@ -287,9 +296,19 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       acceptor={(bet as any).acceptor}
       isMine={opts?.isMine ?? (bet.maker?.toLowerCase() === addrLower)}
       isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
+      makerVipTier={(bet as any).maker_vip_tier}
+      isBoosted={!!(bet as any).is_boosted || !!(bet as any).boosted_at}
+      isPinned={!!(bet as any).is_pinned}
+      pinSlot={(bet as any).pin_slot}
       pendingBetId={opts?.withCancel ? pendingBetId : undefined}
       pendingAction={opts?.withCancel ? pendingAction : undefined}
       onCancel={opts?.withCancel && !cancelAllState ? handleCancel : undefined}
+      onBoost={opts?.onBoost}
+      onPin={opts?.onPin}
+      canBoost={opts?.canBoost}
+      pinPrice={opts?.pinPrice}
+      isBoostPending={opts?.isBoostPending}
+      isPinPending={opts?.isPinPending}
     />
   );
 
@@ -407,9 +426,9 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                   {t('myBets.waitingForOpponent', { count: myOpenBets.length })}
                 </h3>
                 <div className="flex items-center gap-2">
-                  {vipStatus?.active && (
+                  {vipStatus && vipStatus.boostLimit !== null && (
                     <span className="text-[9px] text-[var(--color-text-secondary)]">
-                      {t('myBets.boostsLeft', { count: (vipStatus.boostLimit ?? 0) - vipStatus.boostsUsedToday })}
+                      {t('myBets.boostsLeft', { count: vipStatus.boostLimit - vipStatus.boostsUsedToday })}
                     </span>
                   )}
                   {myOpenBets.length > 1 && !cancelAllState && (
@@ -447,56 +466,25 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 {myOpenBets.map((bet) => {
                   const betId = String(bet.id);
                   const isBoosted = !!(bet as any).is_boosted || !!(bet as any).boosted_at;
-                  const isPinned = !!(bet as any).is_pinned;
-                  const canBoost = vipStatus?.active && !isBoosted &&
-                    (vipStatus.boostLimit === null || vipStatus.boostsUsedToday < vipStatus.boostLimit);
+                  // Allow free users (3 boosts/day) — don't gate on vipStatus.active
+                  const canBoost = !isBoosted &&
+                    (vipStatus?.boostLimit === null ||
+                     (vipStatus?.boostsUsedToday ?? 0) < (vipStatus?.boostLimit ?? 3));
                   // Find cheapest available pin slot
                   const cheapestSlot = pinSlots
                     ?.filter(s => s.betId !== betId)
                     .sort((a, b) => Number(BigInt(a.outbidPrice) - BigInt(b.outbidPrice)))[0];
 
-                  return (
-                    <div key={bet.id} className="space-y-1">
-                      {renderBetCard(bet, { isMine: true, withCancel: true })}
-                      {/* Boost & Pin action buttons */}
-                      {bet.status === 'open' && (
-                        <div className="flex gap-1.5 px-1">
-                          <button
-                            type="button"
-                            disabled={!canBoost || boostMutation.isPending}
-                            onClick={() => boostMutation.mutate(betId)}
-                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-colors ${
-                              isBoosted
-                                ? 'bg-indigo-500/10 text-indigo-400 cursor-default'
-                                : canBoost
-                                  ? 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-indigo-500/10 hover:text-indigo-400'
-                                  : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] opacity-40 cursor-not-allowed'
-                            }`}
-                          >
-                            <Zap size={10} />
-                            {isBoosted ? t('myBets.boosted') : t('myBets.boost')}
-                          </button>
-                          {cheapestSlot && !isPinned && (
-                            <button
-                              type="button"
-                              disabled={pinMutation.isPending}
-                              onClick={() => pinMutation.mutate({ betId, slot: cheapestSlot.slot })}
-                              className="flex items-center gap-1 rounded-lg bg-[var(--color-surface)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
-                            >
-                              <Pin size={10} />
-                              {t('myBets.pin')}
-                            </button>
-                          )}
-                          {isPinned && (
-                            <span className="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-400">
-                              <Pin size={10} />
-                              {t('myBets.pinned')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
+                  return renderBetCard(bet, {
+                    isMine: true,
+                    withCancel: true,
+                    onBoost: (id) => boostMutation.mutate(id),
+                    onPin: cheapestSlot ? (id) => pinMutation.mutate({ betId: id, slot: cheapestSlot.slot }) : undefined,
+                    canBoost,
+                    pinPrice: cheapestSlot?.outbidPrice ?? null,
+                    isBoostPending: boostMutation.isPending,
+                    isPinPending: pinMutation.isPending,
+                  });
                 })}
               </div>
             </div>
