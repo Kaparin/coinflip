@@ -892,7 +892,16 @@ class EventsService {
           await this.calculateContestResults(event.id);
           logger.info({ eventId: event.id }, 'Contest results calculated');
         }
-        // Raffles wait for admin to trigger draw
+
+        // Auto-draw for raffles
+        if (event.type === 'raffle') {
+          const drawResult = await this.drawRaffleWinners(event.id);
+          if (drawResult && drawResult.results.length > 0) {
+            logger.info({ eventId: event.id, winnersCount: drawResult.results.length }, 'Raffle winners auto-drawn');
+          } else {
+            logger.info({ eventId: event.id }, 'Raffle auto-draw: no participants or no prizes');
+          }
+        }
       } catch (err) {
         logger.error({ err, eventId: event.id }, 'Event lifecycle transition failed');
       }
@@ -927,11 +936,23 @@ class EventsService {
             const calcResults = await this.calculateContestResults(event.id);
             if (calcResults && calcResults.length > 0) {
               logger.info({ eventId: event.id, winnersCount: calcResults.length }, 'Re-calculated stuck contest results');
-              // Update local hasResults flag for next checks
               continue; // Will pick up on next lifecycle tick with results populated
             }
           } catch (calcErr) {
             logger.error({ err: calcErr, eventId: event.id }, 'Re-calculate contest results failed');
+          }
+        }
+
+        // 3a2. Raffles stuck without results — re-attempt draw
+        if (!hasResults && event.type === 'raffle' && participantCount > 0) {
+          try {
+            const drawResult = await this.drawRaffleWinners(event.id);
+            if (drawResult && drawResult.results.length > 0) {
+              logger.info({ eventId: event.id, winnersCount: drawResult.results.length }, 'Re-drew stuck raffle winners');
+              continue; // Will pick up on next lifecycle tick with results populated
+            }
+          } catch (drawErr) {
+            logger.error({ err: drawErr, eventId: event.id }, 'Re-draw raffle winners failed');
           }
         }
 
