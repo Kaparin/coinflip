@@ -42,12 +42,15 @@ class ActivityService {
           'bet_win_' || b.bet_id AS id,
           'bet_win' AS type,
           (b.payout_amount::numeric - b.amount::numeric)::text AS amount,
-          COALESCE(b.resolved_at, b.updated_at) AS ts,
+          b.resolved_time AS ts,
           jsonb_build_object(
             'betId', b.bet_id,
             'totalAmount', b.amount,
             'payoutAmount', b.payout_amount,
-            'opponentAddress', CASE WHEN b.winner_user_id = b.maker_user_id THEN b.acceptor ELSE b.maker END,
+            'opponentAddress', CASE WHEN b.winner_user_id = b.maker_user_id
+              THEN (SELECT address FROM users WHERE id = b.acceptor_user_id)
+              ELSE (SELECT address FROM users WHERE id = b.maker_user_id)
+            END,
             'opponentNickname', CASE WHEN b.winner_user_id = b.maker_user_id
               THEN (SELECT profile_nickname FROM users WHERE id = b.acceptor_user_id)
               ELSE (SELECT profile_nickname FROM users WHERE id = b.maker_user_id)
@@ -66,11 +69,14 @@ class ActivityService {
           'bet_loss_' || b.bet_id AS id,
           'bet_loss' AS type,
           b.amount::text AS amount,
-          COALESCE(b.resolved_at, b.updated_at) AS ts,
+          b.resolved_time AS ts,
           jsonb_build_object(
             'betId', b.bet_id,
             'totalAmount', b.amount,
-            'opponentAddress', CASE WHEN b.winner_user_id = b.maker_user_id THEN b.maker ELSE b.acceptor END,
+            'opponentAddress', CASE WHEN b.winner_user_id = b.maker_user_id
+              THEN (SELECT address FROM users WHERE id = b.maker_user_id)
+              ELSE (SELECT address FROM users WHERE id = b.acceptor_user_id)
+            END,
             'opponentNickname', CASE WHEN b.winner_user_id = b.maker_user_id
               THEN (SELECT profile_nickname FROM users WHERE id = b.maker_user_id)
               ELSE (SELECT profile_nickname FROM users WHERE id = b.acceptor_user_id)
