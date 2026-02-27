@@ -22,17 +22,17 @@ const tierMeta: Record<string, {
   silver: {
     icon: FaStar,
     gradient: 'from-gray-400 to-gray-300',
-    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boosts10'],
+    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boosts10', 'vip.perks.largeJackpot'],
   },
   gold: {
     icon: FaCrown,
     gradient: 'from-yellow-500 to-amber-400',
-    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.megaJackpot'],
+    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot'],
   },
   diamond: {
     icon: GiCutDiamond,
     gradient: 'from-purple-500 via-pink-500 to-red-500',
-    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.megaJackpot', 'vip.perks.superMegaJackpot'],
+    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot', 'vip.perks.superMegaJackpot'],
   },
 };
 

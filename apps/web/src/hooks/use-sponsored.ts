@@ -46,6 +46,7 @@ export function useSubmitSponsored() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/v1/announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
     },
   });
 }

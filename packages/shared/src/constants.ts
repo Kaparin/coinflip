@@ -183,8 +183,11 @@ export const PIN_OUTBID_MULTIPLIER = 2;
 export const PIN_EXPIRE_REFUND_BPS = 5000;
 
 // ---- VIP Jackpot Tiers ----
-/** Minimum VIP tier required to be eligible for VIP-exclusive jackpot tiers */
+/** Minimum VIP tier required to be eligible for VIP-exclusive jackpot tiers.
+ *  mini & medium: open to all (no entry).
+ *  large: Silver VIP, mega: Gold VIP, super_mega: Diamond VIP. */
 export const VIP_JACKPOT_TIERS: Partial<Record<string, VipTier>> = {
+  large: 'silver',
   mega: 'gold',
   super_mega: 'diamond',
 };

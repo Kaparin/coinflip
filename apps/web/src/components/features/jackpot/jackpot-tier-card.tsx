@@ -1,12 +1,19 @@
 'use client';
 
-import { formatLaunch } from '@coinflip/shared/constants';
+import { formatLaunch, VIP_JACKPOT_TIERS } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { JackpotProgressBar } from './jackpot-progress-bar';
 import { useTranslation } from '@/lib/i18n';
+import { Crown } from 'lucide-react';
 import { GiCoins, GiLightningFrequency, GiFireGem, GiCrown, GiOpenTreasureChest } from 'react-icons/gi';
 import type { JackpotPoolResponse } from '@coinflip/shared/types';
 import type { IconType } from 'react-icons';
+
+const VIP_BADGE_STYLES: Record<string, { gradient: string; text: string }> = {
+  silver: { gradient: 'from-gray-400/20 to-gray-300/10 border-gray-400/30', text: 'text-gray-300' },
+  gold: { gradient: 'from-yellow-500/20 to-amber-400/10 border-amber-400/30', text: 'text-amber-400' },
+  diamond: { gradient: 'from-purple-500/20 to-pink-500/10 border-purple-400/30', text: 'text-purple-300' },
+};
 
 interface TierStyle {
   icon: IconType;
@@ -90,6 +97,8 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
   const targetFormatted = formatLaunch(pool.targetAmount);
   const isNearlyFull = pool.progress >= 80;
   const isAlmostDone = pool.progress >= 95;
+  const requiredVip = VIP_JACKPOT_TIERS[pool.tierName];
+  const vipBadgeStyle = requiredVip ? VIP_BADGE_STYLES[requiredVip] : null;
 
   return (
     <div
@@ -117,9 +126,17 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
               </div>
             </div>
             <div>
-              <h3 className={`text-sm font-bold ${style.accent}`}>
-                {t(`jackpot.tiers.${pool.tierName}`)}
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className={`text-sm font-bold ${style.accent}`}>
+                  {t(`jackpot.tiers.${pool.tierName}`)}
+                </h3>
+                {requiredVip && vipBadgeStyle ? (
+                  <span className={`inline-flex items-center gap-0.5 rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} px-1.5 py-0.5 text-[9px] font-bold ${vipBadgeStyle.text}`}>
+                    <Crown size={8} />
+                    <span className="capitalize">{requiredVip}</span>
+                  </span>
+                ) : null}
+              </div>
               <span className="text-[10px] text-[var(--color-text-secondary)]">
                 #{pool.cycle} · {t('jackpot.minGames', { count: pool.minGames })}
               </span>

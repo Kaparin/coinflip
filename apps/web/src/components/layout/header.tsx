@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
@@ -11,6 +11,8 @@ import { useGetVaultBalance, useGetActiveEvents } from '@coinflip/api-client';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { StatusChips } from '@/components/features/auth/status-chips';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
+import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
+import { useVipStatus } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { ADMIN_ADDRESS, EXPLORER_URL } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
@@ -34,8 +36,10 @@ export function Header() {
   const activeEventCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
+  const { data: vipStatus } = useVipStatus(wallet.isConnected);
   const [menuOpen, setMenuOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [vipModalOpen, setVipModalOpen] = useState(false);
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -151,6 +155,22 @@ export function Header() {
                       </span>
                     )}
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => setVipModalOpen(true)}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      vipStatus?.active
+                        ? 'bg-amber-500/10 text-amber-400'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                    }`}
+                  >
+                    <Crown size={14} />
+                    {vipStatus?.active ? (
+                      <span className="capitalize">{vipStatus.tier}</span>
+                    ) : (
+                      t('nav.vip')
+                    )}
+                  </button>
                 </nav>
 
                 <StatusChips
@@ -357,6 +377,22 @@ export function Header() {
 
               {/* Quick links */}
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setVipModalOpen(true); setMenuOpen(false); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium ${
+                    vipStatus?.active
+                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold'
+                      : 'border-[var(--color-border)] bg-[var(--color-bg)]'
+                  }`}
+                >
+                  <Crown size={14} className={vipStatus?.active ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'} />
+                  {vipStatus?.active ? (
+                    <span className="capitalize">{vipStatus.tier} VIP</span>
+                  ) : (
+                    t('nav.vip')
+                  )}
+                </button>
                 {wallet.address && (
                   <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
                     onClick={() => setMenuOpen(false)}
@@ -443,6 +479,7 @@ export function Header() {
       )}
 
       <OnboardingModal isOpen={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
+      <VipPurchaseModal open={vipModalOpen} onClose={() => setVipModalOpen(false)} />
     </>
   );
 }

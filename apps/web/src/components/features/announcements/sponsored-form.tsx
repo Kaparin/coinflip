@@ -2,10 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Megaphone, X, Send, Loader2, CheckCircle, Clock, ShieldCheck } from 'lucide-react';
+import { Megaphone, X, Send, Loader2, CheckCircle, Clock, ShieldCheck, CalendarClock } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { useSponsoredConfig, useSubmitSponsored } from '@/hooks/use-sponsored';
 import { formatLaunch } from '@coinflip/shared/constants';
+
+/** Get min datetime-local value (now + minDelayMinutes) */
+function getMinScheduleTime(minDelayMinutes: number): string {
+  const d = new Date(Date.now() + minDelayMinutes * 60 * 1000);
+  // Format as YYYY-MM-DDTHH:MM for datetime-local input
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 interface SponsoredFormProps {
   open: boolean;
@@ -17,6 +25,8 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
   const [mounted, setMounted] = useState(false);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [useSchedule, setUseSchedule] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
@@ -45,6 +55,8 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
       // Reset form after close animation
       setTitle('');
       setMessage('');
+      setUseSchedule(false);
+      setScheduledAt('');
       setSubmitted(false);
       setError(null);
     }, 200);
@@ -54,7 +66,14 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
     if (!title.trim() || !message.trim()) return;
     setError(null);
     try {
-      await submitMutation.mutateAsync({ title: title.trim(), message: message.trim() });
+      const body: { title: string; message: string; scheduledAt?: string } = {
+        title: title.trim(),
+        message: message.trim(),
+      };
+      if (useSchedule && scheduledAt) {
+        body.scheduledAt = new Date(scheduledAt).toISOString();
+      }
+      await submitMutation.mutateAsync(body);
       setSubmitted(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -181,6 +200,37 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
                   className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-teal-500 focus:outline-none resize-none"
                 />
                 <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5 text-right">{message.length}/{maxMessage}</p>
+              </div>
+
+              {/* Schedule toggle */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setUseSchedule(!useSchedule)}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors w-full ${
+                    useSchedule
+                      ? 'border-teal-500/40 bg-teal-500/10 text-teal-400'
+                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  }`}
+                >
+                  <CalendarClock size={14} />
+                  {useSchedule ? t('sponsored.scheduleLabel') : t('sponsored.publishNow')}
+                </button>
+
+                {useSchedule && (
+                  <div>
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      min={getMinScheduleTime(config?.minDelayMin ?? 60)}
+                      className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+                      {t('sponsored.scheduleHint', { min: config?.minDelayMin ?? 60 })}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg bg-teal-500/5 border border-teal-500/20 px-3 py-2.5 text-[11px] text-[var(--color-text-secondary)] leading-relaxed">

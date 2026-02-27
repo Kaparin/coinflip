@@ -586,7 +586,8 @@
     "play": "Play",
     "profile": "Profile",
     "events": "Events",
-    "news": "News"
+    "news": "News",
+    "vip": "VIP"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -814,6 +815,8 @@
       "mega": "Mega",
       "super_mega": "Super Mega"
     },
+    "vipRequired": "{tier} VIP",
+    "openToAll": "Open to all",
     "notifications": {
       "won": "{tier} jackpot won by {winner} — {amount} LAUNCH!"
     }
@@ -834,6 +837,7 @@
       "frame": "Animated profile frame",
       "boosts10": "10 bet boosts per day",
       "boostsUnlimited": "Unlimited bet boosts",
+      "largeJackpot": "Large jackpot eligibility",
       "megaJackpot": "Mega jackpot eligibility",
       "superMegaJackpot": "Super Mega jackpot eligibility"
     }
@@ -895,6 +899,9 @@
     "successStep1": "An admin will review your announcement shortly. If approved, it will be published to all users.",
     "successStep2": "If your announcement is rejected, the full amount will be returned to your game balance.",
     "close": "Got it",
-    "submit": "Submit"
+    "submit": "Submit",
+    "scheduleLabel": "Publish at (optional)",
+    "scheduleHint": "Leave empty for immediate publication after approval. Min {min} minutes from now.",
+    "publishNow": "Publish immediately after approval"
   }
 }
