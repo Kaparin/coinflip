@@ -32,10 +32,10 @@ const INSTANTIATE_PARAMS = {
   token_cw20: LAUNCH_CW20_ADDR,
   treasury: TREASURY_ADDRESS,
   commission_bps: 1000, // 10%
-  min_bet: "1000000", // 1 LAUNCH (6 decimals)
+  min_bet: "1000000", // 1 COIN (6 decimals)
   reveal_timeout_secs: 300, // 5 minutes
   max_open_per_user: 5,
-  max_daily_amount_per_user: "1000000000000", // 1M LAUNCH — effectively no limit for now
+  max_daily_amount_per_user: "1000000000000", // 1M COIN — effectively no limit for now
 };
 
 const WASM_PATH = resolve(
@@ -87,7 +87,7 @@ async function main() {
   log(`RPC: ${RPC_URL}`);
   log(`Chain ID: ${CHAIN_ID}`);
   log(`Treasury: ${TREASURY_ADDRESS}`);
-  log(`LAUNCH CW20: ${LAUNCH_CW20_ADDR}`);
+  log(`COIN CW20: ${LAUNCH_CW20_ADDR}`);
 
   // 1. Create wallet from mnemonic
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(MNEMONIC, {

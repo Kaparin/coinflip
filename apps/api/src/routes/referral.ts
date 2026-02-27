@@ -151,7 +151,7 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
     return c.json({
       error: {
         code: 'INSUFFICIENT_BALANCE',
-        message: 'Insufficient balance. You need 1,000 LAUNCH to change branch.',
+        message: 'Insufficient balance. You need 1,000 COIN to change branch.',
       },
     }, 400);
   }

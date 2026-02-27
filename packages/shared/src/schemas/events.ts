@@ -39,7 +39,7 @@ export const RaffleConfigSchema = z
 export const PrizeEntrySchema = z
   .object({
     place: z.number().int().min(1).openapi({ description: 'Prize place (1st, 2nd, etc.)' }),
-    amount: AmountSchema.openapi({ description: 'Prize amount in micro-LAUNCH' }),
+    amount: AmountSchema.openapi({ description: 'Prize amount in micro-COIN' }),
     label: z.string().optional().openapi({ description: 'Display label for this prize tier' }),
   })
   .openapi({ ref: 'PrizeEntry' });

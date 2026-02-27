@@ -51,7 +51,7 @@ pnpm --filter scripts tsx scripts/grant-authz.ts
 
 ## Architecture Overview
 
-PvP CoinFlip dApp on Axiome Chain. Two players wager LAUNCH (CW20 token) on heads/tails. Winner gets 2x stake minus 10% commission. "1-click" UX via Cosmos x/authz delegation + x/feegrant gas sponsorship.
+PvP CoinFlip dApp on Axiome Chain. Two players wager COIN (CW20 token) on heads/tails. Winner gets 2x stake minus 10% commission. "1-click" UX via Cosmos x/authz delegation + x/feegrant gas sponsorship.
 
 ### Monorepo Layout (pnpm workspaces + Turborepo)
 

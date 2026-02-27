@@ -50,8 +50,8 @@ export function VipTab() {
         <StatCard label="Silver" value={stats?.silver_count ?? 0} />
         <StatCard label="Gold" value={stats?.gold_count ?? 0} />
         <StatCard label="Diamond" value={stats?.diamond_count ?? 0} />
-        <StatCard label="Total Revenue" value={stats ? formatLaunch(stats.total_revenue) : '0'} sub="LAUNCH" />
-        <StatCard label="This Week" value={stats ? formatLaunch(stats.week_revenue) : '0'} sub="LAUNCH" />
+        <StatCard label="Total Revenue" value={stats ? formatLaunch(stats.total_revenue) : '0'} sub="COIN" />
+        <StatCard label="This Week" value={stats ? formatLaunch(stats.week_revenue) : '0'} sub="COIN" />
       </div>
 
       {/* Grant VIP */}

@@ -44,7 +44,7 @@ export function buildDescription(
   switch (action) {
     case 'create_bet': {
       const amount = (p as { create_bet?: { amount?: string } })?.create_bet?.amount;
-      return amount ? `Create bet ${amount} LAUNCH by ${shortAddr}` : `Create bet by ${shortAddr}`;
+      return amount ? `Create bet ${amount} COIN by ${shortAddr}` : `Create bet by ${shortAddr}`;
     }
     case 'accept_bet': {
       const betId = (p as { accept_bet?: { bet_id?: number } })?.accept_bet?.bet_id;
@@ -68,7 +68,7 @@ export function buildDescription(
     }
     case 'withdraw': {
       const amount = (p as { withdraw?: { amount?: string } })?.withdraw?.amount;
-      return amount ? `Withdraw ${amount} LAUNCH for ${shortAddr}` : `Withdraw for ${shortAddr}`;
+      return amount ? `Withdraw ${amount} COIN for ${shortAddr}` : `Withdraw for ${shortAddr}`;
     }
     case 'deposit':
       return `Deposit by ${shortAddr}`;
@@ -78,7 +78,7 @@ export function buildDescription(
         const shortRecipient = transfer.recipient && transfer.recipient.length > 15
           ? `${transfer.recipient.slice(0, 10)}...${transfer.recipient.slice(-4)}`
           : transfer.recipient;
-        return `CW20 transfer ${transfer.amount} LAUNCH to ${shortRecipient}`;
+        return `CW20 transfer ${transfer.amount} COIN to ${shortRecipient}`;
       }
       return `CW20 transfer by ${shortAddr}`;
     }

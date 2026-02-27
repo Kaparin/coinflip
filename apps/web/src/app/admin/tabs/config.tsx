@@ -51,19 +51,19 @@ const CATEGORY_LABELS: Record<string, string> = {
 const KEY_LABELS: Record<string, string> = {
   OPEN_BET_TTL_SECS: 'Open Bet TTL (seconds)',
   REVEAL_TIMEOUT_SECS: 'Reveal Timeout (seconds)',
-  MIN_BET_AMOUNT: 'Min Bet (LAUNCH)',
-  MAX_DAILY_AMOUNT: 'Max Daily Volume (LAUNCH)',
+  MIN_BET_AMOUNT: 'Min Bet (COIN)',
+  MAX_DAILY_AMOUNT: 'Max Daily Volume (COIN)',
   MAX_OPEN_BETS_PER_USER: 'Max Open Bets Per User',
   MAX_BATCH_SIZE: 'Max Batch Size',
-  BET_PRESETS: 'Bet Presets (LAUNCH)',
+  BET_PRESETS: 'Bet Presets (COIN)',
   LEADERBOARD_CACHE_TTL_MS: 'Leaderboard Cache TTL (ms)',
   PIN_SLOTS: 'Pin Slots',
-  PIN_MIN_PRICE: 'Pin Min Price (LAUNCH)',
+  PIN_MIN_PRICE: 'Pin Min Price (COIN)',
   PIN_OUTBID_MULTIPLIER: 'Pin Outbid Multiplier',
-  BIG_WIN_THRESHOLD: 'Big Win Threshold (LAUNCH)',
+  BIG_WIN_THRESHOLD: 'Big Win Threshold (COIN)',
   MAINTENANCE_MODE: 'Maintenance Mode',
   MAINTENANCE_MESSAGE: 'Maintenance Message',
-  SPONSORED_PRICE: 'Sponsored Price (LAUNCH)',
+  SPONSORED_PRICE: 'Sponsored Price (COIN)',
   SPONSORED_IS_ACTIVE: 'Sponsored Active',
   SPONSORED_MIN_DELAY_MIN: 'Min Delay (minutes)',
   SPONSORED_MAX_TITLE: 'Max Title Length',
@@ -315,7 +315,7 @@ function ConfigField({
     <div>
       <label className="flex items-baseline gap-1 text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 uppercase tracking-wider">
         <span className="truncate">{label}</span>
-        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">LAUNCH</span>}
+        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">COIN</span>}
       </label>
       <input
         type={config.valueType === 'number' || isMicroLaunch ? 'number' : 'text'}

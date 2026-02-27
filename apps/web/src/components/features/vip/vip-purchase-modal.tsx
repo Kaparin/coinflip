@@ -104,7 +104,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
                   <div>
                     <h3 className="font-bold capitalize">{config.tier}</h3>
                     <p className="text-sm text-white/50">
-                      {formatLaunch(config.price)} LAUNCH / {t('vip.month')}
+                      {formatLaunch(config.price)} COIN / {t('vip.month')}
                     </p>
                   </div>
                 </div>

@@ -39,7 +39,7 @@ async function getCW20Balance(address: string): Promise<string> {
 async function main() {
   console.log('=== CoinFlip Test Accounts ===\n');
   console.log(`RPC: ${RPC}`);
-  console.log(`CW20 (LAUNCH): ${CW20_ADDR}\n`);
+  console.log(`CW20 (COIN): ${CW20_ADDR}\n`);
 
   const client = await StargateClient.connect(RPC);
 
@@ -60,13 +60,13 @@ async function main() {
     const nativeBalance = await client.getBalance(address, 'uaxm');
     const axmAmount = (Number(nativeBalance.amount) / 1_000_000).toFixed(2);
 
-    // CW20 LAUNCH balance
+    // CW20 COIN balance
     const launchBalance = await getCW20Balance(address);
 
     console.log(`[${acc.name}]`);
     console.log(`  Address: ${address}`);
     console.log(`  AXM:     ${axmAmount} AXM (${nativeBalance.amount} uaxm)`);
-    console.log(`  LAUNCH:  ${launchBalance}`);
+    console.log(`  COIN:    ${launchBalance}`);
     console.log();
   }
 

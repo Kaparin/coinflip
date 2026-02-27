@@ -171,7 +171,7 @@ class PinService {
     await db.insert(treasuryLedger).values({
       txhash: `pin_${crypto.randomUUID()}`,
       amount: requiredPrice,
-      denom: 'LAUNCH',
+      denom: 'COIN',
       source: 'bet_pin',
     });
 

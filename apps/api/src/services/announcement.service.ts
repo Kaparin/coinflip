@@ -91,7 +91,7 @@ class AnnouncementService {
     await db.insert(treasuryLedger).values({
       txhash: `announcement_${ann!.id}`,
       amount: config.price,
-      denom: 'LAUNCH',
+      denom: 'COIN',
       source: 'sponsored_announcement',
     });
 
@@ -158,7 +158,7 @@ class AnnouncementService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_announcement_${announcementId}`,
         amount: ann.pricePaid,
-        denom: 'LAUNCH',
+        denom: 'COIN',
         source: 'sponsored_announcement_refund',
       });
 

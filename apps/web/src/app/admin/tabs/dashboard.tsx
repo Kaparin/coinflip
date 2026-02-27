@@ -52,7 +52,7 @@ export function DashboardTab() {
     const microAmount = toMicroLaunch(humanAmount);
     try {
       const result = await withdraw.mutateAsync(microAmount);
-      setWithdrawSuccess(`Withdrawn ${withdrawAmount} LAUNCH. Tx: ${result.txHash}`);
+      setWithdrawSuccess(`Withdrawn ${withdrawAmount} COIN. Tx: ${result.txHash}`);
       setWithdrawAmount('');
     } catch (err) {
       setWithdrawError(err instanceof Error ? err.message : 'Withdrawal failed');
@@ -164,7 +164,7 @@ export function DashboardTab() {
                 Candidates: {sweepPreview.data?.candidates.length ?? '...'}
               </span>
               <span className="text-xs font-bold text-[var(--color-primary)]">
-                Total sweepable: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} LAUNCH
+                Total sweepable: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} COIN
               </span>
             </div>
 
@@ -240,7 +240,7 @@ export function DashboardTab() {
                 <span className="text-[var(--color-success)]">Succeeded: {sweepResult.succeeded}</span>
                 <span className="text-[var(--color-danger)]">Failed: {sweepResult.failed}</span>
                 <span className="text-[var(--color-text-secondary)]">Skipped: {sweepResult.skipped}</span>
-                <span className="font-bold">Total swept: {fmtLaunch(sweepResult.totalSwept)} LAUNCH</span>
+                <span className="font-bold">Total swept: {fmtLaunch(sweepResult.totalSwept)} COIN</span>
               </div>
               {sweepResult.results.filter((r) => r.status !== 'skipped').length > 0 && (
                 <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--color-border)]">

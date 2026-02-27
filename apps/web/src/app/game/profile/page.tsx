@@ -389,7 +389,7 @@ type BranchStep = 'idle' | 'validating' | 'withdrawing' | 'transferring' | 'upda
 
 const BRANCH_STEPS: { key: BranchStep; labelRu: string; labelEn: string }[] = [
   { key: 'validating', labelRu: 'Проверка данных...', labelEn: 'Validating...' },
-  { key: 'withdrawing', labelRu: 'Списание 1 000 LAUNCH из vault...', labelEn: 'Withdrawing 1,000 LAUNCH from vault...' },
+  { key: 'withdrawing', labelRu: 'Списание 1 000 COIN из vault...', labelEn: 'Withdrawing 1,000 COIN from vault...' },
   { key: 'transferring', labelRu: 'Перевод в казну платформы...', labelEn: 'Transferring to platform treasury...' },
   { key: 'updating', labelRu: 'Обновление реферальной ветки...', labelEn: 'Updating referral branch...' },
 ];
@@ -590,7 +590,7 @@ function ChangeBranchSection() {
               <div>
                 <p className="text-sm font-bold text-green-500">{t('referral.changeBranchSuccess')}</p>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  {isRu ? '1 000 LAUNCH списано' : '1,000 LAUNCH deducted'}
+                  {isRu ? '1 000 COIN списано' : '1,000 COIN deducted'}
                 </p>
               </div>
             </div>
@@ -713,14 +713,14 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
             <p className="text-lg font-extrabold text-[var(--color-primary)]">
               {platformStats ? formatLaunch(BigInt(platformStats.treasuryVaultAvailable)) : '—'}
             </p>
-            <p className="text-[9px] text-[var(--color-text-secondary)]">LAUNCH</p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">COIN</p>
           </div>
           <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3">
             <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.totalReferralPaid')}</p>
             <p className="text-lg font-extrabold text-[var(--color-success)]">
               {platformStats ? formatLaunch(BigInt(platformStats.totalReferralPaid)) : '—'}
             </p>
-            <p className="text-[9px] text-[var(--color-text-secondary)]">LAUNCH</p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">COIN</p>
           </div>
         </div>
       </CollapsibleSection>
@@ -815,25 +815,25 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[11px]">
                   <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
-                  <span className="font-bold">180 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(90%)</span></span>
+                  <span className="font-bold">180 COIN <span className="text-[var(--color-text-secondary)] font-normal">(90%)</span></span>
                 </div>
                 <div className="h-px bg-[var(--color-border)]" />
                 <div className="flex justify-between text-[11px]">
                   <span className="text-violet-400">{t('referral.exampleL1')}</span>
-                  <span className="font-bold text-violet-400">6 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(3%)</span></span>
+                  <span className="font-bold text-violet-400">6 COIN <span className="text-[var(--color-text-secondary)] font-normal">(3%)</span></span>
                 </div>
                 <div className="flex justify-between text-[11px]">
                   <span className="text-blue-400">{t('referral.exampleL2')}</span>
-                  <span className="font-bold text-blue-400">3 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(1.5%)</span></span>
+                  <span className="font-bold text-blue-400">3 COIN <span className="text-[var(--color-text-secondary)] font-normal">(1.5%)</span></span>
                 </div>
                 <div className="flex justify-between text-[11px]">
                   <span className="text-teal-400">{t('referral.exampleL3')}</span>
-                  <span className="font-bold text-teal-400">1 LAUNCH <span className="text-[var(--color-text-secondary)] font-normal">(0.5%)</span></span>
+                  <span className="font-bold text-teal-400">1 COIN <span className="text-[var(--color-text-secondary)] font-normal">(0.5%)</span></span>
                 </div>
                 <div className="h-px bg-[var(--color-border)]" />
                 <div className="flex justify-between text-[11px]">
                   <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
-                  <span className="font-bold text-[var(--color-text-secondary)]">10 LAUNCH <span className="font-normal">(5%)</span></span>
+                  <span className="font-bold text-[var(--color-text-secondary)]">10 COIN <span className="font-normal">(5%)</span></span>
                 </div>
               </div>
             </div>
@@ -918,7 +918,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     {t('referral.claiming')}
                   </>
                 ) : (
-                  `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} LAUNCH)`
+                  `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} COIN)`
                 )}
               </button>
             )}
@@ -940,7 +940,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between">
-                        <p className="text-sm font-bold">{earned} <span className="text-[10px] font-normal text-[var(--color-text-secondary)]">LAUNCH</span></p>
+                        <p className="text-sm font-bold">{earned} <span className="text-[10px] font-normal text-[var(--color-text-secondary)]">COIN</span></p>
                         <span className={`text-xs font-bold ${textColor}`}>{pct}</span>
                       </div>
                       <p className="text-[10px] text-[var(--color-text-secondary)]">

@@ -308,7 +308,7 @@ export function BetCard({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onPin(id); }}
                     disabled={isPinPending}
-                    title={`Pin · ${formatLaunch(pinPrice)} LAUNCH`}
+                    title={`Pin · ${formatLaunch(pinPrice)} COIN`}
                     className="h-6 w-6 flex items-center justify-center rounded-md bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors disabled:opacity-40"
                   >
                     <Pin size={12} />

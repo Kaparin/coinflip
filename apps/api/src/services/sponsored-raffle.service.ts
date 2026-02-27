@@ -55,10 +55,10 @@ class SponsoredRaffleService {
       throw new AppError('VALIDATION_ERROR', `Description exceeds max length of ${config.maxDesc}`, 400);
     }
 
-    // Validate prize amount (minimum 1 LAUNCH = 1_000_000 micro)
+    // Validate prize amount (minimum 1 COIN = 1_000_000 micro)
     const prizeNum = BigInt(prizeAmount);
     if (prizeNum < 1_000_000n) {
-      throw new AppError('VALIDATION_ERROR', 'Prize amount must be at least 1 LAUNCH', 400);
+      throw new AppError('VALIDATION_ERROR', 'Prize amount must be at least 1 COIN', 400);
     }
 
     // Validate duration
@@ -127,7 +127,7 @@ class SponsoredRaffleService {
     await db.insert(treasuryLedger).values({
       txhash: `raffle_${eventRow!.id}`,
       amount: config.price,
-      denom: 'LAUNCH',
+      denom: 'COIN',
       source: 'sponsored_raffle',
     });
 
@@ -201,7 +201,7 @@ class SponsoredRaffleService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_raffle_${eventId}`,
         amount: event.pricePaid,
-        denom: 'LAUNCH',
+        denom: 'COIN',
         source: 'sponsored_raffle_refund',
       });
 
@@ -251,7 +251,7 @@ class SponsoredRaffleService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_raffle_${eventId}`,
         amount: event.pricePaid,
-        denom: 'LAUNCH',
+        denom: 'COIN',
         source: 'sponsored_raffle_refund',
       });
 

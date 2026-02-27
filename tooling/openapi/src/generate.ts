@@ -39,7 +39,7 @@ const document = createDocument({
     title: 'Heads or Tails PvP dApp API',
     version: '1.0.0',
     description:
-      'API for the PvP Heads or Tails decentralized application on Axiome Chain. Enables creating, accepting, revealing, and resolving Heads/Tails bets with LAUNCH tokens.',
+      'API for the PvP Heads or Tails decentralized application on Axiome Chain. Enables creating, accepting, revealing, and resolving Heads/Tails bets with COIN tokens.',
   },
   servers: [
     { url: 'http://localhost:3001', description: 'Local development' },
@@ -236,7 +236,7 @@ const document = createDocument({
     '/api/v1/vault/withdraw': {
       post: {
         tags: ['Vault'],
-        summary: 'Withdraw LAUNCH from vault',
+        summary: 'Withdraw COIN from vault',
         operationId: 'withdrawFromVault',
         requestBody: {
           required: true,

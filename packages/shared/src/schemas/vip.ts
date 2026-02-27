@@ -75,6 +75,6 @@ export const AdminGrantVipRequestSchema = z.object({
 
 export const AdminUpdateVipConfigRequestSchema = z.object({
   tier: VipTierSchema,
-  price: z.string().openapi({ description: 'Price in micro-LAUNCH' }),
+  price: z.string().openapi({ description: 'Price in micro-COIN' }),
   isActive: z.boolean().optional(),
 }).openapi({ ref: 'AdminUpdateVipConfigRequest' });

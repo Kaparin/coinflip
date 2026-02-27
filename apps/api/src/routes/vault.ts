@@ -218,7 +218,7 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
       contract: env.LAUNCH_CW20_ADDR,
       msg: depositMsg,
       amount,
-      instruction: 'Sign this CW20 Send transaction via Keplr to deposit LAUNCH tokens.',
+      instruction: 'Sign this CW20 Send transaction via Keplr to deposit COIN tokens.',
     },
   });
 });

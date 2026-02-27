@@ -112,7 +112,7 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
             <div>
               <h3 className="text-sm font-bold">{t('sponsored.title')}</h3>
               <p className="text-[10px] text-[var(--color-text-secondary)]">
-                {t('sponsored.price')}: {formatLaunch(price)} LAUNCH
+                {t('sponsored.price')}: {formatLaunch(price)} COIN
               </p>
             </div>
           </div>
@@ -254,7 +254,7 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
                 ) : (
                   <Send size={16} />
                 )}
-                {t('sponsored.submit')} ({formatLaunch(price)} LAUNCH)
+                {t('sponsored.submit')} ({formatLaunch(price)} COIN)
               </button>
             </div>
           )}

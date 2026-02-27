@@ -34,7 +34,7 @@ export class EventService {
       .values({
         txhash: params.txhash,
         amount: params.amount,
-        denom: 'LAUNCH',
+        denom: 'COIN',
         source: params.source,
       })
       .returning();

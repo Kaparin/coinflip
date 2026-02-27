@@ -44,7 +44,7 @@ export function JackpotTab() {
     <div className="space-y-4">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Total Pooled" value={formatLaunch(totalPooled.toString())} sub="LAUNCH" />
+        <StatCard label="Total Pooled" value={formatLaunch(totalPooled.toString())} sub="COIN" />
         <StatCard label="Active Tiers" value={`${activeTiers} / ${tiers.length}`} />
         <StatCard label="Drawing" value={drawingPools} warn={drawingPools > 0} />
       </div>

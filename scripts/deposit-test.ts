@@ -1,5 +1,5 @@
 /**
- * Deposit LAUNCH tokens into the CoinFlip vault for test players.
+ * Deposit COIN tokens into the CoinFlip vault for test players.
  * Sends CW20 tokens via MsgExecuteContract (CW20 Send to contract).
  */
 import { resolve } from 'node:path';
@@ -17,7 +17,7 @@ const RPC = process.env.AXIOME_RPC_URL!;
 const CW20_ADDR = process.env.LAUNCH_CW20_ADDR!;
 const CONTRACT_ADDR = process.env.COINFLIP_CONTRACT_ADDR!;
 
-const DEPOSIT_AMOUNT = '1000000000'; // 1,000,000,000 LAUNCH tokens
+const DEPOSIT_AMOUNT = '1000000000'; // 1,000,000,000 COIN tokens
 
 interface Player {
   name: string;
@@ -51,7 +51,7 @@ async function depositForPlayer(player: Player) {
     gasPrice: GasPrice.fromString('0.025uaxm'),
   });
 
-  // CW20 Send message: send LAUNCH tokens to the CoinFlip contract with deposit msg
+  // CW20 Send message: send COIN tokens to the CoinFlip contract with deposit msg
   const sendMsg = {
     send: {
       contract: CONTRACT_ADDR,
@@ -70,7 +70,7 @@ async function depositForPlayer(player: Player) {
     }),
   };
 
-  console.log(`Sending ${DEPOSIT_AMOUNT} LAUNCH to vault...`);
+  console.log(`Sending ${DEPOSIT_AMOUNT} COIN to vault...`);
 
   try {
     const result = await client.signAndBroadcast(address, [msg], 'auto', 'CoinFlip vault deposit');
@@ -91,7 +91,7 @@ async function main() {
   console.log('CoinFlip Vault Deposit Script');
   console.log(`CW20: ${CW20_ADDR}`);
   console.log(`Contract: ${CONTRACT_ADDR}`);
-  console.log(`Amount: ${DEPOSIT_AMOUNT} LAUNCH per player`);
+  console.log(`Amount: ${DEPOSIT_AMOUNT} COIN per player`);
 
   for (const player of players) {
     await depositForPlayer(player);

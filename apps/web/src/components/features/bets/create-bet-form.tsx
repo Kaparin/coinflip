@@ -315,7 +315,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           <div className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
             <span className="font-semibold text-[var(--color-text)]">{parsedAmount.toLocaleString()}</span>
             <LaunchTokenIcon size={45} />
-            <span>LAUNCH</span>
+            <span>COIN</span>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] animate-pulse mt-1">
             {t('common.confirming')}

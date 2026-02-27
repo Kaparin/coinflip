@@ -192,7 +192,7 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <LaunchTokenIcon size={28} />
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">LAUNCH</span>
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
                 </div>
               </div>
             </div>

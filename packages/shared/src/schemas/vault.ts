@@ -5,14 +5,14 @@ import { AmountSchema } from './common.js';
 // ---- Deposit ----
 export const DepositRequestSchema = z
   .object({
-    amount: AmountSchema.openapi({ description: 'Amount of LAUNCH to deposit', example: '500' }),
+    amount: AmountSchema.openapi({ description: 'Amount of COIN to deposit', example: '500' }),
   })
   .openapi({ ref: 'DepositRequest' });
 
 // ---- Withdraw ----
 export const WithdrawRequestSchema = z
   .object({
-    amount: AmountSchema.openapi({ description: 'Amount of LAUNCH to withdraw', example: '200' }),
+    amount: AmountSchema.openapi({ description: 'Amount of COIN to withdraw', example: '200' }),
   })
   .openapi({ ref: 'WithdrawRequest' });
 

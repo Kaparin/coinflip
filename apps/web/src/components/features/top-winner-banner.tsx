@@ -68,7 +68,7 @@ export function TopWinnerBanner() {
               </div>
               <div className="flex items-center justify-end gap-0.5 mt-0.5">
                 <LaunchTokenIcon size={10} />
-                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">LAUNCH</span>
+                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">COIN</span>
               </div>
             </div>
             <ChevronRight size={14} className="text-[var(--color-text-secondary)] group-hover:text-amber-400 transition-colors shrink-0" />

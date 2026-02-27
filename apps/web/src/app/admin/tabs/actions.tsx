@@ -137,7 +137,7 @@ function UnlockFundsAction() {
           type="text"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount (micro LAUNCH)"
+          placeholder="Amount (micro COIN)"
           className="w-40 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <button

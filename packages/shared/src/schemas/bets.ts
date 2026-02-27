@@ -6,7 +6,7 @@ import { MAX_BATCH_SIZE, MIN_BATCH_SIZE } from '../constants.js';
 // ---- Create bet ----
 export const CreateBetRequestSchema = z
   .object({
-    amount: AmountSchema.openapi({ description: 'Bet amount in LAUNCH tokens', example: '100' }),
+    amount: AmountSchema.openapi({ description: 'Bet amount in COIN tokens', example: '100' }),
   })
   .openapi({ ref: 'CreateBetRequest' });
 

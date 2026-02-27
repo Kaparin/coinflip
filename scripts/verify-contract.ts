@@ -60,7 +60,7 @@ async function main() {
   log(`Max daily/user: ${config.max_daily_amount_per_user}`);
 
   // 2. Check CW20 token info
-  log("\n--- Querying LAUNCH CW20 token info ---");
+  log("\n--- Querying COIN CW20 token info ---");
   try {
     const tokenInfo = await client.queryContractSmart(LAUNCH_CW20, {
       token_info: {},
@@ -74,19 +74,19 @@ async function main() {
   }
 
   // 3. Check relayer CW20 balance
-  log("\n--- Querying relayer LAUNCH balance ---");
+  log("\n--- Querying relayer COIN balance ---");
   try {
     const cw20Balance = await client.queryContractSmart(LAUNCH_CW20, {
       balance: { address: account.address },
     });
-    log(`Relayer LAUNCH balance: ${cw20Balance.balance}`);
+    log(`Relayer COIN balance: ${cw20Balance.balance}`);
   } catch (err) {
     log(`Warning: Could not query CW20 balance: ${err}`);
   }
 
   // 4. Test deposit (small amount)
-  const TEST_AMOUNT = "1000000"; // 1 LAUNCH
-  log(`\n--- Test deposit: ${TEST_AMOUNT} LAUNCH ---`);
+  const TEST_AMOUNT = "1000000"; // 1 COIN
+  log(`\n--- Test deposit: ${TEST_AMOUNT} COIN ---`);
   try {
     const depositMsg = {
       send: {
@@ -112,7 +112,7 @@ async function main() {
     log(`Vault locked: ${vaultBal.locked}`);
 
     // 5. Test withdraw
-    log(`\n--- Test withdraw: ${TEST_AMOUNT} LAUNCH ---`);
+    log(`\n--- Test withdraw: ${TEST_AMOUNT} COIN ---`);
     const withdrawResult = await client.execute(
       account.address,
       CONTRACT_ADDR,
@@ -128,7 +128,7 @@ async function main() {
     log(`Vault after withdraw — available: ${vaultBalAfter.available}, locked: ${vaultBalAfter.locked}`);
   } catch (err) {
     log(`Deposit/withdraw test failed: ${err}`);
-    log("This may be expected if the relayer has no LAUNCH tokens yet.");
+    log("This may be expected if the relayer has no COIN tokens yet.");
   }
 
   log("\n=== Verification complete! ===");

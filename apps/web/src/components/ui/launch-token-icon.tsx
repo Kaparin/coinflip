@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 
-const LAUNCH_TOKEN_LOGO = '/launch-token-logo.png';
+const LAUNCH_TOKEN_LOGO = '/coin-token-logo.png';
 
 export interface LaunchTokenIconProps {
   /** Size in pixels. Default: 48 */
@@ -15,7 +15,7 @@ export function LaunchTokenIcon({ size = 48, className = '' }: LaunchTokenIconPr
   return (
     <Image
       src={LAUNCH_TOKEN_LOGO}
-      alt="LAUNCH"
+      alt="COIN"
       width={size}
       height={size}
       className={`inline-block align-middle object-contain shrink-0 ${className}`}

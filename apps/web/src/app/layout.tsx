@@ -4,7 +4,7 @@ import { Providers } from './providers';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000';
 const TITLE = 'Heads or Tails — PvP on Axiome';
-const DESCRIPTION = 'Wager LAUNCH tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.';
+const DESCRIPTION = 'Wager COIN tokens in a provably fair peer-to-peer coin flip game on Axiome Chain.';
 
 export const metadata: Metadata = {
   title: TITLE,

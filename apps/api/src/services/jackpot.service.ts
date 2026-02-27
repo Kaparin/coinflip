@@ -248,7 +248,7 @@ class JackpotService {
         userId: winner.userId,
         type: 'jackpot_won',
         title: `Jackpot ${displayName} Won!`,
-        message: `You won the ${displayName} Jackpot — ${prizeAmount} LAUNCH!`,
+        message: `You won the ${displayName} Jackpot — ${prizeAmount} COIN!`,
         metadata: {
           poolId,
           tierId: pool.tierId,

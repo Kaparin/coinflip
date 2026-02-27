@@ -105,8 +105,8 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
               {r.description && <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{r.description}</div>}
               <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] text-[var(--color-text-secondary)]">
                 <span>{fmtDate(r.startsAt)} — {fmtDate(r.endsAt)}</span>
-                <span className="font-bold text-[var(--color-success)]">Prize: {formatLaunch(r.totalPrizePool)} LAUNCH</span>
-                {r.pricePaid && <span>Paid: {formatLaunch(r.pricePaid)} LAUNCH</span>}
+                <span className="font-bold text-[var(--color-success)]">Prize: {formatLaunch(r.totalPrizePool)} COIN</span>
+                {r.pricePaid && <span>Paid: {formatLaunch(r.pricePaid)} COIN</span>}
               </div>
               {(r.sponsorNickname || r.sponsorAddress) && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--color-text-secondary)]">
@@ -867,7 +867,7 @@ export function EventsTab() {
 
           {/* Prize Pool */}
           <div>
-            <label className={labelCls}>Total Prize Pool (LAUNCH)</label>
+            <label className={labelCls}>Total Prize Pool (COIN)</label>
             <input
               value={formPrizePool}
               onChange={(e) => setFormPrizePool(e.target.value)}
@@ -908,7 +908,7 @@ export function EventsTab() {
                     : 'text-[var(--color-text-secondary)]'
                 }`}
               >
-                Total: {prizesTotal} / {formPrizePool || '0'} LAUNCH
+                Total: {prizesTotal} / {formPrizePool || '0'} COIN
               </span>
             </div>
 
@@ -926,7 +926,7 @@ export function EventsTab() {
                     type="number"
                     min="1"
                   />
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">LAUNCH</span>
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
                   <button
                     type="button"
                     onClick={() => removePrize(index)}
@@ -1072,7 +1072,7 @@ export function EventsTab() {
                     <span className="font-bold">End:</span> {fmtDate(detailEvent.endsAt)}
                   </div>
                   <div>
-                    <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} LAUNCH
+                    <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} COIN
                   </div>
                   <div>
                     <span className="font-bold">Participants:</span> {detailEvent.participantCount}
@@ -1260,7 +1260,7 @@ export function EventsTab() {
                             <td className="px-2 py-1.5 font-bold">#{w.finalRank ?? idx + 1}</td>
                             <td className="px-2 py-1.5 font-mono">{shortAddr(w.address)}</td>
                             <td className="px-2 py-1.5 text-right">
-                              {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} LAUNCH` : '-'}
+                              {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} COIN` : '-'}
                             </td>
                             <td className="px-2 py-1.5 text-center">
                               {w.prizeTxHash ? (
@@ -1338,7 +1338,7 @@ export function EventsTab() {
                         {fmtDate(event.startsAt)} &mdash; {fmtDate(event.endsAt)}
                       </span>
                       <span>{event.participantCount} participants</span>
-                      <span>Prize: {formatLaunch(event.totalPrizePool)} LAUNCH</span>
+                      <span>Prize: {formatLaunch(event.totalPrizePool)} COIN</span>
                     </div>
                     {configStr && (
                       <div className="mt-1 text-[10px] italic text-[var(--color-text-secondary)]">{configStr}</div>

@@ -44,17 +44,17 @@ async function main() {
   // Step 1: Check vault balances
   console.log('--- Step 1: Check vault balances ---');
   const yangBalance = await apiCall('/api/v1/vault/balance', 'GET', YANG);
-  console.log(`  Yang: ${yangBalance?.data?.available ?? '?'} LAUNCH available`);
+  console.log(`  Yang: ${yangBalance?.data?.available ?? '?'} COIN available`);
   const teraBalance = await apiCall('/api/v1/vault/balance', 'GET', TERA);
-  console.log(`  Tera: ${teraBalance?.data?.available ?? '?'} LAUNCH available`);
+  console.log(`  Tera: ${teraBalance?.data?.available ?? '?'} COIN available`);
 
   if (BigInt(yangBalance?.data?.available ?? 0) < 100n) {
     console.error('  Yang has insufficient balance!');
     return;
   }
 
-  // Step 2: Yang creates a bet (Heads, 10,000,000 LAUNCH)
-  console.log('\n--- Step 2: Yang creates bet (10000000 LAUNCH, Heads) ---');
+  // Step 2: Yang creates a bet (Heads, 10,000,000 COIN)
+  console.log('\n--- Step 2: Yang creates bet (10000000 COIN, Heads) ---');
   const secret = generateSecret(); // 64 hex chars (32 bytes)
   const side = 'heads';
   // Commitment = SHA256("coinflip_v1" || maker_address || side || secret_bytes)
@@ -116,9 +116,9 @@ async function main() {
   console.log('\n--- Step 6: Final balances ---');
   await new Promise(r => setTimeout(r, 2000)); // wait for indexer
   const yangFinal = await apiCall('/api/v1/vault/balance', 'GET', YANG);
-  console.log(`  Yang: ${yangFinal?.data?.available ?? '?'} LAUNCH available`);
+  console.log(`  Yang: ${yangFinal?.data?.available ?? '?'} COIN available`);
   const teraFinal = await apiCall('/api/v1/vault/balance', 'GET', TERA);
-  console.log(`  Tera: ${teraFinal?.data?.available ?? '?'} LAUNCH available`);
+  console.log(`  Tera: ${teraFinal?.data?.available ?? '?'} COIN available`);
 
   // Step 7: Check bet details
   console.log('\n--- Step 7: Bet details ---');

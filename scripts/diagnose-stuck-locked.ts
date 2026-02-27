@@ -49,8 +49,8 @@ async function main() {
     vault_balance: { address: ADDRESS },
   });
   console.log('1. CHAIN vault_balance:');
-  console.log(`   available: ${chainBalance.available} (${fromMicroLaunch(chainBalance.available)} LAUNCH)`);
-  console.log(`   locked:    ${chainBalance.locked} (${fromMicroLaunch(chainBalance.locked)} LAUNCH)\n`);
+  console.log(`   available: ${chainBalance.available} (${fromMicroLaunch(chainBalance.available)} COIN)`);
+  console.log(`   locked:    ${chainBalance.locked} (${fromMicroLaunch(chainBalance.locked)} COIN)\n`);
 
   // 2. Chain user_bets (all bets where user is maker or acceptor)
   const chainUserBets = await queryChain<{ bets: Array<{
@@ -71,7 +71,7 @@ async function main() {
     for (const b of chainUserBets.bets) {
       const role = b.maker === ADDRESS ? 'maker' : 'acceptor';
       const created = new Date(b.created_at_time > 1e12 ? b.created_at_time : b.created_at_time * 1000).toISOString();
-      console.log(`   - Bet #${b.id}: ${fromMicroLaunch(b.amount)} LAUNCH, status=${b.status}, role=${role}, created=${created}`);
+      console.log(`   - Bet #${b.id}: ${fromMicroLaunch(b.amount)} COIN, status=${b.status}, role=${role}, created=${created}`);
     }
     console.log();
   }
@@ -109,8 +109,8 @@ async function main() {
   if (!vb) {
     console.log('   (no row — user has no vault_balances record)\n');
   } else {
-    console.log(`   available: ${vb.available} (${fromMicroLaunch(vb.available)} LAUNCH)`);
-    console.log(`   locked:    ${vb.locked} (${fromMicroLaunch(vb.locked)} LAUNCH)`);
+    console.log(`   available: ${vb.available} (${fromMicroLaunch(vb.available)} COIN)`);
+    console.log(`   locked:    ${vb.locked} (${fromMicroLaunch(vb.locked)} COIN)`);
     console.log(`   updated_at: ${vb.updated_at}\n`);
   }
 
@@ -130,7 +130,7 @@ async function main() {
   } else {
     for (const b of dbBets) {
       const role = b.maker_user_id === user.id ? 'maker' : 'acceptor';
-      console.log(`   - Bet #${b.bet_id}: ${fromMicroLaunch(b.amount)} LAUNCH, status=${b.status}, role=${role}`);
+      console.log(`   - Bet #${b.bet_id}: ${fromMicroLaunch(b.amount)} COIN, status=${b.status}, role=${role}`);
       console.log(`     created=${b.created_time}, accepted=${b.accepted_time ?? '-'}, resolved=${b.resolved_time ?? '-'}`);
     }
     console.log();
@@ -152,11 +152,11 @@ async function main() {
     const activeChainBets = chainUserBets.bets.filter(b =>
       ['open', 'accepted'].includes(b.status.toLowerCase()),
     );
-    console.log(`Chain has ${fromMicroLaunch(chainBalance.locked)} LAUNCH locked.`);
+    console.log(`Chain has ${fromMicroLaunch(chainBalance.locked)} COIN locked.`);
     console.log(`Active bets on chain: ${activeChainBets.length}`);
     for (const b of activeChainBets) {
       console.log(`\n   Bet #${b.id} (${b.status}):`);
-      console.log(`   - Amount: ${fromMicroLaunch(b.amount)} LAUNCH`);
+      console.log(`   - Amount: ${fromMicroLaunch(b.amount)} COIN`);
       console.log(`   - Maker: ${b.maker}`);
       console.log(`   - Acceptor: ${b.acceptor ?? '(none)'}`);
       const role = b.maker === ADDRESS ? 'maker' : 'acceptor';

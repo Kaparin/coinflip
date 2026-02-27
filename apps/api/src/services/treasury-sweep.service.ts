@@ -262,7 +262,7 @@ class TreasurySweepService {
       await db.insert(treasuryLedger).values({
         txhash: transferResult.txHash ?? `sweep_${userId}_${Date.now()}`,
         amount: sweepAmount.toString(),
-        denom: 'LAUNCH',
+        denom: 'COIN',
         source: 'treasury_sweep',
       });
 

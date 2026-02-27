@@ -66,7 +66,7 @@ export const DISPLAY_DENOM = 'AXM';
 export const COIN_DECIMALS = 6;
 
 /** CW20 token denom label */
-export const LAUNCH_TOKEN_LABEL = 'LAUNCH';
+export const LAUNCH_TOKEN_LABEL = 'COIN';
 
 /** Gas adjustment multiplier for estimation */
 export const GAS_ADJUSTMENT = 1.4;

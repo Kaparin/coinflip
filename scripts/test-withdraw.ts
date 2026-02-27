@@ -20,7 +20,7 @@ const CW20 = process.env.LAUNCH_CW20_ADDR!;
 const RELAYER_MNEMONIC = process.env.RELAYER_MNEMONIC!;
 const YANG = 'axm1djudvj9cdyt96t6a0ayqq0d75k8xztvkcm30xq';
 
-const WITHDRAW_AMOUNT = '100000000'; // 100M LAUNCH
+const WITHDRAW_AMOUNT = '100000000'; // 100M COIN
 
 async function getVaultBalance(address: string): Promise<{ available: string; locked: string }> {
   const q = btoa(JSON.stringify({ vault_balance: { address } }));
@@ -45,7 +45,7 @@ async function main() {
   console.log(`  CW20 wallet: ${cw20Before}`);
 
   // Withdraw via relayer (authz)
-  console.log(`\nWithdrawing ${WITHDRAW_AMOUNT} LAUNCH from vault...`);
+  console.log(`\nWithdrawing ${WITHDRAW_AMOUNT} COIN from vault...`);
 
   const registry = new Registry();
   registry.register('/cosmos.authz.v1beta1.MsgExec', MsgExec);
@@ -105,7 +105,7 @@ async function main() {
   console.log(`  CW20 wallet: ${cw20After}`);
 
   const diff = BigInt(cw20After) - BigInt(cw20Before);
-  console.log(`\n  CW20 gained: ${diff} LAUNCH`);
+  console.log(`\n  CW20 gained: ${diff} COIN`);
 
   client.disconnect();
 }

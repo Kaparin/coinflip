@@ -133,7 +133,7 @@ class VipService {
     await db.insert(treasuryLedger).values({
       txhash: `vip_${crypto.randomUUID()}`,
       amount: price,
-      denom: 'LAUNCH',
+      denom: 'COIN',
       source: 'vip_subscription',
     });
 

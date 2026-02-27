@@ -373,7 +373,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
         </div>
         {isRevealed && (
           <p className={`text-xs font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
-            {isWinner ? `+${payout} LAUNCH` : `-${formatLaunch(bet.amount)} LAUNCH`}
+            {isWinner ? `+${payout} COIN` : `-${formatLaunch(bet.amount)} COIN`}
           </p>
         )}
       </div>
@@ -592,7 +592,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 <div>
                   <p className="text-sm font-medium">{t('pin.title')} — {t('pin.slot')} #{pinTarget.slot}</p>
                   <p className="text-xs text-[var(--color-text-secondary)]">
-                    {t('pin.cost')}: <span className="font-bold text-amber-400">{formatLaunch(pinTarget.price)} LAUNCH</span>
+                    {t('pin.cost')}: <span className="font-bold text-amber-400">{formatLaunch(pinTarget.price)} COIN</span>
                   </p>
                 </div>
               </div>
@@ -607,7 +607,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                     <span className="text-[var(--color-text-secondary)]">
                       {targetSlot.userNickname || (targetSlot.userAddress ? `${targetSlot.userAddress.slice(0, 10)}...` : '—')}
                     </span>
-                    <span className="font-medium">{t('pin.paid')}: {formatLaunch(targetSlot.price)} LAUNCH</span>
+                    <span className="font-medium">{t('pin.paid')}: {formatLaunch(targetSlot.price)} COIN</span>
                   </div>
                 </div>
               )}
@@ -633,7 +633,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                   }}
                   className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] active:scale-[0.98]"
                 >
-                  {formatLaunch(pinTarget.price)} LAUNCH
+                  {formatLaunch(pinTarget.price)} COIN
                 </button>
               </div>
             </div>

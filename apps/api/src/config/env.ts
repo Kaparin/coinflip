@@ -49,7 +49,7 @@ export function validateProductionEnv(): void {
   const isProd = env.NODE_ENV === 'production';
   const required: Array<{ key: keyof typeof env; label: string }> = [
     { key: 'COINFLIP_CONTRACT_ADDR', label: 'CoinFlip smart contract address' },
-    { key: 'LAUNCH_CW20_ADDR', label: 'LAUNCH CW20 token contract address' },
+    { key: 'LAUNCH_CW20_ADDR', label: 'COIN CW20 token contract address' },
     { key: 'RELAYER_MNEMONIC', label: 'Relayer wallet mnemonic' },
     { key: 'RELAYER_ADDRESS', label: 'Relayer wallet address' },
     { key: 'TREASURY_ADDRESS', label: 'Treasury wallet address' },

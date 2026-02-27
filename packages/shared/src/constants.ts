@@ -1,27 +1,27 @@
 // ---- Token Decimals ----
 
 /**
- * LAUNCH CW20 token has 6 decimals.
- * 1 LAUNCH (human) = 1,000,000 micro-LAUNCH (on-chain).
- * All contract/API values are in micro-LAUNCH.
- * UI displays in LAUNCH (human-readable).
+ * COIN CW20 token has 6 decimals.
+ * 1 COIN (human) = 1,000,000 micro-COIN (on-chain).
+ * All contract/API values are in micro-COIN.
+ * UI displays in COIN (human-readable).
  */
 export const LAUNCH_DECIMALS = 6;
 export const LAUNCH_MULTIPLIER = 10 ** LAUNCH_DECIMALS; // 1_000_000
 
-/** Convert human-readable LAUNCH to micro-LAUNCH (on-chain) */
+/** Convert human-readable COIN to micro-COIN (on-chain) */
 export function toMicroLaunch(human: number | string): string {
   const n = typeof human === 'string' ? parseFloat(human) : human;
   return Math.round(n * LAUNCH_MULTIPLIER).toString();
 }
 
-/** Convert micro-LAUNCH (on-chain) to human-readable LAUNCH */
+/** Convert micro-COIN (on-chain) to human-readable COIN */
 export function fromMicroLaunch(micro: string | number | bigint): number {
   const n = typeof micro === 'bigint' ? Number(micro) : Number(micro);
   return n / LAUNCH_MULTIPLIER;
 }
 
-/** Format human-readable LAUNCH for display (e.g. 1,234.56) */
+/** Format human-readable COIN for display (e.g. 1,234.56) */
 export function formatLaunch(micro: string | number | bigint): string {
   const human = fromMicroLaunch(micro);
   if (human >= 1_000_000) return `${(human / 1_000_000).toFixed(human % 1_000_000 === 0 ? 0 : 2)}M`;
@@ -49,8 +49,8 @@ export const MAX_BATCH_SIZE = 20;
 /** Minimum bets in a batch request */
 export const MIN_BATCH_SIZE = 2;
 
-/** Minimum bet size in micro-LAUNCH (on-chain). 1 LAUNCH = 1,000,000 micro */
-export const MIN_BET_AMOUNT = '1000000'; // = 1 LAUNCH
+/** Minimum bet size in micro-COIN (on-chain). 1 COIN = 1,000,000 micro */
+export const MIN_BET_AMOUNT = '1000000'; // = 1 COIN
 
 /** Commission in basis points (1000 = 10%) */
 export const COMMISSION_BPS = 1000;
@@ -61,11 +61,11 @@ export const AUTHZ_GRANT_DURATION_DAYS = 30;
 /** Limit for chain open_bets query (contract pagination) */
 export const CHAIN_OPEN_BETS_LIMIT = 200;
 
-/** Daily max amount in play per wallet (micro-LAUNCH) */
-export const MAX_DAILY_AMOUNT = '1000000000000'; // = 1,000,000 LAUNCH
+/** Daily max amount in play per wallet (micro-COIN) */
+export const MAX_DAILY_AMOUNT = '1000000000000'; // = 1,000,000 COIN
 
 // ---- Preset bet amounts ----
-// Values are in HUMAN-READABLE LAUNCH. Frontend converts to micro for API.
+// Values are in HUMAN-READABLE COIN. Frontend converts to micro for API.
 export const BET_PRESETS = [1, 5, 10, 50, 100, 500] as const;
 export const BET_PRESET_LABELS = ['1', '5', '10', '50', '100', '500'] as const;
 
@@ -153,11 +153,11 @@ export type VipTier = (typeof VIP_TIER)[keyof typeof VIP_TIER];
 /** VIP subscription duration in days */
 export const VIP_DURATION_DAYS = 30;
 
-/** Default prices in micro-LAUNCH (admin-editable via vip_config table) */
+/** Default prices in micro-COIN (admin-editable via vip_config table) */
 export const VIP_DEFAULT_PRICES: Record<VipTier, string> = {
-  silver: '50000000',   // 50 LAUNCH
-  gold: '100000000',    // 100 LAUNCH
-  diamond: '200000000', // 200 LAUNCH
+  silver: '50000000',   // 50 COIN
+  gold: '100000000',    // 100 COIN
+  diamond: '200000000', // 200 COIN
 };
 
 /** Daily boost limits by tier (null = unlimited) */
@@ -173,7 +173,7 @@ export const BOOST_LIMITS: Record<VipTier | 'free', number | null> = {
 /** Number of pin slots at the top of the bet list */
 export const PIN_SLOTS = 3;
 
-/** Minimum pin price in micro-LAUNCH (3 LAUNCH) */
+/** Minimum pin price in micro-COIN (3 COIN) */
 export const PIN_MIN_PRICE = '3000000';
 
 /** Multiplier to outbid current pin holder */
