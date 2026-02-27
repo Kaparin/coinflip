@@ -8,7 +8,7 @@ import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
-import { useGetVaultBalance, useGetActiveEvents } from '@coinflip/api-client';
+import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { StatusChips } from '@/components/features/auth/status-chips';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
@@ -38,6 +38,8 @@ export function Header() {
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
+  const { data: currentUserData } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
+  const userNickname = (currentUserData as any)?.data?.nickname as string | null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [vipModalOpen, setVipModalOpen] = useState(false);
@@ -209,7 +211,9 @@ export function Header() {
                       <UserAvatar address={wallet.address} size={24} />
                     </VipAvatarFrame>
                   )}
-                  <span className="font-mono text-xs">{wallet.shortAddress ?? ''}</span>
+                  <span className={`text-xs max-w-[120px] truncate ${userNickname ? 'font-medium' : 'font-mono'}`}>
+                    {userNickname || wallet.shortAddress || ''}
+                  </span>
                   <ChevronDown size={12} className={`text-[var(--color-text-secondary)] transition-transform ${walletDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -225,7 +229,10 @@ export function Header() {
                           </VipAvatarFrame>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-mono break-all leading-relaxed">{wallet.address}</p>
+                          {userNickname && (
+                            <p className="text-sm font-bold truncate">{userNickname}</p>
+                          )}
+                          <p className="text-[10px] font-mono text-[var(--color-text-secondary)] break-all leading-relaxed">{wallet.address}</p>
                         </div>
                       </div>
                     </div>

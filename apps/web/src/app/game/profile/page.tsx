@@ -961,7 +961,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   );
 }
 
-function NicknameEditor({ currentNickname, address }: { currentNickname: string | null; address: string }) {
+function NicknameEditor({ currentNickname, address, loading }: { currentNickname: string | null; address: string; loading?: boolean }) {
   const { t } = useTranslation();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
@@ -1001,6 +1001,12 @@ function NicknameEditor({ currentNickname, address }: { currentNickname: string 
     if (e.key === 'Enter') handleSave();
     if (e.key === 'Escape') setEditing(false);
   }, [handleSave]);
+
+  if (loading) {
+    return (
+      <div className="h-5 w-24 animate-pulse rounded bg-[var(--color-border)]" />
+    );
+  }
 
   if (editing) {
     return (
@@ -1126,7 +1132,7 @@ export default function ProfilePage() {
   const wallet = useWalletContext();
   const { t, locale, setLocale } = useTranslation();
   const [copied, setCopied] = useState(false);
-  const { data: profileData } = useGetCurrentUser({ query: { enabled: wallet.isConnected } });
+  const { data: profileData, isLoading: profileLoading } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
 
   const isAdmin =
@@ -1230,6 +1236,7 @@ export default function ProfilePage() {
               <NicknameEditor
                 currentNickname={(profileData as any)?.data?.nickname ?? null}
                 address={wallet.address ?? ''}
+                loading={profileLoading}
               />
               <VipBadge tier={vipStatus?.tier} />
             </div>
