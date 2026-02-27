@@ -14,7 +14,7 @@ import { formatBetResponse } from '../lib/format.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
-import { removePendingLock, invalidateBalanceCache, getChainVaultBalance } from '../routes/vault.js';
+import { removePendingLock, invalidateBalanceCache, getChainVaultBalance, getTotalPendingLocks } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
@@ -706,14 +706,32 @@ async function syncPlayersBalanceFromChain(
 
     if (makerAddr) {
       const cb = chainBalances[idx++]!;
-      await vaultService.syncBalanceFromChain(makerUserId, cb.available, cb.locked, 0n);
+      // Adjust chain values by pending locks from OTHER in-flight bets.
+      // Without this, sync overwrites lockFunds decrements — enabling double-spend.
+      const makerPending = getTotalPendingLocks(makerAddr);
+      const makerAvail = BigInt(cb.available) - makerPending;
+      const makerLocked = BigInt(cb.locked) + makerPending;
+      await vaultService.syncBalanceFromChain(
+        makerUserId,
+        (makerAvail < 0n ? 0n : makerAvail).toString(),
+        makerLocked.toString(),
+        0n,
+      );
       invalidateBalanceCache(makerAddr);
       wsService.emitBalanceUpdated(makerAddr, cb);
     }
 
     if (acceptorAddr && acceptorUserId) {
       const cb = chainBalances[idx]!;
-      await vaultService.syncBalanceFromChain(acceptorUserId, cb.available, cb.locked, 0n);
+      const acceptorPending = getTotalPendingLocks(acceptorAddr);
+      const acceptorAvail = BigInt(cb.available) - acceptorPending;
+      const acceptorLocked = BigInt(cb.locked) + acceptorPending;
+      await vaultService.syncBalanceFromChain(
+        acceptorUserId,
+        (acceptorAvail < 0n ? 0n : acceptorAvail).toString(),
+        acceptorLocked.toString(),
+        0n,
+      );
       invalidateBalanceCache(acceptorAddr);
       wsService.emitBalanceUpdated(acceptorAddr, cb);
     }

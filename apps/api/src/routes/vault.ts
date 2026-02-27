@@ -157,16 +157,21 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   const locked = chainLocked + pendingLockAmount;
   const total = available + locked;
 
-  // Sync to DB in background (don't block response)
-  vaultService.syncBalanceFromChain(
-    user.id,
-    chainBalance.available,
-    chainBalance.locked,
-    0n,
-  ).catch(err => logger.warn({ err }, 'Background vault sync failed'));
-
   // Include server-side pending bet count
   const pendingBets = getPendingBetCount(user.id);
+
+  // Sync chain balance to DB ONLY when no pending locks/bets exist.
+  // During rapid bet creation/acceptance, lockFunds atomically decrements DB available.
+  // If we sync stale chain values (chain hasn't confirmed the lock yet), we overwrite
+  // the correct DB available with a higher chain value — allowing double-spending.
+  if (pendingLockAmount === 0n && pendingBets === 0) {
+    vaultService.syncBalanceFromChain(
+      user.id,
+      chainBalance.available,
+      chainBalance.locked,
+      0n,
+    ).catch(err => logger.warn({ err }, 'Background vault sync failed'));
+  }
   const openBetsCount = dbOpenCount + pendingBets;
 
   return c.json({
