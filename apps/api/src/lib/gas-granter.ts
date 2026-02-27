@@ -1,16 +1,14 @@
 /**
  * Gas Granter Resolver — determines who pays gas for a user's transaction.
  *
- * - VIP users: treasury pays gas explicitly (granter = treasuryAddress)
- * - Non-VIP users: no explicit granter — relayer falls back to treasury feegrant
- *   if available, otherwise relayer pays its own gas.
+ * Returns undefined for all users — the relayer handles gas payment internally:
+ * - If treasury→relayer feegrant exists on-chain, treasury pays gas
+ * - Otherwise, relayer pays gas from its own balance
+ *
+ * Previously tried to force user/treasury as explicit granter, but this requires
+ * on-chain feegrants that may not exist. The relayer fallback is more robust.
  */
 
-import { vipService } from '../services/vip.service.js';
-import { env } from '../config/env.js';
-
-export async function resolveGasGranter(userId: string, _userAddress: string): Promise<string | undefined> {
-  const vip = await vipService.getActiveVip(userId);
-  if (vip) return env.TREASURY_ADDRESS || undefined; // VIP → treasury pays
-  return undefined;                                    // non-VIP → relayer/treasury fallback
+export async function resolveGasGranter(_userId: string, _userAddress: string): Promise<string | undefined> {
+  return undefined;
 }
