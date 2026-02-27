@@ -336,19 +336,25 @@ authRouter.get('/grants', authMiddleware, async (c) => {
     // Ignore — user feegrant check is non-critical
   }
 
-  // Update session in DB
-  if (authzGranted) {
-    try {
-      const session = await userService.getActiveSession(user.id);
-      if (session && !session.authzEnabled) {
-        await userService.updateSession(session.id, {
-          authzEnabled: true,
-          authzExpirationTime: authzExpiresAt ? new Date(authzExpiresAt) : undefined,
-        });
+  // Update session in DB (authz + fee_sponsored flags)
+  try {
+    const session = await userService.getActiveSession(user.id);
+    if (session) {
+      const updates: Record<string, unknown> = {};
+      if (authzGranted && !session.authzEnabled) {
+        updates.authzEnabled = true;
+        updates.authzExpirationTime = authzExpiresAt ? new Date(authzExpiresAt) : undefined;
       }
-    } catch (err) {
-      logger.warn({ err }, 'Failed to update session authz status');
+      const effectiveFeeSponsored = feeGrantActive || userFeeGrantActive;
+      if (session.feeSponsored !== effectiveFeeSponsored) {
+        updates.feeSponsored = effectiveFeeSponsored;
+      }
+      if (Object.keys(updates).length > 0) {
+        await userService.updateSession(session.id, updates);
+      }
     }
+  } catch (err) {
+    logger.warn({ err }, 'Failed to update session grant status');
   }
 
   return c.json({

@@ -19,7 +19,7 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
 
   const oneClickEnabled = grantData?.authz_granted ?? false;
-  const gasSponsored = grantData?.fee_grant_active ?? false;
+  const gasSponsored = (grantData?.fee_grant_active ?? false) || (grantData?.user_fee_grant_active ?? false);
 
   const handleCopy = useCallback(() => {
     if (!address) return;
