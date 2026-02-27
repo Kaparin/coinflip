@@ -1,10 +1,14 @@
 import type { BetRow } from '../services/bet.service.js';
 import { REVEAL_TIMEOUT_SECS, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 
-type UserInfo = { address: string; nickname: string | null };
+type UserInfo = { address: string; nickname: string | null; vipTier?: string | null };
 
 /** Format a DB bet row into the API response shape */
-export function formatBetResponse(bet: BetRow, addressMap?: Map<string, UserInfo>) {
+export function formatBetResponse(
+  bet: BetRow,
+  addressMap?: Map<string, UserInfo>,
+  extra?: { is_boosted?: boolean; is_pinned?: boolean; pin_slot?: number | null },
+) {
   const revealDeadline = bet.acceptedTime
     ? new Date(bet.acceptedTime.getTime() + REVEAL_TIMEOUT_SECS * 1000).toISOString()
     : null;
@@ -43,6 +47,12 @@ export function formatBetResponse(bet: BetRow, addressMap?: Map<string, UserInfo
 
     reveal_deadline: revealDeadline,
     expires_at: expiresAt,
+
+    maker_vip_tier: makerInfo?.vipTier ?? null,
+    acceptor_vip_tier: acceptorInfo?.vipTier ?? null,
+    is_boosted: extra?.is_boosted ?? (bet as BetRow & { boostedAt?: Date | null }).boostedAt != null,
+    is_pinned: extra?.is_pinned ?? false,
+    pin_slot: extra?.pin_slot ?? null,
   };
 }
 

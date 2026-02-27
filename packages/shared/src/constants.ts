@@ -140,5 +140,54 @@ export const JACKPOT_POOL_STATUS = {
   COMPLETED: 'completed',
 } as const;
 
+// ---- VIP Subscriptions ----
+
+export const VIP_TIER = {
+  SILVER: 'silver',
+  GOLD: 'gold',
+  DIAMOND: 'diamond',
+} as const;
+
+export type VipTier = (typeof VIP_TIER)[keyof typeof VIP_TIER];
+
+/** VIP subscription duration in days */
+export const VIP_DURATION_DAYS = 30;
+
+/** Default prices in micro-LAUNCH (admin-editable via vip_config table) */
+export const VIP_DEFAULT_PRICES: Record<VipTier, string> = {
+  silver: '50000000',   // 50 LAUNCH
+  gold: '100000000',    // 100 LAUNCH
+  diamond: '200000000', // 200 LAUNCH
+};
+
+/** Daily boost limits by tier (null = unlimited) */
+export const BOOST_LIMITS: Record<VipTier | 'free', number | null> = {
+  free: 3,
+  silver: 10,
+  gold: null,
+  diamond: null,
+};
+
+// ---- Bet Pins (auction system) ----
+
+/** Number of pin slots at the top of the bet list */
+export const PIN_SLOTS = 3;
+
+/** Minimum pin price in micro-LAUNCH (3 LAUNCH) */
+export const PIN_MIN_PRICE = '3000000';
+
+/** Multiplier to outbid current pin holder */
+export const PIN_OUTBID_MULTIPLIER = 2;
+
+/** Refund percentage (BPS) when pinned bet expires naturally (50%) */
+export const PIN_EXPIRE_REFUND_BPS = 5000;
+
+// ---- VIP Jackpot Tiers ----
+/** Minimum VIP tier required to be eligible for VIP-exclusive jackpot tiers */
+export const VIP_JACKPOT_TIERS: Partial<Record<string, VipTier>> = {
+  mega: 'gold',
+  super_mega: 'diamond',
+};
+
 // ---- API versions ----
 export const API_V1_PREFIX = '/api/v1';

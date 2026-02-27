@@ -816,5 +816,43 @@
     "notifications": {
       "won": "Джекпот {tier} выиграл {winner} — {amount} LAUNCH!"
     }
+  },
+  "vip": {
+    "title": "VIP Подписка",
+    "month": "мес",
+    "subscribe": "Подписаться",
+    "upgrade": "Улучшить",
+    "purchasing": "Обработка...",
+    "purchaseSuccess": "VIP подписка активирована!",
+    "currentPlan": "Текущий план",
+    "included": "Включено",
+    "currentTier": "Текущий тир",
+    "expiresAt": "Истекает",
+    "perks": {
+      "badge": "Эксклюзивный VIP бейдж и рамка аватара",
+      "frame": "Анимированная рамка профиля",
+      "boosts10": "10 бустов ставок в день",
+      "boostsUnlimited": "Безлимитные бусты ставок",
+      "megaJackpot": "Участие в Мега джекпоте",
+      "superMegaJackpot": "Участие в Супер Мега джекпоте"
+    }
+  },
+  "boost": {
+    "title": "Буст",
+    "remaining": "{used}/{limit} бустов использовано сегодня",
+    "unlimited": "Безлимитные бусты",
+    "limitReached": "Дневной лимит бустов достигнут",
+    "alreadyBoosted": "Уже забустена",
+    "success": "Ставка забустена!"
+  },
+  "pin": {
+    "title": "Закрепить ставку",
+    "slot": "Слот {n}",
+    "empty": "Свободен",
+    "outbidPrice": "Перебить за {price} LAUNCH",
+    "minPrice": "Закрепить за {price} LAUNCH",
+    "noRefund": "Нет возврата при перебитии",
+    "expireRefund": "50% возврат если ставка истечёт",
+    "success": "Ставка закреплена!"
   }
 }

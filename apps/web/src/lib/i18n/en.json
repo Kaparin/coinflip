@@ -816,5 +816,43 @@
     "notifications": {
       "won": "{tier} jackpot won by {winner} — {amount} LAUNCH!"
     }
+  },
+  "vip": {
+    "title": "VIP Subscription",
+    "month": "month",
+    "subscribe": "Subscribe",
+    "upgrade": "Upgrade",
+    "purchasing": "Processing...",
+    "purchaseSuccess": "VIP subscription activated!",
+    "currentPlan": "Current Plan",
+    "included": "Included",
+    "currentTier": "Current tier",
+    "expiresAt": "Expires",
+    "perks": {
+      "badge": "Exclusive VIP badge & avatar frame",
+      "frame": "Animated profile frame",
+      "boosts10": "10 bet boosts per day",
+      "boostsUnlimited": "Unlimited bet boosts",
+      "megaJackpot": "Mega jackpot eligibility",
+      "superMegaJackpot": "Super Mega jackpot eligibility"
+    }
+  },
+  "boost": {
+    "title": "Boost",
+    "remaining": "{used}/{limit} boosts used today",
+    "unlimited": "Unlimited boosts",
+    "limitReached": "Daily boost limit reached",
+    "alreadyBoosted": "Already boosted",
+    "success": "Bet boosted!"
+  },
+  "pin": {
+    "title": "Pin Bet",
+    "slot": "Slot {n}",
+    "empty": "Empty",
+    "outbidPrice": "Outbid for {price} LAUNCH",
+    "minPrice": "Pin for {price} LAUNCH",
+    "noRefund": "No refund if outbid",
+    "expireRefund": "50% refund if bet expires",
+    "success": "Bet pinned!"
   }
 }

@@ -31,6 +31,8 @@ export const bets = pgTable(
     txhashCreate: text('txhash_create').notNull(),
     txhashAccept: text('txhash_accept'),
     txhashResolve: text('txhash_resolve'),
+
+    boostedAt: timestamp('boosted_at', { withTimezone: true }),
   },
   (table) => [
     index('bets_status_idx').on(table.status),

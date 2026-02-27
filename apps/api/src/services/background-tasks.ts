@@ -1698,7 +1698,15 @@ export function startBackgroundSweep(): void {
       await pendingSecretsService.cleanup().catch(err =>
         logger.warn({ err }, 'sweep: pending secrets cleanup failed'));
 
-      // 9. Cleanup expired sessions
+      // 10. Cleanup expired pin slots (pinned bets that are no longer open → 50% refund)
+      try {
+        const { pinService } = await import('./pin.service.js');
+        await pinService.cleanupExpiredPins();
+      } catch (err) {
+        logger.warn({ err }, 'sweep: pin cleanup failed');
+      }
+
+      // 11. Cleanup expired sessions
       try {
         const db = (await import('../lib/db.js')).getDb();
         const { sessions } = await import('@coinflip/db/schema');

@@ -404,8 +404,8 @@ export class BetService {
       .limit(limit);
   }
 
-  /** Build a map of userId -> { address, nickname } for a list of bets */
-  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, { address: string; nickname: string | null }>> {
+  /** Build a map of userId -> { address, nickname, vipTier } for a list of bets */
+  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, { address: string; nickname: string | null; vipTier: string | null }>> {
     const userIds = new Set<string>();
     for (const bet of betRows) {
       userIds.add(bet.makerUserId);
@@ -415,14 +415,24 @@ export class BetService {
 
     if (userIds.size === 0) return new Map();
 
-    const userRows = await this.db
-      .select({ id: users.id, address: users.address, nickname: users.profileNickname })
-      .from(users)
-      .where(inArray(users.id, [...userIds]));
+    const userRows = await this.db.execute(sql`
+      SELECT
+        u.id,
+        u.address,
+        u.profile_nickname AS nickname,
+        (SELECT vs.tier FROM vip_subscriptions vs
+         WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL
+         ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier
+      FROM users u
+      WHERE u.id IN ${sql`(${sql.join(
+        [...userIds].map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`}
+    `) as unknown as Array<{ id: string; address: string; nickname: string | null; vip_tier: string | null }>;
 
-    const map = new Map<string, { address: string; nickname: string | null }>();
+    const map = new Map<string, { address: string; nickname: string | null; vipTier: string | null }>();
     for (const u of userRows) {
-      map.set(u.id, { address: u.address, nickname: u.nickname });
+      map.set(u.id, { address: u.address, nickname: u.nickname, vipTier: u.vip_tier });
     }
     return map;
   }

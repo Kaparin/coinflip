@@ -14,6 +14,7 @@ import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { getCoinFlipStats } from './bets.js';
 import { jackpotService } from '../services/jackpot.service.js';
+import { vipService } from '../services/vip.service.js';
 import { wsService } from '../services/ws.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
@@ -892,4 +893,66 @@ adminRouter.get('/announcements', zValidator('query', AnnouncementListSchema), a
       hasMore: offset + limit < (countResult[0]?.count ?? 0),
     },
   });
+});
+
+// ═══════════════════════════════════════════
+// VIP Administration
+// ═══════════════════════════════════════════
+
+// GET /admin/vip/stats — VIP revenue and subscriber counts
+adminRouter.get('/vip/stats', async (c) => {
+  const stats = await vipService.getStats();
+  return c.json({ data: stats });
+});
+
+// GET /admin/vip/subscribers — list active VIP subscribers
+const VipSubscribersQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(50),
+  offset: z.coerce.number().min(0).default(0),
+});
+
+adminRouter.get('/vip/subscribers', zValidator('query', VipSubscribersQuerySchema), async (c) => {
+  const { limit, offset } = c.req.valid('query');
+  const subscribers = await vipService.getSubscribers(limit, offset);
+  return c.json({ data: subscribers });
+});
+
+// POST /admin/vip/grant — grant free VIP to a user
+const AdminGrantVipSchema = z.object({
+  userId: z.string().uuid(),
+  tier: z.enum(['silver', 'gold', 'diamond']),
+  days: z.number().int().min(1).max(365).default(30),
+});
+
+adminRouter.post('/vip/grant', zValidator('json', AdminGrantVipSchema), async (c) => {
+  const { userId, tier, days } = c.req.valid('json');
+  await vipService.grantVip(userId, tier, days);
+  logger.info({ userId, tier, days, admin: c.get('address') }, 'admin: VIP granted');
+  return c.json({ data: { status: 'ok', message: `Granted ${tier} VIP for ${days} days` } });
+});
+
+// POST /admin/vip/revoke — revoke a user's VIP
+const AdminRevokeVipSchema = z.object({
+  userId: z.string().uuid(),
+});
+
+adminRouter.post('/vip/revoke', zValidator('json', AdminRevokeVipSchema), async (c) => {
+  const { userId } = c.req.valid('json');
+  await vipService.revokeVip(userId);
+  logger.info({ userId, admin: c.get('address') }, 'admin: VIP revoked');
+  return c.json({ data: { status: 'ok', message: 'VIP subscription revoked' } });
+});
+
+// PUT /admin/vip/config — update tier price/active status
+const AdminUpdateVipConfigSchema = z.object({
+  tier: z.enum(['silver', 'gold', 'diamond']),
+  price: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+adminRouter.put('/vip/config', zValidator('json', AdminUpdateVipConfigSchema), async (c) => {
+  const body = c.req.valid('json');
+  await vipService.updateConfig(body.tier, { price: body.price, isActive: body.isActive });
+  logger.info({ ...body, admin: c.get('address') }, 'admin: VIP config updated');
+  return c.json({ data: { status: 'ok' } });
 });

@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
 import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipBadge } from '@/components/ui/vip-badge';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
 
@@ -38,6 +40,14 @@ export interface BetCardProps {
   pendingAction?: 'cancel' | 'accept' | null;
   /** This bet was recently accepted by current user, show processing UI */
   isAccepting?: boolean;
+  /** VIP tier of the maker */
+  makerVipTier?: string | null;
+  /** Whether this bet is boosted */
+  isBoosted?: boolean;
+  /** Whether this bet is pinned */
+  isPinned?: boolean;
+  /** Pin slot number (1-3) */
+  pinSlot?: number | null;
   onAccept?: (id: string) => void;
   onCancel?: (id: string) => void;
 }
@@ -196,6 +206,7 @@ export function BetCard({
   revealDeadline, expiresAt, acceptedAt, winner, acceptor,
   isMine = false, isAcceptor = false, index = 0, pendingBetId, pendingAction,
   isAccepting: isAcceptingProp = false,
+  makerVipTier, isBoosted, isPinned, pinSlot,
   onAccept, onCancel,
 }: BetCardProps) {
   const { t } = useTranslation();
@@ -277,8 +288,13 @@ export function BetCard({
         {/* Middle: Maker + Timer */}
         <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)] mb-2">
           <Link href={`/game/profile/${maker}`} className="flex items-center gap-1.5 min-w-0 group/maker" onClick={(e) => e.stopPropagation()}>
-            <UserAvatar address={maker} size={16} />
-            <span className="font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors">{makerNickname || truncAddr(maker)}</span>
+            <VipAvatarFrame tier={makerVipTier}>
+              <UserAvatar address={maker} size={16} />
+            </VipAvatarFrame>
+            <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier)}`}>{makerNickname || truncAddr(maker)}</span>
+            <VipBadge tier={makerVipTier} />
+            {isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">PIN</span>}
+            {isBoosted && !isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">&uarr;</span>}
           </Link>
           {status === 'open' && expiryDate && !expiryCountdown.isExpired ? (
             <span className={`flex items-center gap-1 font-mono tabular-nums ${

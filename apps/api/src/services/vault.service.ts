@@ -118,6 +118,34 @@ export class VaultService {
   }
 
   /**
+   * Atomically deduct from available balance (no locked increase).
+   * Used for off-chain payments: VIP subscriptions, pin purchases, etc.
+   * Returns the updated row, or null if insufficient balance.
+   */
+  async deductBalance(userId: string, amount: string) {
+    const result = await this.db
+      .update(vaultBalances)
+      .set({
+        available: sql`${vaultBalances.available}::numeric - ${amount}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(vaultBalances.userId, userId),
+          sql`${vaultBalances.available}::numeric >= ${amount}::numeric`,
+        ),
+      )
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ userId, amount }, 'deductBalance: insufficient available balance');
+      return null;
+    }
+
+    return result[0];
+  }
+
+  /**
    * Credit prize to user's bonus balance. This is separate from on-chain
    * available and is NOT overwritten by syncBalanceFromChain.
    * Bonus is an off-chain prize credit displayed alongside chain balance.

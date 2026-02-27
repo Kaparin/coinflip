@@ -591,3 +591,93 @@ export function useAdminSendAnnouncement() {
     },
   });
 }
+
+// ─── VIP Administration ──────────────────────────────────────
+
+interface VipStats {
+  active_count: number;
+  silver_count: number;
+  gold_count: number;
+  diamond_count: number;
+  total_revenue: string;
+  week_revenue: string;
+}
+
+interface VipSubscriber {
+  id: string;
+  userId: string;
+  tier: string;
+  pricePaid: string;
+  startedAt: string;
+  expiresAt: string;
+  address: string;
+  nickname: string | null;
+}
+
+export function useAdminVipStats() {
+  const { address } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'vip', 'stats'],
+    queryFn: () => adminFetch<VipStats>('/api/v1/admin/vip/stats', address!),
+    enabled: !!address,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminVipSubscribers(page = 0) {
+  const { address } = useWalletContext();
+  const limit = 20;
+  return useQuery({
+    queryKey: ['admin', 'vip', 'subscribers', page],
+    queryFn: () =>
+      adminFetchFull<{ data: VipSubscriber[] }>(`/api/v1/admin/vip/subscribers?limit=${limit}&offset=${page * limit}`, address!),
+    enabled: !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminGrantVip() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string; tier: string; days?: number }) =>
+      adminFetch<{ status: string; message: string }>('/api/v1/admin/vip/grant', address!, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'vip'] });
+    },
+  });
+}
+
+export function useAdminRevokeVip() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      adminFetch<{ status: string; message: string }>('/api/v1/admin/vip/revoke', address!, {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'vip'] });
+    },
+  });
+}
+
+export function useAdminUpdateVipConfig() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { tier: string; price?: string; isActive?: boolean }) =>
+      adminFetch<{ status: string }>('/api/v1/admin/vip/config', address!, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vip/config'] });
+    },
+  });
+}

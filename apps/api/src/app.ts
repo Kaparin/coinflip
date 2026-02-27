@@ -12,6 +12,7 @@ import { eventsRouter } from './routes/events.js';
 import { jackpotRouter } from './routes/jackpot.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { activityRouter } from './routes/activity.js';
+import { vipRouter } from './routes/vip.js';
 import { adminEventsRouter } from './routes/admin-events.js';
 import { adminTransactionsRouter } from './routes/admin-transactions.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -111,6 +112,7 @@ app.route('/api/v1/events', eventsRouter);
 app.route('/api/v1/jackpot', jackpotRouter);
 app.route('/api/v1/notifications', notificationsRouter);
 app.route('/api/v1/activity', activityRouter);
+app.route('/api/v1/vip', vipRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

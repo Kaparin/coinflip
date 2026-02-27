@@ -12,3 +12,4 @@ export { profileReactions } from './profile-reactions';
 export { jackpotTiers, jackpotPools, jackpotContributions } from './jackpot';
 export { userNotifications } from './notifications';
 export { announcements } from './announcements';
+export { vipSubscriptions, vipConfig, betPins, boostUsage } from './vip';

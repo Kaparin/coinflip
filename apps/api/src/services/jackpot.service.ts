@@ -9,7 +9,7 @@
 import crypto from 'node:crypto';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { jackpotTiers, jackpotPools, jackpotContributions, users, userNotifications } from '@coinflip/db/schema';
-import { JACKPOT_PER_TIER_BPS } from '@coinflip/shared/constants';
+import { JACKPOT_PER_TIER_BPS, VIP_JACKPOT_TIERS } from '@coinflip/shared/constants';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { wsService } from './ws.service.js';
@@ -157,10 +157,31 @@ class JackpotService {
       }
 
       // Get eligible users (total resolved bets >= minGames)
-      const eligible = await this.getEligibleUsers(pool.minGames);
+      let eligible = await this.getEligibleUsers(pool.minGames);
+
+      // VIP-exclusive tiers: filter by VIP tier
+      const requiredVipTier = VIP_JACKPOT_TIERS[pool.tierName];
+      if (requiredVipTier) {
+        const { vipService } = await import('./vip.service.js');
+        const vipTierOrder: Record<string, number> = { silver: 1, gold: 2, diamond: 3 };
+        const minTierLevel = vipTierOrder[requiredVipTier] ?? 0;
+
+        const vipFiltered: typeof eligible = [];
+        for (const user of eligible) {
+          const vip = await vipService.getActiveVip(user.userId);
+          if (vip && (vipTierOrder[vip.tier] ?? 0) >= minTierLevel) {
+            vipFiltered.push(user);
+          }
+        }
+        eligible = vipFiltered;
+        logger.info(
+          { poolId, tierName: pool.tierName, requiredVipTier, totalEligible: eligible.length },
+          'Jackpot VIP filter applied',
+        );
+      }
 
       if (eligible.length === 0) {
-        logger.warn({ poolId, minGames: pool.minGames }, 'Jackpot draw: no eligible users, staying in drawing state');
+        logger.warn({ poolId, minGames: pool.minGames, vipFilter: requiredVipTier ?? 'none' }, 'Jackpot draw: no eligible users, staying in drawing state');
         return;
       }
 

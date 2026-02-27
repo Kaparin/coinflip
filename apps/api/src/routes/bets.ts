@@ -45,6 +45,7 @@ export function getCoinFlipStats() {
 import type { AppEnv } from '../types.js';
 import type { RelayResult } from '../services/relayer.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
+import { pinService } from '../services/pin.service.js';
 
 // Re-export pending bet counts from shared lib (avoids circular deps with background-tasks)
 import { getPendingBetCount, incrementPendingBetCount, decrementPendingBetCount } from '../lib/pending-counts.js';
@@ -133,6 +134,11 @@ export const betsRouter = new Hono<AppEnv>();
 betsRouter.get('/', zValidator('query', BetListQuerySchema), async (c) => {
   const { cursor, limit, status, min_amount, max_amount } = c.req.valid('query');
 
+  // Get pin slots for the response
+  const pinSlots = await pinService.getPinSlots();
+  const pinnedBetIds = new Set(pinSlots.filter((s) => s.betId).map((s) => s.betId!));
+  const pinSlotMap = new Map(pinSlots.filter((s) => s.betId).map((s) => [s.betId!, s.slot]));
+
   const result = await betService.getOpenBets({
     cursor: cursor ?? undefined,
     limit,
@@ -143,8 +149,48 @@ betsRouter.get('/', zValidator('query', BetListQuerySchema), async (c) => {
 
   const addressMap = await betService.buildAddressMap(result.data);
 
+  // Separate pinned, boosted, and regular bets
+  const pinned: typeof result.data = [];
+  const boosted: typeof result.data = [];
+  const regular: typeof result.data = [];
+
+  for (const bet of result.data) {
+    const betIdStr = bet.betId.toString();
+    if (pinnedBetIds.has(betIdStr)) {
+      pinned.push(bet);
+    } else if (bet.boostedAt) {
+      boosted.push(bet);
+    } else {
+      regular.push(bet);
+    }
+  }
+
+  // Sort boosted by boostedAt DESC (newest boosts first)
+  boosted.sort((a, b) => {
+    const aTime = a.boostedAt?.getTime() ?? 0;
+    const bTime = b.boostedAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
+
+  // Sort pinned by slot number
+  pinned.sort((a, b) => {
+    const aSlot = pinSlotMap.get(a.betId.toString()) ?? 99;
+    const bSlot = pinSlotMap.get(b.betId.toString()) ?? 99;
+    return aSlot - bSlot;
+  });
+
+  const ordered = [...pinned, ...boosted, ...regular];
+
   return c.json({
-    data: result.data.map((bet) => formatBetResponse(bet, addressMap)),
+    data: ordered.map((bet) => {
+      const betIdStr = bet.betId.toString();
+      return formatBetResponse(bet, addressMap, {
+        is_pinned: pinnedBetIds.has(betIdStr),
+        pin_slot: pinSlotMap.get(betIdStr) ?? null,
+        is_boosted: bet.boostedAt != null,
+      });
+    }),
+    pin_slots: pinSlots,
     cursor: result.cursor,
     has_more: result.has_more,
   });

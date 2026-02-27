@@ -59,3 +59,16 @@ export {
   JackpotHistoryQuerySchema,
   JackpotEligibilityResponseSchema,
 } from './jackpot.js';
+
+export {
+  VipTierSchema,
+  PurchaseVipRequestSchema,
+  BoostBetRequestSchema,
+  PinBetRequestSchema,
+  VipConfigResponseSchema,
+  VipStatusResponseSchema,
+  PinSlotResponseSchema,
+  PinSlotsResponseSchema,
+  AdminGrantVipRequestSchema,
+  AdminUpdateVipConfigRequestSchema,
+} from './vip.js';
