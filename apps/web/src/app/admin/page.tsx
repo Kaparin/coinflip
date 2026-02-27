@@ -16,6 +16,7 @@ import {
   Settings,
   PieChart,
   Newspaper,
+  ShoppingCart,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { DashboardTab } from './tabs/dashboard';
@@ -31,8 +32,9 @@ import { VipTab } from './tabs/vip';
 import { ConfigTab } from './tabs/config';
 import { CommissionTab } from './tabs/commission';
 import { NewsTab } from './tabs/news';
+import { PresaleTab } from './tabs/presale';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news';
+type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news' | 'presale';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -45,6 +47,7 @@ const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'transactions', icon: ArrowLeftRight, label: 'Txns' },
   { id: 'announcements', icon: Megaphone, label: 'Announce' },
   { id: 'news', icon: Newspaper, label: 'News' },
+  { id: 'presale', icon: ShoppingCart, label: 'Presale' },
   { id: 'config', icon: Settings, label: 'Config' },
   { id: 'diagnostics', icon: AlertTriangle, label: 'Diag' },
   { id: 'actions', icon: Wrench, label: 'Actions' },
@@ -101,6 +104,7 @@ export default function AdminPage() {
       {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'commission' && <CommissionTab />}
       {activeTab === 'news' && <NewsTab />}
+      {activeTab === 'presale' && <PresaleTab />}
     </div>
   );
 }

@@ -24,6 +24,7 @@ export const AXIOME_CONNECT_PREFIX = 'axiomesign://';
 /** Contract addresses */
 export const COINFLIP_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_CONTRACT ?? '';
 export const LAUNCH_CW20_CONTRACT = process.env.NEXT_PUBLIC_LAUNCH_CW20 ?? '';
+export const PRESALE_CONTRACT = process.env.NEXT_PUBLIC_PRESALE_CONTRACT ?? '';
 
 /** Admin wallet address (for showing admin link in UI) */
 export const ADMIN_ADDRESS = process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? '';

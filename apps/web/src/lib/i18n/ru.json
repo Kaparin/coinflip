@@ -595,7 +595,31 @@
     "profile": "Профиль",
     "events": "События",
     "news": "Новости",
-    "vip": "VIP"
+    "vip": "VIP",
+    "presale": "Купить COIN"
+  },
+  "presale": {
+    "title": "Пресейл COIN",
+    "subtitle": "Обменяйте AXM на токены COIN по специальному курсу",
+    "rate": "Курс обмена",
+    "rateValue": "1 AXM = {rate} COIN",
+    "available": "Доступно COIN",
+    "youPay": "Вы платите (AXM)",
+    "youGet": "Вы получите (COIN)",
+    "balance": "Ваш баланс AXM",
+    "buy": "Купить COIN",
+    "buying": "Покупка...",
+    "success": "Покупка завершена!",
+    "successDetail": "Вы купили {amount} COIN за {axm} AXM",
+    "disabled": "Пресейл временно приостановлен",
+    "noContract": "Контракт пресейла не настроен",
+    "soldOut": "Все токены COIN проданы",
+    "insufficientAxm": "Недостаточно AXM",
+    "enterAmount": "Введите сумму",
+    "totalRaised": "Всего собрано AXM",
+    "totalSold": "Всего продано COIN",
+    "presets": "Быстрый выбор",
+    "txHash": "Транзакция"
   },
   "admin": {
     "title": "Панель администратора",

@@ -18,7 +18,7 @@ import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { SigningStargateClient, GasPrice, calculateFee } from '@cosmjs/stargate';
 import { DEFAULT_GAS_PRICE } from '@coinflip/shared/chain';
-import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT } from '@/lib/constants';
+import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, PRESALE_CONTRACT } from '@/lib/constants';
 import { toMicroLaunch } from '@coinflip/shared/constants';
 import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
@@ -404,6 +404,118 @@ export async function signDirectWithdraw(
     withdrawMsg,
     'auto',
     'CoinFlip withdraw',
+  );
+
+  return {
+    txHash: result.transactionHash,
+    height: result.height,
+  };
+}
+
+// ---- Presale: Buy COIN with native AXM ----
+
+/**
+ * Buy COIN tokens by sending native AXM to the presale contract.
+ * The contract executes a CW20 transfer of COIN tokens back to the buyer.
+ *
+ * @param wallet - CosmJS wallet instance
+ * @param address - Buyer's axm1... address
+ * @param microAxmAmount - Amount in uaxm (micro-AXM) to spend
+ */
+export async function signPresaleBuy(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  microAxmAmount: string,
+): Promise<{ txHash: string; height: number }> {
+  const client = await getCosmWasmClient(wallet);
+
+  const result = await client.execute(
+    address,
+    PRESALE_CONTRACT,
+    { buy: {} },
+    'auto',
+    'COIN Presale purchase',
+    [{ denom: 'uaxm', amount: microAxmAmount }],
+  );
+
+  return {
+    txHash: result.transactionHash,
+    height: result.height,
+  };
+}
+
+// ---- Presale Admin: Update Config ----
+
+export async function signPresaleUpdateConfig(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  config: {
+    rate_num?: number;
+    rate_denom?: number;
+    enabled?: boolean;
+    max_per_tx?: string;
+  },
+): Promise<{ txHash: string; height: number }> {
+  const client = await getCosmWasmClient(wallet);
+
+  const msg: Record<string, unknown> = {};
+  if (config.rate_num !== undefined) msg.rate_num = config.rate_num;
+  if (config.rate_denom !== undefined) msg.rate_denom = config.rate_denom;
+  if (config.enabled !== undefined) msg.enabled = config.enabled;
+  if (config.max_per_tx !== undefined) msg.max_per_tx = config.max_per_tx;
+
+  const result = await client.execute(
+    address,
+    PRESALE_CONTRACT,
+    { update_config: msg },
+    'auto',
+    'Presale config update',
+  );
+
+  return {
+    txHash: result.transactionHash,
+    height: result.height,
+  };
+}
+
+// ---- Presale Admin: Withdraw AXM ----
+
+export async function signPresaleWithdrawAxm(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  microAmount: string,
+): Promise<{ txHash: string; height: number }> {
+  const client = await getCosmWasmClient(wallet);
+
+  const result = await client.execute(
+    address,
+    PRESALE_CONTRACT,
+    { withdraw_axm: { amount: microAmount } },
+    'auto',
+    'Presale AXM withdraw',
+  );
+
+  return {
+    txHash: result.transactionHash,
+    height: result.height,
+  };
+}
+
+// ---- Presale Admin: Withdraw COIN ----
+
+export async function signPresaleWithdrawCoin(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  microAmount: string,
+): Promise<{ txHash: string; height: number }> {
+  const client = await getCosmWasmClient(wallet);
+
+  const result = await client.execute(
+    address,
+    PRESALE_CONTRACT,
+    { withdraw_coin: { amount: microAmount } },
+    'auto',
+    'Presale COIN withdraw',
   );
 
   return {

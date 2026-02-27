@@ -2,12 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Puzzle, User, Trophy, Newspaper } from 'lucide-react';
+import { Puzzle, User, Trophy, Newspaper, ShoppingCart } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetActiveEvents } from '@coinflip/api-client';
 import { useTranslation } from '@/lib/i18n';
+import { PRESALE_CONTRACT } from '@/lib/constants';
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   {
     href: '/game',
     labelKey: 'nav.play' as const,
@@ -24,6 +25,16 @@ const NAV_ITEMS = [
     icon: <User size={20} />,
   },
 ];
+
+const PRESALE_NAV_ITEM = {
+  href: '/game/presale',
+  labelKey: 'nav.presale' as const,
+  icon: <ShoppingCart size={20} />,
+};
+
+const NAV_ITEMS = PRESALE_CONTRACT
+  ? [BASE_NAV_ITEMS[0]!, PRESALE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
+  : BASE_NAV_ITEMS;
 
 export function BottomNav() {
   const { t } = useTranslation();

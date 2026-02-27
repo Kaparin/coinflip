@@ -595,7 +595,31 @@
     "profile": "Profile",
     "events": "Events",
     "news": "News",
-    "vip": "VIP"
+    "vip": "VIP",
+    "presale": "Buy COIN"
+  },
+  "presale": {
+    "title": "COIN Presale",
+    "subtitle": "Swap AXM for COIN tokens at a special rate",
+    "rate": "Exchange Rate",
+    "rateValue": "1 AXM = {rate} COIN",
+    "available": "COIN Available",
+    "youPay": "You Pay (AXM)",
+    "youGet": "You Get (COIN)",
+    "balance": "Your AXM Balance",
+    "buy": "Buy COIN",
+    "buying": "Buying...",
+    "success": "Purchase complete!",
+    "successDetail": "You bought {amount} COIN for {axm} AXM",
+    "disabled": "Presale is currently paused",
+    "noContract": "Presale contract not configured",
+    "soldOut": "All COIN tokens have been sold",
+    "insufficientAxm": "Insufficient AXM balance",
+    "enterAmount": "Enter amount",
+    "totalRaised": "Total AXM Raised",
+    "totalSold": "Total COIN Sold",
+    "presets": "Quick Select",
+    "txHash": "Transaction"
   },
   "admin": {
     "title": "Admin Dashboard",

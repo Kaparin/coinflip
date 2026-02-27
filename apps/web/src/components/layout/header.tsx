@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -15,7 +15,7 @@ import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
 import { useVipStatus } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
-import { ADMIN_ADDRESS, EXPLORER_URL } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, PRESALE_CONTRACT } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
@@ -166,6 +166,17 @@ export function Header() {
                       </span>
                     )}
                   </Link>
+                  {PRESALE_CONTRACT && (
+                    <Link href="/game/presale"
+                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        pathname?.startsWith('/game/presale')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                      }`}>
+                      <ShoppingCart size={14} />
+                      {t('nav.presale')}
+                    </Link>
+                  )}
                   <Link href="/game/news"
                     className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                       pathname?.startsWith('/game/news')
