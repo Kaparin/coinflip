@@ -150,10 +150,8 @@ class SponsoredRaffleService {
     if (event.startsAt <= now) {
       const activated = await eventsService.setStatus(eventId, 'active');
       if (activated) {
-        wsService.broadcast({
-          type: 'event_started',
-          data: { eventId, title: event.title, type: event.type },
-        });
+        const broadcastData = await eventsService.buildEventStartedData(event);
+        wsService.broadcast({ type: 'event_started', data: broadcastData });
         logger.info({ eventId }, 'Sponsored raffle approved and activated immediately');
         return { status: 'activated' };
       }

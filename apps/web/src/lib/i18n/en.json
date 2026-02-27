@@ -753,6 +753,11 @@
       "resultsPublished": "Results for \"{{title}}\" are in!",
       "canceled": "Event \"{{title}}\" was canceled"
     },
+    "eventStartModal": {
+      "viewEvent": "View Event",
+      "dismiss": "Maybe later",
+      "remaining": "left"
+    },
     "info": {
       "title": "How do events work?",
       "contestTitle": "Contests",

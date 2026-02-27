@@ -857,10 +857,8 @@ class EventsService {
     for (const event of draftsToActivate) {
       try {
         await this.setStatus(event.id, 'active');
-        wsService.broadcast({
-          type: 'event_started',
-          data: { eventId: event.id, title: event.title, type: event.type },
-        });
+        const broadcastData = await this.buildEventStartedData(event);
+        wsService.broadcast({ type: 'event_started', data: broadcastData });
         logger.info({ eventId: event.id, type: event.type, title: event.title }, 'Event auto-activated (startsAt reached)');
       } catch (err) {
         logger.error({ err, eventId: event.id }, 'Event auto-activation failed');
@@ -967,6 +965,39 @@ class EventsService {
         logger.error({ err, eventId: event.id }, 'Failed to handle stuck calculating event');
       }
     }
+  }
+
+  // ─── Build enriched data for event_started WS broadcast ──────────────────────────
+
+  async buildEventStartedData(event: typeof events.$inferSelect): Promise<Record<string, unknown>> {
+    const data: Record<string, unknown> = {
+      eventId: event.id,
+      title: event.title,
+      type: event.type,
+      description: event.description ?? null,
+      totalPrizePool: event.totalPrizePool ?? '0',
+      endsAt: event.endsAt instanceof Date ? event.endsAt.toISOString() : String(event.endsAt),
+    };
+
+    // Resolve sponsor info if sponsored event
+    if (event.userId) {
+      try {
+        const db = getDb();
+        const [sponsor] = await db
+          .select({ address: users.address, nickname: users.profileNickname })
+          .from(users)
+          .where(eq(users.id, event.userId))
+          .limit(1);
+        if (sponsor) {
+          data.sponsorAddress = sponsor.address;
+          data.sponsorNickname = sponsor.nickname;
+        }
+      } catch (err) {
+        logger.error({ err, eventId: event.id }, 'Failed to resolve sponsor info for event_started broadcast');
+      }
+    }
+
+    return data;
   }
 
   // ─── Format for API Response ──────────────────────────

@@ -68,6 +68,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const isUpcoming = event.status === 'draft' && new Date(event.startsAt) > new Date();
   const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
+  const eventDescription = event.description ? String(event.description) : null;
 
   // Extract winners + seed from results
   const resultsResponse = resultsData as unknown as { data?: { winners?: Array<Record<string, unknown>>; raffleSeed?: string } };
@@ -122,23 +123,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </span>
         </div>
 
-        {event.description && (
-          <p className="relative text-xs text-[var(--color-text-secondary)]">{event.description}</p>
+        {eventDescription && (
+          <p className="relative text-xs text-[var(--color-text-secondary)]">{eventDescription}</p>
         )}
 
         {/* Sponsor badge */}
-        {(event as unknown as Record<string, unknown>).sponsorAddress && (
-          <div className="relative flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
-            <User size={12} />
-            <span className="font-medium">
-              {t('sponsoredRaffle.sponsoredBy')}{' '}
-              <span className="font-bold">
-                {String((event as unknown as Record<string, unknown>).sponsorNickname ?? '') ||
-                  `${String((event as unknown as Record<string, unknown>).sponsorAddress).slice(0, 10)}...`}
-              </span>
+        {(() => {
+          const ev = event as unknown as Record<string, unknown>;
+          const addr = ev.sponsorAddress ? String(ev.sponsorAddress) : null;
+          if (!addr) return null;
+          const nick = ev.sponsorNickname ? String(ev.sponsorNickname) : null;
+          return (
+            <div className="relative flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+              <User size={12} />
+              <span className="font-medium">
+                {t('sponsoredRaffle.sponsoredBy')}{' '}
+                <span className="font-bold">
+                  {nick || `${addr.slice(0, 10)}...`}
+                </span>
             </span>
           </div>
-        )}
+          );
+        })()}
 
         {/* Stats row */}
         <div className="relative flex flex-wrap items-center gap-4 text-xs text-[var(--color-text-secondary)]">

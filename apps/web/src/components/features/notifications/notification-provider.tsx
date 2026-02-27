@@ -5,6 +5,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingNotifications, useMarkNotificationRead, type Notification } from '@/hooks/use-notifications';
 import { JackpotWinModal } from './jackpot-win-modal';
 import { AnnouncementModal } from './announcement-modal';
+import { EventStartModal } from './event-start-modal';
 import type { WsEvent } from '@coinflip/shared/types';
 
 interface NotificationContextValue {
@@ -32,6 +33,12 @@ interface QueuedNotification {
   priority?: 'normal' | 'important';
   sponsorAddress?: string;
   sponsorNickname?: string;
+  // event_started fields
+  eventId?: string;
+  eventType?: string;
+  description?: string | null;
+  totalPrizePool?: string;
+  endsAt?: string;
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -115,6 +122,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           sponsorNickname: data.sponsorNickname ? String(data.sponsorNickname) : undefined,
         },
       ]);
+    } else if (event.type === 'event_started') {
+      const wsId = `ws_event_${data.eventId}`;
+      if (processedIds.current.has(wsId)) return;
+      processedIds.current.add(wsId);
+
+      setQueue((prev) => [
+        ...prev,
+        {
+          id: wsId,
+          type: 'event_started',
+          eventId: String(data.eventId ?? ''),
+          eventType: String(data.type ?? 'raffle'),
+          title: String(data.title ?? ''),
+          description: data.description ? String(data.description) : null,
+          totalPrizePool: String(data.totalPrizePool ?? '0'),
+          endsAt: String(data.endsAt ?? ''),
+          sponsorAddress: data.sponsorAddress ? String(data.sponsorAddress) : undefined,
+          sponsorNickname: data.sponsorNickname ? String(data.sponsorNickname) : undefined,
+        },
+      ]);
     }
   }, []);
 
@@ -161,6 +188,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           title={current.title ?? ''}
           message={current.message ?? ''}
           priority={current.priority ?? 'normal'}
+          sponsorAddress={current.sponsorAddress}
+          sponsorNickname={current.sponsorNickname}
+        />
+      )}
+      {current?.type === 'event_started' && (
+        <EventStartModal
+          open={true}
+          onDismiss={handleDismiss}
+          eventId={current.eventId ?? ''}
+          eventType={current.eventType ?? 'raffle'}
+          title={current.title ?? ''}
+          description={current.description}
+          totalPrizePool={current.totalPrizePool ?? '0'}
+          endsAt={current.endsAt ?? ''}
           sponsorAddress={current.sponsorAddress}
           sponsorNickname={current.sponsorNickname}
         />

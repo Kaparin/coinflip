@@ -127,7 +127,8 @@ adminEventsRouter.post('/:id/activate', async (c) => {
   const updated = await eventsService.setStatus(eventId, 'active');
   if (!updated) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
 
-  wsService.broadcast({ type: 'event_started', data: { eventId, title: event.title, type: event.type } });
+  const broadcastData = await eventsService.buildEventStartedData(event);
+  wsService.broadcast({ type: 'event_started', data: broadcastData });
   logger.info({ eventId, title: event.title }, 'Event activated by admin');
 
   const data = await eventsService.formatEventResponse(updated);

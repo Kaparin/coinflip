@@ -753,6 +753,11 @@
       "resultsPublished": "Результаты «{{title}}» опубликованы!",
       "canceled": "Событие «{{title}}» отменено"
     },
+    "eventStartModal": {
+      "viewEvent": "Перейти к событию",
+      "dismiss": "Может позже",
+      "remaining": "осталось"
+    },
     "info": {
       "title": "Как работают события?",
       "contestTitle": "Конкурсы",
