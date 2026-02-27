@@ -1,13 +1,14 @@
 /**
- * Sponsored Raffle Service — players pay LAUNCH to create raffles for admin review.
+ * Sponsored Raffle Service — players pay LAUNCH to create raffles.
  *
- * Pattern mirrors AnnouncementService:
- *   submit → pending → admin approve/reject → activate (lifecycle manages)
- * On reject: full refund (service fee + prize pool).
+ * Raffles are auto-published (no admin approval needed).
+ * If startsAt > 1 hour from now → only visible to creator, can edit/cancel.
+ * Once within 1 hour of start → visible to all, locked (no changes).
+ * On cancel: full refund (service fee + prize pool).
  */
 
-import { eq, sql, and, desc } from 'drizzle-orm';
-import { events, users } from '@coinflip/db/schema';
+import { eq, sql, and, desc, gte } from 'drizzle-orm';
+import { events, eventParticipants, users } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
@@ -110,7 +111,7 @@ class SponsoredRaffleService {
           totalPrizePool: prizeAmount,
           createdBy: userRow?.address ?? 'sponsored',
           userId,
-          sponsoredStatus: 'pending',
+          sponsoredStatus: 'approved',
           pricePaid: totalCost,
         })
         .returning({ id: events.id });
@@ -191,6 +192,108 @@ class SponsoredRaffleService {
     }
 
     return { status: 'rejected' };
+  }
+
+  /**
+   * Cancel a sponsored raffle (by creator).
+   * Only allowed if startsAt > now + 1 hour. Full refund (service fee + prize pool).
+   */
+  async cancelSponsored(eventId: string, userId: string) {
+    const db = getDb();
+
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.id, eventId), eq(events.userId, userId)))
+      .limit(1);
+
+    if (!event) throw new AppError('NOT_FOUND', 'Raffle not found', 404);
+    if (event.sponsoredStatus !== 'approved' || !['draft', 'active'].includes(event.status)) {
+      throw new AppError('INVALID_STATE', 'Cannot cancel this raffle', 400);
+    }
+
+    const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+    if (event.startsAt <= oneHourFromNow) {
+      throw new AppError('VALIDATION_ERROR', 'Cannot cancel raffle less than 1 hour before start', 400);
+    }
+
+    // Delete participants if any
+    await db.delete(eventParticipants).where(eq(eventParticipants.eventId, eventId));
+
+    // Archive the event
+    await db
+      .update(events)
+      .set({ status: 'archived', sponsoredStatus: 'canceled' })
+      .where(eq(events.id, eventId));
+
+    // Full refund
+    if (event.pricePaid) {
+      await vaultService.creditAvailable(userId, event.pricePaid);
+      logger.info({ eventId, userId, refund: event.pricePaid }, 'Sponsored raffle canceled by creator, refunded');
+    }
+
+    wsService.broadcast({
+      type: 'event_canceled',
+      data: { eventId, title: event.title, type: event.type },
+    });
+
+    return { status: 'canceled', refund: event.pricePaid };
+  }
+
+  /**
+   * Update a sponsored raffle (by creator).
+   * Only allowed if current startsAt > now + 1 hour and status is still 'draft'.
+   * Can change: startsAt, endsAt.
+   */
+  async updateSponsored(
+    eventId: string,
+    userId: string,
+    updates: { startsAt?: string; endsAt?: string },
+  ) {
+    const db = getDb();
+    const config = await this.getConfig();
+
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.id, eventId), eq(events.userId, userId)))
+      .limit(1);
+
+    if (!event) throw new AppError('NOT_FOUND', 'Raffle not found', 404);
+    if (event.status !== 'draft' || event.sponsoredStatus !== 'approved') {
+      throw new AppError('INVALID_STATE', 'Cannot edit this raffle', 400);
+    }
+
+    const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+    if (event.startsAt <= oneHourFromNow) {
+      throw new AppError('VALIDATION_ERROR', 'Cannot edit raffle less than 1 hour before start', 400);
+    }
+
+    const newStartsAt = updates.startsAt ? new Date(updates.startsAt) : event.startsAt;
+    const newEndsAt = updates.endsAt ? new Date(updates.endsAt) : event.endsAt;
+
+    // Validate new start time (at least 5 min from now)
+    if (newStartsAt.getTime() < Date.now() + 5 * 60 * 1000) {
+      throw new AppError('VALIDATION_ERROR', 'Start time must be at least 5 minutes from now', 400);
+    }
+
+    // Validate duration
+    const durationHours = (newEndsAt.getTime() - newStartsAt.getTime()) / (1000 * 60 * 60);
+    if (durationHours < config.minDurationHours) {
+      throw new AppError('VALIDATION_ERROR', `Duration must be at least ${config.minDurationHours} hour(s)`, 400);
+    }
+    if (durationHours > config.maxDurationHours) {
+      throw new AppError('VALIDATION_ERROR', `Duration must be at most ${config.maxDurationHours} hours`, 400);
+    }
+
+    const set: Record<string, unknown> = { updatedAt: new Date() };
+    if (updates.startsAt) set.startsAt = newStartsAt;
+    if (updates.endsAt) set.endsAt = newEndsAt;
+
+    await db.update(events).set(set).where(eq(events.id, eventId));
+    logger.info({ eventId, userId, updates }, 'Sponsored raffle updated by creator');
+
+    return { status: 'updated' };
   }
 
   /** Get pending sponsored raffles (admin panel) */

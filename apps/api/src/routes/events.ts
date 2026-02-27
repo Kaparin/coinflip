@@ -21,12 +21,24 @@ function tryGetUserId(c: { get: (key: string) => unknown }): string | undefined 
 // ---- Public endpoints (with optional auth for hasJoined) ----
 
 // GET /events/active — Active + upcoming events
+// Sponsored raffles with startsAt > 1hr from now are only visible to their creator.
 eventsRouter.get('/active', optionalAuthMiddleware, async (c) => {
   const userId = tryGetUserId(c);
-  const activeEvents = await eventsService.getPublicActiveEvents();
+  const allEvents = await eventsService.getPublicActiveEvents();
+  const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+
+  // Filter: sponsored drafts with startsAt > 1hr → only creator sees them
+  const visibleEvents = allEvents.filter(e => {
+    if (!e.userId) return true; // non-sponsored → always visible
+    if (e.status === 'draft' && e.startsAt > oneHourFromNow) {
+      return e.userId === userId; // only creator sees it
+    }
+    return true;
+  });
+
   // Format each event independently — one failing event shouldn't break the entire list
   const data: unknown[] = [];
-  for (const e of activeEvents) {
+  for (const e of visibleEvents) {
     try {
       data.push(await eventsService.formatEventResponse(e, userId));
     } catch (err) {
@@ -88,6 +100,28 @@ eventsRouter.post('/sponsored', authMiddleware, zValidator('json', SubmitSponsor
   return c.json({ data: result }, 201);
 });
 
+// POST /events/sponsored/:id/cancel — Creator cancels their raffle (full refund)
+eventsRouter.post('/sponsored/:id/cancel', authMiddleware, async (c) => {
+  const eventId = c.req.param('id');
+  const user = c.get('user');
+  const result = await sponsoredRaffleService.cancelSponsored(eventId, user.id);
+  return c.json({ data: result });
+});
+
+// PUT /events/sponsored/:id — Creator edits their raffle (startsAt, endsAt)
+const UpdateSponsoredSchema = z.object({
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+});
+
+eventsRouter.put('/sponsored/:id', authMiddleware, zValidator('json', UpdateSponsoredSchema), async (c) => {
+  const eventId = c.req.param('id');
+  const user = c.get('user');
+  const body = c.req.valid('json');
+  const result = await sponsoredRaffleService.updateSponsored(eventId, user.id, body);
+  return c.json({ data: result });
+});
+
 // ---- Public event details ----
 
 // GET /events/:id — Event details
@@ -98,6 +132,11 @@ eventsRouter.get('/:id', optionalAuthMiddleware, async (c) => {
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
   // Hide drafts that aren't upcoming (past drafts that were never activated)
   if (event.status === 'draft' && event.startsAt < new Date()) {
+    throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+  }
+  // Sponsored drafts > 1hr before start → only creator can view
+  const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+  if (event.userId && event.status === 'draft' && event.startsAt > oneHourFromNow && event.userId !== userId) {
     throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
   }
 

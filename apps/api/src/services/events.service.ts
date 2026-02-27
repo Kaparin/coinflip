@@ -4,6 +4,7 @@ import { eq, and, sql, inArray, desc, asc, lt, lte, gte, or, count as countFn } 
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { treasuryService } from './treasury.service.js';
+import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
 import { LEADERBOARD_CACHE_TTL_MS, EMPTY_EVENT_ARCHIVE_GRACE_MS, EVENT_AUTO_APPROVE_GRACE_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
@@ -782,11 +783,15 @@ class EventsService {
       throw new AppError('INVALID_STATE', `Cannot cancel event in ${event.status} status`, 400);
     }
 
-    // If active, delete participants first (refund not needed — no funds locked for events)
-    if (event.status === 'active') {
-      await db
-        .delete(eventParticipants)
-        .where(eq(eventParticipants.eventId, eventId));
+    // Delete participants first
+    await db
+      .delete(eventParticipants)
+      .where(eq(eventParticipants.eventId, eventId));
+
+    // Refund sponsored raffle creator (service fee + prize pool)
+    if (event.userId && event.pricePaid) {
+      await vaultService.creditAvailable(event.userId, event.pricePaid);
+      logger.info({ eventId, userId: event.userId, refund: event.pricePaid }, 'Sponsored raffle refunded on cancel');
     }
 
     const [deleted] = await db
@@ -1091,6 +1096,10 @@ class EventsService {
       createdAt,
       sponsorAddress,
       sponsorNickname,
+      // Sponsored raffle management fields
+      isOwner: userId != null && event.userId === userId,
+      pricePaid: event.pricePaid ?? null,
+      sponsoredStatus: event.sponsoredStatus ?? null,
     };
   }
 }

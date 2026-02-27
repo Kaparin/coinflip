@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, Users, Target, User } from 'lucide-react';
+import { Trophy, Users, Target, User, Eye, Lock } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
@@ -22,6 +22,7 @@ interface EventCardProps {
     hasJoined?: boolean;
     sponsorAddress?: string | null;
     sponsorNickname?: string | null;
+    isOwner?: boolean;
   };
   size?: 'large' | 'medium' | 'compact';
   index?: number;
@@ -93,6 +94,18 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
             {event.hasJoined && (
               <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-success)]">
                 {t('events.joined')}
+              </span>
+            )}
+            {event.isOwner && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
+                <User size={9} />
+                {t('sponsoredRaffle.yourRaffle')}
+              </span>
+            )}
+            {event.isOwner && isUpcoming && new Date(event.startsAt) > new Date(Date.now() + 60 * 60 * 1000) && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <Eye size={9} />
+                {t('sponsoredRaffle.onlyYouSee')}
               </span>
             )}
           </div>

@@ -1,8 +1,8 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2 } from 'lucide-react';
 import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
@@ -14,6 +14,7 @@ import { RaffleParticipants } from '@/components/features/events/raffle-particip
 import { JoinRaffleButton } from '@/components/features/events/join-raffle-button';
 import { getEventTheme } from '@/components/features/events/event-theme';
 import { useTranslation } from '@/lib/i18n';
+import { useCancelSponsoredRaffle, useUpdateSponsoredRaffle } from '@/hooks/use-sponsored-raffle';
 
 function formatDateRange(startsAt: string, endsAt: string): string {
   const fmt = (iso: string) => {
@@ -35,6 +36,46 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const isContest = event?.type === 'contest';
   const hasResults = event?.status === 'completed' || event?.status === 'calculating' || event?.status === 'archived';
+
+  // Owner controls
+  const ev = event as unknown as Record<string, unknown> | undefined;
+  const isOwner = Boolean(ev?.isOwner);
+  const pricePaid = ev?.pricePaid ? String(ev.pricePaid) : null;
+
+  const cancelMutation = useCancelSponsoredRaffle();
+  const updateMutation = useUpdateSponsoredRaffle();
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showEditDates, setShowEditDates] = useState(false);
+  const [editStartsAt, setEditStartsAt] = useState('');
+  const [editDurationHours, setEditDurationHours] = useState(0);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
+
+  const handleCancel = useCallback(async () => {
+    if (!event) return;
+    try {
+      await cancelMutation.mutateAsync(event.id);
+      setCancelSuccess(true);
+      setShowCancelConfirm(false);
+    } catch {
+      // error shown by mutation state
+    }
+  }, [event, cancelMutation]);
+
+  const handleUpdate = useCallback(async () => {
+    if (!event || !editStartsAt) return;
+    const startDate = new Date(editStartsAt);
+    const endDate = new Date(startDate.getTime() + editDurationHours * 60 * 60 * 1000);
+    try {
+      await updateMutation.mutateAsync({
+        eventId: event.id,
+        startsAt: startDate.toISOString(),
+        endsAt: endDate.toISOString(),
+      });
+      setShowEditDates(false);
+    } catch {
+      // error shown by mutation state
+    }
+  }, [event, editStartsAt, editDurationHours, updateMutation]);
 
   // Fetch results for completed events (hook must be called unconditionally)
   const { data: resultsData } = useGetEventResults(id, {
@@ -186,6 +227,154 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </div>
+
+      {/* Owner controls for sponsored raffle */}
+      {isOwner && !isEnded && !cancelSuccess && (() => {
+        const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+        const canEdit = isUpcoming && new Date(event.startsAt) > oneHourFromNow;
+
+        return (
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
+              <User size={14} />
+              {t('sponsoredRaffle.yourRaffle')}
+            </div>
+
+            {canEdit ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditStartsAt(event.startsAt.slice(0, 16));
+                    const dur = (new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime()) / (1000 * 60 * 60);
+                    setEditDurationHours(Math.round(dur));
+                    setShowEditDates(!showEditDates);
+                    setShowCancelConfirm(false);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs font-medium hover:bg-[var(--color-surface-hover)] transition-colors"
+                >
+                  <Pencil size={12} />
+                  {t('sponsoredRaffle.editDates')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowCancelConfirm(!showCancelConfirm); setShowEditDates(false); }}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <XCircle size={12} />
+                  {t('sponsoredRaffle.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                <Lock size={12} />
+                {t('sponsoredRaffle.lockedDesc')}
+              </div>
+            )}
+
+            {/* Cancel confirmation */}
+            {showCancelConfirm && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 space-y-2">
+                <p className="text-xs text-red-300">
+                  {pricePaid
+                    ? t('sponsoredRaffle.cancelConfirm').replace('{{amount}}', formatLaunch(pricePaid))
+                    : t('sponsoredRaffle.cancel') + '?'}
+                </p>
+                {cancelMutation.error && (
+                  <p className="text-xs text-red-400">{cancelMutation.error.message}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={cancelMutation.isPending}
+                    className="rounded-lg bg-red-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                  >
+                    {cancelMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : t('sponsoredRaffle.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="rounded-lg border border-[var(--color-border)] px-4 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-hover)] transition-colors"
+                  >
+                    {t('common.close')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit dates form */}
+            {showEditDates && (
+              <div className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] p-3 space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1 block">
+                    {t('sponsoredRaffle.fieldStartTime')}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editStartsAt}
+                    onChange={(e) => setEditStartsAt(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-1 block">
+                    {t('sponsoredRaffle.fieldDuration')}
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[1, 6, 12, 24, 48, 72, 168].map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setEditDurationHours(h)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                          editDurationHours === h
+                            ? 'bg-[var(--color-primary)] text-white'
+                            : 'bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30'
+                        }`}
+                      >
+                        {h >= 24 ? `${h / 24}d` : `${h}h`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {updateMutation.error && (
+                  <p className="text-xs text-red-400">{updateMutation.error.message}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    disabled={updateMutation.isPending || !editStartsAt}
+                    className="rounded-lg bg-[var(--color-primary)] px-4 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary)]/80 disabled:opacity-50 transition-colors"
+                  >
+                    {updateMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : t('common.save')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditDates(false)}
+                    className="rounded-lg border border-[var(--color-border)] px-4 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-hover)] transition-colors"
+                  >
+                    {t('common.close')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Cancel success */}
+      {cancelSuccess && (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center space-y-2">
+          <CheckCircle size={28} className="mx-auto text-[var(--color-success)]" />
+          <h3 className="text-sm font-bold">{t('sponsoredRaffle.canceled')}</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">{t('sponsoredRaffle.canceledDesc')}</p>
+          <Link href="/game/events" className="inline-block text-xs text-[var(--color-primary)] hover:underline mt-2">
+            {t('events.backToEvents')}
+          </Link>
+        </div>
+      )}
 
       {/* Unified Prizes + Winners */}
       <section>

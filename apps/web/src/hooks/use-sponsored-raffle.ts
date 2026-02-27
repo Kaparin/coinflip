@@ -57,3 +57,50 @@ export function useSubmitSponsoredRaffle() {
     },
   });
 }
+
+export function useCancelSponsoredRaffle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      const res = await fetch(`${API_URL}/api/v1/events/sponsored/${eventId}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders() },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+        throw new Error(err.error?.message ?? `Request failed: ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+    },
+  });
+}
+
+export function useUpdateSponsoredRaffle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ eventId, ...body }: { eventId: string; startsAt?: string; endsAt?: string }) => {
+      const res = await fetch(`${API_URL}/api/v1/events/sponsored/${eventId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+        throw new Error(err.error?.message ?? `Request failed: ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] });
+    },
+  });
+}

@@ -932,9 +932,20 @@
     "fieldStartTime": "Start Time",
     "fieldDuration": "Duration",
     "submit": "Submit Raffle",
-    "submitted": "Raffle Submitted!",
-    "submittedDesc": "Your raffle has been sent for admin review. If approved, it will appear in the events list. If rejected, funds will be refunded to your game balance.",
+    "submitted": "Raffle Scheduled!",
+    "submittedDesc": "Your raffle will become visible to everyone 1 hour before the start time. Until then, you can edit or cancel it from the event page.",
     "errorMinPrize": "Minimum prize is 1 LAUNCH",
-    "sponsoredBy": "Sponsored by"
+    "sponsoredBy": "Sponsored by",
+    "cancel": "Cancel Raffle",
+    "cancelConfirm": "Cancel this raffle and get a refund of {{amount}} LAUNCH?",
+    "canceled": "Raffle Canceled",
+    "canceledDesc": "Funds have been returned to your game balance.",
+    "edit": "Edit",
+    "editDates": "Edit Dates",
+    "locked": "Locked",
+    "lockedDesc": "Less than 1 hour until start — changes are no longer possible",
+    "yourRaffle": "Your raffle",
+    "onlyYouSee": "Only you can see this",
+    "refund": "Refund"
   }
 }
