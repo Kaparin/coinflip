@@ -331,7 +331,8 @@
     "removeReaction": "Remove reaction",
     "sendMessage": "Send Message",
     "viewPublicProfile": "View public profile",
-    "jackpotWins": "Jackpot Wins"
+    "jackpotWins": "Jackpot Wins",
+    "announcements": "Announcements"
   },
   "leaderboard": {
     "wins": "Wins",
@@ -903,5 +904,8 @@
     "scheduleLabel": "Publish at (optional)",
     "scheduleHint": "Leave empty for immediate publication after approval. Min {min} minutes from now.",
     "publishNow": "Publish immediately after approval"
+  },
+  "announcement": {
+    "sponsor": "Sponsor"
   }
 }

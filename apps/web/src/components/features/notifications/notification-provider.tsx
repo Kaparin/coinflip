@@ -30,6 +30,8 @@ interface QueuedNotification {
   title?: string;
   message?: string;
   priority?: 'normal' | 'important';
+  sponsorAddress?: string;
+  sponsorNickname?: string;
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -109,6 +111,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           title: String(data.title ?? ''),
           message: String(data.message ?? ''),
           priority: (data.priority as 'normal' | 'important') ?? 'normal',
+          sponsorAddress: data.sponsorAddress ? String(data.sponsorAddress) : undefined,
+          sponsorNickname: data.sponsorNickname ? String(data.sponsorNickname) : undefined,
         },
       ]);
     }
@@ -157,6 +161,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           title={current.title ?? ''}
           message={current.message ?? ''}
           priority={current.priority ?? 'normal'}
+          sponsorAddress={current.sponsorAddress}
+          sponsorNickname={current.sponsorNickname}
         />
       )}
     </NotificationContext.Provider>

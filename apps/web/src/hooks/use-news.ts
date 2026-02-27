@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 
 export type NewsFeedType = 'news_post' | 'announcement' | 'big_win' | 'jackpot_win';
@@ -34,5 +34,26 @@ export function useNewsFeed(types?: string) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30_000,
+  });
+}
+
+export interface UserAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  priority: string;
+  createdAt: string;
+}
+
+export function useUserAnnouncements(address: string) {
+  return useQuery({
+    queryKey: ['/api/v1/users', address, 'announcements'],
+    queryFn: async (): Promise<UserAnnouncement[]> => {
+      const res = await fetch(`${API_URL}/api/v1/users/${address}/announcements`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data ?? [];
+    },
+    staleTime: 60_000,
   });
 }

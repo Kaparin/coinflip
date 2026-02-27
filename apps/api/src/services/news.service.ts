@@ -62,8 +62,14 @@ class NewsService {
           a.title AS title,
           a.message AS content,
           a.created_at AS ts,
-          jsonb_build_object('priority', a.priority, 'sentCount', a.sent_count) AS metadata
+          jsonb_build_object(
+            'priority', a.priority,
+            'sentCount', a.sent_count,
+            'sponsorAddress', u.address,
+            'sponsorNickname', u.profile_nickname
+          ) AS metadata
         FROM announcements a
+        LEFT JOIN users u ON u.id = a.user_id
         WHERE a.status = 'published'
       `);
     }

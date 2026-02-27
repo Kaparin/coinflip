@@ -3,12 +3,13 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useCallback, useMemo } from 'react';
 import { usePlayerProfile } from '@/hooks/use-player-profile';
+import { useUserAnnouncements } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
 import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 import Link from 'next/link';
@@ -353,6 +354,7 @@ export default function PlayerProfilePage() {
 
   const [page, setPage] = useState(0);
   const { data: profile, isLoading, error, isFetching, isPlaceholderData } = usePlayerProfile(rawAddress, page, PAGE_SIZE);
+  const { data: userAnnouncements } = useUserAnnouncements(rawAddress);
 
   const [copied, setCopied] = useState(false);
   const [reactingEmoji, setReactingEmoji] = useState<string | null>(null);
@@ -779,6 +781,40 @@ export default function PlayerProfilePage() {
                 </div>
               );
             })}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Announcements (only if user has any) */}
+      {userAnnouncements && userAnnouncements.length > 0 && (
+        <CollapsibleSection
+          title={t('playerProfile.announcements')}
+          icon={<Megaphone size={18} />}
+          defaultOpen={false}
+          badge={
+            <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+              {userAnnouncements.length}
+            </span>
+          }
+        >
+          <div className="space-y-2">
+            {userAnnouncements.map((ann) => (
+              <div
+                key={ann.id}
+                className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-3"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Megaphone size={12} className="text-teal-400 shrink-0" />
+                  <h4 className="text-sm font-bold leading-snug truncate">{ann.title}</h4>
+                </div>
+                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap line-clamp-3">
+                  {ann.message}
+                </p>
+                <p className="text-[10px] text-[var(--color-text-secondary)] mt-1.5">
+                  {new Date(ann.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            ))}
           </div>
         </CollapsibleSection>
       )}

@@ -6,6 +6,7 @@ import { jackpotPools, jackpotTiers } from '@coinflip/db/schema';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
+import { announcementService } from '../services/announcement.service.js';
 import { getDb } from '../lib/db.js';
 import { Errors } from '../lib/errors.js';
 import { verifyTelegramLogin } from '../lib/telegram-auth.js';
@@ -178,6 +179,13 @@ usersRouter.delete('/:address/reaction', authMiddleware, async (c) => {
 
   await userService.removeProfileReaction(viewer.id, targetUser.id);
   return c.json({ data: { removed: true } });
+});
+
+// GET /api/v1/users/:address/announcements — Published announcements by this user
+usersRouter.get('/:address/announcements', async (c) => {
+  const address = c.req.param('address');
+  const items = await announcementService.getByUserAddress(address);
+  return c.json({ data: items });
 });
 
 // GET /api/v1/users/:address — Public profile with stats, recent bets, and optional H2H

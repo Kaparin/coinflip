@@ -184,9 +184,31 @@ class AnnouncementService {
       .set({ status: 'published', sentCount, reviewedAt: new Date() })
       .where(eq(announcements.id, announcementId));
 
+    // Resolve sponsor info for WS broadcast
+    let sponsorAddress: string | null = null;
+    let sponsorNickname: string | null = null;
+    if (ann.userId) {
+      const [sponsor] = await db
+        .select({ address: users.address, nickname: users.profileNickname })
+        .from(users)
+        .where(eq(users.id, ann.userId))
+        .limit(1);
+      if (sponsor) {
+        sponsorAddress = sponsor.address;
+        sponsorNickname = sponsor.nickname;
+      }
+    }
+
     wsService.broadcast({
       type: 'announcement',
-      data: { id: ann.id, title: ann.title, message: ann.message, priority: ann.priority },
+      data: {
+        id: ann.id,
+        title: ann.title,
+        message: ann.message,
+        priority: ann.priority,
+        sponsorAddress,
+        sponsorNickname,
+      },
     });
   }
 
@@ -227,6 +249,40 @@ class AnnouncementService {
       .update(announcements)
       .set({ status: 'deleted' })
       .where(eq(announcements.id, announcementId));
+  }
+
+  /** Get published announcements by user address (for profile page) */
+  async getByUserAddress(address: string): Promise<Array<{
+    id: string;
+    title: string;
+    message: string;
+    priority: string;
+    createdAt: string;
+  }>> {
+    const db = getDb();
+    const rows = await db.execute(sql`
+      SELECT a.id, a.title, a.message, a.priority, a.created_at
+      FROM announcements a
+      JOIN users u ON u.id = a.user_id
+      WHERE u.address = ${address}
+        AND a.status = 'published'
+      ORDER BY a.created_at DESC
+      LIMIT 20
+    `) as unknown as Array<{
+      id: string;
+      title: string;
+      message: string;
+      priority: string;
+      created_at: Date | string;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      message: r.message,
+      priority: r.priority,
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    }));
   }
 
   /** Get pending sponsored announcements (admin) */

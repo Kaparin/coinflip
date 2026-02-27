@@ -6,7 +6,9 @@ import { useTranslation } from '@/lib/i18n';
 import { useNewsFeed, type NewsFeedItem, type NewsFeedType } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { SponsoredForm } from '@/components/features/announcements/sponsored-form';
+import { UserAvatar } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
+import Link from 'next/link';
 
 const FILTER_OPTIONS: Array<{ value: string; labelKey: string; icon: typeof Newspaper }> = [
   { value: '', labelKey: 'news.filterAll', icon: Newspaper },
@@ -163,6 +165,10 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
     );
   }
 
+  // Sponsor info for announcements
+  const sponsorAddress = item.metadata.sponsorAddress as string | undefined;
+  const sponsorNickname = item.metadata.sponsorNickname as string | undefined;
+
   // News post and announcement — full card
   return (
     <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden ${typeConfig.borderClass}`}>
@@ -177,6 +183,20 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
         )}
         <span className="ml-auto font-normal normal-case text-[var(--color-text-secondary)]">{relativeTime}</span>
       </div>
+
+      {/* Sponsor row */}
+      {sponsorAddress && (
+        <Link
+          href={`/game/profile/${sponsorAddress}`}
+          className="flex items-center gap-2 px-3.5 py-1.5 border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors group"
+        >
+          <UserAvatar address={sponsorAddress} size={16} />
+          <span className="text-[11px] font-medium text-teal-400 group-hover:text-teal-300 truncate">
+            {sponsorNickname || shortAddress(sponsorAddress)}
+          </span>
+          <span className="text-[9px] text-[var(--color-text-secondary)] shrink-0">{t('announcement.sponsor')}</span>
+        </Link>
+      )}
 
       {/* Content */}
       <div className="px-3.5 py-2.5">
