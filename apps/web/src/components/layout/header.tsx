@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
@@ -154,6 +154,15 @@ export function Header() {
                         {activeEventCount}
                       </span>
                     )}
+                  </Link>
+                  <Link href="/game/news"
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      pathname?.startsWith('/game/news')
+                        ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
+                    }`}>
+                    <Newspaper size={14} />
+                    {t('nav.news')}
                   </Link>
                   <button
                     type="button"

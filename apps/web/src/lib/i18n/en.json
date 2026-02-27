@@ -213,7 +213,12 @@
     "recentResults": "Results ({count})",
     "tabOpen": "Open",
     "tabInPlay": "In Play",
-    "tabResults": "Results"
+    "tabResults": "Results",
+    "boost": "Boost",
+    "boosted": "Boosted",
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "boostsLeft": "{count} boosts left"
   },
   "history": {
     "connectToView": "Connect wallet to view history",

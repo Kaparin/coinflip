@@ -10,8 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
-import { Coins } from 'lucide-react';
+import { Coins, Zap, Pin } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
+import { useBoostBet, usePinBet, useVipStatus, usePinSlots } from '@/hooks/use-vip';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 import { extractErrorPayload, isActionInProgress, getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -31,6 +32,12 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
   const [pendingBetId, setPendingBetId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<MyBetsTab>('open');
+
+  // VIP: boost & pin actions for open bets
+  const { data: vipStatus } = useVipStatus(isConnected);
+  const { data: pinSlots } = usePinSlots();
+  const boostMutation = useBoostBet();
+  const pinMutation = usePinBet();
 
   // Smart polling: slow (30s) when WS connected, faster (15s) when WS down
   const pollInterval = () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
@@ -399,15 +406,22 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)]">
                   {t('myBets.waitingForOpponent', { count: myOpenBets.length })}
                 </h3>
-                {myOpenBets.length > 1 && !cancelAllState && (
-                  <button
-                    type="button"
-                    onClick={() => handleCancelAll(myOpenBets.map(b => String(b.id)))}
-                    className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-1 text-[10px] font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
-                  >
-                    {t('myBets.cancelAll', { count: myOpenBets.length })}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {vipStatus?.active && (
+                    <span className="text-[9px] text-[var(--color-text-secondary)]">
+                      {t('myBets.boostsLeft', { count: (vipStatus.boostLimit ?? 0) - vipStatus.boostsUsedToday })}
+                    </span>
+                  )}
+                  {myOpenBets.length > 1 && !cancelAllState && (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelAll(myOpenBets.map(b => String(b.id)))}
+                      className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-1 text-[10px] font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
+                    >
+                      {t('myBets.cancelAll', { count: myOpenBets.length })}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {cancelAllState && (
@@ -430,7 +444,60 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
               )}
 
               <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-                {myOpenBets.map((bet) => renderBetCard(bet, { isMine: true, withCancel: true }))}
+                {myOpenBets.map((bet) => {
+                  const betId = String(bet.id);
+                  const isBoosted = !!(bet as any).is_boosted || !!(bet as any).boosted_at;
+                  const isPinned = !!(bet as any).is_pinned;
+                  const canBoost = vipStatus?.active && !isBoosted &&
+                    (vipStatus.boostLimit === null || vipStatus.boostsUsedToday < vipStatus.boostLimit);
+                  // Find cheapest available pin slot
+                  const cheapestSlot = pinSlots
+                    ?.filter(s => s.betId !== betId)
+                    .sort((a, b) => Number(BigInt(a.outbidPrice) - BigInt(b.outbidPrice)))[0];
+
+                  return (
+                    <div key={bet.id} className="space-y-1">
+                      {renderBetCard(bet, { isMine: true, withCancel: true })}
+                      {/* Boost & Pin action buttons */}
+                      {bet.status === 'open' && (
+                        <div className="flex gap-1.5 px-1">
+                          <button
+                            type="button"
+                            disabled={!canBoost || boostMutation.isPending}
+                            onClick={() => boostMutation.mutate(betId)}
+                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-colors ${
+                              isBoosted
+                                ? 'bg-indigo-500/10 text-indigo-400 cursor-default'
+                                : canBoost
+                                  ? 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-indigo-500/10 hover:text-indigo-400'
+                                  : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] opacity-40 cursor-not-allowed'
+                            }`}
+                          >
+                            <Zap size={10} />
+                            {isBoosted ? t('myBets.boosted') : t('myBets.boost')}
+                          </button>
+                          {cheapestSlot && !isPinned && (
+                            <button
+                              type="button"
+                              disabled={pinMutation.isPending}
+                              onClick={() => pinMutation.mutate({ betId, slot: cheapestSlot.slot })}
+                              className="flex items-center gap-1 rounded-lg bg-[var(--color-surface)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
+                            >
+                              <Pin size={10} />
+                              {t('myBets.pin')}
+                            </button>
+                          )}
+                          {isPinned && (
+                            <span className="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-400">
+                              <Pin size={10} />
+                              {t('myBets.pinned')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

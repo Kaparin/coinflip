@@ -213,7 +213,12 @@
     "recentResults": "Результаты ({count})",
     "tabOpen": "Открытые",
     "tabInPlay": "В игре",
-    "tabResults": "Результаты"
+    "tabResults": "Результаты",
+    "boost": "Буст",
+    "boosted": "Ускорено",
+    "pin": "Закрепить",
+    "pinned": "Закреплено",
+    "boostsLeft": "Буст осталось: {count}"
   },
   "history": {
     "connectToView": "Подключите кошелёк для просмотра истории",
