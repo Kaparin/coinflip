@@ -441,7 +441,8 @@
     "oneClick": "1-Click",
     "gas": "Gas",
     "active": "Active",
-    "notSetUp": "Not set up"
+    "notSetUp": "Not set up",
+    "reauthorize": "Click to re-authorize — gas authorization expired"
   },
   "profile": {
     "title": "Profile",

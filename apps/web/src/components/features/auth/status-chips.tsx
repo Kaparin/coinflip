@@ -18,20 +18,25 @@ export function StatusChips({
 }: StatusChipsProps) {
   const { t } = useTranslation();
 
+  // Needs re-auth: authz exists but feegrant is missing
+  const needsReauth = oneClickEnabled && !gasSponsored;
+
   const chips = [
     {
       key: 'oneclick',
       icon: <MousePointerClick size={14} />,
       label: t('statusChips.oneClick'),
-      enabled: oneClickEnabled,
-      clickable: !oneClickEnabled,
+      enabled: oneClickEnabled && !needsReauth,
+      warning: needsReauth,
+      clickable: !oneClickEnabled || needsReauth,
     },
     {
       key: 'gas',
       icon: <Flame size={14} />,
       label: t('statusChips.gas'),
       enabled: gasSponsored,
-      clickable: false,
+      warning: false,
+      clickable: needsReauth,
     },
   ] as const;
 
@@ -49,11 +54,15 @@ export function StatusChips({
             } ${
               chip.enabled
                 ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10 text-[var(--color-success)] shadow-[0_0_8px_rgba(34,197,94,0.15)]'
-                : isClickable
+                : chip.warning || isClickable
                   ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 text-[var(--color-warning)] cursor-pointer hover:bg-[var(--color-warning)]/20 active:scale-[0.96]'
                   : 'border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)] opacity-50'
             }`}
-            title={`${chip.label}: ${chip.enabled ? t('statusChips.active') : t('statusChips.notSetUp')}`}
+            title={
+              chip.warning
+                ? t('statusChips.reauthorize')
+                : `${chip.label}: ${chip.enabled ? t('statusChips.active') : t('statusChips.notSetUp')}`
+            }
           >
             {chip.icon}
             {!compact && <span>{chip.label}</span>}
