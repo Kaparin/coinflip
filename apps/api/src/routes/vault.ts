@@ -86,6 +86,21 @@ export function removePendingLock(address: string, lockId: string): void {
   }
 }
 
+/**
+ * Delay pending lock removal to let the chain REST API reflect the new state.
+ * During this window the balance endpoint continues to subtract the pending lock
+ * from chain-reported available, preventing a stale-data flash.
+ *
+ * Use this in SUCCESS paths only (bet confirmed on chain). Error paths should
+ * call removePendingLock() immediately so funds appear unlocked right away.
+ */
+export function removePendingLockDelayed(address: string, lockId: string, delayMs = 5_000): void {
+  setTimeout(() => {
+    removePendingLock(address, lockId);
+    invalidateBalanceCache(address);
+  }, delayMs);
+}
+
 export function clearPendingLocks(address: string): void {
   pendingLocksMap.delete(address);
 }

@@ -14,7 +14,7 @@ import { formatBetResponse } from '../lib/format.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
-import { removePendingLock, invalidateBalanceCache, getChainVaultBalance, getTotalPendingLocks } from '../routes/vault.js';
+import { removePendingLock, removePendingLockDelayed, invalidateBalanceCache, getChainVaultBalance, getTotalPendingLocks } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
@@ -216,9 +216,11 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       // Bet is now in DB with secret — clean up pending_bet_secrets
       await pendingSecretsService.delete(commitment).catch(() => {});
 
-      // Decrement pending counter, clear pending lock
+      // Decrement pending counter; delay pending lock removal so the chain
+      // REST API has time to reflect the new locked amount before the balance
+      // endpoint stops subtracting the pending lock. Prevents stale-data flash.
       decrementPendingBetCount(makerUserId);
-      if (pendingLockId) removePendingLock(address, pendingLockId);
+      if (pendingLockId) removePendingLockDelayed(address, pendingLockId);
       invalidateBalanceCache(address);
 
       logger.info({ betId: chainBetId, txHash }, `${tag} — bet saved to DB`);
@@ -417,7 +419,8 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
       }
 
       // Success — tx confirmed. The bet is now Revealed on chain (accept + reveal atomic).
-      if (pendingLockId) removePendingLock(address, pendingLockId);
+      // Delay pending lock removal so chain REST API has time to reflect the new state.
+      if (pendingLockId) removePendingLockDelayed(address, pendingLockId);
       invalidateBalanceCache(address);
 
       // Sync from chain: picks up winner, payout, commission and updates DB.
@@ -571,8 +574,9 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
         return;
       }
 
-      // Step 2: Success — update DB, clear pending lock (chain now reflects it)
-      if (pendingLockId) removePendingLock(address, pendingLockId);
+      // Step 2: Success — update DB. Delay pending lock removal so chain REST API
+      // reflects the new locked amount before balance endpoint stops subtracting it.
+      if (pendingLockId) removePendingLockDelayed(address, pendingLockId);
       invalidateBalanceCache(address);
 
       const bet = await betService.acceptBet({
@@ -718,7 +722,11 @@ async function syncPlayersBalanceFromChain(
         0n,
       );
       invalidateBalanceCache(makerAddr);
-      wsService.emitBalanceUpdated(makerAddr, cb);
+      // Send adjusted values (not raw chain) so WS event doesn't flash stale data
+      wsService.emitBalanceUpdated(makerAddr, {
+        available: (makerAvail < 0n ? 0n : makerAvail).toString(),
+        locked: makerLocked.toString(),
+      });
     }
 
     if (acceptorAddr && acceptorUserId) {
@@ -733,7 +741,11 @@ async function syncPlayersBalanceFromChain(
         0n,
       );
       invalidateBalanceCache(acceptorAddr);
-      wsService.emitBalanceUpdated(acceptorAddr, cb);
+      // Send adjusted values (not raw chain) so WS event doesn't flash stale data
+      wsService.emitBalanceUpdated(acceptorAddr, {
+        available: (acceptorAvail < 0n ? 0n : acceptorAvail).toString(),
+        locked: acceptorLocked.toString(),
+      });
     }
 
     logger.debug({ betId }, 'Post-resolution balance sync completed for both players');
