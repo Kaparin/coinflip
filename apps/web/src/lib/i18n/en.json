@@ -863,8 +863,12 @@
   },
   "pin": {
     "title": "Pin Bet",
-    "slot": "Slot {n}",
+    "slot": "Slot",
     "empty": "Empty",
+    "cost": "Cost",
+    "paid": "Paid",
+    "currentHolder": "Current holder",
+    "alreadyPinned": "This bet is already pinned",
     "outbidPrice": "Outbid for {price} LAUNCH",
     "minPrice": "Pin for {price} LAUNCH",
     "noRefund": "No refund if outbid",

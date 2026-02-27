@@ -114,6 +114,17 @@ class PinService {
     if (bet.status !== 'open') throw Errors.validationError('Can only pin open bets');
     if (bet.makerUserId !== userId) throw Errors.validationError('Can only pin your own bets');
 
+    // Check if this bet is already pinned in ANY slot
+    const [existingPin] = await db
+      .select({ slot: betPins.slot, userId: betPins.userId })
+      .from(betPins)
+      .where(eq(betPins.betId, BigInt(betId)))
+      .limit(1);
+
+    if (existingPin && existingPin.userId === userId) {
+      throw Errors.validationError('This bet is already pinned');
+    }
+
     // Check current slot state
     const [currentPin] = await db
       .select({ userId: betPins.userId, price: betPins.price, betId: betPins.betId })
@@ -124,9 +135,6 @@ class PinService {
     let requiredPrice: string;
     if (currentPin) {
       // Slot occupied — must outbid
-      if (currentPin.userId === userId && currentPin.betId === BigInt(betId)) {
-        throw Errors.validationError('This bet is already pinned in this slot');
-      }
       requiredPrice = (BigInt(currentPin.price) * BigInt(PIN_OUTBID_MULTIPLIER)).toString();
     } else {
       // Slot empty

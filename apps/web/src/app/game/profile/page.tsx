@@ -10,6 +10,9 @@ import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, T
 import { useTranslation } from '@/lib/i18n';
 import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use-referral';
 import { UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
+import { VipBadge } from '@/components/ui/vip-badge';
+import { useVipStatus } from '@/hooks/use-vip';
 import { useToast } from '@/components/ui/toast';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -1124,6 +1127,7 @@ export default function ProfilePage() {
   const { t, locale, setLocale } = useTranslation();
   const [copied, setCopied] = useState(false);
   const { data: profileData } = useGetCurrentUser({ query: { enabled: wallet.isConnected } });
+  const { data: vipStatus } = useVipStatus(wallet.isConnected);
 
   const isAdmin =
     wallet.isConnected &&
@@ -1216,16 +1220,19 @@ export default function ProfilePage() {
       {/* Profile card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">
-          <div className="relative shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]">
+          <VipAvatarFrame tier={vipStatus?.tier} className={`relative shrink-0 ${!vipStatus?.tier ? 'rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]' : ''}`}>
             <div className="rounded-full overflow-hidden bg-[var(--color-bg)]">
               {wallet.address && <UserAvatar address={wallet.address} size={56} />}
             </div>
-          </div>
+          </VipAvatarFrame>
           <div className="min-w-0 flex-1">
-            <NicknameEditor
-              currentNickname={(profileData as any)?.data?.nickname ?? null}
-              address={wallet.address ?? ''}
-            />
+            <div className={`flex items-center gap-2 ${getVipNameClass(vipStatus?.tier)}`}>
+              <NicknameEditor
+                currentNickname={(profileData as any)?.data?.nickname ?? null}
+                address={wallet.address ?? ''}
+              />
+              <VipBadge tier={vipStatus?.tier} />
+            </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
               <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">{wallet.shortAddress}</span>

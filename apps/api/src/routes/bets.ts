@@ -204,8 +204,20 @@ betsRouter.get('/mine', authMiddleware, async (c) => {
   const myBets = await betService.getMyActiveBets(user.id);
   const addressMap = await betService.buildAddressMap(myBets);
 
+  // Include pin data so My Bets shows pin indicators
+  const pinSlots = await pinService.getPinSlots();
+  const pinnedBetIds = new Set(pinSlots.filter((s) => s.betId).map((s) => s.betId!));
+  const pinSlotMap = new Map(pinSlots.filter((s) => s.betId).map((s) => [s.betId!, s.slot]));
+
   return c.json({
-    data: myBets.map((bet) => formatBetResponse(bet, addressMap)),
+    data: myBets.map((bet) => {
+      const betIdStr = bet.betId.toString();
+      return formatBetResponse(bet, addressMap, {
+        is_pinned: pinnedBetIds.has(betIdStr),
+        pin_slot: pinSlotMap.get(betIdStr) ?? null,
+        is_boosted: bet.boostedAt != null,
+      });
+    }),
   });
 });
 

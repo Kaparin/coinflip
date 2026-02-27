@@ -475,10 +475,14 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                   const canBoost = !isBoosted &&
                     (vipStatus?.boostLimit === null ||
                      (vipStatus?.boostsUsedToday ?? 0) < (vipStatus?.boostLimit ?? 3));
-                  // Find cheapest available pin slot
-                  const cheapestSlot = pinSlots
-                    ?.filter(s => s.betId !== betId)
-                    .sort((a, b) => Number(BigInt(a.outbidPrice) - BigInt(b.outbidPrice)))[0];
+                  // Check if this bet is already pinned in any slot
+                  const alreadyPinned = pinSlots?.some(s => s.betId === betId);
+                  // Find cheapest available pin slot (only if not already pinned)
+                  const cheapestSlot = !alreadyPinned
+                    ? pinSlots
+                        ?.filter(s => s.betId !== betId)
+                        .sort((a, b) => Number(BigInt(a.outbidPrice) - BigInt(b.outbidPrice)))[0]
+                    : undefined;
 
                   return renderBetCard(bet, {
                     isMine: true,
@@ -576,45 +580,65 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
       {/* Pin confirmation modal */}
       <Modal open={!!pinTarget} onClose={() => setPinTarget(null)} title={t('pin.title')}>
-        {pinTarget && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
-                <Pin size={20} />
+        {pinTarget && (() => {
+          const targetSlot = pinSlots?.find(s => s.slot === pinTarget.slot);
+          const isOutbid = targetSlot?.betId != null;
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+                  <Pin size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{t('pin.title')} — {t('pin.slot')} #{pinTarget.slot}</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    {t('pin.cost')}: <span className="font-bold text-amber-400">{formatLaunch(pinTarget.price)} LAUNCH</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">{t('pin.title')}</p>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  {t('pin.outbidPrice', { price: formatLaunch(pinTarget.price) })}
-                </p>
+
+              {/* Current slot occupant info */}
+              {isOutbid && targetSlot && (
+                <div className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] p-3 space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {t('pin.currentHolder')}
+                  </p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--color-text-secondary)]">
+                      {targetSlot.userNickname || (targetSlot.userAddress ? `${targetSlot.userAddress.slice(0, 10)}...` : '—')}
+                    </span>
+                    <span className="font-medium">{t('pin.paid')}: {formatLaunch(targetSlot.price)} LAUNCH</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                <p>• {t('pin.noRefund')}</p>
+                <p>• {t('pin.expireRefund')}</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPinTarget(null)}
+                  className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98]"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={pinMutation.isPending}
+                  onClick={() => {
+                    pinMutation.mutate({ betId: pinTarget.betId, slot: pinTarget.slot });
+                    setPinTarget(null);
+                  }}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] active:scale-[0.98]"
+                >
+                  {formatLaunch(pinTarget.price)} LAUNCH
+                </button>
               </div>
             </div>
-            <div className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
-              <p>• {t('pin.noRefund')}</p>
-              <p>• {t('pin.expireRefund')}</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setPinTarget(null)}
-                className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98]"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={pinMutation.isPending}
-                onClick={() => {
-                  pinMutation.mutate({ betId: pinTarget.betId, slot: pinTarget.slot });
-                  setPinTarget(null);
-                }}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] active:scale-[0.98]"
-              >
-                {formatLaunch(pinTarget.price)} LAUNCH
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );

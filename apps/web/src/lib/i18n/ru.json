@@ -863,8 +863,12 @@
   },
   "pin": {
     "title": "Закрепить ставку",
-    "slot": "Слот {n}",
+    "slot": "Слот",
     "empty": "Свободен",
+    "cost": "Стоимость",
+    "paid": "Оплачено",
+    "currentHolder": "Текущий владелец",
+    "alreadyPinned": "Эта ставка уже закреплена",
     "outbidPrice": "Перебить за {price} LAUNCH",
     "minPrice": "Закрепить за {price} LAUNCH",
     "noRefund": "Нет возврата при перебитии",
