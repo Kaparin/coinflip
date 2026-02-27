@@ -6,4 +6,5 @@ export { ToastProvider, useToast, type Toast, type ToastType } from './toast';
 export { Input, type InputProps } from './input';
 export { Skeleton, type SkeletonProps, type SkeletonVariant } from './skeleton';
 export { LaunchTokenIcon, type LaunchTokenIconProps } from './launch-token-icon';
+export { AxmIcon, type AxmIconProps } from './axm-icon';
 export { UserAvatar, type UserAvatarProps } from './user-avatar';

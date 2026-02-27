@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart } from 'lucide-react';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
@@ -124,7 +124,7 @@ export function Header() {
                     <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={40} /></span>
                   </div>
                   <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM (gas)">
-                    <span className="text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} AXM</span>
+                    <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={14} /></span>
                     {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                   </div>
                 </div>
@@ -430,9 +430,9 @@ export function Header() {
                   <span className="flex items-center gap-1 text-xs font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={32} /></span>
                 </div>
                 <div className={`flex items-center justify-between ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</span>
+                  <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]"><AxmIcon size={12} /> AXM ({t('header.gas')})</span>
                   <span className="flex items-center gap-1 text-xs font-medium tabular-nums">
-                    {nativeBalanceHuman.toFixed(2)} AXM
+                    {nativeBalanceHuman.toFixed(2)} <AxmIcon size={14} />
                     {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                   </span>
                 </div>

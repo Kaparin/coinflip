@@ -1,17 +1,19 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ArrowDown, CheckCircle, ExternalLink, Loader2, ShoppingCart, TrendingUp, Coins, AlertTriangle } from 'lucide-react';
+import { ArrowDown, CheckCircle, ExternalLink, Loader2, ShoppingCart, TrendingUp, Coins, AlertTriangle, Clock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useNativeBalance } from '@/hooks/use-wallet-balance';
 import { usePresaleConfig, usePresaleStatus } from '@/hooks/use-presale';
-import { LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
 import { signPresaleBuy } from '@/lib/wallet-signer';
 import { PRESALE_CONTRACT, EXPLORER_URL } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+
+type BuyStep = 'signing' | 'broadcasting' | 'confirming';
 
 const AXM_PRESETS = [1, 5, 10, 50, 100];
 
@@ -25,8 +27,9 @@ export default function PresalePage() {
 
   const [axmInput, setAxmInput] = useState('');
   const [isBuying, setIsBuying] = useState(false);
+  const [buyStep, setBuyStep] = useState<BuyStep | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successTx, setSuccessTx] = useState<{ txHash: string; coinAmount: string; axmAmount: string } | null>(null);
+  const [successTx, setSuccessTx] = useState<{ txHash: string; coinAmount: string; axmAmount: string; pending?: boolean } | null>(null);
 
   const nativeHuman = Number(nativeBalance ?? '0') / 1_000_000;
   const axmAmount = parseFloat(axmInput) || 0;
@@ -45,37 +48,55 @@ export default function PresalePage() {
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
+  const refreshBalances = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
+    queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+    queryClient.invalidateQueries({ queryKey: ['presale'] });
+  }, [queryClient]);
+
   const handleBuy = useCallback(async () => {
     if (!address || !axmAmount || isBuying) return;
 
     setError(null);
     setSuccessTx(null);
     setIsBuying(true);
+    setBuyStep('signing');
 
     try {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
 
-      const result = await signPresaleBuy(wallet, address, String(microAxm));
-
-      setSuccessTx({
-        txHash: result.txHash,
-        coinAmount: fmtNum(coinOutput),
-        axmAmount: fmtNum(axmAmount),
+      const result = await signPresaleBuy(wallet, address, String(microAxm), (step) => {
+        setBuyStep(step);
       });
-      setAxmInput('');
 
-      // Refresh balances
-      queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['presale'] });
+      if (result.timedOut) {
+        // Transaction was broadcast but confirmation timed out — likely succeeded
+        setSuccessTx({
+          txHash: result.txHash,
+          coinAmount: fmtNum(coinOutput),
+          axmAmount: fmtNum(axmAmount),
+          pending: true,
+        });
+      } else {
+        setSuccessTx({
+          txHash: result.txHash,
+          coinAmount: fmtNum(coinOutput),
+          axmAmount: fmtNum(axmAmount),
+        });
+      }
+      setAxmInput('');
+      refreshBalances();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(getUserFriendlyError(msg, t, 'generic'));
+      // Still refresh — tx might have gone through despite error
+      refreshBalances();
     } finally {
       setIsBuying(false);
+      setBuyStep(null);
     }
-  }, [address, axmAmount, microAxm, coinOutput, getWallet, queryClient, isBuying]);
+  }, [address, axmAmount, microAxm, coinOutput, getWallet, refreshBalances, isBuying]);
 
   // No contract configured
   if (!PRESALE_CONTRACT) {
@@ -144,8 +165,8 @@ export default function PresalePage() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('presale.youPay')}</span>
             {isConnected && (
-              <span className="text-[10px] text-[var(--color-text-secondary)]">
-                {t('presale.balance')}: {fmtNum(nativeHuman)} AXM
+              <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
+                {t('presale.balance')}: {fmtNum(nativeHuman)} <AxmIcon size={12} />
               </span>
             )}
           </div>
@@ -165,6 +186,7 @@ export default function PresalePage() {
               className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-[var(--color-text-secondary)]/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-bg)] px-3 py-1.5">
+              <AxmIcon size={18} />
               <span className="text-sm font-bold">AXM</span>
             </div>
           </div>
@@ -224,15 +246,27 @@ export default function PresalePage() {
         </div>
       )}
 
-      {/* Success */}
+      {/* Success / Pending */}
       {successTx && (
-        <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-4 py-3 space-y-2">
+        <div className={`rounded-xl border px-4 py-3 space-y-2 ${
+          successTx.pending
+            ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10'
+            : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
+        }`}>
           <div className="flex items-center gap-2">
-            <CheckCircle size={16} className="text-[var(--color-success)]" />
-            <p className="text-xs font-bold text-[var(--color-success)]">{t('presale.success')}</p>
+            {successTx.pending ? (
+              <Clock size={16} className="text-[var(--color-warning)]" />
+            ) : (
+              <CheckCircle size={16} className="text-[var(--color-success)]" />
+            )}
+            <p className={`text-xs font-bold ${successTx.pending ? 'text-[var(--color-warning)]' : 'text-[var(--color-success)]'}`}>
+              {successTx.pending ? t('presale.pendingTitle') : t('presale.success')}
+            </p>
           </div>
           <p className="text-[10px] text-[var(--color-text-secondary)]">
-            {t('presale.successDetail', { amount: successTx.coinAmount, axm: successTx.axmAmount })}
+            {successTx.pending
+              ? t('presale.pendingDetail', { amount: successTx.coinAmount })
+              : t('presale.successDetail', { amount: successTx.coinAmount, axm: successTx.axmAmount })}
           </p>
           <a
             href={`${EXPLORER_URL}/tx/${successTx.txHash}`}
@@ -264,7 +298,10 @@ export default function PresalePage() {
           {isBuying ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 size={16} className="animate-spin" />
-              {t('presale.buying')}
+              {buyStep === 'signing' ? t('presale.stepSigning')
+                : buyStep === 'broadcasting' ? t('presale.stepBroadcasting')
+                : buyStep === 'confirming' ? t('presale.stepConfirming')
+                : t('presale.buying')}
             </span>
           ) : axmAmount > nativeHuman ? (
             t('presale.insufficientAxm')
@@ -279,7 +316,7 @@ export default function PresalePage() {
         <div className="flex items-center justify-center gap-6 text-[10px] text-[var(--color-text-secondary)]">
           <div className="flex items-center gap-1">
             <TrendingUp size={12} />
-            <span>{t('presale.totalRaised')}: {fmtNum(totalAxmRaised)} AXM</span>
+            <span className="flex items-center gap-0.5">{t('presale.totalRaised')}: {fmtNum(totalAxmRaised)} <AxmIcon size={10} /></span>
           </div>
           <div className="flex items-center gap-1">
             <Coins size={12} />

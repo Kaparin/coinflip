@@ -415,33 +415,99 @@ export async function signDirectWithdraw(
 // ---- Presale: Buy COIN with native AXM ----
 
 /**
+ * Fixed gas for presale buy.
+ * MsgExecuteContract with native funds + CW20 transfer sub-message uses ~250k-400k gas.
+ * 600k provides headroom. Eliminates the `simulate` RPC call that 'auto' requires.
+ */
+const PRESALE_BUY_GAS_LIMIT = 600_000;
+
+export interface PresaleBuyResult {
+  txHash: string;
+  height?: number;
+  /** True if the tx was submitted but confirmation timed out (may still succeed) */
+  timedOut?: boolean;
+}
+
+/**
  * Buy COIN tokens by sending native AXM to the presale contract.
- * The contract executes a CW20 transfer of COIN tokens back to the buyer.
+ * Uses cached client + fixed gas for speed. Handles timeout gracefully.
  *
  * @param wallet - CosmJS wallet instance
  * @param address - Buyer's axm1... address
  * @param microAxmAmount - Amount in uaxm (micro-AXM) to spend
+ * @param onStep - Progress callback: 'signing' | 'broadcasting' | 'confirming'
  */
 export async function signPresaleBuy(
   wallet: DirectSecp256k1HdWallet,
   address: string,
   microAxmAmount: string,
-): Promise<{ txHash: string; height: number }> {
-  const client = await getCosmWasmClient(wallet);
+  onStep?: (step: 'signing' | 'broadcasting' | 'confirming') => void,
+): Promise<PresaleBuyResult> {
+  onStep?.('signing');
 
-  const result = await client.execute(
-    address,
-    PRESALE_CONTRACT,
-    { buy: {} },
-    'auto',
-    'COIN Presale purchase',
-    [{ denom: 'uaxm', amount: microAxmAmount }],
-  );
+  let client: SigningCosmWasmClient;
+  try {
+    client = await getCachedCosmWasmClient(wallet);
+  } catch {
+    clearSigningClientCache();
+    client = await getCachedCosmWasmClient(wallet);
+  }
 
-  return {
-    txHash: result.transactionHash,
-    height: result.height,
+  const msg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: MsgExecuteContract.fromPartial({
+      sender: address,
+      contract: PRESALE_CONTRACT,
+      msg: new TextEncoder().encode(JSON.stringify({ buy: {} })),
+      funds: [{ denom: 'uaxm', amount: microAxmAmount }],
+    }),
   };
+
+  const fee = calculateFee(PRESALE_BUY_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+
+  let txRaw: TxRaw;
+  try {
+    txRaw = await client.sign(address, [msg], fee, 'COIN Presale purchase');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : '';
+    if (errMsg.includes('WebSocket') || errMsg.includes('socket') || errMsg.includes('connect')) {
+      clearSigningClientCache();
+      const freshClient = await getCachedCosmWasmClient(wallet);
+      txRaw = await freshClient.sign(address, [msg], fee, 'COIN Presale purchase');
+    } else {
+      throw err;
+    }
+  }
+
+  onStep?.('broadcasting');
+
+  const txBytes = TxRaw.encode(txRaw).finish();
+
+  try {
+    const result = await client.broadcastTx(txBytes);
+    onStep?.('confirming');
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `Transaction failed with code ${result.code}`);
+    }
+
+    return {
+      txHash: result.transactionHash,
+      height: result.height,
+    };
+  } catch (err) {
+    // CosmJS throws on timeout: "Transaction with ID XXXX was submitted but was not yet found on the chain"
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const hashMatch = errMsg.match(/Transaction with ID ([A-Fa-f0-9]+)/i);
+    if (hashMatch?.[1]) {
+      // Transaction was broadcast but confirmation timed out — it likely succeeded
+      return {
+        txHash: hashMatch[1],
+        timedOut: true,
+      };
+    }
+    throw err;
+  }
 }
 
 // ---- Presale Admin: Update Config ----
