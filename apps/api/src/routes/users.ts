@@ -257,6 +257,7 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       })),
       telegram: user.telegramUsername ? {
         username: user.telegramUsername,
+        photo_url: user.telegramPhotoUrl ?? null,
       } : null,
     },
   });

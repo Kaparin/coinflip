@@ -531,6 +531,8 @@
     "telegramUnlinked": "Telegram account unlinked",
     "telegramUnlinkError": "Failed to unlink Telegram account",
     "telegramLinking": "Linking...",
+    "telegramConnect": "Connect Telegram",
+    "telegramConnectedBadge": "Connected",
     "important4": "Minimum bet amount is 1 COIN.",
     "aboutSections": {
       "randomMechanics": "Random mechanics",

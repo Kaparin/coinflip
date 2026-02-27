@@ -531,6 +531,8 @@
     "telegramUnlinked": "Телеграм отвязан",
     "telegramUnlinkError": "Не удалось отвязать Телеграм",
     "telegramLinking": "Привязка...",
+    "telegramConnect": "Подключить Телеграм",
+    "telegramConnectedBadge": "Подключено",
     "important4": "Минимальная ставка — 1 COIN.",
     "aboutSections": {
       "randomMechanics": "Механика рандома",
