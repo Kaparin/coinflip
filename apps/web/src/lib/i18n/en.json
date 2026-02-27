@@ -865,7 +865,19 @@
     "filterUpdates": "Updates",
     "filterAnnouncements": "Announcements",
     "filterBigWins": "Big Wins",
-    "filterJackpots": "Jackpots"
+    "filterJackpots": "Jackpots",
+    "typeUpdate": "Update",
+    "typeAnnouncement": "Announcement",
+    "typeBigWin": "Big Win",
+    "typeJackpot": "Jackpot",
+    "won": "won",
+    "wonThe": "won the",
+    "betSize": "Bet size",
+    "important": "important",
+    "justNow": "just now",
+    "mAgo": "m ago",
+    "hAgo": "h ago",
+    "dAgo": "d ago"
   },
   "sponsored": {
     "button": "Advertise",

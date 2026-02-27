@@ -146,6 +146,29 @@ export class VaultService {
   }
 
   /**
+   * Credit back to user's available balance (for refunds).
+   * Unlike creditWinner, this restores money to available (on-chain) balance.
+   */
+  async creditAvailable(userId: string, amount: string) {
+    const result = await this.db
+      .insert(vaultBalances)
+      .values({ userId, available: amount })
+      .onConflictDoUpdate({
+        target: vaultBalances.userId,
+        set: {
+          available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    logger.info(
+      { userId, amount, newAvailable: result[0]?.available },
+      'Refund credited to available balance',
+    );
+  }
+
+  /**
    * Credit prize to user's bonus balance. This is separate from on-chain
    * available and is NOT overwritten by syncBalanceFromChain.
    * Bonus is an off-chain prize credit displayed alongside chain balance.

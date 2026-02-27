@@ -123,8 +123,8 @@ export default function NewsPage() {
 function FeedCard({ item }: { item: NewsFeedItem }) {
   const { t } = useTranslation();
 
-  const typeConfig = getTypeConfig(item.type);
-  const relativeTime = formatRelativeTime(item.timestamp);
+  const typeConfig = getTypeConfig(item.type, t);
+  const relativeTime = formatRelativeTime(item.timestamp, t);
 
   return (
     <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden ${typeConfig.borderClass}`}>
@@ -150,7 +150,7 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
         {/* Priority badge for news_post/announcement */}
         {(item.type === 'news_post' || item.type === 'announcement') && item.metadata.priority === 'important' && (
           <span className="inline-block mt-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase">
-            important
+            {t('news.important')}
           </span>
         )}
       </div>
@@ -159,6 +159,7 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
 }
 
 function BigWinContent({ item }: { item: NewsFeedItem }) {
+  const { t } = useTranslation();
   const meta = item.metadata;
   const payoutStr = meta.payoutAmount as string | undefined;
   const amountStr = meta.amount as string | undefined;
@@ -172,12 +173,12 @@ function BigWinContent({ item }: { item: NewsFeedItem }) {
       <div>
         <p className="text-xs">
           <span className="font-bold text-amber-400">{winner}</span>
-          <span className="text-[var(--color-text-secondary)]"> won </span>
+          <span className="text-[var(--color-text-secondary)]"> {t('news.won')} </span>
           <span className="font-bold text-green-400">{payoutStr ? formatLaunch(payoutStr) : '?'} LAUNCH</span>
         </p>
         {amountStr && (
           <p className="text-[10px] text-[var(--color-text-secondary)]">
-            Bet size: {formatLaunch(amountStr)} LAUNCH
+            {t('news.betSize')}: {formatLaunch(amountStr)} LAUNCH
           </p>
         )}
       </div>
@@ -186,6 +187,7 @@ function BigWinContent({ item }: { item: NewsFeedItem }) {
 }
 
 function JackpotWinContent({ item }: { item: NewsFeedItem }) {
+  const { t } = useTranslation();
   const meta = item.metadata;
   const amountStr = meta.amount as string | undefined;
   const tierName = meta.tierName as string | undefined;
@@ -200,8 +202,8 @@ function JackpotWinContent({ item }: { item: NewsFeedItem }) {
       <div>
         <p className="text-xs">
           <span className="font-bold text-purple-400">{winner}</span>
-          <span className="text-[var(--color-text-secondary)]"> won the </span>
-          <span className="font-bold">{tierName ?? 'Jackpot'}</span>
+          <span className="text-[var(--color-text-secondary)]"> {t('news.wonThe')} </span>
+          <span className="font-bold">{tierName ?? t('news.typeJackpot')}</span>
           {cycle && <span className="text-[var(--color-text-secondary)]"> #{cycle}</span>}
         </p>
         {amountStr && (
@@ -214,33 +216,33 @@ function JackpotWinContent({ item }: { item: NewsFeedItem }) {
   );
 }
 
-function getTypeConfig(type: NewsFeedType) {
+function getTypeConfig(type: NewsFeedType, t: (key: string) => string) {
   switch (type) {
     case 'news_post':
       return {
         icon: <Sparkles size={12} />,
-        label: 'Update',
+        label: t('news.typeUpdate'),
         borderClass: 'border-[var(--color-border)]',
         headerClass: 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]',
       };
     case 'announcement':
       return {
         icon: <Megaphone size={12} />,
-        label: 'Announcement',
+        label: t('news.typeAnnouncement'),
         borderClass: 'border-[var(--color-border)]',
         headerClass: 'bg-blue-500/10 text-blue-400',
       };
     case 'big_win':
       return {
         icon: <Trophy size={12} />,
-        label: 'Big Win',
+        label: t('news.typeBigWin'),
         borderClass: 'border-amber-500/20',
         headerClass: 'bg-amber-500/10 text-amber-400',
       };
     case 'jackpot_win':
       return {
         icon: <Gem size={12} />,
-        label: 'Jackpot',
+        label: t('news.typeJackpot'),
         borderClass: 'border-purple-500/20',
         headerClass: 'bg-purple-500/10 text-purple-400',
       };
@@ -252,14 +254,14 @@ function shortAddress(addr: string | undefined | null): string {
   return `${addr.slice(0, 8)}...${addr.slice(-4)}`;
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, t: (key: string) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('news.justNow');
+  if (mins < 60) return `${mins}${t('news.mAgo')}`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}${t('news.hAgo')}`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return `${days}${t('news.dAgo')}`;
   return new Date(iso).toLocaleDateString();
 }

@@ -110,15 +110,17 @@ class ConfigService {
     logger.info({ key, value, updatedBy }, 'Config updated');
   }
 
-  /** Bulk update config entries */
+  /** Bulk update config entries (transactional) */
   async bulkSet(entries: Array<{ key: string; value: string }>, updatedBy: string): Promise<void> {
     const db = getDb();
-    for (const entry of entries) {
-      await db
-        .update(platformConfig)
-        .set({ value: entry.value, updatedAt: new Date(), updatedBy })
-        .where(eq(platformConfig.key, entry.key));
-    }
+    await db.transaction(async (tx) => {
+      for (const entry of entries) {
+        await tx
+          .update(platformConfig)
+          .set({ value: entry.value, updatedAt: new Date(), updatedBy })
+          .where(eq(platformConfig.key, entry.key));
+      }
+    });
     this.invalidateCache();
     logger.info({ count: entries.length, updatedBy }, 'Config bulk updated');
   }

@@ -84,7 +84,7 @@ class NewsService {
             'winnerNickname', u.profile_nickname
           ) AS metadata
         FROM bets b
-        JOIN users u ON u.id = b.winner_user_id
+        LEFT JOIN users u ON u.id = b.winner_user_id
         WHERE b.status IN ('revealed', 'timeout_claimed')
           AND b.payout_amount IS NOT NULL
           AND b.payout_amount::numeric >= ${bigWinThreshold}::numeric

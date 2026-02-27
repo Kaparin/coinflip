@@ -13,6 +13,7 @@ const BYPASS_PREFIXES = [
   '/docs',
   '/openapi.json',
   '/api/v1/config/public',
+  '/ws',
 ];
 
 export async function maintenanceMiddleware(c: Context, next: Next) {

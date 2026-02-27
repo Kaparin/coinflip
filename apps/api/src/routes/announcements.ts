@@ -14,9 +14,9 @@ announcementsRouter.get('/sponsored/config', async (c) => {
 });
 
 const SubmitSponsoredSchema = z.object({
-  title: z.string().min(1).max(500),
-  message: z.string().min(1).max(2000),
-  scheduledAt: z.string().nullable().optional(),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(1000),
+  scheduledAt: z.string().datetime().nullable().optional(),
 });
 
 // POST /api/v1/announcements/sponsored — submit sponsored announcement

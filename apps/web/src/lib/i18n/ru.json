@@ -865,7 +865,19 @@
     "filterUpdates": "Обновления",
     "filterAnnouncements": "Объявления",
     "filterBigWins": "Крупные выигрыши",
-    "filterJackpots": "Джекпоты"
+    "filterJackpots": "Джекпоты",
+    "typeUpdate": "Обновление",
+    "typeAnnouncement": "Объявление",
+    "typeBigWin": "Крупный выигрыш",
+    "typeJackpot": "Джекпот",
+    "won": "выиграл",
+    "wonThe": "выиграл",
+    "betSize": "Размер ставки",
+    "important": "важное",
+    "justNow": "только что",
+    "mAgo": "м назад",
+    "hAgo": "ч назад",
+    "dAgo": "д назад"
   },
   "sponsored": {
     "button": "Реклама",

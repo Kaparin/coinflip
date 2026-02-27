@@ -354,7 +354,7 @@ adminRouter.get('/bets', zValidator('query', BetsQuerySchema), async (c) => {
 // GET /api/v1/admin/bets/stuck — bets in transitional states for too long
 adminRouter.get('/bets/stuck', async (c) => {
   const db = getDb();
-  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
   const stuck = await db.select({
     betId: bets.betId,

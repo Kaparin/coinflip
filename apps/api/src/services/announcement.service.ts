@@ -3,7 +3,7 @@
  *
  * Players pay a configurable price to submit announcements for admin review.
  * On approval, announcements are auto-published at the scheduled time.
- * On rejection, the price is refunded to the user's bonus balance.
+ * On rejection, the price is refunded to the user's available balance.
  */
 
 import { eq, sql, and, desc, lte, isNull, or } from 'drizzle-orm';
@@ -63,19 +63,28 @@ class AnnouncementService {
 
     const db = getDb();
 
-    // Insert announcement with pending status
-    const [ann] = await db
-      .insert(announcements)
-      .values({
-        title,
-        message,
-        priority: 'sponsored',
-        userId,
-        status: 'pending',
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        pricePaid: config.price,
-      })
-      .returning({ id: announcements.id });
+    // Insert announcement with pending status — refund on failure
+    let ann: { id: string } | undefined;
+    try {
+      const [row] = await db
+        .insert(announcements)
+        .values({
+          title,
+          message,
+          priority: 'sponsored',
+          userId,
+          status: 'pending',
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+          pricePaid: config.price,
+        })
+        .returning({ id: announcements.id });
+      ann = row;
+    } catch (err) {
+      // Compensating refund — balance was already deducted
+      await vaultService.creditAvailable(userId, config.price);
+      logger.error({ err, userId }, 'Sponsored announcement insert failed, refunded');
+      throw err;
+    }
 
     logger.info({ announcementId: ann!.id, userId, price: config.price }, 'Sponsored announcement submitted');
     return { id: ann!.id, price: config.price };
@@ -132,10 +141,10 @@ class AnnouncementService {
       })
       .where(eq(announcements.id, announcementId));
 
-    // Refund to bonus balance
+    // Refund to available balance (user paid from available, refund goes back there)
     if (ann.userId && ann.pricePaid) {
-      await vaultService.creditWinner(ann.userId, ann.pricePaid);
-      logger.info({ announcementId, userId: ann.userId, refund: ann.pricePaid }, 'Sponsored announcement rejected, refunded');
+      await vaultService.creditAvailable(ann.userId, ann.pricePaid);
+      logger.info({ announcementId, userId: ann.userId, refund: ann.pricePaid }, 'Sponsored announcement rejected, refunded to available');
     }
 
     return { status: 'rejected' };
@@ -145,14 +154,7 @@ class AnnouncementService {
   private async publishAnnouncement(announcementId: string) {
     const db = getDb();
 
-    const allUsers = await db.select({ id: users.id }).from(users);
-    const sentCount = allUsers.length;
-
-    await db
-      .update(announcements)
-      .set({ status: 'published', sentCount, reviewedAt: new Date() })
-      .where(eq(announcements.id, announcementId));
-
+    // Get announcement data first
     const [ann] = await db
       .select()
       .from(announcements)
@@ -161,20 +163,26 @@ class AnnouncementService {
 
     if (!ann) return;
 
-    // Insert notification for each user
-    if (allUsers.length > 0) {
-      const notifValues = allUsers.map((u) => ({
-        userId: u.id,
-        type: 'announcement' as const,
-        title: ann.title,
-        message: ann.message,
-        metadata: { announcementId: ann.id, priority: ann.priority },
-      }));
+    // Insert notifications for all users via INSERT...SELECT (no memory load)
+    await db.execute(sql`
+      INSERT INTO user_notifications (user_id, type, title, message, metadata)
+      SELECT
+        u.id,
+        'announcement',
+        ${ann.title},
+        ${ann.message},
+        ${JSON.stringify({ announcementId: ann.id, priority: ann.priority })}::jsonb
+      FROM users u
+    `);
 
-      for (let i = 0; i < notifValues.length; i += 500) {
-        await db.insert(userNotifications).values(notifValues.slice(i, i + 500));
-      }
-    }
+    // Get count separately
+    const [countRow] = await db.execute(sql`SELECT count(*)::int AS cnt FROM users`) as unknown as [{ cnt: number }];
+    const sentCount = countRow?.cnt ?? 0;
+
+    await db
+      .update(announcements)
+      .set({ status: 'published', sentCount, reviewedAt: new Date() })
+      .where(eq(announcements.id, announcementId));
 
     wsService.broadcast({
       type: 'announcement',
