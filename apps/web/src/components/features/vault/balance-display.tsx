@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { CheckCircle, Loader2, Shield } from 'lucide-react';
+import { CheckCircle, Loader2, Shield, HelpCircle, Copy, Check, X } from 'lucide-react';
+import Image from 'next/image';
 import { useGetVaultBalance, useWithdrawFromVault } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -193,6 +194,123 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
   );
 }
 
+const COIN_CONTRACT = 'axm1cv5er0wsla3u33w6rkn7ckxpn88huqh9aw0xpu0pagksege7v7nsn8qdhs';
+
+const GUIDE_STEPS = [
+  { image: '/1.jpg', key: 'coinGuideStep1' as const },
+  { image: '/2.jpg', key: 'coinGuideStep2' as const },
+  { image: '/3.jpg', key: 'coinGuideStep3' as const },
+];
+
+function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [expandedImg, setExpandedImg] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(COIN_CONTRACT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = COIN_CONTRACT;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, []);
+
+  if (!open) return null;
+
+  return (
+    <Modal open onClose={onClose} title={t('balance.coinGuideTitle')}>
+      <div className="space-y-4 pb-2">
+        {/* Contract address — copyable */}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="w-full flex items-center gap-2 rounded-xl border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-primary)]/10 active:scale-[0.98]"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('balance.coinGuideContract')}</p>
+            <p className="text-[11px] font-mono text-[var(--color-primary)] truncate">{COIN_CONTRACT}</p>
+          </div>
+          {copied ? (
+            <Check size={16} className="shrink-0 text-[var(--color-success)]" />
+          ) : (
+            <Copy size={16} className="shrink-0 text-[var(--color-primary)]" />
+          )}
+        </button>
+
+        {/* Steps */}
+        {GUIDE_STEPS.map((step, idx) => {
+          const text = t(`balance.${step.key}`);
+          // Parse **bold** markers
+          const parts = text.split(/\*\*(.*?)\*\*/g);
+
+          return (
+            <div key={idx} className="space-y-2">
+              <div className="flex items-start gap-2.5">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white text-xs font-bold">
+                  {idx + 1}
+                </div>
+                <p className="text-xs text-[var(--color-text-secondary)] pt-0.5 leading-relaxed">
+                  {parts.map((part, i) =>
+                    i % 2 === 1 ? <strong key={i} className="text-[var(--color-text)] font-semibold">{part}</strong> : part
+                  )}
+                </p>
+              </div>
+              {/* Thumbnail */}
+              <button
+                type="button"
+                onClick={() => setExpandedImg(step.image)}
+                className="ml-8 block rounded-xl overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-primary)]/50 transition-colors active:scale-[0.98] shadow-sm"
+              >
+                <Image
+                  src={step.image}
+                  alt={`Step ${idx + 1}`}
+                  width={180}
+                  height={320}
+                  className="object-cover w-[180px] h-auto"
+                />
+              </button>
+            </div>
+          );
+        })}
+
+        {/* Expanded image lightbox */}
+        {expandedImg && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setExpandedImg(null)}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setExpandedImg(null); }}
+              className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <Image
+              src={expandedImg}
+              alt="Guide screenshot"
+              width={400}
+              height={800}
+              className="max-h-[85vh] w-auto rounded-2xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export function BalanceDisplay() {
   const { t, locale } = useTranslation();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
@@ -209,6 +327,7 @@ export function BalanceDisplay() {
 
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showCoinGuide, setShowCoinGuide] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [depositStatus, setDepositStatus] = useState<'idle' | 'signing' | 'broadcasting' | 'success' | 'error'>('idle');
@@ -549,7 +668,17 @@ export function BalanceDisplay() {
           <>
             {/* Wallet balance (CW20 tokens in user's wallet, not deposited) */}
             <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3 mb-3">
-              <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.walletBalanceAxiome')}</p>
+              <div className="flex items-center justify-between mb-0.5">
+                <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{t('balance.walletBalanceAxiome')}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowCoinGuide(true)}
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-primary)] opacity-60 hover:opacity-100 transition-opacity"
+                  title={t('balance.coinGuideTitle')}
+                >
+                  <HelpCircle size={14} />
+                </button>
+              </div>
               <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
                 <LaunchTokenIcon size={45} />
                 {fmtNum(walletBalanceHuman)}
@@ -803,6 +932,9 @@ export function BalanceDisplay() {
           </div>
         </Modal>
       )}
+
+      {/* ===== COIN Guide Modal ===== */}
+      <CoinGuideModal open={showCoinGuide} onClose={() => setShowCoinGuide(false)} />
     </>
   );
 }

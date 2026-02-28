@@ -113,7 +113,13 @@
     "yourBalance": "Your balance",
     "yourGameBalance": "Your game balance",
     "inBetsShort": "In bets",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "coinGuideTitle": "How to see COIN in Axiome Wallet",
+    "coinGuideStep1": "Open the **Wallet** tab and tap the **gear icon** (settings) next to Assets",
+    "coinGuideStep2": "Paste the COIN contract address in the search field and **enable** the toggle",
+    "coinGuideStep3": "Go back to Wallet — **COIN** will appear at the bottom of your asset list",
+    "coinGuideContract": "Contract address (tap to copy)",
+    "coinGuideCopied": "Copied!"
   },
   "wager": {
     "title": "Wager",

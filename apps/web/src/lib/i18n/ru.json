@@ -113,7 +113,13 @@
     "yourBalance": "Ваш баланс",
     "yourGameBalance": "Ваш игровой баланс",
     "inBetsShort": "В ставках",
-    "collapse": "Свернуть"
+    "collapse": "Свернуть",
+    "coinGuideTitle": "Как увидеть COIN в Axiome Wallet",
+    "coinGuideStep1": "Откройте вкладку **Wallet** и нажмите на **шестерёнку** (настройки) рядом с Assets",
+    "coinGuideStep2": "Вставьте адрес контракта COIN в поисковое поле и **включите** переключатель",
+    "coinGuideStep3": "Вернитесь в Wallet — **COIN** появится внизу в списке активов",
+    "coinGuideContract": "Адрес контракта (нажмите чтобы скопировать)",
+    "coinGuideCopied": "Скопировано!"
   },
   "wager": {
     "title": "Ставка",
