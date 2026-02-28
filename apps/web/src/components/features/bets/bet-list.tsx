@@ -21,6 +21,8 @@ import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
+import { useGrantStatus } from '@/hooks/use-grant-status';
+import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
@@ -56,6 +58,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const { data: grantStatus } = useGrantStatus();
+  const oneClickEnabled = grantStatus?.authz_granted ?? false;
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const pendingAcceptAfterAuthzRef = useRef<string | null>(null);
   // Smart polling: 30s when WS connected (rare fallback), 15s when WS down.
   // retry: 3 with exponential backoff prevents transient errors (rate limits) from breaking the page.
   // keepPreviousData equivalent: placeholderData keeps stale data visible during error/refetch.
@@ -294,8 +300,13 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const handleAcceptClick = useCallback((id: string) => {
     const bet = bets.find(b => String(b.id) === id);
     if (!bet) return;
+    if (!oneClickEnabled) {
+      pendingAcceptAfterAuthzRef.current = id;
+      setShowOnboarding(true);
+      return;
+    }
     setAcceptTarget({ id, amount: Number(bet.amount) });
-  }, [bets]);
+  }, [bets, oneClickEnabled]);
 
   // Confirm accept: check balance (with ref-based running total), then queue API call
   const handleConfirmAccept = useCallback(() => {
@@ -509,6 +520,25 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           );
         })()}
       </Modal>
+
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onSuccess={() => {
+          const pendingId = pendingAcceptAfterAuthzRef.current;
+          if (pendingId) {
+            pendingAcceptAfterAuthzRef.current = null;
+            // After authz completes, open the accept confirmation for the bet
+            setTimeout(() => {
+              setShowOnboarding(false);
+              const bet = bets.find(b => String(b.id) === pendingId);
+              if (bet) {
+                setAcceptTarget({ id: pendingId, amount: Number(bet.amount) });
+              }
+            }, 2000);
+          }
+        }}
+      />
     </div>
   );
 }

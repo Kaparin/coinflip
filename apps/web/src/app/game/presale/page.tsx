@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ArrowDown, CheckCircle, ExternalLink, Loader2, ShoppingCart, TrendingUp, Coins, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowDown, CheckCircle, ExternalLink, Loader2, ShoppingCart, TrendingUp, Coins, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useNativeBalance } from '@/hooks/use-wallet-balance';
 import { usePresaleConfig, usePresaleStatus } from '@/hooks/use-presale';
+import { useGrantStatus } from '@/hooks/use-grant-status';
 import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
-import { signPresaleBuy } from '@/lib/wallet-signer';
-import { PRESALE_CONTRACT, EXPLORER_URL } from '@/lib/constants';
+import { signPresaleBuy, signDepositTxBytes } from '@/lib/wallet-signer';
+import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
+import { PRESALE_CONTRACT, EXPLORER_URL, API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -25,11 +28,20 @@ export default function PresalePage() {
   const { data: presaleConfig, isLoading: configLoading } = usePresaleConfig();
   const { data: presaleStatus, isLoading: statusLoading } = usePresaleStatus();
 
+  const { data: grantStatus } = useGrantStatus();
+  const oneClickEnabled = grantStatus?.authz_granted ?? false;
+
   const [axmInput, setAxmInput] = useState('');
   const [isBuying, setIsBuying] = useState(false);
   const [buyStep, setBuyStep] = useState<BuyStep | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successTx, setSuccessTx] = useState<{ txHash: string; coinAmount: string; axmAmount: string; pending?: boolean } | null>(null);
+
+  // Post-purchase deposit flow
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [depositStep, setDepositStep] = useState<'signing' | 'broadcasting' | 'confirming' | null>(null);
+  const [depositDone, setDepositDone] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const nativeHuman = Number(nativeBalance ?? '0') / 1_000_000;
   const axmAmount = parseFloat(axmInput) || 0;
@@ -52,7 +64,59 @@ export default function PresalePage() {
     queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
     queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
     queryClient.invalidateQueries({ queryKey: ['presale'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
   }, [queryClient]);
+
+  // Deposit purchased COIN into game vault
+  const handleDeposit = useCallback(async () => {
+    if (!address || !successTx || isDepositing) return;
+    const coinAmount = parseFloat(successTx.coinAmount.replace(/,/g, ''));
+    if (!coinAmount || coinAmount <= 0) return;
+
+    setIsDepositing(true);
+    setDepositStep('signing');
+    setError(null);
+
+    try {
+      const wallet = await getWallet();
+      if (!wallet) throw new Error('Wallet not available');
+
+      const { txBytes } = await signDepositTxBytes(wallet, address, coinAmount);
+      setDepositStep('broadcasting');
+
+      const res = await fetch(`${API_URL}/api/v1/vault/deposit/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wallet-address': address,
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ tx_bytes: txBytes }),
+      });
+
+      setDepositStep('confirming');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error?.message || 'Deposit broadcast failed');
+      }
+
+      setDepositDone(true);
+      refreshBalances();
+
+      // After deposit, prompt authz if not set up
+      if (!oneClickEnabled) {
+        setTimeout(() => setShowOnboarding(true), 1500);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(getUserFriendlyError(msg, t, 'generic'));
+      refreshBalances();
+    } finally {
+      setIsDepositing(false);
+      setDepositStep(null);
+    }
+  }, [address, successTx, isDepositing, getWallet, refreshBalances, oneClickEnabled, t]);
 
   const handleBuy = useCallback(async () => {
     if (!address || !axmAmount || isBuying) return;
@@ -248,7 +312,7 @@ export default function PresalePage() {
 
       {/* Success / Pending */}
       {successTx && (
-        <div className={`rounded-xl border px-4 py-3 space-y-2 ${
+        <div className={`rounded-xl border px-4 py-3 space-y-3 ${
           successTx.pending
             ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10'
             : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
@@ -276,6 +340,49 @@ export default function PresalePage() {
           >
             {t('presale.txHash')} <ExternalLink size={10} />
           </a>
+
+          {/* Auto-deposit buttons (only after confirmed purchase, not pending) */}
+          {!successTx.pending && !depositDone && (
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleDeposit}
+                disabled={isDepositing}
+                className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-3 text-xs font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] disabled:opacity-50 active:scale-[0.98]"
+              >
+                {isDepositing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    {depositStep === 'signing' ? t('presale.depositSigning')
+                      : depositStep === 'broadcasting' ? t('presale.depositBroadcasting')
+                      : depositStep === 'confirming' ? t('presale.depositConfirming')
+                      : t('presale.depositing')}
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight size={14} />
+                    {t('presale.depositAndPlay')}
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSuccessTx(null)}
+                disabled={isDepositing}
+                className="flex-1 rounded-xl border border-[var(--color-border)] px-3 py-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+              >
+                {t('presale.depositLater')}
+              </button>
+            </div>
+          )}
+
+          {/* Deposit success */}
+          {depositDone && (
+            <div className="flex items-center gap-2 rounded-lg bg-[var(--color-success)]/15 px-3 py-2">
+              <CheckCircle size={14} className="text-[var(--color-success)]" />
+              <p className="text-xs font-bold text-[var(--color-success)]">{t('presale.depositSuccess')}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -324,6 +431,8 @@ export default function PresalePage() {
           </div>
         </div>
       )}
+
+      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
     </div>
   );
 }

@@ -2,10 +2,7 @@
 
 import { Wallet } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { useGrantStatus } from '@/hooks/use-grant-status';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
-import { StatusChips } from '@/components/features/auth/status-chips';
-import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { UserAvatar } from '@/components/ui';
 import { useState, useCallback } from 'react';
 import { EXPLORER_URL } from '@/lib/constants';
@@ -14,12 +11,7 @@ import { useTranslation } from '@/lib/i18n';
 export default function WalletPage() {
   const { t } = useTranslation();
   const { address, isConnected, connect, savedWallets, openConnectModal } = useWalletContext();
-  const { data: grantData } = useGrantStatus();
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const oneClickEnabled = grantData?.authz_granted ?? false;
-  const gasSponsored = (grantData?.fee_grant_active ?? false) || (grantData?.user_fee_grant_active ?? false);
 
   const handleCopy = useCallback(() => {
     if (!address) return;
@@ -118,18 +110,6 @@ export default function WalletPage() {
 
       {/* Full Balance Display with deposit/withdraw */}
       <BalanceDisplay />
-
-      {/* Status chips */}
-      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)] mb-3">{t('gameStatus.title')}</p>
-        <StatusChips
-          oneClickEnabled={oneClickEnabled}
-          gasSponsored={gasSponsored}
-          onSetupClick={() => setOnboardingOpen(true)}
-        />
-      </div>
-
-      <OnboardingModal isOpen={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
     </div>
   );
 }

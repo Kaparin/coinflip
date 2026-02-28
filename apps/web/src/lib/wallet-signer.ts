@@ -25,8 +25,6 @@ import { defaultRegistryTypes } from '@cosmjs/stargate';
 import { MsgExec, MsgGrant } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 import { ContractExecutionAuthorization, AcceptedMessageKeysFilter, MaxCallsLimit } from 'cosmjs-types/cosmwasm/wasm/v1/authz';
-import { MsgGrantAllowance } from 'cosmjs-types/cosmos/feegrant/v1beta1/tx';
-import { BasicAllowance } from 'cosmjs-types/cosmos/feegrant/v1beta1/feegrant';
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 
 /**
@@ -100,8 +98,6 @@ export async function getStargateClient(
   const registry = new Registry(defaultRegistryTypes);
   registry.register('/cosmos.authz.v1beta1.MsgGrant', MsgGrant);
   registry.register('/cosmos.authz.v1beta1.MsgExec', MsgExec);
-  registry.register('/cosmos.feegrant.v1beta1.MsgGrantAllowance', MsgGrantAllowance);
-
   const rpcUrl = getRpcUrl();
   return SigningStargateClient.connectWithSigner(rpcUrl, wallet, {
     gasPrice: GasPrice.fromString(DEFAULT_GAS_PRICE),
@@ -234,13 +230,11 @@ export async function signDeposit(
 // ---- Authz Grant ----
 
 /**
- * Fixed gas limit for MsgGrant (authz) + MsgGrantAllowance (feegrant).
- * MsgGrant typically uses 80k-150k gas, MsgGrantAllowance ~80k.
- * 400k provides headroom for both messages in a single tx.
- * Eliminates the `simulate` RPC call that 'auto' gas requires —
- * this avoids stale sequence issues for new accounts after deposit.
+ * Fixed gas limit for MsgGrant (authz).
+ * MsgGrant typically uses 80k-150k gas.
+ * 300k provides headroom. Eliminates the `simulate` RPC call.
  */
-const AUTHZ_GAS_LIMIT = 400_000;
+const AUTHZ_GAS_LIMIT = 300_000;
 
 export interface AuthzGrantResult {
   txHash: string;
@@ -340,31 +334,10 @@ export async function signAuthzGrant(
     }),
   };
 
-  // Build MsgGrantAllowance: user → relayer feegrant (for non-VIP gas payment)
-  const msgFeegrant = {
-    typeUrl: '/cosmos.feegrant.v1beta1.MsgGrantAllowance',
-    value: MsgGrantAllowance.fromPartial({
-      granter: address,
-      grantee,
-      allowance: {
-        typeUrl: '/cosmos.feegrant.v1beta1.BasicAllowance',
-        value: BasicAllowance.encode(
-          BasicAllowance.fromPartial({
-            spendLimit: [{ denom: 'uaxm', amount: '10000000' }], // 10 AXM
-            expiration: {
-              seconds: BigInt(Math.floor(expiration.getTime() / 1000)),
-              nanos: 0,
-            },
-          }),
-        ).finish(),
-      },
-    }),
-  };
-
   const fee = calculateFee(AUTHZ_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
   try {
-    const result = await client.signAndBroadcast(address, [msgGrant, msgFeegrant], fee, 'CoinFlip 1-click authorization');
+    const result = await client.signAndBroadcast(address, [msgGrant], fee, 'CoinFlip game activation');
     if (result.code !== 0) {
       throw new Error(`Authz grant failed: ${result.rawLog}`);
     }
@@ -381,7 +354,7 @@ export async function signAuthzGrant(
     const chainId = await client.getChainId();
 
     const txRaw = await client.sign(
-      address, [msgGrant, msgFeegrant], fee, 'CoinFlip 1-click authorization',
+      address, [msgGrant], fee, 'CoinFlip game activation',
       { accountNumber, sequence: expectedSeq, chainId },
     );
     const txBytes = TxRaw.encode(txRaw).finish();

@@ -7,11 +7,8 @@ import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, 
 import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
 import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
-import { StatusChips } from '@/components/features/auth/status-chips';
-import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
 import { useVipStatus } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
@@ -24,7 +21,6 @@ export function Header() {
   const { t, locale, setLocale } = useTranslation();
   const pathname = usePathname();
   const wallet = useWalletContext();
-  const { data: grantData } = useGrantStatus();
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: wallet.isConnected,
@@ -42,9 +38,10 @@ export function Header() {
   const { data: currentUserData } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
   const userNickname = (currentUserData as any)?.data?.nickname as string | null;
   const [menuOpen, setMenuOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [balanceOpen, setBalanceOpen] = useState(false);
   const [vipModalOpen, setVipModalOpen] = useState(false);
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
+  const balanceRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -55,9 +52,6 @@ export function Header() {
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000; // uaxm → AXM
   const isLowAxm = !vipStatus?.active && nativeBalanceHuman < 0.5;
-  const oneClickEnabled = grantData?.authz_granted ?? false;
-  // Gas is ready if either: treasury feegrant exists (VIP) or user→relayer feegrant exists (non-VIP)
-  const gasSponsored = (grantData?.fee_grant_active ?? false) || (grantData?.user_fee_grant_active ?? false);
 
   const isAdmin =
     wallet.isConnected &&
@@ -69,15 +63,18 @@ export function Header() {
 
   // Close dropdown on click outside
   useEffect(() => {
-    if (!walletDropdownOpen) return;
+    if (!walletDropdownOpen && !balanceOpen) return;
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (walletDropdownOpen && dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setWalletDropdownOpen(false);
+      }
+      if (balanceOpen && balanceRef.current && !balanceRef.current.contains(e.target as Node)) {
+        setBalanceOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [walletDropdownOpen]);
+  }, [walletDropdownOpen, balanceOpen]);
 
   const handleCopyAddress = useCallback(() => {
     if (!wallet.address) return;
@@ -204,12 +201,6 @@ export function Header() {
                   </button>
                 </nav>
 
-                <StatusChips
-                  oneClickEnabled={oneClickEnabled}
-                  gasSponsored={gasSponsored}
-                  compact
-                  onSetupClick={() => setOnboardingOpen(true)}
-                />
               </>
             )}
 
@@ -376,19 +367,90 @@ export function Header() {
             )}
           </div>
 
-          {/* Mobile: Connect button when disconnected, else 1-Click chip + burger */}
+          {/* Mobile: balance indicator + burger */}
           <div className="flex items-center gap-1.5 md:hidden min-w-0">
             {wallet.isConnected ? (
               <>
-                <div className="min-w-0 overflow-hidden">
-                  <StatusChips
-                    oneClickEnabled={oneClickEnabled}
-                    gasSponsored={gasSponsored}
-                    compact
-                    onSetupClick={() => setOnboardingOpen(true)}
-                  />
+                {/* Balance indicator — opens balance sheet */}
+                <div className="relative" ref={balanceRef}>
+                  <button
+                    type="button"
+                    onClick={() => { setBalanceOpen(!balanceOpen); setMenuOpen(false); }}
+                    className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold tabular-nums transition-all active:scale-[0.96] ${
+                      balanceOpen
+                        ? 'border-[var(--color-primary)]/50 bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/5 text-[var(--color-success)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      {fmtBal(availableHuman)} <LaunchTokenIcon size={28} />
+                    </span>
+                    <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Balance dropdown sheet */}
+                  {balanceOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden animate-fade-in z-50">
+                      {/* Balance rows */}
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-success)]/10">
+                              <Wallet size={14} className="text-[var(--color-success)]" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</p>
+                              <p className="text-sm font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)}</p>
+                            </div>
+                          </div>
+                          <LaunchTokenIcon size={32} />
+                        </div>
+                        <div className="h-px bg-[var(--color-border)]" />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
+                              <Wallet size={14} className="text-[var(--color-primary)]" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</p>
+                              <p className="text-sm font-bold tabular-nums">{fmtBal(walletBalanceHuman)}</p>
+                            </div>
+                          </div>
+                          <LaunchTokenIcon size={32} />
+                        </div>
+                        <div className="h-px bg-[var(--color-border)]" />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isLowAxm ? 'bg-[var(--color-warning)]/10' : 'bg-[var(--color-text-secondary)]/10'}`}>
+                              <AxmIcon size={14} />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</p>
+                              <p className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>
+                                {nativeBalanceHuman.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <AxmIcon size={16} />
+                            {isLowAxm && <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Deposit/Withdraw CTA */}
+                      <Link
+                        href="/game/wallet"
+                        onClick={() => { setBalanceOpen(false); setMenuOpen(false); }}
+                        className="flex items-center justify-center gap-2 border-t border-[var(--color-border)] bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 px-4 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
+                      >
+                        <Wallet size={16} />
+                        {t('header.depositWithdraw')}
+                      </Link>
+                    </div>
+                  )}
                 </div>
-                <button type="button" onClick={() => setMenuOpen(!menuOpen)}
+
+                <button type="button" onClick={() => { setMenuOpen(!menuOpen); setBalanceOpen(false); }}
                   className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
                   aria-label={t('header.toggleMenu')}>
                   {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -417,25 +479,6 @@ export function Header() {
                   className="shrink-0 ml-2 text-[10px] font-medium text-[var(--color-primary)] hover:underline">
                   {copied ? t('common.copied') : t('common.copy')}
                 </button>
-              </div>
-
-              {/* Balances (mobile) */}
-              <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
-                  <span className="flex items-center gap-1 text-xs font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={32} /></span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
-                  <span className="flex items-center gap-1 text-xs font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={32} /></span>
-                </div>
-                <div className={`flex items-center justify-between ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>
-                  <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]"><AxmIcon size={12} /> AXM ({t('header.gas')})</span>
-                  <span className="flex items-center gap-1 text-xs font-medium tabular-nums">
-                    {nativeBalanceHuman.toFixed(2)} <AxmIcon size={14} />
-                    {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
-                  </span>
-                </div>
               </div>
 
               {/* Quick links */}
@@ -541,7 +584,6 @@ export function Header() {
         </div>
       )}
 
-      <OnboardingModal isOpen={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
       <VipPurchaseModal open={vipModalOpen} onClose={() => setVipModalOpen(false)} />
     </>
   );

@@ -14,6 +14,8 @@ import { CheckCircle, Loader2, Shield } from 'lucide-react';
 interface OnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Called after authz grant succeeds (before the done screen auto-closes) */
+  onSuccess?: () => void;
 }
 
 /**
@@ -24,7 +26,7 @@ type AuthStep = 'fetching' | 'signing' | 'broadcasting' | 'confirming';
 
 const AUTH_STEPS: AuthStep[] = ['fetching', 'signing', 'broadcasting', 'confirming'];
 
-export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
+export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalProps) {
   const { t } = useTranslation();
   const { address, getWallet } = useWalletContext();
   const { data: grantStatus, refetch } = useGrantStatus();
@@ -79,6 +81,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
 
       setStep('done');
       setTimeout(() => void refetch(), 3000);
+      onSuccess?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to sign grant';
       setError(msg);
@@ -111,7 +114,6 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
               {[
                 t('onboarding.onlyContract'),
                 t('onboarding.limitedActions'),
-                t('onboarding.gasAllowance'),
                 t('onboarding.expires30d'),
                 t('onboarding.signedLocally'),
               ].map((text) => (
@@ -128,10 +130,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
               </div>
             )}
 
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={onClose} className="flex-1">{t('onboarding.later')}</Button>
-              <Button onClick={handleGrantAuthz} loading={isSubmitting} className="flex-1">{t('onboarding.authorize')}</Button>
-            </div>
+            <Button onClick={handleGrantAuthz} loading={isSubmitting} className="w-full">{t('onboarding.authorize')}</Button>
           </>
         )}
 
@@ -207,7 +206,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
             <p className="text-sm text-[var(--color-text-secondary)] text-center">
               {t('onboarding.allSetDesc')}
             </p>
-            <Button onClick={onClose} className="mt-2">{t('onboarding.startPlaying')}</Button>
+            <Button onClick={onClose} className="mt-2">{t('common.close')}</Button>
           </div>
         )}
       </div>

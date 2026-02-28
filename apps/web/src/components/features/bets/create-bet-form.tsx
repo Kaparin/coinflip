@@ -9,7 +9,7 @@ import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { setBalanceGracePeriod } from '@/lib/balance-grace';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
-import { AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
 import { LaunchTokenIcon } from '@/components/ui';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { useTranslation } from '@/lib/i18n';
@@ -43,6 +43,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   const setAmount = onAmountChange ?? setInternalAmount;
   const [phase, setPhase] = useState<'pick' | 'confirm' | 'submitted'>('pick');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const pendingAfterAuthzRef = useRef(false);
   const { address, isConnected, connect } = useWalletContext();
   const { data: grantStatus } = useGrantStatus();
   const { addToast } = useToast();
@@ -156,8 +157,13 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
 
   const handleConfirm = useCallback(() => {
     if (!isValidAmount || !address || !canCreateBet) return;
+    if (!oneClickEnabled) {
+      pendingAfterAuthzRef.current = true;
+      setShowOnboarding(true);
+      return;
+    }
     setPhase('confirm');
-  }, [isValidAmount, address, canCreateBet]);
+  }, [isValidAmount, address, canCreateBet, oneClickEnabled]);
 
   const handleCancel = useCallback(() => {
     setPhase('pick');
@@ -279,28 +285,6 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   return (
     <div className={variant === 'card' ? 'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden' : ''}>
       <div className={variant === 'card' ? 'p-5' : ''}>
-      {/* Authz Setup Warning */}
-      {isConnected && !oneClickEnabled && grantStatus !== undefined && (
-        <div className="mb-4 rounded-xl bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 p-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={20} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-[var(--color-warning)] mb-1">{t('wager.oneClickRequired')}</p>
-              <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                {t('wager.oneClickDesc')}
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="mt-1 rounded-lg bg-[var(--color-warning)] px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-[var(--color-warning)]/80"
-              >
-                {t('wager.enableOneClick')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {phase === 'submitted' ? (
         <div className="flex flex-col items-center gap-3 py-8 animate-fade-up">
           <div className="relative flex h-16 w-16 items-center justify-center">
@@ -416,10 +400,15 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             {parsedAmount > 0 && parsedAmount < 1 && (
               <p className="mt-1.5 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
             )}
-            {parsedAmount > availableHuman && availableHuman > 0 && (
-              <p className="mt-1.5 text-[10px] text-[var(--color-danger)]">
-                {t('wager.insufficientBalance', { amount: availableHuman.toLocaleString() })}
-              </p>
+            {parsedAmount > availableHuman && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
+                <span className="text-[var(--color-danger)]">
+                  {t('wager.insufficientBalance', { amount: availableHuman.toLocaleString() })}
+                </span>
+                <Link href="/game/wallet" className="font-bold text-[var(--color-primary)] hover:underline">
+                  {t('wager.goDeposit')}
+                </Link>
+              </div>
             )}
           </div>
 
@@ -438,8 +427,18 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             </div>
           )}
 
+          {/* Zero balance prompt */}
+          {isConnected && availableHuman === 0 && (
+            <Link
+              href="/game/wallet"
+              className="mb-3 flex items-center justify-center gap-2 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 px-4 py-3 text-xs font-bold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/10"
+            >
+              {t('wager.depositToStart')}
+            </Link>
+          )}
+
           {/* Create Button */}
-          <button type="button" disabled={!isValidAmount || !isConnected || (!oneClickEnabled && isConnected) || !canCreateBet || batchSubmitting}
+          <button type="button" disabled={!isValidAmount || !isConnected || !canCreateBet || batchSubmitting}
             onClick={isConnected ? handleConfirm : connect}
             className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98] ${
               isValidAmount
@@ -448,17 +447,15 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             }`}>
             {!isConnected
               ? t('common.connectWallet')
-              : !oneClickEnabled
-                ? t('wager.enableFirst')
-                : !canCreateBet
-                  ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
-                  : isValidAmount
-                    ? <span className="flex items-center justify-center gap-1.5">{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={45} /></span>
-                    : t('wager.enterAmount')}
+              : !canCreateBet
+                ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
+                : isValidAmount
+                  ? <span className="flex items-center justify-center gap-1.5">{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <LaunchTokenIcon size={45} /></span>
+                  : t('wager.enterAmount')}
           </button>
 
           {/* ─── Batch Mode ─── */}
-          {isConnected && oneClickEnabled && (
+          {isConnected && (
             <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] tracking-wide">
@@ -574,7 +571,20 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
       )}
       </div>
 
-      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onSuccess={() => {
+          if (pendingAfterAuthzRef.current) {
+            pendingAfterAuthzRef.current = false;
+            // Auto-proceed to confirm step after authz completes
+            setTimeout(() => {
+              setShowOnboarding(false);
+              setPhase('confirm');
+            }, 2000);
+          }
+        }}
+      />
     </div>
   );
 }
