@@ -782,6 +782,8 @@
     "endsIn": "Ends in",
     "startsIn": "Starts in",
     "ended": "Ended",
+    "duration": "Duration",
+    "upcomingEvents": "Upcoming Events",
     "rank": "Rank",
     "player": "Player",
     "metric": "Score",

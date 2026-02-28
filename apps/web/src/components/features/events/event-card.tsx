@@ -1,12 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, Users, Target, User, Eye, Lock, BarChart3 } from 'lucide-react';
+import { Trophy, Users, Target, User, Eye, Clock, BarChart3 } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
 import { useTranslation } from '@/lib/i18n';
+
+function formatDuration(startsAt: string, endsAt: string): string {
+  const ms = new Date(endsAt).getTime() - new Date(startsAt).getTime();
+  if (ms <= 0) return '';
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+  const remainH = hours % 24;
+  if (days > 0 && remainH > 0) return `${days}d ${remainH}h`;
+  if (days > 0) return `${days}d`;
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`;
+  return `${minutes}m`;
+}
 
 const METRIC_KEYS: Record<string, string> = {
   turnover: 'events.rules.metricTurnover',
@@ -47,9 +60,12 @@ interface EventCardProps {
 export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps) {
   const { t } = useTranslation();
   const theme = getEventTheme(event.type);
-  const isActive = event.status === 'active';
+  const now = new Date();
+  const notStartedYet = new Date(event.startsAt) > now;
+  const isUpcoming = (event.status === 'draft' || event.status === 'active') && notStartedYet;
+  const isActive = (event.status === 'active') && !notStartedYet;
   const isCompleted = event.status === 'completed' || event.status === 'calculating';
-  const isUpcoming = event.status === 'draft' && new Date(event.startsAt) > new Date();
+  const isLive = isActive || isUpcoming;
 
   const TypeIcon = event.type === 'contest' ? Target : Trophy;
 
@@ -85,7 +101,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
     <Link
       href={`/game/events/${event.id}`}
       className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-xl border border-[var(--color-border)] p-4 card-hover ${
-        isActive || isUpcoming
+        isLive
           ? `${theme.bgGradient} ${theme.borderGlow} shimmer-overlay`
           : 'bg-[var(--color-surface)]'
       } ${isCompleted ? 'opacity-80' : ''}`}
@@ -150,9 +166,19 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         </div>
 
         {/* Timer */}
-        <div className="shrink-0">
+        <div className="shrink-0 text-right">
           {isActive && <EventTimer targetDate={event.endsAt} label={t('events.endsIn')} eventType={event.type} />}
-          {isUpcoming && <EventTimer targetDate={event.startsAt} label={t('events.startsIn')} eventType={event.type} />}
+          {isUpcoming && (
+            <>
+              <EventTimer targetDate={event.startsAt} label={t('events.startsIn')} eventType={event.type} />
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Clock size={9} className="text-[var(--color-text-secondary)]" />
+                <span className="text-[9px] text-[var(--color-text-secondary)]">
+                  {t('events.duration')}: {formatDuration(event.startsAt, event.endsAt)}
+                </span>
+              </div>
+            </>
+          )}
           {isCompleted && (
             <span className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)]">
               {t('events.ended')}

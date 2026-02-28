@@ -16,9 +16,17 @@ export function EventList() {
     { query: { staleTime: 60_000 } },
   );
 
-  const activeEvents = activeData?.data ?? [];
+  const allActiveEvents = activeData?.data ?? [];
   const completedEvents = completedData?.data ?? [];
   const isLoading = activeLoading || completedLoading;
+
+  // Split into truly active (already started) and upcoming (starts in the future)
+  const now = new Date();
+  const liveEvents = allActiveEvents.filter(e => e.status === 'active' && new Date(e.startsAt) <= now);
+  const upcomingEvents = allActiveEvents.filter(e =>
+    (e.status === 'draft' && new Date(e.startsAt) > now) ||
+    (e.status === 'active' && new Date(e.startsAt) > now),
+  );
 
   if (isLoading) {
     return (
@@ -30,7 +38,7 @@ export function EventList() {
     );
   }
 
-  if (activeEvents.length === 0 && completedEvents.length === 0) {
+  if (liveEvents.length === 0 && upcomingEvents.length === 0 && completedEvents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Trophy size={40} className="mb-3 text-[var(--color-text-secondary)]" />
@@ -41,15 +49,29 @@ export function EventList() {
 
   return (
     <div className="space-y-6">
-      {/* Active events */}
-      {activeEvents.length > 0 && (
+      {/* Active (live) events */}
+      {liveEvents.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
             {t('events.activeEvents')}
           </h2>
           <div className="space-y-3">
-            {activeEvents.map((event, i) => (
+            {liveEvents.map((event, i) => (
               <EventCard key={event.id} event={event} size="large" index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Upcoming events */}
+      {upcomingEvents.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            {t('events.upcomingEvents')}
+          </h2>
+          <div className="space-y-3">
+            {upcomingEvents.map((event, i) => (
+              <EventCard key={event.id} event={event} size="large" index={liveEvents.length + i} />
             ))}
           </div>
         </section>

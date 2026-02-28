@@ -25,6 +25,19 @@ function formatDateRange(startsAt: string, endsAt: string): string {
   return `${fmt(startsAt)} \u2014 ${fmt(endsAt)}`;
 }
 
+function formatDuration(startsAt: string, endsAt: string): string {
+  const ms = new Date(endsAt).getTime() - new Date(startsAt).getTime();
+  if (ms <= 0) return '';
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+  const remainH = hours % 24;
+  if (days > 0 && remainH > 0) return `${days}d ${remainH}h`;
+  if (days > 0) return `${days}d`;
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`;
+  return `${minutes}m`;
+}
+
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useTranslation();
@@ -105,8 +118,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const theme = getEventTheme(event.type);
   const TypeIcon = isContest ? Target : Trophy;
-  const isActive = event.status === 'active';
-  const isUpcoming = event.status === 'draft' && new Date(event.startsAt) > new Date();
+  const now = new Date();
+  const notStartedYet = new Date(event.startsAt) > now;
+  const isUpcoming = (event.status === 'draft' || event.status === 'active') && notStartedYet;
+  const isActive = (event.status === 'active') && !notStartedYet;
   const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
   const eventDescription = event.description ? String(event.description) : null;
@@ -199,11 +214,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <span>{event.participantCount} {t('events.participants')}</span>
           </div>
           {isUpcoming && (
-            <div className="flex items-center gap-1">
-              <Clock size={12} className={theme.iconColor} />
-              <span className="text-[var(--color-text-secondary)]">{t('events.startsIn')}</span>
-              <EventTimer targetDate={event.startsAt} compact eventType={event.type} />
-            </div>
+            <>
+              <div className="flex items-center gap-1">
+                <Clock size={12} className={theme.iconColor} />
+                <span className="text-[var(--color-text-secondary)]">{t('events.startsIn')}</span>
+                <EventTimer targetDate={event.startsAt} compact eventType={event.type} />
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar size={12} className="text-[var(--color-text-secondary)]" />
+                <span>{t('events.duration')}: {formatDuration(event.startsAt, event.endsAt)}</span>
+              </div>
+            </>
           )}
           {isActive && (
             <div className="flex items-center gap-1">

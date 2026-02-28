@@ -59,17 +59,19 @@ export function EventTimer({ targetDate, label, compact, eventType }: EventTimer
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      {label && <span className="text-[10px] text-[var(--color-text-secondary)]">{label}</span>}
-      {isCritical && (
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-danger)] opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--color-danger)]" />
+    <div className="flex flex-col items-end">
+      {label && <span className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{label}</span>}
+      <div className="flex items-center gap-1.5">
+        {isCritical && (
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-danger)] opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--color-danger)]" />
+          </span>
+        )}
+        <span className={`tabular-nums font-mono text-sm font-bold ${colorClass} ${isUrgent ? 'animate-urgency-pulse' : ''}`}>
+          {isExpired ? 'Ended' : formatTimeLeft(timeLeft)}
         </span>
-      )}
-      <span className={`tabular-nums font-mono text-sm font-bold ${colorClass} ${isUrgent ? 'animate-urgency-pulse' : ''}`}>
-        {isExpired ? 'Ended' : formatTimeLeft(timeLeft)}
-      </span>
+      </div>
     </div>
   );
 }
