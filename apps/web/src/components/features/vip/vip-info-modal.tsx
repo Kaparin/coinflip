@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FaCrown, FaStar } from 'react-icons/fa';
 import { GiCutDiamond } from 'react-icons/gi';
 import { Modal } from '@/components/ui/modal';
@@ -42,6 +43,9 @@ interface VipInfoModalProps {
 export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotTierName }: VipInfoModalProps) {
   const { t } = useTranslation();
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const meta = tierMeta[tier];
   if (!meta) return null;
@@ -85,7 +89,7 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
           {/* CTA button */}
           <button
             type="button"
-            onClick={() => setPurchaseOpen(true)}
+            onClick={() => { onClose(); setPurchaseOpen(true); }}
             className={`w-full rounded-xl bg-gradient-to-r ${meta.gradient} px-4 py-3 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]`}
           >
             {t('vip.info.getVip')}
@@ -93,7 +97,10 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
         </div>
       </Modal>
 
-      <VipPurchaseModal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />
+      {mounted && createPortal(
+        <VipPurchaseModal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />,
+        document.body,
+      )}
     </>
   );
 }
