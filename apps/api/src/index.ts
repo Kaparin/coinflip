@@ -61,6 +61,14 @@ async function initServices() {
   } else {
     logger.info('Background sweep disabled (ENABLE_BACKGROUND_SWEEP != "true"). Set ENABLE_BACKGROUND_SWEEP=true to enable.');
   }
+
+  // Periodic jackpot backfill every 5 minutes — catches any contributions
+  // missed due to transient errors during event processing
+  setInterval(() => {
+    jackpotService.backfillContributions().catch((err) => {
+      logger.warn({ err }, 'Periodic jackpot backfill failed');
+    });
+  }, 5 * 60 * 1000);
 }
 
 const server = serve({

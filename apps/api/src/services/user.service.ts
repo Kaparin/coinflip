@@ -655,31 +655,31 @@ export class UserService {
     const earned: string[] = [];
 
     // Win milestones
-    if (wins >= 1) earned.push('first_win');
-    if (wins >= 10) earned.push('wins_10');
-    if (wins >= 50) earned.push('wins_50');
-    if (wins >= 100) earned.push('wins_100');
+    if (wins >= 100) earned.push('first_win');
+    if (wins >= 1_000) earned.push('wins_10');
+    if (wins >= 5_000) earned.push('wins_50');
+    if (wins >= 10_000) earned.push('wins_100');
 
     // Games milestones
-    if (totalBets >= 100) earned.push('veteran');
-    if (totalBets >= 500) earned.push('legend');
+    if (totalBets >= 10_000) earned.push('veteran');
+    if (totalBets >= 50_000) earned.push('legend');
 
     // Bet size
-    if (maxBet >= 100 * MICRO) earned.push('high_roller');
-    if (maxBet >= 500 * MICRO) earned.push('whale');
+    if (maxBet >= 10_000 * MICRO) earned.push('high_roller');
+    if (maxBet >= 50_000 * MICRO) earned.push('whale');
 
     // Volume
-    if (totalWagered >= 1_000 * MICRO) earned.push('volume_1k');
-    if (totalWagered >= 10_000 * MICRO) earned.push('volume_10k');
-    if (totalWagered >= 100_000 * MICRO) earned.push('volume_100k');
+    if (totalWagered >= 100_000 * MICRO) earned.push('volume_1k');
+    if (totalWagered >= 1_000_000 * MICRO) earned.push('volume_10k');
+    if (totalWagered >= 10_000_000 * MICRO) earned.push('volume_100k');
 
     // Profitability
-    if (totalWon > totalWagered && totalBets >= 5) earned.push('profitable');
+    if (totalWon > totalWagered && totalBets >= 500) earned.push('profitable');
 
     // Win streaks
-    if (maxWinStreak >= 3) earned.push('streak_3');
-    if (maxWinStreak >= 5) earned.push('streak_5');
-    if (maxWinStreak >= 10) earned.push('streak_10');
+    if (maxWinStreak >= 300) earned.push('streak_3');
+    if (maxWinStreak >= 500) earned.push('streak_5');
+    if (maxWinStreak >= 1_000) earned.push('streak_10');
 
     return {
       earned,
