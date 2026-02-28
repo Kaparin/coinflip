@@ -578,7 +578,7 @@ export function BalanceDisplay() {
             <div className={`flex items-center justify-between rounded-xl p-2.5 mb-3 ${isLowAxm ? 'bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20' : 'bg-[var(--color-bg)]'}`}>
               <div className="flex items-center gap-2">
                 <AxmIcon size={18} />
-                <span className="text-[10px] uppercase text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</span>
+                <span className="text-[10px] uppercase text-[var(--color-text-secondary)]">AXM</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>{nativeBalanceHuman.toFixed(2)}</span>

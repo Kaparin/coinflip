@@ -117,7 +117,7 @@ export function Header() {
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
                     <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={18} /></span>
                   </div>
-                  <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM (gas)">
+                  <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM">
                     <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={18} /></span>
                     {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                   </div>
