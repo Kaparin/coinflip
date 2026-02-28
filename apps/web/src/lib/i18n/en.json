@@ -817,6 +817,22 @@
       "raffleDesc": "A raffle is a lottery among participants. Click 'Join Raffle' on the raffle page to enter. Winners are chosen randomly using a verifiable algorithm (seed is published after the draw). More participants mean a bigger prize pool!",
       "rulesTitle": "General Rules",
       "rulesDesc": "Events are launched periodically by the CoinFlip team. Prizes are credited to your vault balance automatically after results are finalized. Keep an eye on active events — they appear in this section. Each event has a limited duration."
+    },
+    "rules": {
+      "title": "How to participate",
+      "contestAutoJoin": "All players participate automatically — just play during the event!",
+      "contestRankedBy": "Players are ranked by:",
+      "metricTurnover": "Total wagered",
+      "metricWins": "Number of wins",
+      "metricProfit": "Net profit",
+      "minBetAmount": "Only bets ≥ {{amount}} COIN count",
+      "raffleJoinRequired": "Click \"Join Raffle\" to enter the draw",
+      "raffleRequiresMinBets": "Requires {{count}} completed bets",
+      "raffleRequiresMinTurnover": "Requires {{amount}} COIN wagered",
+      "raffleMaxParticipants": "{{current}} / {{max}} spots filled",
+      "raffleSpotsAvailable": "{{count}} spots left",
+      "raffleFull": "Raffle is full",
+      "prizesCredited": "Prizes are credited to your vault automatically"
     }
   },
   "walletPage": {

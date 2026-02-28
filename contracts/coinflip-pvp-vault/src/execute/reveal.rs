@@ -112,7 +112,6 @@ pub fn execute_reveal(
         .add_attribute("side", format!("{:?}", side))
         .add_attribute("winner", winner.to_string())
         .add_attribute("payout", payout.to_string())
-        .add_attribute("action", "coinflip.commission_paid")
-        .add_attribute("treasury", config.treasury.to_string())
-        .add_attribute("commission", commission.to_string()))
+        .add_attribute("commission", commission.to_string())
+        .add_attribute("treasury", config.treasury.to_string()))
 }

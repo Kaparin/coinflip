@@ -43,7 +43,7 @@ export default function GamePage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events/active'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events/completed'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/v1/events'] }),

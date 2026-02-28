@@ -87,13 +87,22 @@ export function TelegramLoginButton({
       return;
     }
 
-    window.Telegram.Login.auth(
-      { bot_id: botName, request_access: 'write', lang },
-      (user) => {
-        setLoading(false);
-        if (user) onAuthRef.current(user);
-      },
-    );
+    // Safety timeout: if Telegram popup is blocked or callback never fires, reset loading
+    const timeout = setTimeout(() => setLoading(false), 60_000);
+
+    try {
+      window.Telegram.Login.auth(
+        { bot_id: botName, request_access: 'write', lang },
+        (user) => {
+          clearTimeout(timeout);
+          setLoading(false);
+          if (user) onAuthRef.current(user);
+        },
+      );
+    } catch {
+      clearTimeout(timeout);
+      setLoading(false);
+    }
   }, [botName, lang]);
 
   return (

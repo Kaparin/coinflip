@@ -314,6 +314,7 @@ export class IndexerService {
       'coinflip.accept_bet': 'bet_accepted',
       'coinflip.bet_revealed': 'bet_revealed',
       'coinflip.reveal': 'bet_revealed',
+      'coinflip.commission_paid': 'bet_revealed', // Contract emits duplicate "action" attr — commission_paid overwrites bet_revealed
       'coinflip.bet_timeout_claimed': 'bet_timeout_claimed',
       'coinflip.claim_timeout': 'bet_timeout_claimed',
     };
@@ -336,7 +337,8 @@ export class IndexerService {
       event.type === 'coinflip.commission_paid' ||
       event.attributes.action === 'commission_paid'
     ) {
-      const amount = event.attributes.amount;
+      // Contract emits "commission" attribute, not "amount"
+      const amount = event.attributes.commission ?? event.attributes.amount;
       if (amount && BigInt(amount) > 0n) {
         try {
           await eventService.recordCommission({
@@ -433,9 +435,11 @@ export class IndexerService {
         }
 
         case 'coinflip.reveal':
-        case 'coinflip.bet_revealed': {
-          const commissionAmount = event.attributes.commission_amount ?? null;
-          const payoutAmount = event.attributes.payout_amount ?? null;
+        case 'coinflip.bet_revealed':
+        case 'coinflip.commission_paid': { // Contract emits duplicate "action" attr — commission_paid overwrites bet_revealed
+          // Contract emits "commission"/"payout", indexer historically used "commission_amount"/"payout_amount"
+          const commissionAmount = event.attributes.commission_amount ?? event.attributes.commission ?? null;
+          const payoutAmount = event.attributes.payout_amount ?? event.attributes.payout ?? null;
           const winnerAddress = event.attributes.winner ?? null;
 
           let winnerUserId: string | null = null;

@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2, BarChart3, Info } from 'lucide-react';
 import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
@@ -208,6 +208,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           {isActive && (
             <div className="flex items-center gap-1">
               <Clock size={12} className={theme.iconColor} />
+              <span className="text-[var(--color-text-secondary)]">{t('events.endsIn')}</span>
               <EventTimer targetDate={event.endsAt} compact eventType={event.type} />
             </div>
           )}
@@ -227,6 +228,71 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </div>
+
+      {/* Event rules — context-specific based on config */}
+      {(isActive || isUpcoming) && (() => {
+        const config = (event as unknown as Record<string, unknown>).config as {
+          metric?: string; autoJoin?: boolean; minBetAmount?: string;
+          minBets?: number; minTurnover?: string; maxParticipants?: number;
+        } | undefined;
+
+        const metricKeys: Record<string, string> = {
+          turnover: 'events.rules.metricTurnover',
+          wins: 'events.rules.metricWins',
+          profit: 'events.rules.metricProfit',
+        };
+
+        return (
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <Info size={14} className={theme.iconColor} />
+              {t('events.rules.title')}
+            </div>
+
+            <div className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+              {isContest ? (
+                <>
+                  <p>{t('events.rules.contestAutoJoin')}</p>
+                  {config?.metric && (
+                    <div className="flex items-center gap-1.5">
+                      <BarChart3 size={12} className={theme.iconColor} />
+                      <span>
+                        {t('events.rules.contestRankedBy')}{' '}
+                        <span className="font-bold text-[var(--color-text)]">
+                          {t(metricKeys[config.metric] ?? 'events.metric')}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  {config?.minBetAmount && BigInt(config.minBetAmount) > 0n && (
+                    <p>{t('events.rules.minBetAmount').replace('{{amount}}', formatLaunch(config.minBetAmount))}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p>{t('events.rules.raffleJoinRequired')}</p>
+                  {config?.minBets && (
+                    <p>{t('events.rules.raffleRequiresMinBets').replace('{{count}}', String(config.minBets))}</p>
+                  )}
+                  {config?.minTurnover && BigInt(config.minTurnover) > 0n && (
+                    <p>{t('events.rules.raffleRequiresMinTurnover').replace('{{amount}}', formatLaunch(config.minTurnover))}</p>
+                  )}
+                  {config?.maxParticipants && (
+                    <p>
+                      {event.participantCount >= config.maxParticipants
+                        ? t('events.rules.raffleFull')
+                        : t('events.rules.raffleMaxParticipants')
+                            .replace('{{current}}', String(event.participantCount))
+                            .replace('{{max}}', String(config.maxParticipants))}
+                    </p>
+                  )}
+                </>
+              )}
+              <p className="text-[10px] mt-1">{t('events.rules.prizesCredited')}</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Owner controls for sponsored raffle */}
       {isOwner && !isEnded && !cancelSuccess && (() => {

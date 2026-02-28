@@ -114,8 +114,16 @@ function refreshSavedState(
 }
 
 export function useWebWallet(): WebWalletState {
-  const [address, setAddress] = useState<string | null>(null);
+  // Initialize address synchronously from sessionStorage to avoid flash of
+  // "Connect Wallet" → "Connecting..." → connected UI on every page load.
+  const [address, setAddress] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const stored = sessionStorage.getItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+    return stored && stored.startsWith('axm1') ? stored : null;
+  });
   const [isConnecting, setIsConnecting] = useState(false);
+  // Triggers re-render when wallet instance becomes available (walletRef is a ref, not state)
+  const [walletReady, setWalletReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
   const [savedAddress, setSavedAddress] = useState<string | null>(null);
@@ -204,7 +212,10 @@ export function useWebWallet(): WebWalletState {
     }
   }, []);
 
-  // Check for saved wallets on mount + try to auto-restore session
+  // Check for saved wallets on mount + try to auto-restore session.
+  // Address is already initialized from sessionStorage (see useState above),
+  // so the UI shows the connected state instantly — no "Connecting..." flash.
+  // We only need to restore the wallet instance (for signing) silently.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -213,14 +224,14 @@ export function useWebWallet(): WebWalletState {
     // Try to restore wallet from session (persists across page refreshes within same tab)
     const sessionAddr = sessionStorage.getItem(STORAGE_KEYS.CONNECTED_ADDRESS);
     if (sessionAddr && sessionAddr.startsWith('axm1')) {
-      setIsConnecting(true);
+      // Don't set isConnecting — address is already set from initial state,
+      // so the header shows connected UI immediately. Wallet restore is silent.
       restoreSessionWallet().then(async (wallet) => {
         if (wallet) {
           const [account] = await wallet.getAccounts();
           if (account?.address === sessionAddr) {
             walletRef.current = wallet;
-            setAddress(sessionAddr);
-            setIsConnecting(false);
+            setWalletReady(true);
             // Register session in background (fire-and-forget)
             registerSession(sessionAddr, wallet.mnemonic).catch((err) => {
               console.error('[useWebWallet] Session registration failed:', err);
@@ -229,10 +240,12 @@ export function useWebWallet(): WebWalletState {
             // Address mismatch — clear stale session
             clearSessionWallet();
             sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
-            setIsConnecting(false);
+            setAddress(null);
           }
         } else {
-          setIsConnecting(false);
+          // Restore failed — clear stored address so UI shows disconnected state
+          sessionStorage.removeItem(STORAGE_KEYS.CONNECTED_ADDRESS);
+          setAddress(null);
         }
       });
     }
@@ -258,6 +271,7 @@ export function useWebWallet(): WebWalletState {
       clearSigningClientCache();
 
       walletRef.current = wallet;
+      setWalletReady(true);
 
       // Encrypt and save to localStorage
       const { encrypted, salt, iv } = await encryptMnemonic(mnemonic.trim().toLowerCase(), pin);
@@ -284,6 +298,7 @@ export function useWebWallet(): WebWalletState {
       const msg = err instanceof Error ? err.message : 'Failed to connect wallet';
       setError(msg);
       walletRef.current = null;
+      setWalletReady(false);
     } finally {
       setIsConnecting(false);
     }
@@ -319,6 +334,7 @@ export function useWebWallet(): WebWalletState {
       clearSigningClientCache();
 
       walletRef.current = wallet;
+      setWalletReady(true);
 
       // Verify address matches
       if (addr !== stored.address) {
@@ -340,6 +356,7 @@ export function useWebWallet(): WebWalletState {
       const msg = err instanceof Error ? err.message : 'Failed to unlock wallet';
       setError(msg);
       walletRef.current = null;
+      setWalletReady(false);
     } finally {
       setIsConnecting(false);
     }
@@ -349,6 +366,7 @@ export function useWebWallet(): WebWalletState {
   const switchWallet = useCallback(async (targetAddress: string, pin: string) => {
     // Disconnect current first
     walletRef.current = null;
+    setWalletReady(false);
     setAddress(null);
     clearSessionWallet();
     clearSigningClientCache();
@@ -361,6 +379,7 @@ export function useWebWallet(): WebWalletState {
   /** Disconnect (keep saved wallet for later unlock) */
   const disconnect = useCallback(() => {
     walletRef.current = null;
+    setWalletReady(false);
     setAddress(null);
     setError(null);
     clearSessionWallet();
@@ -378,6 +397,7 @@ export function useWebWallet(): WebWalletState {
     const wasCurrent = !targetAddress || address === targetAddress;
     if (wasCurrent) {
       walletRef.current = null;
+      setWalletReady(false);
       setAddress(null);
       clearSessionWallet();
       clearSigningClientCache();
@@ -398,7 +418,7 @@ export function useWebWallet(): WebWalletState {
 
   return {
     address,
-    isConnected: address !== null && walletRef.current !== null,
+    isConnected: address !== null && walletReady,
     isConnecting,
     hasSaved,
     savedAddress,

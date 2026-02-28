@@ -985,8 +985,8 @@ function NicknameEditor({ currentNickname, address, loading }: { currentNickname
     setSaving(true);
     try {
       await customFetch({ url: '/api/v1/users/me', method: 'PATCH', data: { nickname: trimmed } });
-      // Invalidate all caches that display the nickname (users/me, profiles, leaderboard, top-winner, bets)
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      // Invalidate all caches that display the nickname
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
       addToast('success', t('profile.nicknameSaved'));
       setEditing(false);
@@ -1056,7 +1056,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
         method: 'POST',
         data: user,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
       addToast('success', t('profile.telegramLinked'));
     } catch {
       addToast('error', t('profile.telegramLinkError'));
@@ -1066,7 +1066,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
   const handleUnlink = useCallback(async () => {
     try {
       await customFetch({ url: '/api/v1/users/me/telegram', method: 'DELETE' });
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
       addToast('success', t('profile.telegramUnlinked'));
     } catch {
       addToast('error', t('profile.telegramUnlinkError'));

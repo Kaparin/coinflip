@@ -1,12 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, Users, Target, User, Eye, Lock } from 'lucide-react';
+import { Trophy, Users, Target, User, Eye, Lock, BarChart3 } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
 import { useTranslation } from '@/lib/i18n';
+
+const METRIC_KEYS: Record<string, string> = {
+  turnover: 'events.rules.metricTurnover',
+  wins: 'events.rules.metricWins',
+  profit: 'events.rules.metricProfit',
+};
+
+interface EventConfig {
+  metric?: string;
+  autoJoin?: boolean;
+  minBetAmount?: string;
+  minBets?: number;
+  minTurnover?: string;
+  maxParticipants?: number;
+}
 
 interface EventCardProps {
   event: {
@@ -23,6 +38,7 @@ interface EventCardProps {
     sponsorAddress?: string | null;
     sponsorNickname?: string | null;
     isOwner?: boolean;
+    config?: EventConfig;
   };
   size?: 'large' | 'medium' | 'compact';
   index?: number;
@@ -115,6 +131,16 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
             {event.title}
           </h3>
 
+          {/* Contest metric badge */}
+          {event.type === 'contest' && event.config?.metric && (
+            <div className="flex items-center gap-1 mt-1">
+              <BarChart3 size={10} className="text-[var(--color-text-secondary)]" />
+              <span className="text-[10px] text-[var(--color-text-secondary)]">
+                {t(METRIC_KEYS[event.config.metric] ?? 'events.metric')}
+              </span>
+            </div>
+          )}
+
           {/* Description */}
           {size === 'large' && event.description && (
             <p className="mt-1 text-xs text-[var(--color-text-secondary)] line-clamp-2">
@@ -148,8 +174,18 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         <div className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)]">
           <div className="flex items-center gap-1">
             <Users size={12} />
-            <span>{event.participantCount}</span>
+            <span>
+              {event.config?.maxParticipants
+                ? `${event.participantCount} / ${event.config.maxParticipants}`
+                : event.participantCount}
+            </span>
           </div>
+          {/* Raffle requirements hint */}
+          {event.type === 'raffle' && event.config?.minBets && (
+            <span className="text-[10px]">
+              {t('events.rules.raffleRequiresMinBets').replace('{{count}}', String(event.config.minBets))}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <Trophy size={12} className="text-[var(--color-warning)]" />

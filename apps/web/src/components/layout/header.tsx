@@ -105,7 +105,7 @@ export function Header() {
 
           {/* Desktop nav */}
           <div className="hidden items-center gap-3 md:flex">
-            {wallet.isConnected && (
+            {wallet.address && (
               <>
                 {/* Balance display */}
                 <div className="flex items-center gap-3 text-sm">
@@ -209,7 +209,7 @@ export function Header() {
               </Link>
             )}
 
-            {wallet.isConnected ? (
+            {wallet.address ? (
               <div className="relative" ref={dropdownRef}>
                 <button type="button" onClick={() => setWalletDropdownOpen(!walletDropdownOpen)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
@@ -366,7 +366,7 @@ export function Header() {
 
           {/* Mobile: balance indicator + burger */}
           <div className="flex items-center gap-1.5 md:hidden min-w-0">
-            {wallet.isConnected ? (
+            {wallet.address ? (
               <>
                 {/* Balance indicator — toggles balance panel */}
                 <button
@@ -400,14 +400,14 @@ export function Header() {
         </div>
 
         {/* Mobile balance panel — full-width BalanceDisplay */}
-        {balanceOpen && wallet.isConnected && (
+        {balanceOpen && wallet.address && (
           <div className="border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 md:hidden animate-fade-in">
             <BalanceDisplay />
           </div>
         )}
 
         {/* Mobile dropdown — address + actions (only when connected; Connect is in header when disconnected) */}
-        {menuOpen && wallet.isConnected && (
+        {menuOpen && wallet.address && (
           <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 md:hidden">
             <div className="flex flex-col gap-2.5">
               {/* Compact address row */}
