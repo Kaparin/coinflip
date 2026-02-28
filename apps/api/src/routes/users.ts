@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { jackpotPools, jackpotTiers } from '@coinflip/db/schema';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware, evictUserCache } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { announcementService } from '../services/announcement.service.js';
@@ -61,6 +61,8 @@ usersRouter.patch('/me', authMiddleware, zValidator('json', UpdateProfileSchema)
 
   const updated = await userService.updateNickname(user.id, nickname);
   if (!updated) throw Errors.userNotFound();
+
+  evictUserCache(user.address);
 
   return c.json({
     data: {
@@ -129,6 +131,9 @@ usersRouter.post('/me/telegram', authMiddleware, zValidator('json', TelegramLink
       photoUrl: telegramData.photo_url ?? null,
     });
 
+    // Evict cached user so next GET /me returns fresh telegram data
+    evictUserCache(user.address);
+
     return c.json({
       data: {
         telegram: {
@@ -149,6 +154,8 @@ usersRouter.post('/me/telegram', authMiddleware, zValidator('json', TelegramLink
 usersRouter.delete('/me/telegram', authMiddleware, async (c) => {
   const user = c.get('user');
   await userService.unlinkTelegram(user.id);
+  // Evict cached user so next GET /me returns fresh data without telegram
+  evictUserCache(user.address);
   return c.json({ data: { removed: true } });
 });
 

@@ -14,6 +14,11 @@ const USER_CACHE_MAX_AGE_MS = 60_000;
 
 const userCache = new Map<string, { user: any; ts: number }>();
 
+/** Evict a user from the auth cache so the next request fetches fresh DB data. */
+export function evictUserCache(address: string) {
+  userCache.delete(address);
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of userCache.entries()) {
