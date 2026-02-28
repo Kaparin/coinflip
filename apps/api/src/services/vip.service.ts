@@ -163,7 +163,7 @@ class VipService {
     // Get VIP tier for limit
     const vip = await this.getActiveVip(userId);
     const tier = vip?.tier ?? 'free';
-    const limit = BOOST_LIMITS[tier as keyof typeof BOOST_LIMITS] ?? BOOST_LIMITS.free;
+    const limit = tier in BOOST_LIMITS ? BOOST_LIMITS[tier as keyof typeof BOOST_LIMITS] : BOOST_LIMITS.free;
 
     return { used, limit };
   }

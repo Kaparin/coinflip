@@ -446,7 +446,7 @@ class EventsService {
         FROM player_bets pb
         JOIN users u ON u.id = pb.user_id
         WHERE ${participantFilter}
-        GROUP BY pb.user_id, u.address, u.profile_nickname
+        GROUP BY pb.user_id, u.id, u.address, u.profile_nickname
         ORDER BY ${metricOrderSql}
         LIMIT ${limit} OFFSET ${offset}
       `);
