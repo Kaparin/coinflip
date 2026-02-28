@@ -33,6 +33,12 @@ function TelegramAuthCallback() {
     if (!user) return;
     handledRef.current = true;
 
+    console.log('[TelegramAuthCallback] Detected TG auth hash, saving data and redirecting to profile', {
+      tgUserId: user.id,
+      tgUsername: user.username,
+      currentPath: window.location.pathname,
+    });
+
     // Clean up hash from URL immediately
     window.history.replaceState(null, '', window.location.pathname);
 

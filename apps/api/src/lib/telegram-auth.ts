@@ -12,7 +12,7 @@ export interface TelegramLoginData {
   hash: string;
 }
 
-const MAX_LOGIN_AGE_SECONDS = 300; // 5 minutes
+const MAX_LOGIN_AGE_SECONDS = 600; // 10 minutes (allow for slow mobile redirects)
 
 /**
  * Verify Telegram Login Widget data.

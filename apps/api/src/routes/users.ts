@@ -106,6 +106,9 @@ usersRouter.post('/me/telegram', authMiddleware, zValidator('json', TelegramLink
   const user = c.get('user');
   const telegramData = c.req.valid('json');
 
+  const now = Math.floor(Date.now() / 1000);
+  logger.info({ userId: user.id, address: user.address, tgId: telegramData.id, tgUsername: telegramData.username, authDate: telegramData.auth_date, authAge: now - telegramData.auth_date }, 'Telegram link attempt');
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     logger.error('TELEGRAM_BOT_TOKEN is not configured');
@@ -114,6 +117,7 @@ usersRouter.post('/me/telegram', authMiddleware, zValidator('json', TelegramLink
 
   const result = verifyTelegramLogin(telegramData, botToken);
   if (!result.valid) {
+    logger.warn({ userId: user.id, tgId: telegramData.id, reason: result.reason, authAge: now - telegramData.auth_date }, 'Telegram link verification failed');
     return c.json({ error: { code: 'VALIDATION_ERROR', message: result.reason } }, 400);
   }
 

@@ -1061,6 +1061,18 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
     processedRef.current = true;
     setLinking(true);
 
+    const authToken = typeof window !== 'undefined'
+      ? (sessionStorage.getItem('coinflip_auth_token') || sessionStorage.getItem('coinflip_tg_auth_token'))
+      : null;
+
+    console.log('[TelegramLink] Processing pending TG auth data:', {
+      tgUserId: pendingUser.id,
+      tgUsername: pendingUser.username,
+      authDate: pendingUser.auth_date,
+      authAge: Math.floor(Date.now() / 1000) - pendingUser.auth_date,
+      hasAuthToken: !!authToken,
+    });
+
     (async () => {
       try {
         await customFetch({
@@ -1070,8 +1082,12 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
         });
         await queryClient.refetchQueries({ queryKey: ['/api/v1/users/me'] });
         addToast('success', t('profile.telegramLinked'));
-      } catch {
-        addToast('error', t('profile.telegramLinkError'));
+      } catch (err: unknown) {
+        const errObj = err as { error?: { code?: string; message?: string }; status?: number };
+        const code = errObj?.error?.code ?? 'UNKNOWN';
+        const message = errObj?.error?.message ?? String(err);
+        console.error('[TelegramLink] Failed:', { code, message, err });
+        addToast('error', `${t('profile.telegramLinkError')}: ${message}`);
       } finally {
         setLinking(false);
       }
@@ -1182,8 +1198,8 @@ export default function ProfilePage() {
   const wallet = useWalletContext();
   const { t, locale, setLocale } = useTranslation();
   const [copied, setCopied] = useState(false);
-  const { data: profileData, isLoading: profileLoading } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
-  const { data: vipStatus } = useVipStatus(wallet.isConnected);
+  const { data: profileData, isLoading: profileLoading } = useGetCurrentUser({ query: { enabled: !!wallet.address, staleTime: 30_000 } });
+  const { data: vipStatus } = useVipStatus(!!wallet.address);
 
   const isAdmin =
     wallet.isConnected &&
