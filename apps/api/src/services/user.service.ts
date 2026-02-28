@@ -546,6 +546,18 @@ export class UserService {
     firstName: string;
     photoUrl: string | null;
   }) {
+    // Unlink this Telegram from any other user first (unique constraint on telegram_id)
+    await this.db
+      .update(users)
+      .set({
+        telegramId: null,
+        telegramUsername: null,
+        telegramFirstName: null,
+        telegramPhotoUrl: null,
+        telegramLinkedAt: null,
+      })
+      .where(eq(users.telegramId, data.telegramId));
+
     const [updated] = await this.db
       .update(users)
       .set({
