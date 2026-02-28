@@ -226,10 +226,10 @@ export default function PresalePage() {
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
         {/* You Pay */}
         <div className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('presale.youPay')}</span>
+          <div className="flex items-center justify-between gap-2 overflow-hidden">
+            <span className="text-xs font-medium text-[var(--color-text-secondary)] shrink-0">{t('presale.youPay')}</span>
             {isConnected && (
-              <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
+              <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] truncate">
                 {t('presale.balance')}: {fmtNum(nativeHuman)} <AxmIcon size={12} />
               </span>
             )}
@@ -247,11 +247,11 @@ export default function PresalePage() {
               min="0"
               step="0.1"
               disabled={!isEnabled || isBuying}
-              className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-[var(--color-text-secondary)]/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="flex-1 min-w-0 bg-transparent text-2xl font-bold outline-none placeholder:text-[var(--color-text-secondary)]/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-bg)] px-3 py-1.5">
+            <div className="flex items-center gap-1.5 shrink-0 rounded-lg bg-[var(--color-bg)] px-3 py-1.5">
               <AxmIcon size={20} />
-              <span className="text-sm font-bold">AXM</span>
+              <span className="text-sm font-bold whitespace-nowrap">AXM</span>
             </div>
           </div>
 
@@ -292,12 +292,12 @@ export default function PresalePage() {
         <div className="p-4 bg-[var(--color-bg)]/50 space-y-2">
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('presale.youGet')}</span>
           <div className="flex items-center gap-3">
-            <span className={`flex-1 text-2xl font-bold ${coinOutput > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-text-secondary)]/30'}`}>
+            <span className={`flex-1 min-w-0 text-2xl font-bold truncate ${coinOutput > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-text-secondary)]/30'}`}>
               {coinOutput > 0 ? fmtNum(coinOutput) : '0'}
             </span>
-            <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-surface)] px-3 py-1.5">
+            <div className="flex items-center gap-1.5 shrink-0 rounded-lg bg-[var(--color-surface)] px-3 py-1.5">
               <LaunchTokenIcon size={20} />
-              <span className="text-sm font-bold">COIN</span>
+              <span className="text-sm font-bold whitespace-nowrap">COIN</span>
             </div>
           </div>
         </div>

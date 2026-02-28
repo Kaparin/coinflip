@@ -1,23 +1,24 @@
 'use client';
 
+import Image from 'next/image';
+
+const AXM_LOGO = '/axm.png';
+
 export interface AxmIconProps {
   /** Size in pixels. Default: 16 */
   size?: number;
   className?: string;
 }
 
-/** AXM native token icon — circular badge with coin background */
+/** AXM native token icon — circular badge */
 export function AxmIcon({ size = 16, className = '' }: AxmIconProps) {
   return (
-    <span
-      role="img"
-      aria-label="AXM"
-      className={`inline-block shrink-0 rounded-full overflow-clip bg-cover bg-center align-middle ${className}`}
-      style={{
-        width: size,
-        height: size,
-        backgroundImage: "url('/axm.png')",
-      }}
+    <Image
+      src={AXM_LOGO}
+      alt="AXM"
+      width={size}
+      height={size}
+      className={`inline-block align-middle object-cover shrink-0 rounded-full ${className}`}
     />
   );
 }
