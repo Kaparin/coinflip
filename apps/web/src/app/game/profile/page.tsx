@@ -22,7 +22,7 @@ import {
   Loader2, BarChart3, Gift, Target, MessageCircle,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
-import { TelegramLoginButton, type TelegramUser } from '@/components/features/profile/telegram-login-button';
+import { TelegramLoginButton, type TelegramUser, consumeTelegramAuthData } from '@/components/features/profile/telegram-login-button';
 import { useTelegramContext } from '@/contexts/telegram-context';
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -1050,16 +1050,52 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
   const { addToast } = useToast();
   const queryClient = useQueryClient();
   const { isTelegramApp, telegramUser } = useTelegramContext();
+  const [linking, setLinking] = useState(false);
+  const processedRef = useRef(false);
+
+  // Process pending Telegram auth data (saved by TelegramAuthCallback after redirect)
+  useEffect(() => {
+    if (processedRef.current || telegram) return;
+    const pendingUser = consumeTelegramAuthData();
+    if (!pendingUser) return;
+    processedRef.current = true;
+    setLinking(true);
+
+    (async () => {
+      try {
+        await customFetch({
+          url: '/api/v1/users/me/telegram',
+          method: 'POST',
+          data: pendingUser,
+        });
+        await queryClient.refetchQueries({ queryKey: ['/api/v1/users/me'] });
+        addToast('success', t('profile.telegramLinked'));
+      } catch {
+        addToast('error', t('profile.telegramLinkError'));
+      } finally {
+        setLinking(false);
+      }
+    })();
+  }, [telegram, queryClient, addToast, t]);
 
   const handleUnlink = useCallback(async () => {
     try {
       await customFetch({ url: '/api/v1/users/me/telegram', method: 'DELETE' });
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/v1/users/me'] });
       addToast('success', t('profile.telegramUnlinked'));
     } catch {
       addToast('error', t('profile.telegramUnlinkError'));
     }
   }, [queryClient, addToast, t]);
+
+  if (linking) {
+    return (
+      <div className="flex items-center gap-2 py-2">
+        <Loader2 size={16} className="animate-spin text-[#2AABEE]" />
+        <span className="text-xs text-[var(--color-text-secondary)]">{t('profile.telegramLinking')}</span>
+      </div>
+    );
+  }
 
   if (telegram) {
     return (
@@ -1162,7 +1198,7 @@ export default function ProfilePage() {
     setTimeout(() => setCopied(false), 2000);
   }, [wallet.address]);
 
-  if (!wallet.isConnected) {
+  if (!wallet.address) {
     return (
       <div className="max-w-lg mx-auto px-4 py-12 text-center pb-24 md:pb-6">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8">

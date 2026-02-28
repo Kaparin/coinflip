@@ -1,6 +1,6 @@
 'use client';
 
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
 import { ToastProvider } from '@/components/ui/toast';
 import { WalletProvider, useWalletContext } from '@/contexts/wallet-context';
@@ -10,10 +10,7 @@ import { ConnectWalletModal } from '@/components/features/auth/connect-wallet-mo
 import { I18nProvider } from '@/lib/i18n';
 import { NotificationProvider } from '@/components/features/notifications/notification-provider';
 import { captureRefCode, registerCapturedRef } from '@/hooks/use-referral';
-import { parseTelegramHashResult, consumeTelegramAuthPending } from '@/components/features/profile/telegram-login-button';
-import { customFetch } from '@coinflip/api-client/custom-fetch';
-import { useToast } from '@/components/ui/toast';
-import { useTranslation } from '@/lib/i18n';
+import { parseTelegramHashResult, saveTelegramAuthData } from '@/components/features/profile/telegram-login-button';
 import { useRouter } from 'next/navigation';
 
 /** Capture referral code from URL on mount */
@@ -24,13 +21,10 @@ function RefCodeCapture() {
 
 /** Global handler for Telegram OAuth redirect callback.
  *  Telegram redirects to origin/#tgAuthResult=base64 (always root).
- *  This component detects the hash, sends auth data to API, and redirects to profile. */
+ *  This component saves auth data to sessionStorage and redirects to profile
+ *  where the actual API call happens (session is guaranteed there). */
 function TelegramAuthCallback() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { address } = useWalletContext();
-  const { addToast } = useToast();
-  const { t } = useTranslation();
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -42,26 +36,12 @@ function TelegramAuthCallback() {
     // Clean up hash from URL immediately
     window.history.replaceState(null, '', window.location.pathname);
 
-    if (!address) {
-      addToast('error', t('profile.telegramLinkError'));
-      return;
-    }
+    // Save TG auth data for deferred processing on profile page
+    saveTelegramAuthData(user);
 
-    (async () => {
-      try {
-        await customFetch({
-          url: '/api/v1/users/me/telegram',
-          method: 'POST',
-          data: user,
-        });
-        queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
-        addToast('success', t('profile.telegramLinked'));
-      } catch {
-        addToast('error', t('profile.telegramLinkError'));
-      }
-      router.push('/game/profile');
-    })();
-  }, [address, router, queryClient, addToast, t]);
+    // Navigate to profile where the linking will be processed
+    router.push('/game/profile');
+  }, [router]);
 
   return null;
 }

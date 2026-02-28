@@ -13,6 +13,7 @@ export interface TelegramUser {
 }
 
 const TG_CALLBACK_KEY = 'tg_auth_pending';
+const TG_AUTH_DATA_KEY = 'tg_auth_data';
 
 /** Mark that we're about to redirect to Telegram OAuth. */
 export function markTelegramAuthPending() {
@@ -26,6 +27,24 @@ export function consumeTelegramAuthPending(): boolean {
     if (v) { sessionStorage.removeItem(TG_CALLBACK_KEY); return true; }
   } catch { /* noop */ }
   return false;
+}
+
+/** Save parsed Telegram auth data to sessionStorage for deferred processing. */
+export function saveTelegramAuthData(user: TelegramUser) {
+  try { sessionStorage.setItem(TG_AUTH_DATA_KEY, JSON.stringify(user)); } catch { /* noop */ }
+}
+
+/** Consume saved Telegram auth data (returns null if none). */
+export function consumeTelegramAuthData(): TelegramUser | null {
+  try {
+    const raw = sessionStorage.getItem(TG_AUTH_DATA_KEY);
+    if (raw) {
+      sessionStorage.removeItem(TG_AUTH_DATA_KEY);
+      const data = JSON.parse(raw) as TelegramUser;
+      if (data && typeof data.id === 'number' && typeof data.hash === 'string') return data;
+    }
+  } catch { /* noop */ }
+  return null;
 }
 
 /** Parse `#tgAuthResult=<base64json>` from the URL hash. */
