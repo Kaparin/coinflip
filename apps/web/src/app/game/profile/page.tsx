@@ -22,7 +22,7 @@ import {
   Loader2, BarChart3, Gift, Target, MessageCircle,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
-import { TelegramLoginButton, type TelegramUser } from '@/components/features/profile/telegram-login-button';
+import { TelegramLoginButton, type TelegramUser, parseTelegramHashResult, consumeTelegramAuthPending } from '@/components/features/profile/telegram-login-button';
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -1048,8 +1048,10 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
   const { t, locale } = useTranslation();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+  const [linking, setLinking] = useState(false);
 
   const handleTelegramAuth = useCallback(async (user: TelegramUser) => {
+    setLinking(true);
     try {
       await customFetch({
         url: '/api/v1/users/me/telegram',
@@ -1060,8 +1062,26 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
       addToast('success', t('profile.telegramLinked'));
     } catch {
       addToast('error', t('profile.telegramLinkError'));
+    } finally {
+      setLinking(false);
     }
   }, [queryClient, addToast, t]);
+
+  const handleTelegramAuthRef = useRef(handleTelegramAuth);
+  handleTelegramAuthRef.current = handleTelegramAuth;
+
+  // Handle Telegram OAuth redirect callback (#tgAuthResult=base64 in URL hash)
+  useEffect(() => {
+    if (!consumeTelegramAuthPending()) return;
+    const user = parseTelegramHashResult();
+    if (user) {
+      handleTelegramAuthRef.current(user);
+    }
+    // Clean up hash from URL
+    if (window.location.hash.startsWith('#tgAuthResult')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   const handleUnlink = useCallback(async () => {
     try {
@@ -1121,18 +1141,30 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
     );
   }
 
-  if (!TELEGRAM_BOT_NAME) return null;
+  if (!TELEGRAM_BOT_NAME) {
+    return (
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        {t('profile.telegramNotConfigured')}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--color-text-secondary)]">
         {t('profile.telegramDesc')}
       </p>
-      <TelegramLoginButton
-        botName={TELEGRAM_BOT_NAME}
-        onAuth={handleTelegramAuth}
-        lang={locale}
-      />
+      {linking ? (
+        <div className="flex items-center justify-center gap-2 rounded-xl bg-[#2AABEE]/10 px-4 py-2.5 text-sm font-bold text-[#2AABEE]">
+          <Loader2 size={16} className="animate-spin" />
+          {t('profile.telegramLinking')}
+        </div>
+      ) : (
+        <TelegramLoginButton
+          botName={TELEGRAM_BOT_NAME}
+          lang={locale}
+        />
+      )}
     </div>
   );
 }
@@ -1278,7 +1310,7 @@ export default function ProfilePage() {
       {/* Telegram */}
       <CollapsibleSection
         title={t('profile.telegramSection')}
-        defaultOpen={false}
+        defaultOpen
         icon={<MessageCircle size={20} className="text-[#2AABEE]" />}
       >
         <TelegramSection telegram={(profileData as any)?.data?.telegram ?? null} />

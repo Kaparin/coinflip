@@ -539,6 +539,7 @@
     "telegramUnlinkError": "Не удалось отвязать Телеграм",
     "telegramLinking": "Привязка...",
     "telegramConnect": "Подключить Телеграм",
+    "telegramNotConfigured": "Интеграция с Telegram ещё не настроена.",
     "telegramConnectedBadge": "Подключено",
     "important4": "Минимальная ставка — 1 COIN.",
     "aboutSections": {

@@ -539,6 +539,7 @@
     "telegramUnlinkError": "Failed to unlink Telegram account",
     "telegramLinking": "Linking...",
     "telegramConnect": "Connect Telegram",
+    "telegramNotConfigured": "Telegram integration is not configured yet.",
     "telegramConnectedBadge": "Connected",
     "important4": "Minimum bet amount is 1 COIN.",
     "aboutSections": {
