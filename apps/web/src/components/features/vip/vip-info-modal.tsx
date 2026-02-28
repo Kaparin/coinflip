@@ -59,7 +59,7 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={`${tierLabel} VIP`}>
+      <Modal open={open && !purchaseOpen} onClose={onClose} title={`${tierLabel} VIP`}>
         <div className="flex flex-col items-center gap-4">
           {/* Tier icon badge */}
           <div className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${meta.gradient}`}>
@@ -89,7 +89,7 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
           {/* CTA button */}
           <button
             type="button"
-            onClick={() => { onClose(); setPurchaseOpen(true); }}
+            onClick={() => setPurchaseOpen(true)}
             className={`w-full rounded-xl bg-gradient-to-r ${meta.gradient} px-4 py-3 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]`}
           >
             {t('vip.info.getVip')}
@@ -98,7 +98,7 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
       </Modal>
 
       {mounted && createPortal(
-        <VipPurchaseModal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />,
+        <VipPurchaseModal open={purchaseOpen} onClose={() => { setPurchaseOpen(false); onClose(); }} />,
         document.body,
       )}
     </>
