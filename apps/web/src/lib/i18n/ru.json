@@ -84,6 +84,7 @@
     "inBets": "В ставках",
     "total": "Всего",
     "depositBtn": "Пополнить",
+    "walletHasOnly": "На кошельке: {{amount}} COIN",
     "depositSuccess": "Пополнение выполнено!",
     "depositTitle": "Пополнить COIN",
     "depositDesc": "Отправить COIN-токены из кошелька в игровое хранилище. Подписывается локально в браузере.",

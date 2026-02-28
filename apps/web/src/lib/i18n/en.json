@@ -84,6 +84,7 @@
     "inBets": "In Bets",
     "total": "Total",
     "depositBtn": "Deposit",
+    "walletHasOnly": "Wallet balance: {{amount}} COIN",
     "depositSuccess": "Deposit Successful!",
     "depositTitle": "Deposit COIN",
     "depositDesc": "Send COIN tokens from your wallet to the game vault. Signed locally in your browser.",

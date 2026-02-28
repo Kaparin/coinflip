@@ -7,10 +7,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
-import { LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
 import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { signDepositTxBytes, signDeposit } from '@/lib/wallet-signer';
-import { useWalletBalance } from '@/hooks/use-wallet-balance';
+import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
 import { API_URL, EXPLORER_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 
@@ -204,6 +204,7 @@ export function BalanceDisplay() {
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
+  const { data: nativeBalanceRaw } = useNativeBalance(address);
   const queryClient = useQueryClient();
 
   const [showDeposit, setShowDeposit] = useState(false);
@@ -347,6 +348,9 @@ export function BalanceDisplay() {
 
   // Wallet (CW20) balance - tokens not yet deposited
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
+  // Native AXM balance (for gas)
+  const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000;
+  const isLowAxm = nativeBalanceHuman < 0.5;
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -570,6 +574,18 @@ export function BalanceDisplay() {
               </div>
             </div>
 
+            {/* AXM native balance (gas) */}
+            <div className={`flex items-center justify-between rounded-xl p-2.5 mb-3 ${isLowAxm ? 'bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20' : 'bg-[var(--color-bg)]'}`}>
+              <div className="flex items-center gap-2">
+                <AxmIcon size={18} />
+                <span className="text-[10px] uppercase text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>{nativeBalanceHuman.toFixed(2)}</span>
+                {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeposit(true)} disabled={isOperationInFlight}
                 className="flex-1 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-40 btn-press">
@@ -607,7 +623,10 @@ export function BalanceDisplay() {
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
                   +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={45} />
                 </p>
-                <p className="text-xs text-[var(--color-text-secondary)] mb-4 break-all font-mono">TX: {depositTxHash.slice(0, 16)}...</p>
+                <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-[var(--color-primary)] hover:underline mb-4 break-all font-mono block">
+                  TX: {depositTxHash.slice(0, 16)}... →
+                </a>
                 <button type="button" onClick={resetDeposit}
                   className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">
                   {t('balance.collapse')}
@@ -637,6 +656,11 @@ export function BalanceDisplay() {
                   <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                     className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
+                  {depositAmount && parseFloat(depositAmount) > 0 && parseFloat(depositAmount) > walletBalanceHuman && (
+                    <p className="text-[10px] text-[var(--color-warning)] mt-1.5">
+                      {t('balance.walletHasOnly', { amount: fmtNum(walletBalanceHuman) })}
+                    </p>
+                  )}
                 </div>
 
                 {depositError && (
