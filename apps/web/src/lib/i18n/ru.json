@@ -540,6 +540,7 @@
     "telegramLinking": "Привязка...",
     "telegramConnect": "Подключить Телеграм",
     "telegramNotConfigured": "Интеграция с Telegram ещё не настроена.",
+    "telegramLinkedViaMiniApp": "Привязан как {{name}} через Telegram",
     "telegramConnectedBadge": "Подключено",
     "important4": "Минимальная ставка — 1 COIN.",
     "aboutSections": {

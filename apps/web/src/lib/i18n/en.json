@@ -540,6 +540,7 @@
     "telegramLinking": "Linking...",
     "telegramConnect": "Connect Telegram",
     "telegramNotConfigured": "Telegram integration is not configured yet.",
+    "telegramLinkedViaMiniApp": "Linked as {{name}} via Telegram",
     "telegramConnectedBadge": "Connected",
     "important4": "Minimum bet amount is 1 COIN.",
     "aboutSections": {

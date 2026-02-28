@@ -22,7 +22,8 @@ import {
   Loader2, BarChart3, Gift, Target, MessageCircle,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
-import { TelegramLoginButton, type TelegramUser, parseTelegramHashResult, consumeTelegramAuthPending } from '@/components/features/profile/telegram-login-button';
+import { TelegramLoginButton, type TelegramUser } from '@/components/features/profile/telegram-login-button';
+import { useTelegramContext } from '@/contexts/telegram-context';
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -1048,40 +1049,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
   const { t, locale } = useTranslation();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
-  const [linking, setLinking] = useState(false);
-
-  const handleTelegramAuth = useCallback(async (user: TelegramUser) => {
-    setLinking(true);
-    try {
-      await customFetch({
-        url: '/api/v1/users/me/telegram',
-        method: 'POST',
-        data: user,
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users/me'] });
-      addToast('success', t('profile.telegramLinked'));
-    } catch {
-      addToast('error', t('profile.telegramLinkError'));
-    } finally {
-      setLinking(false);
-    }
-  }, [queryClient, addToast, t]);
-
-  const handleTelegramAuthRef = useRef(handleTelegramAuth);
-  handleTelegramAuthRef.current = handleTelegramAuth;
-
-  // Handle Telegram OAuth redirect callback (#tgAuthResult=base64 in URL hash)
-  useEffect(() => {
-    if (!consumeTelegramAuthPending()) return;
-    const user = parseTelegramHashResult();
-    if (user) {
-      handleTelegramAuthRef.current(user);
-    }
-    // Clean up hash from URL
-    if (window.location.hash.startsWith('#tgAuthResult')) {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-  }, []);
+  const { isTelegramApp, telegramUser } = useTelegramContext();
 
   const handleUnlink = useCallback(async () => {
     try {
@@ -1141,7 +1109,19 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
     );
   }
 
-  if (!TELEGRAM_BOT_NAME || !TELEGRAM_BOT_ID) {
+  // In Telegram Mini App: TG data is linked automatically during auth.
+  // If we're here (no `telegram`), the auto-link from Mini App auth may not
+  // have transferred data yet — just show the TG user info from context.
+  if (isTelegramApp && telegramUser) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+        <Check size={12} className="text-[var(--color-success)]" />
+        <span>{t('profile.telegramLinkedViaMiniApp', { name: telegramUser.first_name })}</span>
+      </div>
+    );
+  }
+
+  if (!TELEGRAM_BOT_ID) {
     return (
       <p className="text-xs text-[var(--color-text-secondary)]">
         {t('profile.telegramNotConfigured')}
@@ -1154,17 +1134,10 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
       <p className="text-xs text-[var(--color-text-secondary)]">
         {t('profile.telegramDesc')}
       </p>
-      {linking ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-[#2AABEE]/10 px-4 py-2.5 text-sm font-bold text-[#2AABEE]">
-          <Loader2 size={16} className="animate-spin" />
-          {t('profile.telegramLinking')}
-        </div>
-      ) : (
-        <TelegramLoginButton
-          botId={TELEGRAM_BOT_ID}
-          lang={locale}
-        />
-      )}
+      <TelegramLoginButton
+        botId={TELEGRAM_BOT_ID}
+        lang={locale}
+      />
     </div>
   );
 }
