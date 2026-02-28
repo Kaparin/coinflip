@@ -12,12 +12,10 @@ export function AxmIcon({ size = 16, className = '' }: AxmIconProps) {
     <span
       role="img"
       aria-label="AXM"
-      className={`block shrink-0 rounded-full overflow-clip bg-cover bg-center align-middle ${className}`}
+      className={`inline-block shrink-0 rounded-full overflow-clip bg-cover bg-center align-middle ${className}`}
       style={{
         width: size,
         height: size,
-        maxWidth: 'fit-content',
-        aspectRatio: `${size} / ${size}`,
         backgroundImage: "url('/axm.png')",
       }}
     />

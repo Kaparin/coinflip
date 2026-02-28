@@ -214,7 +214,7 @@ export function TransactionsTab() {
                   <td className="whitespace-nowrap px-2 py-1.5">
                     {tx.txHash ? (
                       <a
-                        href={`${EXPLORER_URL}/tx/${tx.txHash}`}
+                        href={`${EXPLORER_URL}/transactions/${tx.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 font-mono text-[var(--color-primary)] hover:underline"

@@ -250,7 +250,7 @@ export default function PresalePage() {
               className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-[var(--color-text-secondary)]/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-bg)] px-3 py-1.5">
-              <AxmIcon size={18} />
+              <AxmIcon size={20} />
               <span className="text-sm font-bold">AXM</span>
             </div>
           </div>
@@ -296,7 +296,7 @@ export default function PresalePage() {
               {coinOutput > 0 ? fmtNum(coinOutput) : '0'}
             </span>
             <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-surface)] px-3 py-1.5">
-              <LaunchTokenIcon size={40} />
+              <LaunchTokenIcon size={20} />
               <span className="text-sm font-bold">COIN</span>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function PresalePage() {
               : t('presale.successDetail', { amount: successTx.coinAmount, axm: successTx.axmAmount })}
           </p>
           <a
-            href={`${EXPLORER_URL}/tx/${successTx.txHash}`}
+            href={`${EXPLORER_URL}/transactions/${successTx.txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-primary)] hover:underline"
