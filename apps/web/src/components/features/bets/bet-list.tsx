@@ -461,7 +461,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
                 isMine={isMyBet}
                 pendingBetId={pendingBetId}
                 pendingAction={pendingAction}
-                onAccept={isMyBet ? undefined : handleAcceptClick}
+                onAccept={isMyBet || !isConnected ? undefined : handleAcceptClick}
                 onCancel={isMyBet ? handleCancelClick : undefined}
               />
             );

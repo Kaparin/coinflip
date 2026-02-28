@@ -491,14 +491,14 @@ export class IndexerService {
             }
           }
 
-          // Distribute referral rewards (idempotent — safe if already called by background task)
-          await this.distributeReferralRewardsForBet(BigInt(betId));
-
-          // Contribute to jackpot pools (idempotent via unique constraint)
-          await this.processJackpotContribution(BigInt(betId));
-
-          // Distribute partner commission (idempotent via unique constraint)
-          await this.processPartnerCommission(BigInt(betId));
+          // Post-resolution processing — each step wrapped individually
+          // so one failure doesn't block the others
+          await this.distributeReferralRewardsForBet(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'bet_revealed: referral distribution failed'));
+          await this.processJackpotContribution(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'bet_revealed: jackpot contribution failed'));
+          await this.processPartnerCommission(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'bet_revealed: partner commission failed'));
 
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
@@ -590,14 +590,13 @@ export class IndexerService {
             }
           }
 
-          // Distribute referral rewards (idempotent — safe if already called by background task)
-          await this.distributeReferralRewardsForBet(BigInt(betId));
-
-          // Contribute to jackpot pools (idempotent via unique constraint)
-          await this.processJackpotContribution(BigInt(betId));
-
-          // Distribute partner commission (idempotent via unique constraint)
-          await this.processPartnerCommission(BigInt(betId));
+          // Post-resolution processing — each step wrapped individually
+          await this.distributeReferralRewardsForBet(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'timeout_claimed: referral distribution failed'));
+          await this.processJackpotContribution(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'timeout_claimed: jackpot contribution failed'));
+          await this.processPartnerCommission(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'timeout_claimed: partner commission failed'));
 
           break;
         }
@@ -818,9 +817,12 @@ export class IndexerService {
 
           // If bet was resolved (revealed/timeout_claimed), distribute referral rewards + jackpot + partner
           if (mappedStatus === 'revealed' || mappedStatus === 'timeout_claimed') {
-            await this.distributeReferralRewardsForBet(bet.betId);
-            await this.processJackpotContribution(bet.betId);
-            await this.processPartnerCommission(bet.betId);
+            await this.distributeReferralRewardsForBet(bet.betId)
+              .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: referral failed'));
+            await this.processJackpotContribution(bet.betId)
+              .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: jackpot failed'));
+            await this.processPartnerCommission(bet.betId)
+              .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: partner failed'));
           }
 
           synced++;

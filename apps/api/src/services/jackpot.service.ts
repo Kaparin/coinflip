@@ -46,7 +46,10 @@ class JackpotService {
           ),
         );
 
-      if (activePools.length === 0) return;
+      if (activePools.length === 0) {
+        logger.warn({ betId: betId.toString() }, 'Jackpot: no active filling pools found — contribution skipped');
+        return;
+      }
 
       for (const pool of activePools) {
         const bps = pool.contributionBps ?? JACKPOT_PER_TIER_BPS;
