@@ -43,26 +43,16 @@ export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipB
 
   const classes = `inline-flex items-center gap-0.5 rounded-full font-bold ${config.className} ${
     isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
-  }${onClick ? ' cursor-pointer border-0 m-0 appearance-none' : ''}`;
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={classes}
-        title={`${config.label} VIP`}
-      >
-        <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
-        {showLabel && <span>{config.label}</span>}
-      </button>
-    );
-  }
+  }${onClick ? ' cursor-pointer' : ''}`;
 
   return (
     <span
       className={classes}
       title={`${config.label} VIP`}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as any); } } : undefined}
     >
       <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
       {showLabel && <span>{config.label}</span>}
