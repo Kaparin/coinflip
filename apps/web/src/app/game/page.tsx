@@ -9,7 +9,6 @@ import { BetList } from '@/components/features/bets/bet-list';
 import { MyBets } from '@/components/features/bets/my-bets';
 import { HistoryList } from '@/components/features/history/history-list';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
-import { MobileBalanceBar } from '@/components/features/vault/mobile-balance-bar';
 import { Leaderboard } from '@/components/features/leaderboard/leaderboard';
 import { TopWinnerBanner } from '@/components/features/top-winner-banner';
 import { JackpotBanner } from '@/components/features/jackpot/jackpot-banner';
@@ -185,7 +184,6 @@ export default function GamePage() {
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24 md:pb-6">
       <TgWelcomeBanner />
-      <MobileBalanceBar />
       <div className="hidden md:block">
         <BalanceDisplay />
       </div>

@@ -15,6 +15,7 @@ import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { ADMIN_ADDRESS, EXPLORER_URL, PRESALE_CONTRACT } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 
 export function Header() {
@@ -41,7 +42,6 @@ export function Header() {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [vipModalOpen, setVipModalOpen] = useState(false);
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
-  const balanceRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -63,18 +63,15 @@ export function Header() {
 
   // Close dropdown on click outside
   useEffect(() => {
-    if (!walletDropdownOpen && !balanceOpen) return;
+    if (!walletDropdownOpen) return;
     const handler = (e: MouseEvent) => {
-      if (walletDropdownOpen && dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setWalletDropdownOpen(false);
-      }
-      if (balanceOpen && balanceRef.current && !balanceRef.current.contains(e.target as Node)) {
-        setBalanceOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [walletDropdownOpen, balanceOpen]);
+  }, [walletDropdownOpen]);
 
   const handleCopyAddress = useCallback(() => {
     if (!wallet.address) return;
@@ -114,14 +111,14 @@ export function Header() {
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-1.5" title={t('header.vaultTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={40} /></span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={18} /></span>
                   </div>
                   <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={40} /></span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={18} /></span>
                   </div>
                   <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM (gas)">
-                    <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={14} /></span>
+                    <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={18} /></span>
                     {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                   </div>
                 </div>
@@ -371,84 +368,21 @@ export function Header() {
           <div className="flex items-center gap-1.5 md:hidden min-w-0">
             {wallet.isConnected ? (
               <>
-                {/* Balance indicator — opens balance sheet */}
-                <div className="relative" ref={balanceRef}>
-                  <button
-                    type="button"
-                    onClick={() => { setBalanceOpen(!balanceOpen); setMenuOpen(false); }}
-                    className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold tabular-nums transition-all active:scale-[0.96] ${
-                      balanceOpen
-                        ? 'border-[var(--color-primary)]/50 bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                        : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/5 text-[var(--color-success)]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1">
-                      {fmtBal(availableHuman)} <LaunchTokenIcon size={28} />
-                    </span>
-                    <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {/* Balance dropdown sheet */}
-                  {balanceOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden animate-fade-in z-50">
-                      {/* Balance rows */}
-                      <div className="p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-success)]/10">
-                              <Wallet size={14} className="text-[var(--color-success)]" />
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</p>
-                              <p className="text-sm font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)}</p>
-                            </div>
-                          </div>
-                          <LaunchTokenIcon size={32} />
-                        </div>
-                        <div className="h-px bg-[var(--color-border)]" />
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
-                              <Wallet size={14} className="text-[var(--color-primary)]" />
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</p>
-                              <p className="text-sm font-bold tabular-nums">{fmtBal(walletBalanceHuman)}</p>
-                            </div>
-                          </div>
-                          <LaunchTokenIcon size={32} />
-                        </div>
-                        <div className="h-px bg-[var(--color-border)]" />
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isLowAxm ? 'bg-[var(--color-warning)]/10' : 'bg-[var(--color-text-secondary)]/10'}`}>
-                              <AxmIcon size={14} />
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-[var(--color-text-secondary)]">AXM ({t('header.gas')})</p>
-                              <p className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>
-                                {nativeBalanceHuman.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <AxmIcon size={16} />
-                            {isLowAxm && <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Deposit/Withdraw CTA */}
-                      <Link
-                        href="/game/wallet"
-                        onClick={() => { setBalanceOpen(false); setMenuOpen(false); }}
-                        className="flex items-center justify-center gap-2 border-t border-[var(--color-border)] bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 px-4 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
-                      >
-                        <Wallet size={16} />
-                        {t('header.depositWithdraw')}
-                      </Link>
-                    </div>
-                  )}
-                </div>
+                {/* Balance indicator — toggles balance panel */}
+                <button
+                  type="button"
+                  onClick={() => { setBalanceOpen(!balanceOpen); setMenuOpen(false); }}
+                  className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold tabular-nums transition-all active:scale-[0.96] ${
+                    balanceOpen
+                      ? 'border-[var(--color-primary)]/50 bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                      : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/5 text-[var(--color-success)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    {fmtBal(availableHuman)} <LaunchTokenIcon size={18} />
+                  </span>
+                  <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
+                </button>
 
                 <button type="button" onClick={() => { setMenuOpen(!menuOpen); setBalanceOpen(false); }}
                   className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
@@ -464,6 +398,13 @@ export function Header() {
             )}
           </div>
         </div>
+
+        {/* Mobile balance panel — full-width BalanceDisplay */}
+        {balanceOpen && wallet.isConnected && (
+          <div className="border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 md:hidden animate-fade-in">
+            <BalanceDisplay />
+          </div>
+        )}
 
         {/* Mobile dropdown — address + actions (only when connected; Connect is in header when disconnected) */}
         {menuOpen && wallet.isConnected && (
