@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   useAdminUnlockFunds,
   useAdminForceCancel,
@@ -9,6 +10,9 @@ import {
   useAdminHealSystem,
 } from '@/hooks/use-admin';
 import type { HealResult } from '@/hooks/use-admin';
+import { useWalletContext } from '@/contexts/wallet-context';
+import { signCoinflipAdminSweep } from '@/lib/wallet-signer';
+import { COINFLIP_CONTRACT } from '@/lib/constants';
 
 export function ActionsTab() {
   return (
@@ -18,6 +22,7 @@ export function ActionsTab() {
       </p>
 
       <HealSystemAction />
+      <ContractSweepAction />
       <UnlockFundsAction />
       <ForceCancelAction />
       <RecoverSecretAction />
@@ -98,6 +103,46 @@ function HealSystemAction() {
 
       {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
     </div>
+  );
+}
+
+function ContractSweepAction() {
+  const { address, getWallet } = useWalletContext();
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  const handleSweep = useCallback(async () => {
+    if (!address || loading) return;
+    setResult(null);
+    setLoading(true);
+    try {
+      const wallet = await getWallet();
+      if (!wallet) throw new Error('Wallet not available');
+      const res = await signCoinflipAdminSweep(wallet, address);
+      setResult({ type: 'success', msg: `Swept orphaned tokens. TX: ${res.txHash}` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setResult({ type: 'error', msg });
+    } finally {
+      setLoading(false);
+    }
+  }, [address, getWallet, loading]);
+
+  return (
+    <ActionCard
+      title="Sweep Orphaned COIN from CoinFlip Contract"
+      description={`Recover COIN tokens stuck on the CoinFlip contract that are not tracked in any vault balance. These tokens were orphaned after a state reset. Contract: ${COINFLIP_CONTRACT.slice(0, 16)}...`}
+    >
+      <button
+        type="button"
+        disabled={loading}
+        onClick={handleSweep}
+        className="flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold disabled:opacity-40"
+      >
+        {loading ? <><Loader2 size={12} className="animate-spin" /> Sweeping...</> : 'Sweep Orphaned Tokens'}
+      </button>
+      {result && <ResultMsg type={result.type} msg={result.msg} />}
+    </ActionCard>
   );
 }
 

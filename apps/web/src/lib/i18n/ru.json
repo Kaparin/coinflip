@@ -806,7 +806,8 @@
     "eventStartModal": {
       "viewEvent": "Перейти к событию",
       "dismiss": "Может позже",
-      "remaining": "осталось"
+      "remaining": "Осталось",
+      "prize": "Призовой фонд"
     },
     "info": {
       "title": "Как работают события?",
@@ -946,7 +947,9 @@
     "justNow": "только что",
     "mAgo": "м назад",
     "hAgo": "ч назад",
-    "dAgo": "д назад"
+    "dAgo": "д назад",
+    "readMore": "Читать полностью",
+    "collapse": "Свернуть"
   },
   "sponsored": {
     "button": "Реклама",

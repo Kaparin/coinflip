@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Target, X, User } from 'lucide-react';
+import { Trophy, Target, X, Clock, Zap, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -25,6 +25,22 @@ interface EventStartModalProps {
 function shortAddr(addr: string): string {
   if (addr.length <= 14) return addr;
   return `${addr.slice(0, 8)}...${addr.slice(-4)}`;
+}
+
+function formatTimeRemaining(endsAt: string): string | null {
+  if (!endsAt) return null;
+  const endsDate = new Date(endsAt);
+  if (isNaN(endsDate.getTime())) return null;
+  const diffMs = endsDate.getTime() - Date.now();
+  if (diffMs <= 0) return null;
+  const totalMinutes = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  const remainingMins = totalMinutes % 60;
+  if (days > 0) return `${days}d ${remainingHours}h`;
+  if (hours > 0) return `${hours}h ${remainingMins}m`;
+  return `${remainingMins}m`;
 }
 
 export function EventStartModal({
@@ -71,27 +87,15 @@ export function EventStartModal({
   const isContest = eventType === 'contest';
   const Icon = isContest ? Target : Trophy;
   const isSponsored = !!sponsorAddress;
+  const timeStr = formatTimeRemaining(endsAt);
 
-  // Theme colors based on event type
-  const borderColor = isContest ? 'border-indigo-500/30' : 'border-amber-500/30';
-  const iconBg = isContest ? 'bg-indigo-500/15' : 'bg-amber-500/15';
-  const iconColor = isContest ? 'text-indigo-400' : 'text-amber-400';
-  const btnGradient = isContest
-    ? 'from-indigo-500 to-indigo-600 shadow-indigo-500/20'
-    : 'from-amber-500 to-amber-600 shadow-amber-500/20';
-  const badgeBg = isContest
-    ? 'bg-indigo-500/15 text-indigo-400'
-    : 'bg-amber-500/15 text-amber-400';
-
-  // Time remaining
-  const endsDate = new Date(endsAt);
-  const diffMs = endsDate.getTime() - Date.now();
-  const diffHours = Math.max(0, Math.floor(diffMs / 3_600_000));
-  const diffDays = Math.floor(diffHours / 24);
-  const remainingHours = diffHours % 24;
-  const timeStr = diffDays > 0
-    ? `${diffDays}d ${remainingHours}h`
-    : `${diffHours}h`;
+  // Theme
+  const accentFrom = isContest ? 'from-indigo-500' : 'from-amber-500';
+  const accentTo = isContest ? 'to-violet-600' : 'to-orange-500';
+  const accentColor = isContest ? 'text-indigo-400' : 'text-amber-400';
+  const accentBg = isContest ? 'bg-indigo-500' : 'bg-amber-500';
+  const borderColor = isContest ? 'border-indigo-500/25' : 'border-amber-500/25';
+  const glowShadow = isContest ? 'shadow-indigo-500/15' : 'shadow-amber-500/15';
 
   return createPortal(
     <div
@@ -104,86 +108,112 @@ export function EventStartModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-sm rounded-2xl border bg-[var(--color-surface)] shadow-2xl transition-all duration-300 ${
+        className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-2xl border bg-[var(--color-surface)] shadow-2xl ${glowShadow} transition-all duration-300 overflow-hidden ${
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         } ${borderColor}`}
       >
+        {/* Gradient header strip */}
+        <div className={`h-1.5 w-full bg-gradient-to-r ${accentFrom} ${accentTo}`} />
+
         {/* Close button */}
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors"
+          className="absolute top-4 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-bg)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
         >
-          <X size={16} />
+          <X size={14} />
         </button>
 
-        <div className="p-5 text-center space-y-3">
-          {/* Sponsor badge */}
-          {isSponsored && (
-            <Link
-              href={`/game/profile/${sponsorAddress}`}
-              onClick={handleDismiss}
-              className="flex items-center justify-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 transition-colors hover:bg-amber-500/15 group"
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="p-5 space-y-4">
+            {/* Icon + badge row */}
+            <div className="flex flex-col items-center gap-2.5">
+              <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${accentBg}/15`}>
+                <Icon size={32} className={accentColor} />
+              </div>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${accentBg}/15 ${accentColor}`}>
+                <Zap size={10} />
+                {isContest ? t('events.contest') : t('events.raffle')}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-xl font-bold text-center leading-tight">{title}</h3>
+
+            {/* Description */}
+            {description && (
+              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">
+                {description}
+              </p>
+            )}
+
+            {/* Stats row */}
+            <div className="flex items-stretch gap-2">
+              {/* Prize pool */}
+              <div className={`flex-1 rounded-xl border ${borderColor} bg-[var(--color-bg)] p-3 text-center`}>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">
+                  {t('events.eventStartModal.prize')}
+                </p>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="text-lg font-bold text-[var(--color-success)]">{formatLaunch(totalPrizePool)}</span>
+                  <LaunchTokenIcon size={20} />
+                </div>
+              </div>
+
+              {/* Time remaining */}
+              {timeStr && (
+                <div className={`flex-1 rounded-xl border ${borderColor} bg-[var(--color-bg)] p-3 text-center`}>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">
+                    {t('events.eventStartModal.remaining')}
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Clock size={16} className={accentColor} />
+                    <span className="text-lg font-bold">{timeStr}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sponsor badge */}
+            {isSponsored && (
+              <Link
+                href={`/game/profile/${sponsorAddress}`}
+                onClick={handleDismiss}
+                className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-3.5 py-2.5 transition-colors hover:border-amber-500/30 group"
+              >
+                <UserAvatar address={sponsorAddress} size={24} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate group-hover:text-amber-300 transition-colors">
+                    {sponsorNickname || shortAddr(sponsorAddress)}
+                  </p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    {t('announcement.sponsor')}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-[var(--color-text-secondary)] shrink-0" />
+              </Link>
+            )}
+          </div>
+
+          {/* Sticky buttons */}
+          <div className="sticky bottom-0 px-5 pb-5 pt-2 bg-gradient-to-t from-[var(--color-surface)] via-[var(--color-surface)] to-transparent space-y-2">
+            <button
+              type="button"
+              onClick={handleViewEvent}
+              className={`w-full rounded-xl py-3 text-sm font-bold text-white transition-all active:scale-[0.98] bg-gradient-to-r ${accentFrom} ${accentTo} shadow-lg ${glowShadow}`}
             >
-              <UserAvatar address={sponsorAddress} size={20} />
-              <span className="text-xs font-medium text-amber-400 group-hover:text-amber-300 truncate">
-                {sponsorNickname || shortAddr(sponsorAddress)}
-              </span>
-              <span className="text-[9px] text-[var(--color-text-secondary)] shrink-0">
-                {t('announcement.sponsor')}
-              </span>
-            </Link>
-          )}
+              {t('events.eventStartModal.viewEvent')}
+            </button>
 
-          {/* Icon */}
-          <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${iconBg}`}>
-            <Icon size={28} className={iconColor} />
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="w-full py-2 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+            >
+              {t('events.eventStartModal.dismiss')}
+            </button>
           </div>
-
-          {/* Type badge */}
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeBg}`}>
-            {isContest ? t('events.contest') : t('events.raffle')}
-          </span>
-
-          {/* Title */}
-          <h3 className="text-lg font-bold">{title}</h3>
-
-          {/* Description */}
-          {description && (
-            <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed line-clamp-3">
-              {description}
-            </p>
-          )}
-
-          {/* Prize pool + duration */}
-          <div className="flex items-center justify-center gap-4 py-1">
-            <div className="flex items-center gap-1.5">
-              <Trophy size={14} className="text-[var(--color-warning)]" />
-              <span className="text-sm font-bold text-[var(--color-success)]">{formatLaunch(totalPrizePool)}</span>
-              <LaunchTokenIcon size={28} />
-            </div>
-            <div className="text-xs text-[var(--color-text-secondary)]">
-              {timeStr} {t('events.eventStartModal.remaining')}
-            </div>
-          </div>
-
-          {/* View Event button */}
-          <button
-            type="button"
-            onClick={handleViewEvent}
-            className={`w-full rounded-xl py-2.5 text-sm font-bold text-white transition-all active:scale-[0.98] bg-gradient-to-r ${btnGradient} shadow-lg`}
-          >
-            {t('events.eventStartModal.viewEvent')}
-          </button>
-
-          {/* Dismiss link */}
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-          >
-            {t('events.eventStartModal.dismiss')}
-          </button>
         </div>
       </div>
     </div>,

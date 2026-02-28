@@ -85,7 +85,8 @@ adminEventsRouter.post('/create-and-activate', zValidator('json', CreateEventReq
   const activated = await eventsService.setStatus(event!.id, 'active');
   if (!activated) throw new AppError('ACTIVATION_FAILED', 'Failed to activate event', 500);
 
-  wsService.broadcast({ type: 'event_started', data: { eventId: event!.id, title: event!.title, type: event!.type } });
+  const broadcastData = await eventsService.buildEventStartedData(activated);
+  wsService.broadcast({ type: 'event_started', data: broadcastData });
   logger.info({ eventId: event!.id, title: event!.title }, 'Event created and activated by admin');
 
   const data = await eventsService.formatEventResponse(activated);

@@ -73,6 +73,12 @@ pub enum ExecuteMsg {
 
     /// Pending admin: accept ownership (step 2 of 2-step transfer)
     AcceptAdmin {},
+
+    /// Admin: sweep orphaned CW20 tokens (contract balance minus all vault balances)
+    AdminSweep {
+        /// Optional recipient. Defaults to admin.
+        recipient: Option<String>,
+    },
 }
 
 /// Message for contract migration.

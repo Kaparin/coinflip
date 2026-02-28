@@ -528,6 +528,34 @@ export async function signPresaleUpdateConfig(
   };
 }
 
+// ---- CoinFlip Admin: Sweep orphaned tokens ----
+
+export async function signCoinflipAdminSweep(
+  wallet: DirectSecp256k1HdWallet,
+  address: string,
+  recipient?: string,
+): Promise<{ txHash: string; height: number }> {
+  const client = await getCosmWasmClient(wallet);
+
+  const msg: Record<string, unknown> = { admin_sweep: {} };
+  if (recipient) {
+    (msg.admin_sweep as Record<string, unknown>).recipient = recipient;
+  }
+
+  const result = await client.execute(
+    address,
+    COINFLIP_CONTRACT,
+    msg,
+    'auto',
+    'CoinFlip admin sweep orphaned tokens',
+  );
+
+  return {
+    txHash: result.transactionHash,
+    height: result.height,
+  };
+}
+
 // ---- Presale Admin: Withdraw AXM ----
 
 export async function signPresaleWithdrawAxm(

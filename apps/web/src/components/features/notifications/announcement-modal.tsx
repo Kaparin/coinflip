@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Megaphone, AlertTriangle, X } from 'lucide-react';
+import { Megaphone, AlertTriangle, X, ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { UserAvatar } from '@/components/ui';
 import Link from 'next/link';
@@ -50,6 +50,14 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
   const isSponsored = !!sponsorAddress || priority === 'sponsored';
   const Icon = isImportant ? AlertTriangle : Megaphone;
 
+  // Theme
+  const accentFrom = isSponsored ? 'from-teal-500' : isImportant ? 'from-amber-500' : 'from-[var(--color-primary)]';
+  const accentTo = isSponsored ? 'to-emerald-600' : isImportant ? 'to-orange-500' : 'to-indigo-600';
+  const accentColor = isSponsored ? 'text-teal-400' : isImportant ? 'text-amber-400' : 'text-[var(--color-primary)]';
+  const accentBg = isSponsored ? 'bg-teal-500' : isImportant ? 'bg-amber-500' : 'bg-[var(--color-primary)]';
+  const borderColor = isSponsored ? 'border-teal-500/25' : isImportant ? 'border-amber-500/25' : 'border-[var(--color-border)]';
+  const glowShadow = isSponsored ? 'shadow-teal-500/15' : isImportant ? 'shadow-amber-500/15' : 'shadow-[var(--color-primary)]/10';
+
   return createPortal(
     <div
       role="dialog"
@@ -61,68 +69,71 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-sm rounded-2xl border bg-[var(--color-surface)] shadow-2xl transition-all duration-300 ${
+        className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-2xl border bg-[var(--color-surface)] shadow-2xl ${glowShadow} transition-all duration-300 overflow-hidden ${
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-        } ${
-          isSponsored ? 'border-teal-500/30' : isImportant ? 'border-amber-500/30' : 'border-[var(--color-border)]'
-        }`}
+        } ${borderColor}`}
       >
+        {/* Gradient header strip */}
+        <div className={`h-1.5 w-full bg-gradient-to-r ${accentFrom} ${accentTo}`} />
+
         {/* Close button */}
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors"
+          className="absolute top-4 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-bg)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
         >
-          <X size={16} />
+          <X size={14} />
         </button>
 
-        <div className="p-5 text-center space-y-4">
-          {/* Sponsor badge */}
-          {isSponsored && sponsorAddress && (
-            <Link
-              href={`/game/profile/${sponsorAddress}`}
-              onClick={handleDismiss}
-              className="flex items-center justify-center gap-2 rounded-lg bg-teal-500/10 border border-teal-500/20 px-3 py-2 transition-colors hover:bg-teal-500/15 group"
-            >
-              <UserAvatar address={sponsorAddress} size={20} />
-              <span className="text-xs font-medium text-teal-400 group-hover:text-teal-300 truncate">
-                {sponsorNickname || shortAddr(sponsorAddress)}
-              </span>
-              <span className="text-[9px] text-[var(--color-text-secondary)] shrink-0">
-                {t('announcement.sponsor')}
-              </span>
-            </Link>
-          )}
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="p-5 space-y-4">
+            {/* Icon */}
+            <div className="flex flex-col items-center gap-2.5">
+              <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${accentBg}/15`}>
+                <Icon size={32} className={accentColor} />
+              </div>
+            </div>
 
-          {/* Icon */}
-          <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
-            isSponsored ? 'bg-teal-500/15' : isImportant ? 'bg-amber-500/15' : 'bg-[var(--color-primary)]/15'
-          }`}>
-            <Icon size={28} className={isSponsored ? 'text-teal-400' : isImportant ? 'text-amber-400' : 'text-[var(--color-primary)]'} />
+            {/* Title */}
+            <h3 className="text-xl font-bold text-center leading-tight">{title}</h3>
+
+            {/* Message */}
+            <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">
+              {message}
+            </p>
+
+            {/* Sponsor badge */}
+            {isSponsored && sponsorAddress && (
+              <Link
+                href={`/game/profile/${sponsorAddress}`}
+                onClick={handleDismiss}
+                className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-3.5 py-2.5 transition-colors hover:border-teal-500/30 group"
+              >
+                <UserAvatar address={sponsorAddress} size={24} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate group-hover:text-teal-300 transition-colors">
+                    {sponsorNickname || shortAddr(sponsorAddress)}
+                  </p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    {t('announcement.sponsor')}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-[var(--color-text-secondary)] shrink-0" />
+              </Link>
+            )}
           </div>
 
-          {/* Title */}
-          <h3 className="text-lg font-bold">{title}</h3>
-
-          {/* Message */}
-          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">
-            {message}
-          </p>
-
-          {/* Dismiss button */}
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className={`w-full rounded-xl py-2.5 text-sm font-bold text-white transition-all active:scale-[0.98] ${
-              isSponsored
-                ? 'bg-gradient-to-r from-teal-500 to-emerald-600 shadow-lg shadow-teal-500/20'
-                : isImportant
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/20'
-                  : 'bg-gradient-to-r from-[var(--color-primary)] to-indigo-600 shadow-lg shadow-[var(--color-primary)]/20'
-            }`}
-          >
-            {t('common.ok')}
-          </button>
+          {/* Sticky button */}
+          <div className="sticky bottom-0 px-5 pb-5 pt-2 bg-gradient-to-t from-[var(--color-surface)] via-[var(--color-surface)] to-transparent">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className={`w-full rounded-xl py-3 text-sm font-bold text-white transition-all active:scale-[0.98] bg-gradient-to-r ${accentFrom} ${accentTo} shadow-lg ${glowShadow}`}
+            >
+              {t('common.ok')}
+            </button>
+          </div>
         </div>
       </div>
     </div>,

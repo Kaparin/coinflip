@@ -56,4 +56,7 @@ pub enum ContractError {
 
     #[error("Invalid commitment: must be exactly 32 bytes (SHA-256 hash), got {len}")]
     InvalidCommitmentLength { len: usize },
+
+    #[error("No orphaned tokens to sweep")]
+    NothingToSweep,
 }

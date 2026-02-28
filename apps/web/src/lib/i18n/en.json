@@ -806,7 +806,8 @@
     "eventStartModal": {
       "viewEvent": "View Event",
       "dismiss": "Maybe later",
-      "remaining": "left"
+      "remaining": "Time left",
+      "prize": "Prize pool"
     },
     "info": {
       "title": "How do events work?",
@@ -946,7 +947,9 @@
     "justNow": "just now",
     "mAgo": "m ago",
     "hAgo": "h ago",
-    "dAgo": "d ago"
+    "dAgo": "d ago",
+    "readMore": "Read more",
+    "collapse": "Collapse"
   },
   "sponsored": {
     "button": "Advertise",

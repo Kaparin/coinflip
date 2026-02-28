@@ -130,6 +130,7 @@ export default function NewsPage() {
 
 function FeedCard({ item }: { item: NewsFeedItem }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
 
   const typeConfig = getTypeConfig(item.type, t);
   const relativeTime = formatRelativeTime(item.timestamp, t);
@@ -169,6 +170,9 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
   const sponsorAddress = item.metadata.sponsorAddress as string | undefined;
   const sponsorNickname = item.metadata.sponsorNickname as string | undefined;
 
+  // Check if content is long enough to need "Read more"
+  const isLong = item.content.length > 200 || item.content.split('\n').length > 4;
+
   // News post and announcement — full card
   return (
     <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden ${typeConfig.borderClass}`}>
@@ -201,7 +205,18 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
       {/* Content */}
       <div className="px-3.5 py-2.5">
         {item.title && <h3 className="text-[13px] font-bold mb-1 leading-snug">{item.title}</h3>}
-        <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap line-clamp-4">{item.content}</p>
+        <p className={`text-xs text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap ${
+          !expanded && isLong ? 'line-clamp-4' : ''
+        }`}>{item.content}</p>
+        {isLong && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="mt-1.5 text-[11px] font-medium text-[var(--color-primary)] hover:underline"
+          >
+            {expanded ? t('news.collapse') : t('news.readMore')}
+          </button>
+        )}
       </div>
     </div>
   );
