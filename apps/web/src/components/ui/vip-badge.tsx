@@ -7,7 +7,7 @@ type VipTier = 'silver' | 'gold' | 'diamond';
 
 const tierConfig: Record<VipTier, {
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   className: string;
 }> = {
   silver: {
@@ -41,8 +41,12 @@ export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipB
   const Icon = config.icon;
   const isSm = size === 'sm';
 
-  const classes = `inline-flex items-center gap-0.5 rounded-full font-bold ${config.className} ${
-    isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+  // Use explicit pixel sizes — Chrome Android enforces minimum font-size (~12px),
+  // which inflates react-icons' inline `1em` sizing and breaks the badge on mobile.
+  const iconPx = isSm ? 10 : 12;
+
+  const classes = `inline-flex shrink-0 items-center gap-0.5 rounded-full font-bold leading-none ${config.className} ${
+    isSm ? 'px-1.5 py-[3px] text-[10px]' : 'px-2 py-1 text-xs'
   }${onClick ? ' cursor-pointer' : ''}`;
 
   return (
@@ -54,7 +58,7 @@ export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipB
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as any); } } : undefined}
     >
-      <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+      <Icon size={iconPx} className="shrink-0" />
       {showLabel && <span>{config.label}</span>}
     </span>
   );
