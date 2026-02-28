@@ -6,7 +6,8 @@ import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
-import { setBalanceGracePeriod } from '@/lib/balance-grace';
+import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
 import Link from 'next/link';
@@ -55,7 +56,13 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount } = usePendingBalance();
 
   const { data: balanceData } = useGetVaultBalance({
-    query: { enabled: isConnected, refetchInterval: 15_000 },
+    query: {
+      enabled: isConnected,
+      refetchInterval: () => {
+        if (isInBalanceGracePeriod()) return false;
+        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
+      },
+    },
   });
 
   // ── Open bets counter (SOURCE OF TRUTH: server's chain-based count) ──
@@ -114,7 +121,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             },
           }));
           // Protect this accurate balance from stale WS-triggered refetches.
-          setBalanceGracePeriod(5_000);
+          setBalanceGracePeriod(8_000);
         }
 
         // Increment local submitted counter (tracks bets between server refetches)

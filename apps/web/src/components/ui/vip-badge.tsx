@@ -43,7 +43,7 @@ export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipB
 
   const classes = `inline-flex items-center gap-0.5 rounded-full font-bold ${config.className} ${
     isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
-  }${onClick ? ' cursor-pointer' : ''}`;
+  }${onClick ? ' cursor-pointer border-0 m-0 appearance-none' : ''}`;
 
   if (onClick) {
     return (

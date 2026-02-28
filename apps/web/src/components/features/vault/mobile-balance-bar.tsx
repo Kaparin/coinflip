@@ -7,6 +7,8 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
+import { isInBalanceGracePeriod } from '@/lib/balance-grace';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { LaunchTokenIcon } from '@/components/ui';
 import { BalanceDisplay } from './balance-display';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +22,15 @@ export function MobileBalanceBar() {
   const { t } = useTranslation();
   const { isConnected, address } = useWalletContext();
   const { pendingDeduction } = usePendingBalance();
-  const { data, isLoading } = useGetVaultBalance({ query: { enabled: isConnected, refetchInterval: 15_000 } });
+  const { data, isLoading } = useGetVaultBalance({
+    query: {
+      enabled: isConnected,
+      refetchInterval: () => {
+        if (isInBalanceGracePeriod()) return false;
+        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
+      },
+    },
+  });
   const { data: walletBalanceRaw } = useWalletBalance(address);
   const [expanded, setExpanded] = useState(false);
 

@@ -16,7 +16,7 @@ import {
 } from '@coinflip/shared/constants';
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
-import { setBalanceGracePeriod } from '@/lib/balance-grace';
+import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { LaunchTokenIcon } from '@/components/ui';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
@@ -81,7 +81,10 @@ export function BetList({ pendingBets = [] }: BetListProps) {
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
+      refetchInterval: () => {
+        if (isInBalanceGracePeriod()) return false;
+        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
+      },
     },
   });
   const rawAvailableMicro = BigInt(balanceData?.data?.available ?? '0');
@@ -162,7 +165,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           }));
           // Protect this accurate balance from stale WS-triggered refetches.
           // Chain cache may lag behind the DB state for a few seconds.
-          setBalanceGracePeriod(5_000);
+          setBalanceGracePeriod(8_000);
         }
 
         // Optimistically remove the accepted bet from the open bets cache

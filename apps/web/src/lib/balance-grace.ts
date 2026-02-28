@@ -18,7 +18,7 @@ let _graceUntil = 0;
 
 /** Set a grace period (ms) during which vault balance invalidations are skipped. */
 export function setBalanceGracePeriod(ms: number): void {
-  _graceUntil = Date.now() + ms;
+  _graceUntil = Math.max(_graceUntil, Date.now() + ms);
 }
 
 /** Returns true if currently within a deposit grace period. */

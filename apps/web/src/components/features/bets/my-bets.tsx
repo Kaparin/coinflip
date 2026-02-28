@@ -565,9 +565,15 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
               <button
                 type="button"
                 disabled={boostMutation.isPending}
-                onClick={() => {
-                  boostMutation.mutate(boostTarget);
-                  setBoostTarget(null);
+                onClick={async () => {
+                  try {
+                    await boostMutation.mutateAsync(boostTarget);
+                    addToast('success', t('boost.success'));
+                  } catch (err) {
+                    addToast('error', getUserFriendlyError(err, t, 'generic'));
+                  } finally {
+                    setBoostTarget(null);
+                  }
                 }}
                 className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-3 text-sm font-bold text-white transition-all hover:from-indigo-400 hover:to-violet-400 hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] active:scale-[0.98]"
               >
@@ -627,9 +633,15 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 <button
                   type="button"
                   disabled={pinMutation.isPending}
-                  onClick={() => {
-                    pinMutation.mutate({ betId: pinTarget.betId, slot: pinTarget.slot });
-                    setPinTarget(null);
+                  onClick={async () => {
+                    try {
+                      await pinMutation.mutateAsync({ betId: pinTarget.betId, slot: pinTarget.slot });
+                      addToast('success', t('pin.success'));
+                    } catch (err) {
+                      addToast('error', getUserFriendlyError(err, t, 'generic'));
+                    } finally {
+                      setPinTarget(null);
+                    }
                   }}
                   className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] active:scale-[0.98]"
                 >
