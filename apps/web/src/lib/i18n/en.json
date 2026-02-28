@@ -922,6 +922,13 @@
       "largeJackpot": "Large jackpot eligibility",
       "megaJackpot": "Mega jackpot eligibility",
       "superMegaJackpot": "Super Mega jackpot eligibility"
+    },
+    "info": {
+      "playerHasVip": "This player has a {tier} VIP subscription",
+      "jackpotRequiresVip": "Participation in {jackpot} jackpot requires {tier} VIP or higher",
+      "privileges": "Privileges",
+      "getVip": "Get VIP",
+      "learnMore": "Learn more about VIP"
     }
   },
   "boost": {

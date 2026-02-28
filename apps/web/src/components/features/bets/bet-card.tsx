@@ -7,6 +7,7 @@ import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles, Pin } from 'lucide-reac
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
+import { VipInfoModal } from '@/components/features/vip/vip-info-modal';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
 
@@ -249,6 +250,8 @@ export function BetCard({
   const isAnyPending = !!pendingBetId;
   const showAcceptingState = isAcceptingLocal || isAcceptingProp;
 
+  const [vipInfoOpen, setVipInfoOpen] = useState(false);
+
   const staggerClass = index < 10 ? `stagger-${index + 1}` : '';
 
   return (
@@ -346,7 +349,7 @@ export function BetCard({
               <UserAvatar address={maker} size={16} />
             </VipAvatarFrame>
             <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier)}`}>{makerNickname || truncAddr(maker)}</span>
-            <VipBadge tier={makerVipTier} />
+            <VipBadge tier={makerVipTier} onClick={makerVipTier ? (e) => { e.preventDefault(); e.stopPropagation(); setVipInfoOpen(true); } : undefined} />
             {/* Text badges only on cards without action buttons (other people's bets) */}
             {!(onBoost || onPin) && isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">PIN</span>}
             {!(onBoost || onPin) && isBoosted && !isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">&uarr;</span>}
@@ -478,6 +481,15 @@ export function BetCard({
           </div>
         )}
       </div>
+
+      {makerVipTier && ['silver', 'gold', 'diamond'].includes(makerVipTier) && (
+        <VipInfoModal
+          open={vipInfoOpen}
+          onClose={() => setVipInfoOpen(false)}
+          tier={makerVipTier as 'silver' | 'gold' | 'diamond'}
+          context="player"
+        />
+      )}
     </div>
   );
 }

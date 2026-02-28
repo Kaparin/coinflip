@@ -14,13 +14,13 @@ interface VipAvatarFrameProps {
  */
 export function VipAvatarFrame({ tier, children, className = '' }: VipAvatarFrameProps) {
   if (!tier || !['silver', 'gold', 'diamond'].includes(tier)) {
-    return <div className={className}>{children}</div>;
+    return <div className={`inline-flex ${className}`}>{children}</div>;
   }
 
   const frameClass = `vip-frame-${tier as VipTier}`;
 
   return (
-    <div className={`${frameClass} p-0.5 ${className}`}>
+    <div className={`${frameClass} inline-flex p-0.5 ${className}`}>
       {children}
     </div>
   );

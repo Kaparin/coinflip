@@ -31,20 +31,37 @@ interface VipBadgeProps {
   tier: string | null | undefined;
   size?: 'sm' | 'md';
   showLabel?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
-export function VipBadge({ tier, size = 'sm', showLabel = false }: VipBadgeProps) {
+export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipBadgeProps) {
   if (!tier || !(tier in tierConfig)) return null;
 
   const config = tierConfig[tier as VipTier];
   const Icon = config.icon;
   const isSm = size === 'sm';
 
+  const classes = `inline-flex items-center gap-0.5 rounded-full font-bold ${config.className} ${
+    isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+  }${onClick ? ' cursor-pointer' : ''}`;
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={classes}
+        title={`${config.label} VIP`}
+      >
+        <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+        {showLabel && <span>{config.label}</span>}
+      </button>
+    );
+  }
+
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded-full font-bold ${config.className} ${
-        isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
-      }`}
+      className={classes}
       title={`${config.label} VIP`}
     >
       <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />

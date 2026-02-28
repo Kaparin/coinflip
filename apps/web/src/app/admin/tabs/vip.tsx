@@ -1,11 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-import { Crown } from 'lucide-react';
-import { formatLaunch } from '@coinflip/shared/constants';
-import { useAdminVipStats, useAdminVipSubscribers, useAdminGrantVip, useAdminRevokeVip } from '@/hooks/use-admin';
+import { useState, useEffect } from 'react';
+import { Crown, Settings } from 'lucide-react';
+import { formatLaunch, fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
+import { useAdminVipStats, useAdminVipSubscribers, useAdminGrantVip, useAdminRevokeVip, useAdminUpdateVipConfig } from '@/hooks/use-admin';
+import { useVipConfig } from '@/hooks/use-vip';
 import { StatCard, TableWrapper, ActionButton, shortAddr, timeAgo } from '../_shared';
 import { VipBadge } from '@/components/ui/vip-badge';
+
+function TierConfigRow({ tier, price, isActive }: { tier: string; price: string; isActive: boolean }) {
+  const [editPrice, setEditPrice] = useState(() => fromMicroLaunch(Number(price)).toString());
+  const [active, setActive] = useState(isActive);
+  const updateMutation = useAdminUpdateVipConfig();
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setEditPrice(fromMicroLaunch(Number(price)).toString());
+    setActive(isActive);
+  }, [price, isActive]);
+
+  const hasChanges = editPrice !== fromMicroLaunch(Number(price)).toString() || active !== isActive;
+
+  const handleSave = async () => {
+    const microPrice = toMicroLaunch(Number(editPrice)).toString();
+    await updateMutation.mutateAsync({ tier, price: microPrice, isActive: active });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <tr className="border-b border-[var(--color-border)]/30">
+      <td className="py-3">
+        <VipBadge tier={tier} size="md" showLabel />
+      </td>
+      <td className="py-3">
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={editPrice}
+            onChange={(e) => setEditPrice(e.target.value)}
+            min={0}
+            step={10}
+            className="w-28 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-sm tabular-nums focus:border-[var(--color-primary)] focus:outline-none"
+          />
+          <span className="text-xs text-[var(--color-text-secondary)]">COIN</span>
+        </div>
+      </td>
+      <td className="py-3">
+        <button
+          type="button"
+          onClick={() => setActive(!active)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+            active ? 'bg-emerald-500' : 'bg-zinc-600'
+          }`}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            active ? 'translate-x-5' : 'translate-x-0'
+          }`} />
+        </button>
+      </td>
+      <td className="py-3 text-right">
+        <div className="flex items-center justify-end gap-2">
+          {saved && <span className="text-xs text-emerald-400">Saved</span>}
+          <ActionButton
+            onClick={handleSave}
+            disabled={!hasChanges || updateMutation.isPending}
+          >
+            {updateMutation.isPending ? 'Saving...' : 'Save'}
+          </ActionButton>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export function VipTab() {
   const [page, setPage] = useState(0);
@@ -16,6 +83,7 @@ export function VipTab() {
 
   const { data: stats } = useAdminVipStats();
   const { data: subsData } = useAdminVipSubscribers(page);
+  const { data: vipTiers } = useVipConfig();
   const grantMutation = useAdminGrantVip();
   const revokeMutation = useAdminRevokeVip();
 
@@ -52,6 +120,43 @@ export function VipTab() {
         <StatCard label="Diamond" value={stats?.diamond_count ?? 0} />
         <StatCard label="Total Revenue" value={stats ? formatLaunch(stats.total_revenue) : '0'} sub="COIN" />
         <StatCard label="This Week" value={stats ? formatLaunch(stats.week_revenue) : '0'} sub="COIN" />
+      </div>
+
+      {/* Tier Config */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings size={18} className="text-[var(--color-text-secondary)]" />
+          <h3 className="text-sm font-bold">Tier Pricing</h3>
+        </div>
+        <TableWrapper>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
+                <th className="py-2 text-left font-medium px-3">Tier</th>
+                <th className="py-2 text-left font-medium">Price / month</th>
+                <th className="py-2 text-left font-medium">Active</th>
+                <th className="py-2 text-right font-medium px-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {vipTiers?.map((t) => (
+                <TierConfigRow
+                  key={t.tier}
+                  tier={t.tier}
+                  price={t.price}
+                  isActive={t.isActive}
+                />
+              ))}
+              {!vipTiers?.length && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-[var(--color-text-secondary)]">
+                    Loading...
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </TableWrapper>
       </div>
 
       {/* Grant VIP */}

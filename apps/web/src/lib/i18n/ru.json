@@ -922,6 +922,13 @@
       "largeJackpot": "Участие в Большом джекпоте",
       "megaJackpot": "Участие в Мега джекпоте",
       "superMegaJackpot": "Участие в Супер Мега джекпоте"
+    },
+    "info": {
+      "playerHasVip": "Этот игрок имеет VIP {tier} подписку",
+      "jackpotRequiresVip": "Участие в джекпоте {jackpot} доступно для VIP {tier} и выше",
+      "privileges": "Привилегии",
+      "getVip": "Получить VIP",
+      "learnMore": "Узнать о VIP"
     }
   },
   "boost": {

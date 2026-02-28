@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { formatLaunch, VIP_JACKPOT_TIERS } from '@coinflip/shared/constants';
 import { LaunchTokenIcon } from '@/components/ui';
 import { JackpotProgressBar } from './jackpot-progress-bar';
+import { VipInfoModal } from '@/components/features/vip/vip-info-modal';
 import { useTranslation } from '@/lib/i18n';
 import { Crown } from 'lucide-react';
 import { GiCoins, GiLightningFrequency, GiFireGem, GiCrown, GiOpenTreasureChest } from 'react-icons/gi';
@@ -91,6 +93,7 @@ interface JackpotTierCardProps {
 
 export function JackpotTierCard({ pool }: JackpotTierCardProps) {
   const { t } = useTranslation();
+  const [vipInfoOpen, setVipInfoOpen] = useState(false);
   const style = TIER_STYLES[pool.tierName] ?? TIER_STYLES.mini!;
   const Icon = style.icon;
   const currentFormatted = formatLaunch(pool.currentAmount);
@@ -131,10 +134,14 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
                   {t(`jackpot.tiers.${pool.tierName}`)}
                 </h3>
                 {requiredVip && vipBadgeStyle ? (
-                  <span className={`inline-flex items-center gap-0.5 rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} px-1.5 py-0.5 text-[9px] font-bold ${vipBadgeStyle.text}`}>
+                  <button
+                    type="button"
+                    onClick={() => setVipInfoOpen(true)}
+                    className={`inline-flex items-center gap-0.5 rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} px-1.5 py-0.5 text-[9px] font-bold ${vipBadgeStyle.text} cursor-pointer`}
+                  >
                     <Crown size={8} />
                     <span className="capitalize">{requiredVip}</span>
-                  </span>
+                  </button>
                 ) : null}
               </div>
               <span className="text-[10px] text-[var(--color-text-secondary)]">
@@ -173,6 +180,16 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
 
       {/* Bottom accent */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+
+      {requiredVip && ['silver', 'gold', 'diamond'].includes(requiredVip) && (
+        <VipInfoModal
+          open={vipInfoOpen}
+          onClose={() => setVipInfoOpen(false)}
+          tier={requiredVip as 'silver' | 'gold' | 'diamond'}
+          context="jackpot"
+          jackpotTierName={t(`jackpot.tiers.${pool.tierName}`)}
+        />
+      )}
     </div>
   );
 }
