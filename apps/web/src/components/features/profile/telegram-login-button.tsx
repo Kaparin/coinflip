@@ -45,11 +45,10 @@ export function parseTelegramHashResult(): TelegramUser | null {
 }
 
 export function TelegramLoginButton({
-  botName,
+  botId,
   lang = 'en',
 }: {
-  botName: string;
-  onAuth?: (user: TelegramUser) => void;
+  botId: string;
   lang?: string;
 }) {
   const { t } = useTranslation();
@@ -59,7 +58,7 @@ export function TelegramLoginButton({
     const origin = window.location.origin;
     const returnTo = '/game/profile';
     window.location.href =
-      `https://oauth.telegram.org/auth?bot_id=${encodeURIComponent(botName)}` +
+      `https://oauth.telegram.org/auth?bot_id=${encodeURIComponent(botId)}` +
       `&origin=${encodeURIComponent(origin)}` +
       `&embed=1&request_access=write&lang=${lang}` +
       `&return_to=${encodeURIComponent(returnTo)}`;

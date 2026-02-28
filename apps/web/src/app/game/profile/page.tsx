@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use-referral';
 import { UserAvatar } from '@/components/ui';
@@ -1141,7 +1141,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
     );
   }
 
-  if (!TELEGRAM_BOT_NAME) {
+  if (!TELEGRAM_BOT_NAME || !TELEGRAM_BOT_ID) {
     return (
       <p className="text-xs text-[var(--color-text-secondary)]">
         {t('profile.telegramNotConfigured')}
@@ -1161,7 +1161,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
         </div>
       ) : (
         <TelegramLoginButton
-          botName={TELEGRAM_BOT_NAME}
+          botId={TELEGRAM_BOT_ID}
           lang={locale}
         />
       )}

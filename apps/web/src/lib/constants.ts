@@ -29,8 +29,10 @@ export const PRESALE_CONTRACT = process.env.NEXT_PUBLIC_PRESALE_CONTRACT ?? '';
 /** Admin wallet address (for showing admin link in UI) */
 export const ADMIN_ADDRESS = process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? '';
 
-/** Telegram bot name for login widget */
+/** Telegram bot name for display */
 export const TELEGRAM_BOT_NAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? '';
+/** Telegram bot numeric ID for OAuth (first part of bot token) */
+export const TELEGRAM_BOT_ID = process.env.NEXT_PUBLIC_TELEGRAM_BOT_ID ?? '';
 
 /** Local storage keys */
 export const STORAGE_KEYS = {
