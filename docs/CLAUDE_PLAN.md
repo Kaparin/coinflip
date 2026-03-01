@@ -9,11 +9,10 @@
 
 | PR | Scope | Status | Branch |
 |----|-------|--------|--------|
-| PR-1 | DB indexes + query caches | DONE | `perf/db-indexes-and-caches` |
-| PR-2 | Frontend render perf | DONE | `perf/frontend-render` |
-| PR-3 | Async deposit 202 | DONE | `perf/async-deposit-202` |
-| PR-4 | Balance dedup + WS cleanup | DONE | `perf/balance-dedup-ws-cleanup` |
-| PR-5 | RPC failover | DONE | `perf/rpc-failover` |
+
+| PR-3 | Async deposit 202 | PENDING | — |
+| PR-4 | Balance dedup + WS cleanup | PENDING | — |
+| PR-5 | RPC failover | PENDING | — |
 | PR-6 | CometBFT WS indexer | PENDING | — |
 
 ---
@@ -31,6 +30,21 @@
 - `apps/api/src/services/user.service.ts` — add 60s cache for `getLeaderboard()`, `getTopWinner()`, `getUserStats()`
 - DB migration via Neon MCP (CREATE INDEX CONCURRENTLY)
 
+### Verification Checklist
+
+- [ ] Deposit: send → pending → confirmed → balance updated
+- [ ] Bet flow: create → accept → reveal → jackpot/referral intact
+- [ ] Leaderboard: loads correctly, data matches, updates within 60s
+- [ ] TopWinner: displays correct winner, updates within 60s
+- [ ] User stats (/me): correct counts, updates within 60s
+- [ ] No errors in API logs after deploy
+
+### Expected Effect
+- Leaderboard p95: ~500ms+ → <100ms (cached)
+- TopWinner p95: ~300ms+ → <50ms (cached)
+- UserStats p95: ~200ms → <50ms (cached per user)
+- Measurement: check Railway logs for endpoint timings before/after
+
 ---
 
 ## PR-2: Frontend Render Performance
@@ -41,69 +55,13 @@
 
 ### Files Changed
 - `apps/web/src/components/features/bets/bet-card.tsx` — React.memo wrapper
-- `apps/web/src/hooks/use-websocket.ts` — remove setLastEvent
-- `apps/web/src/components/features/bets/my-bets.tsx` — memoize myResolved filter
-- `apps/web/src/app/game/page.tsx` — lazy-mount hidden tabs
 
----
+- [ ] Mobile: pull-to-refresh still works
 
-## PR-3: Async Deposit 202
-
-**Goal:** Non-blocking deposit endpoint — return 202 immediately, confirm in background via WS.
-**Risk:** MEDIUM. Behind `DEPOSIT_ASYNC_MODE` feature flag (default off).
-**Rollback:** Set `DEPOSIT_ASYNC_MODE=false` (or remove env var). Revert commit.
-
-### Files Changed
-- `apps/api/src/config/env.ts` — add `DEPOSIT_ASYNC_MODE` env var
-- `packages/shared/src/types/index.ts` — add `deposit_confirmed` / `deposit_failed` WS event types
-- `apps/api/src/routes/vault.ts` — extract `pollTxConfirmation()`, add async 202 path
-- `apps/web/src/hooks/use-websocket.ts` — handle deposit_confirmed/deposit_failed events
-- `apps/web/src/app/game/page.tsx` — toast notifications for deposit WS events
-- `apps/web/src/lib/i18n/en.json` — i18n keys
-- `apps/web/src/lib/i18n/ru.json` — i18n keys
-
----
-
-## PR-4: Balance Dedup + WS Cleanup
-
-**Goal:** Reduce redundant balance polling when WS is connected, increase chain cache TTL.
-**Risk:** LOW. Polling still active as fallback when WS disconnected.
-**Rollback:** Revert commit.
-
-### Files Changed
-- `apps/api/src/routes/vault.ts` — chain cache TTL 10s → 30s
-- `apps/web/src/components/features/vault/balance-display.tsx` — WS-aware refetchInterval
-- `apps/web/src/hooks/use-wallet-balance.ts` — WS-aware refetchInterval
-
----
-
-## PR-5: RPC Failover
-
-**Goal:** Centralized chain REST utility with automatic failover to backup URLs on 5xx/network errors.
-**Risk:** LOW. Drop-in replacement — same logic, just wrapped in retry-with-fallback.
-**Rollback:** Revert commit. All calls revert to direct `fetch(env.AXIOME_REST_URL + ...)`.
-
-### Files Changed
-- `apps/api/src/lib/chain-fetch.ts` — NEW: `chainRest()` / `chainRestPost()` with failover
-- `apps/api/src/config/env.ts` — add `AXIOME_REST_URLS_FALLBACK` env var
-- `apps/api/src/routes/vault.ts` — replace 4 direct fetch calls
-- `apps/api/src/routes/bets.ts` — replace 2 direct fetch calls
-- `apps/api/src/routes/admin.ts` — replace 4 direct fetch calls
-- `apps/api/src/routes/auth.ts` — replace 2 direct fetch calls
-- `apps/api/src/services/treasury.service.ts` — replace 2 direct fetch calls
-- `apps/api/src/services/indexer.ts` — replace 4 direct fetch calls
-- `apps/api/src/services/relayer.ts` — replace 2 direct fetch calls
-- `apps/api/src/services/background-tasks.ts` — replace 5 direct fetch calls
-- `apps/api/src/services/treasury-sweep.service.ts` — replace 1 direct fetch call
-- `apps/api/src/app.ts` — replace health check fetch
-
----
-
-## PR-6: CometBFT WS Indexer (PENDING)
-
-**Goal:** Replace polling indexer with CometBFT WebSocket subscription for real-time block events.
-**Risk:** MEDIUM. Behind `INDEXER_WS_MODE` feature flag.
-**Rollback:** Set `INDEXER_WS_MODE=false`.
+### Expected Effect
+- Re-renders per second: ~100 (50 timers) → ~50 (still per-card, but memo prevents cascade)
+- Hidden tabs stop polling → -75% background API requests
+- Measurement: React DevTools Profiler, Network tab request count
 
 ---
 
