@@ -27,6 +27,7 @@ import { stringToPath } from '@cosmjs/crypto';
 import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT } from '@coinflip/shared/chain';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { SequenceManager } from './sequence-manager.js';
 import { relayerTxLogService } from './relayer-tx-log.service.js';
 
@@ -143,8 +144,7 @@ export class RelayerService {
       // Only use granter in fees if feegrant is confirmed — otherwise relayer pays its own gas.
       if (this.treasuryAddress) {
         try {
-          const feeUrl = `${env.AXIOME_REST_URL}/cosmos/feegrant/v1beta1/allowance/${this.treasuryAddress}/${this.relayerAddress}`;
-          const feeRes = await fetch(feeUrl, { signal: AbortSignal.timeout(5000) });
+          const feeRes = await chainRest(`/cosmos/feegrant/v1beta1/allowance/${this.treasuryAddress}/${this.relayerAddress}`);
           if (feeRes.ok) {
             this.feeGrantActive = true;
             logger.info(
@@ -358,10 +358,7 @@ export class RelayerService {
         while (Date.now() - pollStartTime < maxPollMs) {
           await new Promise(r => setTimeout(r, pollIntervalMs));
           try {
-            const txRes = await fetch(
-              `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
-              { signal: AbortSignal.timeout(5000) },
-            );
+            const txRes = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`);
             if (txRes.ok) {
               const txData = await txRes.json() as {
                 tx_response?: {

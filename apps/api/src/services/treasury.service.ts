@@ -3,6 +3,7 @@ import { treasuryLedger, bets, users } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { relayerService } from './relayer.js';
 import { Errors } from '../lib/errors.js';
 
@@ -26,9 +27,8 @@ export class TreasuryService {
     let vaultLocked = '0';
     try {
       const query = btoa(JSON.stringify({ vault_balance: { address: treasuryAddr } }));
-      const res = await fetch(
-        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-        { signal: AbortSignal.timeout(5000) },
+      const res = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
       );
       if (res.ok) {
         const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -43,9 +43,8 @@ export class TreasuryService {
     let walletBalance = '0';
     try {
       const query = btoa(JSON.stringify({ balance: { address: treasuryAddr } }));
-      const res = await fetch(
-        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
-        { signal: AbortSignal.timeout(5000) },
+      const res = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
       );
       if (res.ok) {
         const data = (await res.json()) as { data: { balance: string } };

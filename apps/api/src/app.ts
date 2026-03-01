@@ -22,6 +22,7 @@ import { ipRateLimit } from './middleware/rate-limit.js';
 import { maintenanceMiddleware } from './middleware/maintenance.js';
 import { configService } from './services/config.service.js';
 import { env } from './config/env.js';
+import { chainRest } from './lib/chain-fetch.js';
 import { getDb } from './lib/db.js';
 import { sql } from 'drizzle-orm';
 import { logger } from './lib/logger.js';
@@ -62,7 +63,7 @@ app.get('/health', async (c) => {
 
   // Chain RPC check
   try {
-    const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/base/tendermint/v1beta1/syncing`, {
+    const res = await chainRest('/cosmos/base/tendermint/v1beta1/syncing', {
       signal: AbortSignal.timeout(3000),
     });
     checks.chain = res.ok ? 'ok' : 'error';

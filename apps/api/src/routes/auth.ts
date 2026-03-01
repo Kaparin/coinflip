@@ -7,6 +7,7 @@ import { userService } from '../services/user.service.js';
 import { referralService } from '../services/referral.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { env } from '../config/env.js';
 import { chainCached } from '../lib/chain-cache.js';
 import {
@@ -295,8 +296,7 @@ authRouter.get('/grants', authMiddleware, async (c) => {
     const authzResult = await chainCached(
       'grants:' + address,
       async () => {
-        const grantsUrl = `${env.AXIOME_REST_URL}/cosmos/authz/v1beta1/grants?granter=${address}&grantee=${env.RELAYER_ADDRESS}&msg_type_url=/cosmwasm.wasm.v1.MsgExecuteContract`;
-        const grantsRes = await fetch(grantsUrl, { signal: AbortSignal.timeout(5000) });
+        const grantsRes = await chainRest(`/cosmos/authz/v1beta1/grants?granter=${address}&grantee=${env.RELAYER_ADDRESS}&msg_type_url=/cosmwasm.wasm.v1.MsgExecuteContract`);
         if (!grantsRes.ok) return { authzGranted: false, authzExpiresAt: null };
         const grantsData = (await grantsRes.json()) as {
           grants?: Array<{ expiration?: string; authorization?: { type_url: string } }>;
@@ -317,8 +317,7 @@ authRouter.get('/grants', authMiddleware, async (c) => {
 
   // Query chain for feegrant: granter=treasury, grantee=relayer
   try {
-    const feeUrl = `${env.AXIOME_REST_URL}/cosmos/feegrant/v1beta1/allowance/${env.TREASURY_ADDRESS}/${env.RELAYER_ADDRESS}`;
-    const feeRes = await fetch(feeUrl, { signal: AbortSignal.timeout(5000) });
+    const feeRes = await chainRest(`/cosmos/feegrant/v1beta1/allowance/${env.TREASURY_ADDRESS}/${env.RELAYER_ADDRESS}`);
     if (feeRes.ok) {
       feeGrantActive = true;
     }

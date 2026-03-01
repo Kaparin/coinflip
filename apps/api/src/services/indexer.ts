@@ -16,6 +16,7 @@
 import { StargateClient } from '@cosmjs/stargate';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { wsService } from './ws.service.js';
 import { eventService } from './event.service.js';
 import { referralService } from './referral.service.js';
@@ -144,9 +145,8 @@ export class IndexerService {
       // Cosmos SDK v0.47+ uses `query` param instead of `events`.
       // We filter for our contract in code after fetching all txs at this height.
       const queryStr = encodeURIComponent(`tx.height=${height}`);
-      const response = await fetch(
-        `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs?query=${queryStr}&pagination.limit=100`,
-        { signal: AbortSignal.timeout(5000) },
+      const response = await chainRest(
+        `/cosmos/tx/v1beta1/txs?query=${queryStr}&pagination.limit=100`,
       );
 
       if (!response.ok) return;
@@ -639,9 +639,8 @@ export class IndexerService {
           // Fetch all open bets from chain to match by commitment
           const openQuery = JSON.stringify({ open_bets: { limit: 100 } });
           const openEncoded = Buffer.from(openQuery).toString('base64');
-          const openRes = await fetch(
-            `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${openEncoded}`,
-            { signal: AbortSignal.timeout(5000) },
+          const openRes = await chainRest(
+            `/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${openEncoded}`,
           );
           if (openRes.ok) {
             const openData = await openRes.json() as { data: { bets: Array<{ id: number; commitment: string; status: string }> } };
@@ -668,9 +667,8 @@ export class IndexerService {
                   // Search in a wider range of recent chain bets
                   const allQuery = JSON.stringify({ open_bets: { limit: 200 } });
                   const allEncoded = Buffer.from(allQuery).toString('base64');
-                  const allRes = await fetch(
-                    `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${allEncoded}`,
-                    { signal: AbortSignal.timeout(5000) },
+                  const allRes = await chainRest(
+                    `/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${allEncoded}`,
                   );
                   if (allRes.ok) {
                     const allData = await allRes.json() as { data: { bets: Array<{ id: number; commitment: string }> } };
@@ -727,9 +725,8 @@ export class IndexerService {
           // Query chain for current state of this bet
           const query = JSON.stringify({ bet: { bet_id: Number(bet.betId) } });
           const encoded = Buffer.from(query).toString('base64');
-          const res = await fetch(
-            `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${encoded}`,
-            { signal: AbortSignal.timeout(5000) },
+          const res = await chainRest(
+            `/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${encoded}`,
           );
           if (!res.ok) continue;
 
