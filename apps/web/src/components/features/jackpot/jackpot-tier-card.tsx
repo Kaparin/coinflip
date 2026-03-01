@@ -134,14 +134,30 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
                   {t(`jackpot.tiers.${pool.tierName}`)}
                 </h3>
                 {requiredVip && vipBadgeStyle ? (
-                  <button
-                    type="button"
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setVipInfoOpen(true)}
-                    className={`inline-flex items-center gap-0.5 rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} px-1.5 py-0.5 text-[9px] font-bold ${vipBadgeStyle.text} cursor-pointer`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVipInfoOpen(true); } }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      borderRadius: 9999,
+                      padding: '2px 6px',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      border: 'none',
+                      verticalAlign: 'middle',
+                    }}
+                    className={`bg-gradient-to-r ${vipBadgeStyle.gradient} ${vipBadgeStyle.text}`}
                   >
-                    <Crown size={8} />
+                    <Crown style={{ width: 8, height: 8, flexShrink: 0 }} />
                     <span className="capitalize">{requiredVip}</span>
-                  </button>
+                  </span>
                 ) : null}
               </div>
               <span className="text-[10px] text-[var(--color-text-secondary)]">
