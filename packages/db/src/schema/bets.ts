@@ -48,5 +48,8 @@ export const bets = pgTable(
     index('bets_txhash_create_idx').on(table.txhashCreate),
     index('bets_txhash_accept_idx').on(table.txhashAccept),
     index('bets_commitment_idx').on(table.commitment),
+    // Performance indexes (added in perf audit)
+    index('bets_winner_idx').on(table.winnerUserId),
+    index('bets_payout_desc_idx').on(table.payoutAmount),
   ],
 );
