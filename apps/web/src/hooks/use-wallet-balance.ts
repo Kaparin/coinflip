@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { LAUNCH_CW20_CONTRACT } from '@/lib/constants';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from './use-websocket';
 
 /**
  * Fetch CW20 LAUNCH token balance for a given wallet address.
@@ -30,7 +31,7 @@ export function useWalletBalance(address?: string | null) {
     queryKey: ['wallet-cw20-balance', address],
     queryFn: () => fetchCw20Balance(address!),
     enabled: !!address && !!LAUNCH_CW20_CONTRACT,
-    refetchInterval: 15_000,
+    refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     staleTime: 10_000,
   });
 }

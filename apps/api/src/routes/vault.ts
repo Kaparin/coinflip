@@ -47,7 +47,7 @@ export async function getChainVaultBalance(address: string): Promise<{ available
         return { available: '0', locked: '0' };
       }
     },
-    10_000,
+    30_000,
   );
 }
 
