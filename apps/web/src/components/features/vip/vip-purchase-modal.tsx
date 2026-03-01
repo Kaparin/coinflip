@@ -15,7 +15,7 @@ interface VipPurchaseModalProps {
 }
 
 const tierMeta: Record<string, {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   gradient: string;
   perks: string[];
 }> = {
@@ -99,7 +99,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2 rounded-lg bg-gradient-to-r ${meta.gradient}`}>
-                    <Icon className="h-5 w-5 text-white" />
+                    <Icon size={20} className="text-white" />
                   </div>
                   <div>
                     <h3 className="font-bold capitalize">{config.tier}</h3>

@@ -170,7 +170,7 @@ export function DiamondCustomizationPanel() {
                 }`}
               >
                 <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-red-500">
-                  <Icon className="h-4 w-4 text-white" />
+                  <Icon size={16} className="text-white" />
                 </span>
                 <span className="text-[9px] text-[var(--color-text-secondary)] leading-tight text-center">{t(b.labelKey)}</span>
               </button>

@@ -11,7 +11,7 @@ import { useTranslation } from '@/lib/i18n';
 type VipTier = 'silver' | 'gold' | 'diamond';
 
 const tierMeta: Record<VipTier, {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   gradient: string;
   perks: string[];
 }> = {
@@ -63,7 +63,7 @@ export function VipInfoModal({ open, onClose, tier, context = 'player', jackpotT
         <div className="flex flex-col items-center gap-4">
           {/* Tier icon badge */}
           <div className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${meta.gradient}`}>
-            <Icon className="h-8 w-8 text-white" />
+            <Icon size={32} className="text-white" />
           </div>
 
           {/* Description */}

@@ -57,21 +57,31 @@ export function VipBadge({ tier, badgeIcon, size = 'sm', showLabel = false, onCl
     ? DIAMOND_ICON_MAP[badgeIcon]
     : config.icon;
   const isSm = size === 'sm';
+  const iconPx = isSm ? 10 : 12;
+
+  // Inline styles for font-size and max-height prevent Chrome Android font boosting.
+  // react-icons render SVG with inline `width:1em;height:1em` — Tailwind classes
+  // cannot override inline styles, so we pass `size` in px directly to the Icon.
+  const badgeStyle: React.CSSProperties = {
+    fontSize: isSm ? '10px' : '12px',
+    maxHeight: isSm ? '18px' : '22px',
+  };
 
   const classes = `inline-flex shrink-0 items-center gap-0.5 rounded-full font-bold leading-none ${config.className} ${
-    isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+    isSm ? 'px-1.5 py-0.5' : 'px-2 py-1'
   }${onClick ? ' cursor-pointer' : ''}`;
 
   return (
     <span
       className={classes}
+      style={badgeStyle}
       title={`${config.label} VIP`}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as any); } } : undefined}
     >
-      <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+      <Icon size={iconPx} />
       {showLabel && <span>{config.label}</span>}
     </span>
   );
