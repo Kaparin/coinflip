@@ -122,6 +122,15 @@ export default function GamePage() {
       setEventNotification({ message: t('events.notifications.canceled', { title }), variant: 'error' });
     }
 
+    // Deposit notifications (async mode)
+    if (event.type === 'deposit_confirmed') {
+      addToast('success', t('balance.depositConfirmedWs'));
+    }
+    if (event.type === 'deposit_failed') {
+      const reason = String(data?.reason ?? '');
+      addToast('error', t('balance.depositFailedWs', { reason }));
+    }
+
     // Jackpot notifications
     if (event.type === 'jackpot_won') {
       const tierName = String(data?.tierName ?? '');

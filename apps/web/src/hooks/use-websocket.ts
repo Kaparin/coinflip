@@ -357,6 +357,14 @@ export function useWebSocket({
             case 'event_archived':
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
+            case 'deposit_confirmed':
+              // Async deposit confirmed — force refetch balance (override grace period)
+              scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              break;
+            case 'deposit_failed':
+              // Async deposit failed — refetch to revert optimistic balance update
+              scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              break;
             case 'jackpot_updated':
             case 'jackpot_won':
             case 'jackpot_reset':

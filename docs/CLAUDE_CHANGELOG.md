@@ -37,4 +37,40 @@ Each entry: file, lines changed, why, how to rollback.
 
 ## PR-2: Frontend Render Performance
 
-_(entries will be added as changes are made)_
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/components/features/bets/bet-card.tsx` | Wrapped with `React.memo()` | Prevents cascade re-renders from parent WS events. Each card has own timer; memo ensures only cards with changed props re-render. | Revert commit |
+| `apps/web/src/hooks/use-websocket.ts` | Removed `setLastEvent` state, return `lastEvent: null` hardcoded | Every WS message triggered state update → re-render of GamePage + all children. `lastEvent` was never consumed. | Revert commit |
+| `apps/web/src/components/features/bets/my-bets.tsx` | `useMemo` on filter results (`myOpenBets`, `myAccepting`, `myInProgress`, `myResolved`) | New array refs on every render → child re-renders even when data unchanged. | Revert commit |
+| `apps/web/src/app/game/page.tsx` | `visitedTabs` state + lazy-mount pattern for MyBets/History/Leaderboard | All 4 tabs mounted on load, firing API queries + timers when hidden. Now mount on first visit, stay mounted for scroll. | Revert commit |
+
+---
+
+## PR-3: Async Deposit 202
+
+### Feature Flag
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/api/src/config/env.ts` | Added `DEPOSIT_ASYNC_MODE` env var (default `'false'`) | Controls whether deposit endpoint returns 202 (async) or blocks for confirmation (sync). Safe rollback: just set to `false`. | Remove env var or set to `false` |
+
+### Backend Route
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/api/src/routes/vault.ts` | Extracted `pollTxConfirmation()` helper. When `DEPOSIT_ASYNC_MODE=true`: release inflight guard, spawn background poll, return 202 immediately. Background poll emits `deposit_confirmed`/`deposit_failed` + `balance_updated` via WS. Sync path unchanged. | Deposit endpoint blocked for 5-30s waiting for chain confirmation. Async mode returns in ~2s. | Set `DEPOSIT_ASYNC_MODE=false` or revert commit |
+
+### Shared Types
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `packages/shared/src/types/index.ts` | Added `deposit_confirmed` and `deposit_failed` to `WsEventType` union | New WS events for async deposit notification | Revert commit |
+
+### Frontend
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/hooks/use-websocket.ts` | Added `deposit_confirmed` / `deposit_failed` cases to switch — invalidate balance queries | Frontend needs to refetch balance when async deposit confirms or fails | Revert commit |
+| `apps/web/src/app/game/page.tsx` | Added toast notifications for `deposit_confirmed` and `deposit_failed` events | User needs visual feedback when async deposit completes | Revert commit |
+| `apps/web/src/lib/i18n/en.json` | Added `depositConfirmedWs` and `depositFailedWs` keys | i18n for new toast messages | Revert commit |
+| `apps/web/src/lib/i18n/ru.json` | Added `depositConfirmedWs` and `depositFailedWs` keys | i18n for new toast messages | Revert commit |

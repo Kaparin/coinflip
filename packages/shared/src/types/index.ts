@@ -71,6 +71,8 @@ export type WsEventType =
   | 'jackpot_updated'
   | 'jackpot_won'
   | 'jackpot_reset'
+  | 'deposit_confirmed'
+  | 'deposit_failed'
   | 'announcement';
 
 export type WsEvent = {

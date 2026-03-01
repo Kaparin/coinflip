@@ -223,6 +223,43 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
   });
 });
 
+/** Poll chain REST API for tx confirmation (2s interval, 30s timeout). */
+async function pollTxConfirmation(txHash: string): Promise<{ code: number; rawLog: string; height: number } | null> {
+  const pollStartTime = Date.now();
+  const maxPollMs = 30_000;
+  const pollIntervalMs = 2_000;
+
+  while (Date.now() - pollStartTime < maxPollMs) {
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+    try {
+      const txRes = await fetch(
+        `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (txRes.ok) {
+        const txData = await txRes.json() as {
+          tx_response?: {
+            code: number;
+            raw_log?: string;
+            height?: string;
+          };
+        };
+        if (txData.tx_response) {
+          return {
+            code: txData.tx_response.code,
+            rawLog: txData.tx_response.raw_log ?? '',
+            height: Number(txData.tx_response.height ?? 0),
+          };
+        }
+      }
+    } catch {
+      // Not yet indexed — keep polling
+    }
+  }
+
+  return null;
+}
+
 // POST /api/v1/vault/deposit/broadcast — Broadcast a client-signed deposit tx
 //
 // Optimized deposit flow:
@@ -304,40 +341,61 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
     const txHash = txResponse.txhash;
     logger.info({ txHash, address }, 'Deposit tx in mempool (sync broadcast)');
 
-    // Step 2: Poll for block inclusion (same as relayer: 2s interval, 30s timeout)
-    const pollStartTime = Date.now();
-    const maxPollMs = 30_000;
-    const pollIntervalMs = 2_000;
-    let txResult: { code: number; rawLog: string; height: number } | null = null;
+    // ── Async mode: return 202 immediately, poll in background ──
+    if (env.DEPOSIT_ASYNC_MODE === 'true') {
+      // Release inflight guard immediately so the user can do other operations
+      releaseInflight(address);
 
-    while (Date.now() - pollStartTime < maxPollMs) {
-      await new Promise(r => setTimeout(r, pollIntervalMs));
-      try {
-        const txRes = await fetch(
-          `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
-          { signal: AbortSignal.timeout(5000) },
-        );
-        if (txRes.ok) {
-          const txData = await txRes.json() as {
-            tx_response?: {
-              code: number;
-              raw_log?: string;
-              height?: string;
-            };
-          };
-          if (txData.tx_response) {
-            txResult = {
-              code: txData.tx_response.code,
-              rawLog: txData.tx_response.raw_log ?? '',
-              height: Number(txData.tx_response.height ?? 0),
-            };
-            break;
+      // Background polling — fire-and-forget
+      (async () => {
+        try {
+          const result = await pollTxConfirmation(txHash);
+          if (!result) {
+            logger.warn({ txHash, address }, 'Async deposit poll timeout — still in mempool');
+            // Don't emit failure — tx may still confirm via indexer
+            return;
           }
+          if (result.code !== 0) {
+            logger.error({ txHash, address, rawLog: result.rawLog }, 'Async deposit failed on chain');
+            wsService.sendToAddress(address, {
+              type: 'deposit_failed',
+              data: { tx_hash: txHash, reason: result.rawLog },
+            });
+            return;
+          }
+          logger.info({ txHash, address, height: result.height }, 'Async deposit confirmed on chain');
+          invalidateBalanceCache(address);
+          const chainBalance = await getChainVaultBalance(address);
+          await vaultService.syncBalanceFromChain(
+            user.id,
+            chainBalance.available,
+            chainBalance.locked,
+            BigInt(result.height),
+          );
+          wsService.sendToAddress(address, {
+            type: 'deposit_confirmed',
+            data: { tx_hash: txHash, height: result.height },
+          });
+          wsService.sendToAddress(address, {
+            type: 'balance_updated',
+            data: { available: chainBalance.available, locked: chainBalance.locked },
+          });
+        } catch (err) {
+          logger.error({ err, txHash, address }, 'Async deposit background poll error');
         }
-      } catch {
-        // Not yet indexed — keep polling
-      }
+      })();
+
+      return c.json({
+        data: {
+          status: 'pending',
+          tx_hash: txHash,
+          message: 'Transaction submitted. You will be notified when confirmed.',
+        },
+      }, 202);
     }
+
+    // ── Sync mode (default): poll inline, return when confirmed ──
+    const txResult = await pollTxConfirmation(txHash);
 
     if (!txResult) {
       // Tx is in mempool but not confirmed within timeout — still likely to succeed

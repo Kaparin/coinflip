@@ -98,6 +98,8 @@
     "depositInProgress": "Deposit in progress",
     "depositDoNotClose": "Don't close this window. Your transaction is being processed.",
     "depositEstimate": "This usually takes 10 seconds to 1 minute, please be patient",
+    "depositConfirmedWs": "Deposit confirmed on chain!",
+    "depositFailedWs": "Deposit failed: {reason}",
     "withdrawInProgress": "Withdrawal in progress",
     "withdrawSuccess": "Withdrawal Successful!",
     "withdrawTitle": "Withdraw COIN",
