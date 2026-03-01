@@ -43,6 +43,12 @@ referralRouter.get('/platform-stats', async (c) => {
   }
 });
 
+// GET /api/v1/referral/config — Public: referral reward config (dynamic from platform_config)
+referralRouter.get('/config', async (c) => {
+  const config = await referralService.getPublicConfig();
+  return c.json({ data: config });
+});
+
 // GET /api/v1/referral/code — Get or create referral code
 referralRouter.get('/code', authMiddleware, async (c) => {
   const userId = c.get('user').id;

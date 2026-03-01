@@ -8,7 +8,8 @@ import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
-import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use-referral';
+import { useReferral, fetchPlatformStats, fetchReferralConfig, type PlatformStats, type ReferralConfig } from '@/hooks/use-referral';
+import { COMMISSION_BPS } from '@coinflip/shared/constants';
 import { UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipBadge } from '@/components/ui/vip-badge';
@@ -656,11 +657,13 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const { code, stats, claiming, claim, shareUrl } = useReferral(isConnected);
   const [linkCopied, setLinkCopied] = useState(false);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [refConfig, setRefConfig] = useState<ReferralConfig | null>(null);
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     fetchPlatformStats().then(setPlatformStats);
+    fetchReferralConfig().then(setRefConfig);
   }, []);
 
   const copyLink = useCallback(() => {
@@ -694,10 +697,24 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const unclaimedAmount = stats?.balance?.unclaimed ? BigInt(stats.balance.unclaimed) : 0n;
   const totalEarnedAmount = stats?.balance?.totalEarned ? BigInt(stats.balance.totalEarned) : 0n;
 
+  // Dynamic referral config from platform_config (fallback to defaults)
+  const l1Bps = refConfig?.level1Bps ?? 300;
+  const l2Bps = refConfig?.level2Bps ?? 150;
+  const l3Bps = refConfig?.level3Bps ?? 50;
+  const totalRefBps = l1Bps + l2Bps + l3Bps;
+  const bpsToPercent = (bps: number) => {
+    const p = bps / 100;
+    return p % 1 === 0 ? `${p}%` : `${p}%`;
+  };
+  const bpsToCommPercent = (bps: number) => {
+    const p = (bps / COMMISSION_BPS) * 100;
+    return `${Math.round(p * 10) / 10}%`;
+  };
+
   const LEVELS = [
-    { level: 1, pct: '3%', commPct: '30%', color: 'from-violet-500 to-indigo-500', bgColor: 'bg-violet-500/10', textColor: 'text-violet-400', borderColor: 'border-violet-500/30' },
-    { level: 2, pct: '1.5%', commPct: '15%', color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-500/10', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
-    { level: 3, pct: '0.5%', commPct: '5%', color: 'from-teal-500 to-emerald-500', bgColor: 'bg-teal-500/10', textColor: 'text-teal-400', borderColor: 'border-teal-500/30' },
+    { level: 1, pct: bpsToPercent(l1Bps), commPct: bpsToCommPercent(l1Bps), color: 'from-violet-500 to-indigo-500', bgColor: 'bg-violet-500/10', textColor: 'text-violet-400', borderColor: 'border-violet-500/30' },
+    { level: 2, pct: bpsToPercent(l2Bps), commPct: bpsToCommPercent(l2Bps), color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-500/10', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
+    { level: 3, pct: bpsToPercent(l3Bps), commPct: bpsToCommPercent(l3Bps), color: 'from-teal-500 to-emerald-500', bgColor: 'bg-teal-500/10', textColor: 'text-teal-400', borderColor: 'border-teal-500/30' },
   ];
 
   return (
@@ -799,9 +816,9 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">5%</p>
+                    <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">{bpsToPercent(COMMISSION_BPS - totalRefBps)}</p>
                     <p className="text-[9px] text-[var(--color-text-secondary)]">
-                      {t('referral.ofPot')} (50% {t('referral.ofCommission')})
+                      {t('referral.ofPot')} ({bpsToCommPercent(COMMISSION_BPS - totalRefBps)} {t('referral.ofCommission')})
                     </p>
                   </div>
                 </div>
@@ -815,30 +832,43 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
               <p className="text-[11px] text-[var(--color-text-secondary)] mb-2 leading-relaxed">
                 {t('referral.exampleDesc')}
               </p>
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
-                  <span className="font-bold">180 COIN <span className="text-[var(--color-text-secondary)] font-normal">(90%)</span></span>
-                </div>
-                <div className="h-px bg-[var(--color-border)]" />
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-violet-400">{t('referral.exampleL1')}</span>
-                  <span className="font-bold text-violet-400">6 COIN <span className="text-[var(--color-text-secondary)] font-normal">(3%)</span></span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-blue-400">{t('referral.exampleL2')}</span>
-                  <span className="font-bold text-blue-400">3 COIN <span className="text-[var(--color-text-secondary)] font-normal">(1.5%)</span></span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-teal-400">{t('referral.exampleL3')}</span>
-                  <span className="font-bold text-teal-400">1 COIN <span className="text-[var(--color-text-secondary)] font-normal">(0.5%)</span></span>
-                </div>
-                <div className="h-px bg-[var(--color-border)]" />
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
-                  <span className="font-bold text-[var(--color-text-secondary)]">10 COIN <span className="font-normal">(5%)</span></span>
-                </div>
-              </div>
+              {(() => {
+                // Example: 100 COIN bet → 200 COIN pot, 10% commission = 20 COIN
+                const pot = 200;
+                const commission = pot * COMMISSION_BPS / 10000;
+                const winnerPayout = pot - commission;
+                const exL1 = pot * l1Bps / 10000;
+                const exL2 = pot * l2Bps / 10000;
+                const exL3 = pot * l3Bps / 10000;
+                const exPlatform = commission - exL1 - exL2 - exL3;
+                const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1);
+                return (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
+                      <span className="font-bold">{fmt(winnerPayout)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({fmt(100 - COMMISSION_BPS / 100)}%)</span></span>
+                    </div>
+                    <div className="h-px bg-[var(--color-border)]" />
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-violet-400">{t('referral.exampleL1')}</span>
+                      <span className="font-bold text-violet-400">{fmt(exL1)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l1Bps)})</span></span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-blue-400">{t('referral.exampleL2')}</span>
+                      <span className="font-bold text-blue-400">{fmt(exL2)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l2Bps)})</span></span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-teal-400">{t('referral.exampleL3')}</span>
+                      <span className="font-bold text-teal-400">{fmt(exL3)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l3Bps)})</span></span>
+                    </div>
+                    <div className="h-px bg-[var(--color-border)]" />
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
+                      <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} COIN <span className="font-normal">({bpsToPercent(COMMISSION_BPS - totalRefBps)})</span></span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <p className="mt-2 text-[10px] text-[var(--color-text-secondary)] leading-relaxed">

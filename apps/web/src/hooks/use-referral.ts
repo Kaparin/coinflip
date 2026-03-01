@@ -245,6 +245,26 @@ export function useReferral(isConnected: boolean) {
   return { code, stats, rewards, loading, claiming, claim, refresh, shareUrl };
 }
 
+/** Referral config from platform_config table. Public, no auth. */
+export interface ReferralConfig {
+  level1Bps: number;
+  level2Bps: number;
+  level3Bps: number;
+  maxBps: number;
+  changeBranchCostMicro: string;
+}
+
+export async function fetchReferralConfig(): Promise<ReferralConfig | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/referral/config`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Platform stats for transparency: treasury vault + total referral paid. Public, no auth. */
 export interface PlatformStats {
   treasuryVaultAvailable: string;

@@ -9,6 +9,7 @@ import { VipBadge } from '@/components/ui/vip-badge';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipInfoModal } from '@/components/features/vip/vip-info-modal';
 import { useTranslation } from '@/lib/i18n';
+import { feedback } from '@/lib/feedback';
 import Link from 'next/link';
 
 export interface BetCardProps {
@@ -412,7 +413,7 @@ export const BetCard = memo(function BetCard({
           ) : (
             <button
               type="button"
-              onClick={() => onAccept(id)}
+              onClick={() => { feedback('tap'); onAccept(id); }}
               className="w-full rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] min-h-[40px]"
             >
               {t('bets.acceptFlip')}

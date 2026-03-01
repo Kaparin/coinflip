@@ -719,9 +719,9 @@
     "claimSuccess": "Rewards sent to your wallet!",
     "claimFailed": "Failed to claim rewards. Please try again.",
     "level": "Level {level}",
-    "levelDesc1": "Direct invite — 3% of pot",
-    "levelDesc2": "Level 2 — 1.5% of pot",
-    "levelDesc3": "Level 3 — 0.5% of pot",
+    "levelDesc1": "Direct invite",
+    "levelDesc2": "Level 2 referral",
+    "levelDesc3": "Level 3 referral",
     "levelWho1": "Your direct invite",
     "levelWho2": "Invited by your invite",
     "levelWho3": "3rd generation",
@@ -1101,5 +1101,11 @@
     "yourRaffle": "Your raffle",
     "onlyYouSee": "Only you can see this",
     "refund": "Refund"
+  },
+  "settings": {
+    "sound": "Sound",
+    "haptics": "Vibration",
+    "on": "On",
+    "off": "Off"
   }
 }

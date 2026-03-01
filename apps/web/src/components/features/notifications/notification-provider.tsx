@@ -7,6 +7,7 @@ import { JackpotWinModal } from './jackpot-win-modal';
 import { AnnouncementModal } from './announcement-modal';
 import { EventStartModal } from './event-start-modal';
 import type { WsEvent } from '@coinflip/shared/types';
+import { feedback } from '@/lib/feedback';
 
 interface NotificationContextValue {
   /** Push a WS event to be processed as a potential notification */
@@ -153,6 +154,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const [next, ...rest] = queue;
     setCurrent(next!);
     setQueue(rest);
+    // Play feedback when showing a notification
+    if (next!.type === 'jackpot_won') {
+      feedback('jackpot');
+    } else {
+      feedback('notification');
+    }
   }, [current, queue]);
 
   const handleDismiss = useCallback(() => {

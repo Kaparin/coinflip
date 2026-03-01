@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart, Volume2, VolumeX, Vibrate, SmartphoneNfc } from 'lucide-react';
 import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -17,6 +17,8 @@ import { useTranslation } from '@/lib/i18n';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
+import { soundManager } from '@/lib/sounds';
+import { haptics } from '@/lib/haptics';
 
 export function Header() {
   const { t, locale, setLocale } = useTranslation();
@@ -46,6 +48,20 @@ export function Header() {
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => soundManager.isEnabled());
+  const [hapticsOn, setHapticsOn] = useState(() => haptics.isEnabled());
+
+  const toggleSound = useCallback(() => {
+    const next = !soundOn;
+    setSoundOn(next);
+    soundManager.setEnabled(next);
+  }, [soundOn]);
+
+  const toggleHaptics = useCallback(() => {
+    const next = !hapticsOn;
+    setHapticsOn(next);
+    haptics.setEnabled(next);
+  }, [hapticsOn]);
 
   const balance = balanceData?.data;
   const rawAvailable = BigInt(balance?.available ?? '0');
@@ -298,6 +314,38 @@ export function Header() {
                       </div>
                     </div>
 
+                    {/* Sound & Haptic toggles */}
+                    <div className="px-4 py-2.5 border-b border-[var(--color-border)] space-y-2">
+                      <div className="flex items-center gap-2">
+                        {soundOn ? <Volume2 size={16} className="text-[var(--color-text-secondary)]" /> : <VolumeX size={16} className="text-[var(--color-text-secondary)]" />}
+                        <span className="flex-1 text-xs">{t('settings.sound')}</span>
+                        <div className="flex rounded-lg bg-[var(--color-bg)] p-0.5 text-[10px] font-bold">
+                          <button type="button" onClick={toggleSound}
+                            className={`rounded-md px-2.5 py-1.5 transition-colors ${soundOn ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            {t('settings.on')}
+                          </button>
+                          <button type="button" onClick={toggleSound}
+                            className={`rounded-md px-2.5 py-1.5 transition-colors ${!soundOn ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            {t('settings.off')}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hapticsOn ? <Vibrate size={16} className="text-[var(--color-text-secondary)]" /> : <SmartphoneNfc size={16} className="text-[var(--color-text-secondary)]" />}
+                        <span className="flex-1 text-xs">{t('settings.haptics')}</span>
+                        <div className="flex rounded-lg bg-[var(--color-bg)] p-0.5 text-[10px] font-bold">
+                          <button type="button" onClick={toggleHaptics}
+                            className={`rounded-md px-2.5 py-1.5 transition-colors ${hapticsOn ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            {t('settings.on')}
+                          </button>
+                          <button type="button" onClick={toggleHaptics}
+                            className={`rounded-md px-2.5 py-1.5 transition-colors ${!hapticsOn ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'}`}>
+                            {t('settings.off')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Saved wallets — quick switch + manage */}
                     <div className="py-1 border-b border-[var(--color-border)]">
                       {wallet.savedWallets.length > 1 && (
@@ -455,6 +503,26 @@ export function Header() {
                     {t('common.admin')}
                   </Link>
                 )}
+              </div>
+
+              {/* Sound & Haptic toggles (mobile) */}
+              <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
+                  {soundOn ? <Volume2 size={14} className="text-[var(--color-text-secondary)]" /> : <VolumeX size={14} className="text-[var(--color-text-secondary)]" />}
+                  <span className="flex-1 text-xs">{t('settings.sound')}</span>
+                  <button type="button" onClick={toggleSound}
+                    className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${soundOn ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)]'}`}>
+                    {soundOn ? t('settings.on') : t('settings.off')}
+                  </button>
+                </div>
+                <div className="flex-1 flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
+                  {hapticsOn ? <Vibrate size={14} className="text-[var(--color-text-secondary)]" /> : <SmartphoneNfc size={14} className="text-[var(--color-text-secondary)]" />}
+                  <span className="flex-1 text-xs">{t('settings.haptics')}</span>
+                  <button type="button" onClick={toggleHaptics}
+                    className={`rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${hapticsOn ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)]'}`}>
+                    {hapticsOn ? t('settings.on') : t('settings.off')}
+                  </button>
+                </div>
               </div>
 
               {/* Saved wallets — quick switch + manage (mobile) */}

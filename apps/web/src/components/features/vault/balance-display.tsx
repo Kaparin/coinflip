@@ -28,6 +28,7 @@ import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTE
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { onDepositEvent } from '@/lib/deposit-status-events';
+import { feedback } from '@/lib/feedback';
 
 /** Deposit presets in human-readable LAUNCH */
 const DEPOSIT_PRESETS = [100, 500, 1000];
@@ -379,6 +380,7 @@ export function BalanceDisplay() {
       onSuccess: () => {
         const microAmount = lastWithdrawMicroRef.current;
         setWithdrawStatus('success');
+        feedback('success');
 
         // Optimistic update: immediately reflect the balance change in UI
         queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
@@ -517,6 +519,7 @@ export function BalanceDisplay() {
       if (depositTxHash && event.txHash && event.txHash !== depositTxHash) return;
       if (event.type === 'confirmed') {
         setDepositStatus('success');
+        feedback('success');
         // Now safe to release grace period and refetch
         clearBalanceGracePeriod();
         setTimeout(() => {
@@ -541,6 +544,7 @@ export function BalanceDisplay() {
     if (depositStatus !== 'pending') return;
     const failsafe = setTimeout(() => {
       setDepositStatus('success');
+      feedback('success');
       clearBalanceGracePeriod();
       queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
       queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
@@ -660,6 +664,7 @@ export function BalanceDisplay() {
         setDepositStep('confirming');
         setDepositTxHash(result.txHash);
         setDepositStatus('success');
+        feedback('success');
 
         // Optimistic update (same as above)
         const depositMicro = toMicroLaunch(parsedHuman);

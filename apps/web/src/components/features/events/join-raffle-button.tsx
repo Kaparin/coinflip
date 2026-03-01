@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useJoinEvent } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
+import { feedback } from '@/lib/feedback';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, Sparkles } from 'lucide-react';
 
@@ -73,7 +74,7 @@ export function JoinRaffleButton({ eventId, hasJoined, eventType, eventStatus }:
     <div className="space-y-2">
       <button
         type="button"
-        onClick={() => join({ eventId })}
+        onClick={() => { feedback('tap'); join({ eventId }); }}
         disabled={isPending}
         className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 text-sm font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] disabled:opacity-50 active:scale-[0.98]"
       >

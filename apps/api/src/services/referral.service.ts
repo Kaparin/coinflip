@@ -52,6 +52,21 @@ export class ReferralService {
   private db = getDb();
 
   /**
+   * Public config: current referral BPS levels + change branch cost.
+   * Used by frontend to display dynamic percentages.
+   */
+  async getPublicConfig() {
+    const config = await getRewardConfig();
+    return {
+      level1Bps: Number(config.bpsByLevel[1]),
+      level2Bps: Number(config.bpsByLevel[2]),
+      level3Bps: Number(config.bpsByLevel[3]),
+      maxBps: Number(config.maxBps),
+      changeBranchCostMicro: CHANGE_BRANCH_COST_MICRO,
+    };
+  }
+
+  /**
    * Get or create a referral code for a user.
    */
   async getOrCreateCode(userId: string): Promise<string> {

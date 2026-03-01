@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from '@/lib/i18n';
+import { feedback } from '@/lib/feedback';
 
 interface CoinFlipAnimationProps {
   result?: 'heads' | 'tails';
@@ -35,17 +36,30 @@ export function CoinFlipAnimation({
   const { t } = useTranslation();
   const [showResult, setShowResult] = useState(false);
   const confetti = useConfetti(20, showResult && isWin === true);
+  const flipSoundPlayed = useRef(false);
 
   useEffect(() => {
     if (isFlipping) {
       setShowResult(false);
+      if (!flipSoundPlayed.current) {
+        feedback('coinFlip');
+        flipSoundPlayed.current = true;
+      }
       const timer = setTimeout(() => {
         setShowResult(true);
         onComplete?.();
       }, 2000);
       return () => clearTimeout(timer);
     }
+    flipSoundPlayed.current = false;
   }, [isFlipping, onComplete]);
+
+  // Play win/lose feedback when result is shown
+  useEffect(() => {
+    if (showResult && isWin !== undefined) {
+      feedback(isWin ? 'win' : 'lose');
+    }
+  }, [showResult, isWin]);
 
   return (
     <div className="relative flex flex-col items-center gap-4 py-6 overflow-hidden">

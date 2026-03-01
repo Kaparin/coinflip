@@ -11,6 +11,8 @@ import {
   useState,
 } from 'react';
 import { Check, X, Info, AlertTriangle } from 'lucide-react';
+import { soundManager } from '@/lib/sounds';
+import { haptics } from '@/lib/haptics';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -98,6 +100,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback(
     (type: ToastType, message: string) => {
       const id = `toast-${++counter}`;
+      // Play feedback based on toast type
+      if (type === 'success') soundManager.play('success');
+      else if (type === 'error') haptics.error();
       setToasts((prev) => {
         // Deduplicate: skip if an identical toast (same type + message) is already visible
         const duplicate = prev.find(
