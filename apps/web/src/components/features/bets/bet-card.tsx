@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
 import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles, Pin } from 'lucide-react';
@@ -216,7 +216,7 @@ const STATUS_CONFIG: Record<string, { textKey: string; color: string; bgClass: s
   timeout_claimed: { textKey: 'bets.timeout', color: 'var(--color-danger)', bgClass: 'bg-red-500/10 text-red-400' },
 };
 
-export function BetCard({
+export const BetCard = memo(function BetCard({
   id, maker, makerNickname, amount, status, createdAt,
   revealDeadline, expiresAt, acceptedAt, winner, acceptor,
   isMine = false, isAcceptor = false, index = 0, pendingBetId, pendingAction,
@@ -494,4 +494,4 @@ export function BetCard({
       )}
     </div>
   );
-}
+});
