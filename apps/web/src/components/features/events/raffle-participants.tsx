@@ -88,10 +88,10 @@ export function RaffleParticipants({ eventId }: RaffleParticipantsProps) {
                   <span className="text-[10px] text-[var(--color-text-secondary)] w-5 text-right shrink-0">
                     {i + 1}
                   </span>
-                  <VipAvatarFrame tier={p.vip_tier as string | null}>
+                  <VipAvatarFrame tier={p.vip_tier as string | null} frameStyle={p.frame_style as string | null}>
                     <UserAvatar address={addr} size={24} />
                   </VipAvatarFrame>
-                  <span className={`text-xs font-medium ${getVipNameClass(p.vip_tier as string | null)}`}>
+                  <span className={`text-xs font-medium ${getVipNameClass(p.vip_tier as string | null, p.name_gradient as string | null)}`}>
                     {nickname ?? shortAddr(addr)}
                     {isCurrentUser && <span className="ml-1 text-amber-400">({t('leaderboard.you')})</span>}
                   </span>

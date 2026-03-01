@@ -135,6 +135,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     prizeTxHash: (w.prizeTxHash as string | null) ?? null,
     nickname: (w.nickname as string | null) ?? null,
     vip_tier: (w.vip_tier as string | null) ?? null,
+    frameStyle: (w.frame_style as string | null) ?? null,
+    nameGradient: (w.name_gradient as string | null) ?? null,
   }));
   const raffleSeed = resultsResponse?.data?.raffleSeed ?? null;
 

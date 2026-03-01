@@ -360,12 +360,15 @@ class EventsService {
         u.address,
         u.profile_nickname AS nickname,
         (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        vc.frame_style,
+        vc.name_gradient,
         ep.status,
         ep.joined_at AS "joinedAt",
         ep.final_rank AS "finalRank",
         ep.prize_amount AS "prizeAmount"
       FROM event_participants ep
       INNER JOIN users u ON u.id = ep.user_id
+      LEFT JOIN vip_customization vc ON vc.user_id = u.id
       WHERE ep.event_id = ${eventId}
       ORDER BY ep.joined_at ASC
       LIMIT ${limit} OFFSET ${offset}
@@ -438,6 +441,8 @@ class EventsService {
         )
         SELECT pb.user_id, u.address, u.profile_nickname AS nickname,
                (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+               vc.frame_style,
+               vc.name_gradient,
                SUM(pb.amount)::text AS turnover,
                SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN 1 ELSE 0 END)::int AS wins,
                (SUM(CASE WHEN pb.winner_user_id = pb.user_id THEN pb.payout ELSE 0 END) - SUM(pb.amount))::text AS profit,
@@ -445,8 +450,9 @@ class EventsService {
                ROW_NUMBER() OVER (ORDER BY ${metricOrderSql}) AS rank
         FROM player_bets pb
         JOIN users u ON u.id = pb.user_id
+        LEFT JOIN vip_customization vc ON vc.user_id = u.id
         WHERE ${participantFilter}
-        GROUP BY pb.user_id, u.id, u.address, u.profile_nickname
+        GROUP BY pb.user_id, u.id, u.address, u.profile_nickname, vc.frame_style, vc.name_gradient
         ORDER BY ${metricOrderSql}
         LIMIT ${limit} OFFSET ${offset}
       `);
@@ -738,9 +744,12 @@ class EventsService {
         ep.prize_amount AS "prizeAmount",
         ep.prize_tx_hash AS "prizeTxHash",
         ep.final_rank AS "finalRank",
-        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier
+        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        vc.frame_style,
+        vc.name_gradient
       FROM event_participants ep
       INNER JOIN users u ON u.id = ep.user_id
+      LEFT JOIN vip_customization vc ON vc.user_id = u.id
       WHERE ep.event_id = ${eventId}
         AND ep.status = 'winner'
       ORDER BY ep.final_rank ASC
@@ -753,6 +762,8 @@ class EventsService {
       prizeTxHash: string | null;
       finalRank: number | null;
       vip_tier: string | null;
+      frame_style: string | null;
+      name_gradient: string | null;
     }>;
   }
 

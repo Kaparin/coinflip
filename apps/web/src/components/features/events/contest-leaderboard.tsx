@@ -94,11 +94,11 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
 
             {/* Player info */}
             <div className="flex items-center gap-2 min-w-0">
-              <VipAvatarFrame tier={entry.vip_tier as string | null}>
+              <VipAvatarFrame tier={entry.vip_tier as string | null} frameStyle={entry.frame_style as string | null}>
                 <UserAvatar address={addr} size={isTopThree ? 28 : 24} />
               </VipAvatarFrame>
               <div className="min-w-0">
-                <p className={`font-medium truncate ${rank === 1 ? 'text-sm' : 'text-xs'} ${getVipNameClass(entry.vip_tier as string | null)}`}>
+                <p className={`font-medium truncate ${rank === 1 ? 'text-sm' : 'text-xs'} ${getVipNameClass(entry.vip_tier as string | null, entry.name_gradient as string | null)}`}>
                   {nickname ?? shortAddr(addr)}
                   {isCurrentUser && <span className="ml-1 text-indigo-400">({t('leaderboard.you')})</span>}
                 </p>

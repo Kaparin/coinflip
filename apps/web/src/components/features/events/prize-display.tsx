@@ -18,6 +18,8 @@ interface WinnerEntry {
   prizeTxHash?: string | null;
   nickname?: string | null;
   vip_tier?: string | null;
+  frameStyle?: string | null;
+  nameGradient?: string | null;
 }
 
 interface PrizeDisplayProps {
@@ -126,7 +128,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                     {/* Avatar or medal */}
                     {winner ? (
                       <div className="relative">
-                        <VipAvatarFrame tier={winner.vip_tier ?? null}>
+                        <VipAvatarFrame tier={winner.vip_tier ?? null} frameStyle={winner.frameStyle}>
                           <UserAvatar address={winner.address} size={config.avatarSize} />
                         </VipAvatarFrame>
                         {winner.prizeTxHash && (
@@ -144,7 +146,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
 
                     {/* Winner name or place label */}
                     {winner ? (
-                      <span className={`text-[10px] font-medium truncate max-w-full text-center ${getVipNameClass(winner.vip_tier ?? null)}`}>
+                      <span className={`text-[10px] font-medium truncate max-w-full text-center ${getVipNameClass(winner.vip_tier ?? null, winner.nameGradient)}`}>
                         {winner.nickname ?? shortAddr(winner.address)}
                       </span>
                     ) : null}
@@ -189,10 +191,10 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                   </div>
                   {winner ? (
                     <div className="flex items-center gap-2 min-w-0">
-                      <VipAvatarFrame tier={winner.vip_tier ?? null}>
+                      <VipAvatarFrame tier={winner.vip_tier ?? null} frameStyle={winner.frameStyle}>
                         <UserAvatar address={winner.address} size={22} />
                       </VipAvatarFrame>
-                      <span className={`text-xs font-medium truncate ${getVipNameClass(winner.vip_tier ?? null)}`}>
+                      <span className={`text-xs font-medium truncate ${getVipNameClass(winner.vip_tier ?? null, winner.nameGradient)}`}>
                         {winner.nickname ?? shortAddr(winner.address)}
                       </span>
                     </div>
