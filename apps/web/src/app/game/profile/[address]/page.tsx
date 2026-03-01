@@ -492,17 +492,17 @@ export default function PlayerProfilePage() {
       {/* Hero card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">
-          <VipAvatarFrame tier={profile.vip_tier} className="relative shrink-0">
+          <VipAvatarFrame tier={profile.vip_tier} frameStyle={(profile as any).vip_customization?.frameStyle} className="relative shrink-0">
             <div className="rounded-full overflow-hidden bg-[var(--color-bg)]">
               <UserAvatar address={profile.address} size={56} />
             </div>
           </VipAvatarFrame>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className={`text-lg font-bold truncate ${getVipNameClass(profile.vip_tier)}`}>
+              <h1 className={`text-lg font-bold truncate ${getVipNameClass(profile.vip_tier, (profile as any).vip_customization?.nameGradient)}`}>
                 {profile.nickname || truncAddr(profile.address)}
               </h1>
-              <VipBadge tier={profile.vip_tier} />
+              <VipBadge tier={profile.vip_tier} badgeIcon={(profile as any).vip_customization?.badgeIcon} />
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-[var(--color-text-secondary)] font-mono truncate">
@@ -850,6 +850,7 @@ export default function PlayerProfilePage() {
               const opponentAddr = isMaker ? bet.acceptor : bet.maker;
               const opponentNick = isMaker ? bet.acceptor_nickname : bet.maker_nickname;
               const opponentVipTier = isMaker ? bet.acceptor_vip_tier : bet.maker_vip_tier;
+              const opponentVipCust = isMaker ? (bet as any).acceptor_vip_customization : (bet as any).maker_vip_customization;
 
               return (
                 <div
@@ -878,10 +879,10 @@ export default function PlayerProfilePage() {
                         href={`/game/profile/${opponentAddr}`}
                         className="flex items-center gap-1 mt-0.5 group/opponent"
                       >
-                        <VipAvatarFrame tier={opponentVipTier}>
+                        <VipAvatarFrame tier={opponentVipTier} frameStyle={opponentVipCust?.frameStyle}>
                           <UserAvatar address={opponentAddr} size={12} />
                         </VipAvatarFrame>
-                        <span className={`text-[10px] text-[var(--color-text-secondary)] group-hover/opponent:text-[var(--color-text)] transition-colors truncate ${getVipNameClass(opponentVipTier)}`}>
+                        <span className={`text-[10px] text-[var(--color-text-secondary)] group-hover/opponent:text-[var(--color-text)] transition-colors truncate ${getVipNameClass(opponentVipTier, opponentVipCust?.nameGradient)}`}>
                           {t('playerProfile.vs')} {opponentNick || truncAddr(opponentAddr)}
                         </span>
                       </Link>

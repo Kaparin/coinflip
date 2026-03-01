@@ -1,9 +1,23 @@
 'use client';
 
-import { GiCutDiamond } from 'react-icons/gi';
+import type { IconType } from 'react-icons';
+import { GiCutDiamond, GiCrown, GiLightningFrequency, GiSpikedDragonHead, GiEagleEmblem, GiSkullCrossedBones, GiFlame, GiCrossedSwords, GiStarShuriken, GiAllSeeingEye } from 'react-icons/gi';
 import { FaCrown, FaStar } from 'react-icons/fa';
 
 type VipTier = 'silver' | 'gold' | 'diamond';
+
+const DIAMOND_ICON_MAP: Record<string, IconType> = {
+  default: GiCutDiamond,
+  crown: GiCrown,
+  lightning: GiLightningFrequency,
+  dragon: GiSpikedDragonHead,
+  phoenix: GiEagleEmblem,
+  skull: GiSkullCrossedBones,
+  flame: GiFlame,
+  sword: GiCrossedSwords,
+  star: GiStarShuriken,
+  eye: GiAllSeeingEye,
+};
 
 const tierConfig: Record<VipTier, {
   label: string;
@@ -29,16 +43,19 @@ const tierConfig: Record<VipTier, {
 
 interface VipBadgeProps {
   tier: string | null | undefined;
+  badgeIcon?: string | null;
   size?: 'sm' | 'md';
   showLabel?: boolean;
   onClick?: (e: React.MouseEvent) => void;
 }
 
-export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipBadgeProps) {
+export function VipBadge({ tier, badgeIcon, size = 'sm', showLabel = false, onClick }: VipBadgeProps) {
   if (!tier || !(tier in tierConfig)) return null;
 
   const config = tierConfig[tier as VipTier];
-  const Icon = config.icon;
+  const Icon = tier === 'diamond' && badgeIcon && badgeIcon !== 'default' && DIAMOND_ICON_MAP[badgeIcon]
+    ? DIAMOND_ICON_MAP[badgeIcon]
+    : config.icon;
   const isSm = size === 'sm';
 
   const classes = `inline-flex shrink-0 items-center gap-0.5 rounded-full font-bold leading-none ${config.className} ${

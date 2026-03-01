@@ -59,6 +59,19 @@ export const betPins = pgTable(
 );
 
 /**
+ * Diamond VIP customization — preset IDs for name gradient, frame style, badge icon.
+ */
+export const vipCustomization = pgTable('vip_customization', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  nameGradient: text('name_gradient').notNull().default('default'),
+  frameStyle: text('frame_style').notNull().default('default'),
+  badgeIcon: text('badge_icon').notNull().default('default'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * Boost usage tracking — one row per boost action, for daily limit enforcement.
  */
 export const boostUsage = pgTable(

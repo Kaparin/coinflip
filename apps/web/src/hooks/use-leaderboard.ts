@@ -12,6 +12,7 @@ export interface LeaderboardEntry {
   total_wagered: string;
   win_rate: number;
   vip_tier: string | null;
+  vip_customization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
 }
 
 type SortBy = 'wins' | 'wagered' | 'win_rate';

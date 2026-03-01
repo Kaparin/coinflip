@@ -289,13 +289,17 @@ export class UserService {
         u.address,
         u.profile_nickname as nickname,
         (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        vc.name_gradient,
+        vc.frame_style,
+        vc.badge_icon,
         count(*)::int as total_bets,
         sum(p.is_win)::int as wins,
         sum(p.amount)::text as total_wagered,
         case when count(*) > 0 then round(sum(p.is_win)::numeric / count(*)::numeric, 4) else 0 end as win_rate
       from participants p
       join users u on u.id = p.user_id
-      group by u.id, u.address, u.profile_nickname
+      left join vip_customization vc on vc.user_id = u.id
+      group by u.id, u.address, u.profile_nickname, vc.name_gradient, vc.frame_style, vc.badge_icon
       having count(*) >= 1
       order by ${
         sortBy === 'wagered'
@@ -312,22 +316,34 @@ export class UserService {
       address: string;
       nickname: string | null;
       vip_tier: string | null;
+      name_gradient: string | null;
+      frame_style: string | null;
+      badge_icon: string | null;
       total_bets: number;
       wins: number;
       total_wagered: string;
       win_rate: string;
     }>;
 
-    return rawRows.map((row, i) => ({
-      rank: i + 1,
-      address: row.address,
-      nickname: row.nickname,
-      vip_tier: row.vip_tier ?? null,
-      total_bets: Number(row.total_bets),
-      wins: Number(row.wins),
-      total_wagered: row.total_wagered ?? '0',
-      win_rate: parseFloat(String(row.win_rate)) || 0,
-    }));
+    return rawRows.map((row, i) => {
+      const vipTier = row.vip_tier ?? null;
+      const hasCustom = vipTier === 'diamond' && (row.name_gradient || row.frame_style || row.badge_icon);
+      return {
+        rank: i + 1,
+        address: row.address,
+        nickname: row.nickname,
+        vip_tier: vipTier,
+        vip_customization: hasCustom ? {
+          nameGradient: row.name_gradient ?? 'default',
+          frameStyle: row.frame_style ?? 'default',
+          badgeIcon: row.badge_icon ?? 'default',
+        } : null,
+        total_bets: Number(row.total_bets),
+        wins: Number(row.wins),
+        total_wagered: row.total_wagered ?? '0',
+        win_rate: parseFloat(String(row.win_rate)) || 0,
+      };
+    });
   }
   /**
    * Get recent resolved bets for a player (public profile) with pagination.
@@ -354,12 +370,20 @@ export class UserService {
           maker.address as maker,
           maker.profile_nickname as maker_nickname,
           (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.maker_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS maker_vip_tier,
+          mvc.name_gradient as maker_name_gradient,
+          mvc.frame_style as maker_frame_style,
+          mvc.badge_icon as maker_badge_icon,
           acceptor.address as acceptor,
           acceptor.profile_nickname as acceptor_nickname,
-          (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.acceptor_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS acceptor_vip_tier
+          (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = b.acceptor_user_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS acceptor_vip_tier,
+          avc.name_gradient as acceptor_name_gradient,
+          avc.frame_style as acceptor_frame_style,
+          avc.badge_icon as acceptor_badge_icon
         from bets b
         join users maker on maker.id = b.maker_user_id
         left join users acceptor on acceptor.id = b.acceptor_user_id
+        left join vip_customization mvc on mvc.user_id = b.maker_user_id
+        left join vip_customization avc on avc.user_id = b.acceptor_user_id
         where (b.maker_user_id = ${userId} or b.acceptor_user_id = ${userId})
           and b.status in ('revealed', 'timeout_claimed')
         order by b.resolved_time desc nulls last
@@ -371,23 +395,39 @@ export class UserService {
     const total = Number(countRows[0]?.total ?? 0);
 
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
-    const bets = rawRows.map((r) => ({
-      id: String(r.id),
-      amount: String(r.amount ?? '0'),
-      payout_amount: String(r.payout_amount ?? '0'),
-      status: String(r.status),
-      resolved_at: r.resolved_time ? String(r.resolved_time) : null,
-      created_at: r.created_time ? String(r.created_time) : null,
-      winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
-      maker_user_id: String(r.maker_user_id),
-      maker: String(r.maker),
-      maker_nickname: r.maker_nickname ? String(r.maker_nickname) : null,
-      maker_vip_tier: r.maker_vip_tier ? String(r.maker_vip_tier) : null,
-      acceptor: r.acceptor ? String(r.acceptor) : null,
-      acceptor_nickname: r.acceptor_nickname ? String(r.acceptor_nickname) : null,
-      acceptor_vip_tier: r.acceptor_vip_tier ? String(r.acceptor_vip_tier) : null,
-      is_win: r.winner_user_id === userId,
-    }));
+    const bets = rawRows.map((r) => {
+      const makerVipTier = r.maker_vip_tier ? String(r.maker_vip_tier) : null;
+      const acceptorVipTier = r.acceptor_vip_tier ? String(r.acceptor_vip_tier) : null;
+      const hasMakerCustom = makerVipTier === 'diamond' && (r.maker_name_gradient || r.maker_frame_style || r.maker_badge_icon);
+      const hasAcceptorCustom = acceptorVipTier === 'diamond' && (r.acceptor_name_gradient || r.acceptor_frame_style || r.acceptor_badge_icon);
+      return {
+        id: String(r.id),
+        amount: String(r.amount ?? '0'),
+        payout_amount: String(r.payout_amount ?? '0'),
+        status: String(r.status),
+        resolved_at: r.resolved_time ? String(r.resolved_time) : null,
+        created_at: r.created_time ? String(r.created_time) : null,
+        winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
+        maker_user_id: String(r.maker_user_id),
+        maker: String(r.maker),
+        maker_nickname: r.maker_nickname ? String(r.maker_nickname) : null,
+        maker_vip_tier: makerVipTier,
+        maker_vip_customization: hasMakerCustom ? {
+          nameGradient: String(r.maker_name_gradient ?? 'default'),
+          frameStyle: String(r.maker_frame_style ?? 'default'),
+          badgeIcon: String(r.maker_badge_icon ?? 'default'),
+        } : null,
+        acceptor: r.acceptor ? String(r.acceptor) : null,
+        acceptor_nickname: r.acceptor_nickname ? String(r.acceptor_nickname) : null,
+        acceptor_vip_tier: acceptorVipTier,
+        acceptor_vip_customization: hasAcceptorCustom ? {
+          nameGradient: String(r.acceptor_name_gradient ?? 'default'),
+          frameStyle: String(r.acceptor_frame_style ?? 'default'),
+          badgeIcon: String(r.acceptor_badge_icon ?? 'default'),
+        } : null,
+        is_win: r.winner_user_id === userId,
+      };
+    });
 
     return { bets, total };
   }
@@ -427,6 +467,7 @@ export class UserService {
     address: string;
     nickname: string | null;
     vip_tier: string | null;
+    vip_customization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
     amount: string;
     payout: string;
     resolved_at: string | null;
@@ -436,11 +477,15 @@ export class UserService {
         u.address,
         u.profile_nickname as nickname,
         (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        vc.name_gradient,
+        vc.frame_style,
+        vc.badge_icon,
         b.amount::text as amount,
         b.payout_amount::text as payout,
         b.resolved_time as resolved_at
       from bets b
       join users u on u.id = b.winner_user_id
+      left join vip_customization vc on vc.user_id = u.id
       where b.status in ('revealed', 'timeout_claimed')
         and b.winner_user_id is not null
         and b.payout_amount is not null
@@ -452,6 +497,9 @@ export class UserService {
       address: string;
       nickname: string | null;
       vip_tier: string | null;
+      name_gradient: string | null;
+      frame_style: string | null;
+      badge_icon: string | null;
       amount: string;
       payout: string;
       resolved_at: string | null;
@@ -459,10 +507,17 @@ export class UserService {
 
     if (!rawRows.length) return null;
     const row = rawRows[0]!;
+    const vipTier = row.vip_tier ?? null;
+    const hasCustom = vipTier === 'diamond' && (row.name_gradient || row.frame_style || row.badge_icon);
     return {
       address: row.address,
       nickname: row.nickname,
-      vip_tier: row.vip_tier ?? null,
+      vip_tier: vipTier,
+      vip_customization: hasCustom ? {
+        nameGradient: row.name_gradient ?? 'default',
+        frameStyle: row.frame_style ?? 'default',
+        badgeIcon: row.badge_icon ?? 'default',
+      } : null,
       amount: row.amount,
       payout: row.payout,
       resolved_at: row.resolved_at ? String(row.resolved_at) : null,

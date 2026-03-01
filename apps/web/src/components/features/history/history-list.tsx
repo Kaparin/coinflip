@@ -68,6 +68,7 @@ function PlayerRow({
   roleLabel,
   isWinner,
   vipTier,
+  vipCustomization,
 }: {
   address: string;
   nickname: string | null;
@@ -75,17 +76,18 @@ function PlayerRow({
   roleLabel: string;
   isWinner?: boolean;
   vipTier?: string | null;
+  vipCustomization?: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
 }) {
   const { t } = useTranslation();
 
   return (
     <Link href={`/game/profile/${address}`} className="flex items-center gap-2.5 group/player" onClick={(e) => e.stopPropagation()}>
-      <VipAvatarFrame tier={vipTier}>
+      <VipAvatarFrame tier={vipTier} frameStyle={vipCustomization?.frameStyle}>
         <UserAvatar address={address} size={28} />
       </VipAvatarFrame>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className={`text-xs font-semibold truncate group-hover/player:text-[var(--color-primary)] transition-colors ${getVipNameClass(vipTier)}`}>
+          <span className={`text-xs font-semibold truncate group-hover/player:text-[var(--color-primary)] transition-colors ${getVipNameClass(vipTier, vipCustomization?.nameGradient)}`}>
             {nickname || truncAddr(address)}
           </span>
           {isYou && (
@@ -123,6 +125,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
             roleLabel={t('history.maker')}
             isWinner={isResolved && bet.winner?.toLowerCase() === bet.maker.toLowerCase()}
             vipTier={(bet as any).maker_vip_tier}
+            vipCustomization={(bet as any).maker_vip_customization}
           />
         </div>
         <div>
@@ -134,6 +137,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
               roleLabel={t('history.acceptorLabel')}
               isWinner={isResolved && bet.winner?.toLowerCase() === bet.acceptor.toLowerCase()}
               vipTier={(bet as any).acceptor_vip_tier}
+              vipCustomization={(bet as any).acceptor_vip_customization}
             />
           ) : (
             <div className="flex items-center gap-2.5">
@@ -322,6 +326,7 @@ function BetHistoryDetail() {
             const opponentAddr = isMaker ? bet.acceptor : bet.maker;
             const opponentNick = isMaker ? bet.acceptor_nickname : bet.maker_nickname;
             const opponentVipTier = isMaker ? (bet as any).acceptor_vip_tier : (bet as any).maker_vip_tier;
+            const opponentVipCust = isMaker ? (bet as any).acceptor_vip_customization : (bet as any).maker_vip_customization;
 
             let IconComponent: typeof Trophy;
             let borderClass: string;
@@ -408,10 +413,10 @@ function BetHistoryDetail() {
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {opponentAddr ? (
                         <Link href={`/game/profile/${opponentAddr}`} className="flex items-center gap-1.5 group/opp" onClick={(e) => e.stopPropagation()}>
-                          <VipAvatarFrame tier={opponentVipTier}>
+                          <VipAvatarFrame tier={opponentVipTier} frameStyle={opponentVipCust?.frameStyle}>
                             <UserAvatar address={opponentAddr} size={14} />
                           </VipAvatarFrame>
-                          <span className={`text-[10px] text-[var(--color-text-secondary)] truncate group-hover/opp:text-[var(--color-primary)] transition-colors ${getVipNameClass(opponentVipTier)}`}>
+                          <span className={`text-[10px] text-[var(--color-text-secondary)] truncate group-hover/opp:text-[var(--color-primary)] transition-colors ${getVipNameClass(opponentVipTier, opponentVipCust?.nameGradient)}`}>
                             {t('history.vs')}{' '}
                             {opponentNick || truncAddr(opponentAddr)}
                           </span>

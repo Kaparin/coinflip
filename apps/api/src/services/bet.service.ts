@@ -412,8 +412,13 @@ export class BetService {
       .limit(limit);
   }
 
-  /** Build a map of userId -> { address, nickname, vipTier } for a list of bets */
-  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, { address: string; nickname: string | null; vipTier: string | null }>> {
+  /** Build a map of userId -> { address, nickname, vipTier, vipCustomization } for a list of bets */
+  async buildAddressMap(betRows: BetRow[]): Promise<Map<string, {
+    address: string;
+    nickname: string | null;
+    vipTier: string | null;
+    vipCustomization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
+  }>> {
     const userIds = new Set<string>();
     for (const bet of betRows) {
       userIds.add(bet.makerUserId);
@@ -430,17 +435,44 @@ export class BetService {
         u.profile_nickname AS nickname,
         (SELECT vs.tier FROM vip_subscriptions vs
          WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL
-         ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier
+         ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
+        vc.name_gradient,
+        vc.frame_style,
+        vc.badge_icon
       FROM users u
+      LEFT JOIN vip_customization vc ON vc.user_id = u.id
       WHERE u.id IN ${sql`(${sql.join(
         [...userIds].map((id) => sql`${id}::uuid`),
         sql`, `,
       )})`}
-    `) as unknown as Array<{ id: string; address: string; nickname: string | null; vip_tier: string | null }>;
+    `) as unknown as Array<{
+      id: string;
+      address: string;
+      nickname: string | null;
+      vip_tier: string | null;
+      name_gradient: string | null;
+      frame_style: string | null;
+      badge_icon: string | null;
+    }>;
 
-    const map = new Map<string, { address: string; nickname: string | null; vipTier: string | null }>();
+    const map = new Map<string, {
+      address: string;
+      nickname: string | null;
+      vipTier: string | null;
+      vipCustomization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
+    }>();
     for (const u of userRows) {
-      map.set(u.id, { address: u.address, nickname: u.nickname, vipTier: u.vip_tier });
+      const hasCustom = u.vip_tier === 'diamond' && (u.name_gradient || u.frame_style || u.badge_icon);
+      map.set(u.id, {
+        address: u.address,
+        nickname: u.nickname,
+        vipTier: u.vip_tier,
+        vipCustomization: hasCustom ? {
+          nameGradient: u.name_gradient ?? 'default',
+          frameStyle: u.frame_style ?? 'default',
+          badgeIcon: u.badge_icon ?? 'default',
+        } : null,
+      });
     }
     return map;
   }

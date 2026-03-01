@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { PurchaseVipRequestSchema, BoostBetRequestSchema, PinBetRequestSchema } from '@coinflip/shared/schemas';
+import { VipCustomizationSchema } from '@coinflip/shared/vip-customization';
 import { authMiddleware } from '../middleware/auth.js';
 import { vipService } from '../services/vip.service.js';
 import { pinService } from '../services/pin.service.js';
@@ -32,6 +33,28 @@ vipRouter.get('/status', authMiddleware, async (c) => {
     boostsUsedToday: boostInfo.used,
     boostLimit: boostInfo.limit,
   });
+});
+
+// GET /vip/customization — get Diamond VIP customization
+vipRouter.get('/customization', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const customization = await vipService.getCustomization(user.id);
+  return c.json(customization);
+});
+
+// PATCH /vip/customization — update Diamond VIP customization
+vipRouter.patch('/customization', authMiddleware, zValidator('json', VipCustomizationSchema), async (c) => {
+  const user = c.get('user');
+  const data = c.req.valid('json');
+
+  // Diamond-tier guard
+  const vip = await vipService.getActiveVip(user.id);
+  if (!vip || vip.tier !== 'diamond') {
+    throw Errors.validationError('Diamond VIP subscription required');
+  }
+
+  const updated = await vipService.updateCustomization(user.id, data);
+  return c.json(updated);
 });
 
 // POST /vip/purchase — buy VIP subscription

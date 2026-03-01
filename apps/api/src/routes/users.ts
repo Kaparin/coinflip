@@ -7,6 +7,7 @@ import { authMiddleware, optionalAuthMiddleware, evictUserCache } from '../middl
 import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { announcementService } from '../services/announcement.service.js';
+import { vipService } from '../services/vip.service.js';
 import { getDb } from '../lib/db.js';
 import { Errors } from '../lib/errors.js';
 import { verifyTelegramLogin } from '../lib/telegram-auth.js';
@@ -235,6 +236,9 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       .limit(10),
   ]);
 
+  // Fetch Diamond customization if applicable
+  const vipCustom = vipTier === 'diamond' ? await vipService.getCustomization(user.id) : null;
+
   // H2H stats + viewer's own reaction if authenticated
   let h2h: { total_games: number; your_wins: number; their_wins: number } | null = null;
   let myReaction: string | null = null;
@@ -252,6 +256,7 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       nickname: user.profileNickname,
       avatar_url: user.avatarUrl,
       vip_tier: vipTier,
+      vip_customization: vipCustom,
       created_at: user.createdAt.toISOString(),
       stats,
       recent_bets: recentBetsResult.bets,

@@ -140,3 +140,40 @@ export function usePinSlots() {
     refetchInterval: 30_000,
   });
 }
+
+// ─── Diamond Customization ───────────────────────────
+
+export interface VipCustomization {
+  nameGradient: string;
+  frameStyle: string;
+  badgeIcon: string;
+}
+
+/** Get current Diamond VIP customization */
+export function useVipCustomization(enabled = true) {
+  return useQuery({
+    queryKey: ['/api/v1/vip/customization'],
+    queryFn: async (): Promise<VipCustomization> => {
+      return vipFetch<VipCustomization>('/api/v1/vip/customization');
+    },
+    staleTime: 60_000,
+    enabled,
+  });
+}
+
+/** Update Diamond VIP customization */
+export function useUpdateVipCustomization() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<VipCustomization>) => {
+      return vipFetch<VipCustomization>('/api/v1/vip/customization', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (result) => {
+      qc.setQueryData(['/api/v1/vip/customization'], result);
+      qc.invalidateQueries({ queryKey: ['/api/v1/bets'] });
+    },
+  });
+}

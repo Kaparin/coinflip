@@ -1,7 +1,8 @@
 import type { BetRow } from '../services/bet.service.js';
 import { REVEAL_TIMEOUT_SECS, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 
-type UserInfo = { address: string; nickname: string | null; vipTier?: string | null };
+type VipCust = { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
+type UserInfo = { address: string; nickname: string | null; vipTier?: string | null; vipCustomization?: VipCust };
 
 /** Format a DB bet row into the API response shape */
 export function formatBetResponse(
@@ -50,6 +51,8 @@ export function formatBetResponse(
 
     maker_vip_tier: makerInfo?.vipTier ?? null,
     acceptor_vip_tier: acceptorInfo?.vipTier ?? null,
+    maker_vip_customization: makerInfo?.vipCustomization ?? null,
+    acceptor_vip_customization: acceptorInfo?.vipCustomization ?? null,
     is_boosted: extra?.is_boosted ?? (bet as BetRow & { boostedAt?: Date | null }).boostedAt != null,
     is_pinned: extra?.is_pinned ?? false,
     pin_slot: extra?.pin_slot ?? null,

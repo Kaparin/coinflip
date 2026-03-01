@@ -12,7 +12,9 @@ import { useReferral, fetchPlatformStats, type PlatformStats } from '@/hooks/use
 import { UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipBadge } from '@/components/ui/vip-badge';
-import { useVipStatus } from '@/hooks/use-vip';
+import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
+import { GiCutDiamond } from 'react-icons/gi';
+import { DiamondCustomizationPanel } from '@/components/features/vip/diamond-customization-panel';
 import { useToast } from '@/components/ui/toast';
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -1200,6 +1202,8 @@ export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
   const { data: profileData, isLoading: profileLoading } = useGetCurrentUser({ query: { enabled: !!wallet.address, staleTime: 30_000 } });
   const { data: vipStatus } = useVipStatus(!!wallet.address);
+  const isDiamondVip = vipStatus?.active && vipStatus.tier === 'diamond';
+  const { data: vipCustom } = useVipCustomization(!!isDiamondVip);
 
   const isAdmin =
     wallet.isConnected &&
@@ -1292,7 +1296,7 @@ export default function ProfilePage() {
       {/* Profile card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">
-          <VipAvatarFrame tier={vipStatus?.tier} className={`relative shrink-0 ${!vipStatus?.tier ? 'rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]' : ''}`}>
+          <VipAvatarFrame tier={vipStatus?.tier} frameStyle={vipCustom?.frameStyle} className={`relative shrink-0 ${!vipStatus?.tier ? 'rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-[2px]' : ''}`}>
             <div className="rounded-full overflow-hidden bg-[var(--color-bg)]">
               {wallet.address && <UserAvatar address={wallet.address} size={56} />}
             </div>
@@ -1303,9 +1307,9 @@ export default function ProfilePage() {
                 currentNickname={(profileData as any)?.data?.nickname ?? null}
                 address={wallet.address ?? ''}
                 loading={profileLoading}
-                vipNameClass={getVipNameClass(vipStatus?.tier)}
+                vipNameClass={getVipNameClass(vipStatus?.tier, vipCustom?.nameGradient)}
               />
-              <VipBadge tier={vipStatus?.tier} />
+              <VipBadge tier={vipStatus?.tier} badgeIcon={vipCustom?.badgeIcon} />
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
@@ -1332,6 +1336,17 @@ export default function ProfilePage() {
           </Link>
         )}
       </div>
+
+      {/* Diamond VIP Customization */}
+      {isDiamondVip && (
+        <CollapsibleSection
+          title={t('vip.customization.title')}
+          defaultOpen={false}
+          icon={<GiCutDiamond size={20} className="text-purple-400" />}
+        >
+          <DiamondCustomizationPanel />
+        </CollapsibleSection>
+      )}
 
       {/* Telegram */}
       <CollapsibleSection

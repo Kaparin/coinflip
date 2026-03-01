@@ -10,6 +10,7 @@ export interface TopWinner {
   payout: string;
   resolved_at: string | null;
   vip_tier: string | null;
+  vip_customization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
 }
 
 export function useTopWinner() {

@@ -444,6 +444,191 @@ body {
   animation: vip-shimmer 3s linear infinite;
 }
 
+/* ═══ Diamond VIP Custom Name Gradients ═══ */
+
+.vip-name-diamond-fire {
+  background: linear-gradient(90deg, #ff4500, #ff6b00, #ffa500, #ffd700);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-ocean {
+  background: linear-gradient(90deg, #00bfff, #00ced1, #20b2aa, #4682b4, #00bfff);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-aurora {
+  background: linear-gradient(90deg, #00ff87, #60efff, #7b68ee, #00ff87);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-sunset {
+  background: linear-gradient(90deg, #ff6b9d, #ff8c69, #ffa751, #ffd700);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-neon {
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7, #ff2d95, #00d4ff);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 2.5s linear infinite;
+}
+
+.vip-name-diamond-golden {
+  background: linear-gradient(90deg, #ffd700, #daa520, #b8860b, #ffd700);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-ice {
+  background: linear-gradient(90deg, #e8f4fd, #a8d8ea, #6bc5f8, #a8d8ea, #e8f4fd);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+.vip-name-diamond-toxic {
+  background: linear-gradient(90deg, #39ff14, #7fff00, #adff2f, #dfff00, #39ff14);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 2.5s linear infinite;
+}
+
+.vip-name-diamond-blood {
+  background: linear-gradient(90deg, #8b0000, #dc143c, #ff4444, #dc143c, #8b0000);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vip-shimmer 3s linear infinite;
+}
+
+/* ═══ Diamond VIP Custom Frame Styles ═══ */
+
+@keyframes vip-conic-spin {
+  0% { --vip-angle: 0deg; }
+  100% { --vip-angle: 360deg; }
+}
+
+@keyframes vip-conic-spin-fallback {
+  0% { border-color: #ff6b6b; }
+  25% { border-color: #ffd700; }
+  50% { border-color: #50fa7b; }
+  75% { border-color: #bd93f9; }
+  100% { border-color: #ff6b6b; }
+}
+
+@keyframes vip-neon-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(0, 212, 255, 0.5), 0 0 16px 4px rgba(0, 212, 255, 0.2); }
+  50% { box-shadow: 0 0 16px 4px rgba(0, 212, 255, 0.8), 0 0 32px 8px rgba(0, 212, 255, 0.4); }
+}
+
+@keyframes vip-fire-flicker {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 69, 0, 0.5), 0 0 16px 4px rgba(255, 165, 0, 0.3); }
+  33% { box-shadow: 0 0 12px 3px rgba(255, 69, 0, 0.7), 0 0 20px 6px rgba(255, 165, 0, 0.4); }
+  66% { box-shadow: 0 0 6px 1px rgba(255, 69, 0, 0.4), 0 0 12px 3px rgba(255, 165, 0, 0.2); }
+}
+
+@keyframes vip-frost-shimmer {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(168, 216, 234, 0.4), 0 0 16px 4px rgba(107, 197, 248, 0.2); }
+  50% { box-shadow: 0 0 12px 3px rgba(168, 216, 234, 0.7), 0 0 24px 6px rgba(107, 197, 248, 0.4); }
+}
+
+@keyframes vip-plasma-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(138, 43, 226, 0.5), 0 0 16px 4px rgba(75, 0, 130, 0.3); }
+  50% { box-shadow: 0 0 16px 4px rgba(138, 43, 226, 0.8), 0 0 32px 8px rgba(75, 0, 130, 0.5); }
+}
+
+@keyframes vip-solar-glow {
+  0%, 100% { box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.5), 0 0 20px 6px rgba(255, 165, 0, 0.3); }
+  50% { box-shadow: 0 0 20px 6px rgba(255, 215, 0, 0.8), 0 0 40px 10px rgba(255, 165, 0, 0.5); }
+}
+
+@keyframes vip-shadow-pulse {
+  0%, 100% { box-shadow: 0 0 10px 4px rgba(0, 0, 0, 0.6), 0 0 20px 8px rgba(30, 0, 50, 0.3); }
+  50% { box-shadow: 0 0 16px 6px rgba(0, 0, 0, 0.8), 0 0 30px 12px rgba(30, 0, 50, 0.5); }
+}
+
+.vip-frame-diamond-conic-spin {
+  animation: vip-conic-spin-fallback 3s linear infinite;
+  border: 2px solid;
+  border-radius: 50%;
+}
+
+.vip-frame-diamond-double-ring {
+  border: 2px solid rgba(189, 147, 249, 0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(15, 15, 30, 1), 0 0 0 6px rgba(107, 202, 255, 0.7);
+  animation: vip-diamond-rainbow 4s linear infinite;
+}
+
+.vip-frame-diamond-neon-pulse {
+  border: 2px solid rgba(0, 212, 255, 0.7);
+  border-radius: 50%;
+  animation: vip-neon-pulse 2s ease-in-out infinite;
+}
+
+.vip-frame-diamond-fire-ring {
+  border: 2px solid rgba(255, 69, 0, 0.7);
+  border-radius: 50%;
+  animation: vip-fire-flicker 1.5s ease-in-out infinite;
+}
+
+.vip-frame-diamond-frost {
+  border: 2px solid rgba(168, 216, 234, 0.7);
+  border-radius: 50%;
+  animation: vip-frost-shimmer 3s ease-in-out infinite;
+}
+
+.vip-frame-diamond-holographic {
+  animation: vip-conic-spin-fallback 2.5s linear infinite;
+  border: 2px solid;
+  border-radius: 50%;
+  box-shadow: 0 0 8px 2px rgba(189, 147, 249, 0.3);
+}
+
+.vip-frame-diamond-plasma {
+  border: 2px solid rgba(138, 43, 226, 0.7);
+  border-radius: 50%;
+  animation: vip-plasma-pulse 2.5s ease-in-out infinite;
+}
+
+.vip-frame-diamond-solar {
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  border-radius: 50%;
+  animation: vip-solar-glow 2.5s ease-in-out infinite;
+}
+
+.vip-frame-diamond-shadow {
+  border: 2px solid rgba(40, 0, 60, 0.7);
+  border-radius: 50%;
+  animation: vip-shadow-pulse 3s ease-in-out infinite;
+}
+
 /* VIP badge shimmer */
 .vip-badge-shimmer {
   background-size: 200% auto;

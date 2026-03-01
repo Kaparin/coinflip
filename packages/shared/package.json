@@ -9,7 +9,8 @@
     "./constants": "./src/constants.ts",
     "./types": "./src/types/index.ts",
     "./chain": "./src/chain.ts",
-    "./commitment": "./src/commitment.ts"
+    "./commitment": "./src/commitment.ts",
+    "./vip-customization": "./src/vip-customization.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

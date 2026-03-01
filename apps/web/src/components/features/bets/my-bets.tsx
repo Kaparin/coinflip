@@ -302,6 +302,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       isMine={opts?.isMine ?? (bet.maker?.toLowerCase() === addrLower)}
       isAcceptor={(bet as any).acceptor?.toLowerCase() === addrLower}
       makerVipTier={(bet as any).maker_vip_tier}
+      makerVipCustomization={(bet as any).maker_vip_customization}
       isBoosted={!!(bet as any).is_boosted || !!(bet as any).boosted_at}
       isPinned={!!(bet as any).is_pinned}
       pinSlot={(bet as any).pin_slot}

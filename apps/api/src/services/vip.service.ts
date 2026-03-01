@@ -7,7 +7,9 @@
 
 import crypto from 'node:crypto';
 import { eq, sql, and, gt, isNull } from 'drizzle-orm';
-import { vipSubscriptions, vipConfig, boostUsage, treasuryLedger } from '@coinflip/db/schema';
+import { vipSubscriptions, vipConfig, boostUsage, treasuryLedger, vipCustomization } from '@coinflip/db/schema';
+import type { VipCustomization } from '@coinflip/shared/vip-customization';
+import { DEFAULT_VIP_CUSTOMIZATION } from '@coinflip/shared/vip-customization';
 import { VIP_DURATION_DAYS, BOOST_LIMITS } from '@coinflip/shared/constants';
 import type { VipTier } from '@coinflip/shared/constants';
 import { getDb } from '../lib/db.js';
@@ -183,6 +185,57 @@ class VipService {
       price: r.price,
       isActive: r.isActive === 1,
     }));
+  }
+
+  // ─── Customization ─────────────────────────────────
+
+  /** Get Diamond VIP customization for a user (defaults if no record). */
+  async getCustomization(userId: string): Promise<VipCustomization> {
+    const db = getDb();
+    const [row] = await db
+      .select({
+        nameGradient: vipCustomization.nameGradient,
+        frameStyle: vipCustomization.frameStyle,
+        badgeIcon: vipCustomization.badgeIcon,
+      })
+      .from(vipCustomization)
+      .where(eq(vipCustomization.userId, userId))
+      .limit(1);
+
+    if (!row) return { ...DEFAULT_VIP_CUSTOMIZATION };
+
+    return {
+      nameGradient: row.nameGradient as VipCustomization['nameGradient'],
+      frameStyle: row.frameStyle as VipCustomization['frameStyle'],
+      badgeIcon: row.badgeIcon as VipCustomization['badgeIcon'],
+    };
+  }
+
+  /** Update Diamond VIP customization (upsert). */
+  async updateCustomization(userId: string, data: Partial<VipCustomization>): Promise<VipCustomization> {
+    const db = getDb();
+    const current = await this.getCustomization(userId);
+    const merged = { ...current, ...data };
+
+    await db
+      .insert(vipCustomization)
+      .values({
+        userId,
+        nameGradient: merged.nameGradient,
+        frameStyle: merged.frameStyle,
+        badgeIcon: merged.badgeIcon,
+      })
+      .onConflictDoUpdate({
+        target: vipCustomization.userId,
+        set: {
+          nameGradient: merged.nameGradient,
+          frameStyle: merged.frameStyle,
+          badgeIcon: merged.badgeIcon,
+          updatedAt: new Date(),
+        },
+      });
+
+    return merged;
   }
 
   // ─── Admin Methods ──────────────────────────────────

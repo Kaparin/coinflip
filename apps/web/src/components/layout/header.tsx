@@ -10,7 +10,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
 import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
-import { useVipStatus } from '@/hooks/use-vip';
+import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { ADMIN_ADDRESS, EXPLORER_URL, PRESALE_CONTRACT } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
@@ -36,6 +36,8 @@ export function Header() {
   const { data: nativeBalanceRaw } = useNativeBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
+  const isDiamond = vipStatus?.active && vipStatus.tier === 'diamond';
+  const { data: vipCustom } = useVipCustomization(!!isDiamond);
   const { data: currentUserData } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
   const userNickname = (currentUserData as any)?.data?.nickname as string | null;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -214,7 +216,7 @@ export function Header() {
                 <button type="button" onClick={() => setWalletDropdownOpen(!walletDropdownOpen)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]">
                   {wallet.address && (
-                    <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null}>
+                    <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null} frameStyle={vipCustom?.frameStyle}>
                       <UserAvatar address={wallet.address} size={24} />
                     </VipAvatarFrame>
                   )}
@@ -231,7 +233,7 @@ export function Header() {
                     <div className="px-4 py-3 border-b border-[var(--color-border)]">
                       <div className="flex items-center gap-3">
                         {wallet.address && (
-                          <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null}>
+                          <VipAvatarFrame tier={vipStatus?.active ? vipStatus.tier : null} frameStyle={vipCustom?.frameStyle}>
                             <UserAvatar address={wallet.address} size={36} />
                           </VipAvatarFrame>
                         )}

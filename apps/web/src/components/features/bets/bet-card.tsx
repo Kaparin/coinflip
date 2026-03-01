@@ -43,6 +43,8 @@ export interface BetCardProps {
   isAccepting?: boolean;
   /** VIP tier of the maker */
   makerVipTier?: string | null;
+  /** VIP customization of the maker (Diamond only) */
+  makerVipCustomization?: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
   /** Whether this bet is boosted */
   isBoosted?: boolean;
   /** Whether this bet is pinned */
@@ -219,7 +221,7 @@ export function BetCard({
   revealDeadline, expiresAt, acceptedAt, winner, acceptor,
   isMine = false, isAcceptor = false, index = 0, pendingBetId, pendingAction,
   isAccepting: isAcceptingProp = false,
-  makerVipTier, isBoosted, isPinned, pinSlot,
+  makerVipTier, makerVipCustomization, isBoosted, isPinned, pinSlot,
   onAccept, onCancel,
   onBoost, onPin, canBoost: canBoostProp, pinPrice, isBoostPending, isPinPending,
 }: BetCardProps) {
@@ -345,11 +347,11 @@ export function BetCard({
         {/* Middle: Maker + Timer */}
         <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)] mb-2">
           <Link href={`/game/profile/${maker}`} className="flex items-center gap-1.5 min-w-0 group/maker" onClick={(e) => e.stopPropagation()}>
-            <VipAvatarFrame tier={makerVipTier}>
+            <VipAvatarFrame tier={makerVipTier} frameStyle={makerVipCustomization?.frameStyle}>
               <UserAvatar address={maker} size={16} />
             </VipAvatarFrame>
-            <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier)}`}>{makerNickname || truncAddr(maker)}</span>
-            <VipBadge tier={makerVipTier} onClick={makerVipTier ? (e) => { e.preventDefault(); e.stopPropagation(); setVipInfoOpen(true); } : undefined} />
+            <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier, makerVipCustomization?.nameGradient)}`}>{makerNickname || truncAddr(maker)}</span>
+            <VipBadge tier={makerVipTier} badgeIcon={makerVipCustomization?.badgeIcon} onClick={makerVipTier ? (e) => { e.preventDefault(); e.stopPropagation(); setVipInfoOpen(true); } : undefined} />
             {/* Text badges only on cards without action buttons (other people's bets) */}
             {!(onBoost || onPin) && isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">PIN</span>}
             {!(onBoost || onPin) && isBoosted && !isPinned && <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">&uarr;</span>}

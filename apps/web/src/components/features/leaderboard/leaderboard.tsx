@@ -62,11 +62,11 @@ function LeaderboardRow({
 
       {/* Player info */}
       <div className="flex items-center gap-2 min-w-0">
-        <VipAvatarFrame tier={entry.vip_tier}>
+        <VipAvatarFrame tier={entry.vip_tier} frameStyle={entry.vip_customization?.frameStyle}>
           <UserAvatar address={entry.address} size={28} />
         </VipAvatarFrame>
         <div className="min-w-0">
-          <p className={`text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors ${getVipNameClass(entry.vip_tier)}`}>
+          <p className={`text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors ${getVipNameClass(entry.vip_tier, entry.vip_customization?.nameGradient)}`}>
             {entry.nickname || shortAddr(entry.address)}
             {isCurrentUser && (
               <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>
