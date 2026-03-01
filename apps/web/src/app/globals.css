@@ -1,14 +1,19 @@
 @import "tailwindcss";
 
 /* Prevent Chrome Android from auto-inflating text/elements on narrow viewports.
-   Without this, Chrome applies "font boosting" which distorts paddings, borders,
-   and icon sizes — the root cause of VIP badges and other elements rendering
-   as large circles on mobile. Opening DevTools disables this behavior, which is
-   why elements "snap into place" when the inspector activates. */
+   Chrome applies "font boosting" which distorts paddings, borders, and icon sizes —
+   the root cause of VIP badges and other elements rendering as large circles on
+   mobile. text-size-adjust:100% is ignored by Chrome in many cases.
+   The max-height trick is the only reliable fix: Chrome's font boosting algorithm
+   skips any element with an explicit max-height constraint.
+   See: https://nicolasbouliane.com/blog/disabling-font-zooming-chrome-android */
 html {
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+html * {
+  max-height: 1000000px;
 }
 
 :root {

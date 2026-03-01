@@ -139,9 +139,10 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
                     tabIndex={0}
                     onClick={() => setVipInfoOpen(true)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVipInfoOpen(true); } }}
-                    className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} px-1.5 py-0.5 text-[9px] font-bold leading-none ${vipBadgeStyle.text} cursor-pointer`}
+                    className={`inline-flex shrink-0 items-center rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} font-bold leading-none ${vipBadgeStyle.text} cursor-pointer`}
+                    style={{ gap: 2, padding: '2px 6px', fontSize: 9 }}
                   >
-                    <Crown size={8} className="shrink-0" />
+                    <Crown style={{ width: 8, height: 8, flexShrink: 0 }} />
                     <span className="capitalize">{requiredVip}</span>
                   </span>
                 ) : null}
@@ -151,7 +152,7 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
               </span>
             </div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.badge}`}>
+          <span className={`font-bold rounded-full ${style.badge}`} style={{ fontSize: 10, padding: '2px 8px' }}>
             {pool.status === 'filling'
               ? `${pool.progress}%`
               : pool.status === 'drawing'
