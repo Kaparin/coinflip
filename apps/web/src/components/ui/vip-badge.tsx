@@ -7,31 +7,23 @@ type VipTier = 'silver' | 'gold' | 'diamond';
 
 const tierConfig: Record<VipTier, {
   label: string;
-  icon: React.ComponentType<{ style?: React.CSSProperties }>;
-  gradient: string;
-  color: string;
-  shimmer: boolean;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  className: string;
 }> = {
   silver: {
     label: 'Silver',
     icon: FaStar,
-    gradient: 'linear-gradient(to right, #9ca3af, #d1d5db)',
-    color: '#1c1917',
-    shimmer: false,
+    className: 'bg-gradient-to-r from-gray-400 to-gray-300 text-gray-900',
   },
   gold: {
     label: 'Gold',
     icon: FaCrown,
-    gradient: 'linear-gradient(to right, #eab308, #f59e0b)',
-    color: '#78350f',
-    shimmer: true,
+    className: 'bg-gradient-to-r from-yellow-500 to-amber-400 text-amber-900 vip-badge-shimmer',
   },
   diamond: {
     label: 'Diamond',
     icon: GiCutDiamond,
-    gradient: 'linear-gradient(to right, #a855f7, #ec4899, #ef4444)',
-    color: '#ffffff',
-    shimmer: true,
+    className: 'bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white vip-badge-shimmer',
   },
 };
 
@@ -49,45 +41,20 @@ export function VipBadge({ tier, size = 'sm', showLabel = false, onClick }: VipB
   const Icon = config.icon;
   const isSm = size === 'sm';
 
-  const iconPx = isSm ? 10 : 12;
-
-  // All sizing via inline styles — immune to Chrome Android minimum font-size override.
-  const badgeStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 2,
-    borderRadius: 9999,
-    fontWeight: 700,
-    lineHeight: 1,
-    flexShrink: 0,
-    padding: isSm ? '3px 6px' : '4px 8px',
-    fontSize: isSm ? 10 : 12,
-    background: config.gradient,
-    backgroundSize: config.shimmer ? '200% auto' : undefined,
-    animation: config.shimmer ? 'vip-shimmer 2s linear infinite' : undefined,
-    color: config.color,
-    cursor: onClick ? 'pointer' : undefined,
-    border: 'none',
-    margin: 0,
-    verticalAlign: 'middle',
-  };
-
-  const iconStyle: React.CSSProperties = {
-    width: iconPx,
-    height: iconPx,
-    flexShrink: 0,
-  };
+  const classes = `inline-flex shrink-0 items-center gap-0.5 rounded-full font-bold leading-none ${config.className} ${
+    isSm ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+  }${onClick ? ' cursor-pointer' : ''}`;
 
   return (
     <span
-      style={badgeStyle}
+      className={classes}
       title={`${config.label} VIP`}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as any); } } : undefined}
     >
-      <Icon style={iconStyle} />
+      <Icon className={isSm ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
       {showLabel && <span>{config.label}</span>}
     </span>
   );

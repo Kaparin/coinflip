@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Prevent Chrome Android from auto-inflating text/elements on narrow viewports.
+   Without this, Chrome applies "font boosting" which distorts paddings, borders,
+   and icon sizes — the root cause of VIP badges and other elements rendering
+   as large circles on mobile. Opening DevTools disables this behavior, which is
+   why elements "snap into place" when the inspector activates. */
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 :root {
   --color-bg: #0a0a0a;
   --color-surface: #141414;
