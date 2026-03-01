@@ -766,9 +766,16 @@ export function BalanceDisplay() {
             ) : (
               <>
                 <h3 className="text-lg font-bold mb-1">{t('balance.depositTitle')}</h3>
-                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                <p className="text-xs text-[var(--color-text-secondary)] mb-3">
                   {t('balance.depositDesc')}
                 </p>
+
+                <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 mb-3">
+                  <span className="text-xs text-[var(--color-text-secondary)]">{t('balance.walletBalance')}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums">
+                    {fmtNum(walletBalanceHuman)} <LaunchTokenIcon size={36} />
+                  </span>
+                </div>
 
                 <div className="flex gap-2 mb-3">
                   {DEPOSIT_PRESETS.map((preset, i) => (
@@ -782,9 +789,17 @@ export function BalanceDisplay() {
                 </div>
 
                 <div className="mb-3">
-                  <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
+                  <div className="relative">
+                    <input type="text" inputMode="decimal" placeholder={t('balance.amountPlaceholder')} value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 pr-16 text-sm focus:border-[var(--color-primary)] focus:outline-none" />
+                    {walletBalanceHuman > 0 && (
+                      <button type="button" onClick={() => setDepositAmount(String(Math.floor(walletBalanceHuman)))}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-[var(--color-primary)]/10 px-2 py-1 text-[10px] font-bold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-colors">
+                        MAX
+                      </button>
+                    )}
+                  </div>
                   {depositAmount && parseFloat(depositAmount) > 0 && parseFloat(depositAmount) > walletBalanceHuman && (
                     <p className="text-[10px] text-[var(--color-warning)] mt-1.5">
                       {t('balance.walletHasOnly', { amount: fmtNum(walletBalanceHuman) })}
