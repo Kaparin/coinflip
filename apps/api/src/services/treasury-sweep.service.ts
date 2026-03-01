@@ -21,6 +21,7 @@ import { logger } from '../lib/logger.js';
 import { relayerService } from './relayer.js';
 import { vaultService } from './vault.service.js';
 import { env } from '../config/env.js';
+import { chainRest } from '../lib/chain-fetch.js';
 
 export interface SweepCandidate {
   userId: string;
@@ -53,9 +54,8 @@ export interface SweepSummary {
 async function queryChainVaultBalance(address: string): Promise<{ available: string; locked: string }> {
   try {
     const query = btoa(JSON.stringify({ vault_balance: { address } }));
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-      { signal: AbortSignal.timeout(5000) },
+    const res = await chainRest(
+      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
     );
     if (!res.ok) return { available: '0', locked: '0' };
     const data = (await res.json()) as { data: { available: string; locked: string } };

@@ -13,6 +13,7 @@ import { relayerService } from './relayer.js';
 import { formatBetResponse } from '../lib/format.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
 import { removePendingLock, removePendingLockDelayed, invalidateBalanceCache, getChainVaultBalance, getTotalPendingLocks } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
@@ -51,7 +52,7 @@ async function pollForTx(
     first = false;
 
     try {
-      const res = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`, {
+      const res = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`, {
         signal: AbortSignal.timeout(3000),
       });
       if (res.ok) {
@@ -166,9 +167,8 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
           try {
             const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
             const encoded = Buffer.from(query).toString('base64');
-            const res = await fetch(
-              `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-              { signal: AbortSignal.timeout(5000) },
+            const res = await chainRest(
+              `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
             );
             if (res.ok) {
               const data = await res.json() as {
@@ -640,9 +640,8 @@ async function getChainBetState(betId: number): Promise<ChainBetState | null> {
       try {
         const query = JSON.stringify({ bet: { bet_id: betId } });
         const encoded = Buffer.from(query).toString('base64');
-        const res = await fetch(
-          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-          { signal: AbortSignal.timeout(5000) },
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
         );
         if (!res.ok) return null;
         const data = await res.json() as { data: ChainBetState };
@@ -1248,9 +1247,8 @@ async function reconcileOrphanedChainBets(): Promise<void> {
     // Query chain for all open bets
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-      { signal: AbortSignal.timeout(5000) },
+    const res = await chainRest(
+      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
     );
     if (!res.ok) return;
 
@@ -1659,9 +1657,8 @@ export async function runHealSweep(): Promise<HealResult> {
   try {
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-      { signal: AbortSignal.timeout(5000) },
+    const res = await chainRest(
+      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
     );
 
     if (res.ok) {

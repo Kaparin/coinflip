@@ -12,6 +12,7 @@ import { getDb } from '../lib/db.js';
 import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications } from '@coinflip/db/schema';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { getCoinFlipStats } from './bets.js';
 import { jackpotService } from '../services/jackpot.service.js';
 import { vipService } from '../services/vip.service.js';
@@ -186,18 +187,16 @@ adminRouter.get('/users/:userId', async (c) => {
   if (user.address && env.COINFLIP_CONTRACT_ADDR) {
     try {
       const vbQuery = btoa(JSON.stringify({ vault_balance: { address: user.address } }));
-      const vbRes = await fetch(
-        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${vbQuery}`,
-        { signal: AbortSignal.timeout(5000) },
+      const vbRes = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${vbQuery}`,
       );
       if (vbRes.ok) {
         const vbData = await vbRes.json() as { data: { available: string; locked: string } };
         chainBalance = vbData.data;
       }
       const ubQuery = btoa(JSON.stringify({ user_bets: { address: user.address, limit: 20 } }));
-      const ubRes = await fetch(
-        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${ubQuery}`,
-        { signal: AbortSignal.timeout(5000) },
+      const ubRes = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${ubQuery}`,
       );
       if (ubRes.ok) {
         const ubData = await ubRes.json() as { data: { bets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }> } };
@@ -439,9 +438,8 @@ adminRouter.get('/bets/orphaned', async (c) => {
     // Fetch all open bets from chain
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-      { signal: AbortSignal.timeout(5000) },
+    const res = await chainRest(
+      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
     );
 
     if (!res.ok) {
@@ -497,9 +495,8 @@ adminRouter.post('/bets/orphaned/import', zValidator('json', ImportOrphanedSchem
     // Query bet from chain
     const query = JSON.stringify({ bet: { bet_id: chainBetId } });
     const encoded = Buffer.from(query).toString('base64');
-    const res = await fetch(
-      `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-      { signal: AbortSignal.timeout(5000) },
+    const res = await chainRest(
+      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
     );
 
     if (!res.ok) {

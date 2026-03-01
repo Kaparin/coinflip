@@ -24,6 +24,7 @@ import { resolveCreateBetInBackground, confirmAcceptAndRevealInBackground, confi
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
 import { chainCached } from '../lib/chain-cache.js';
+import { chainRest } from '../lib/chain-fetch.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from '../services/pending-secrets.service.js';
 
 /**
@@ -72,9 +73,8 @@ async function getChainBetState(betId: number): Promise<string | null> {
     async () => {
       try {
         const query = btoa(JSON.stringify({ bet: { bet_id: betId } }));
-        const res = await fetch(
-          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-          { signal: AbortSignal.timeout(5000) },
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
         );
         if (!res.ok) return null;
         const data = (await res.json()) as { data: { status?: string } };
@@ -99,9 +99,8 @@ async function getChainOpenBetCountForMaker(makerAddress: string): Promise<numbe
       async () => {
         const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
         const encoded = Buffer.from(query).toString('base64');
-        const res = await fetch(
-          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
-          { signal: AbortSignal.timeout(5000) },
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
         );
         if (!res.ok) return [];
         const data = (await res.json()) as { data: { bets: Array<{ id: number; maker?: string }> } };

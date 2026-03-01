@@ -15,6 +15,7 @@ import type { RelayResult } from '../services/relayer.js';
 import { getPendingBetCount } from '../lib/pending-counts.js';
 import { betService } from '../services/bet.service.js';
 import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
+import { chainRest, chainRestPost } from '../lib/chain-fetch.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 import { resolveGasGranter } from '../lib/gas-granter.js';
 
@@ -35,9 +36,8 @@ export async function getChainVaultBalance(address: string): Promise<{ available
     async () => {
       try {
         const query = btoa(JSON.stringify({ vault_balance: { address } }));
-        const res = await fetch(
-          `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
-          { signal: AbortSignal.timeout(5000) },
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
         );
         if (!res.ok) return { available: '0', locked: '0' };
         const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -245,9 +245,8 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
   if (env.LAUNCH_CW20_ADDR) {
     try {
       const balQuery = btoa(JSON.stringify({ balance: { address } }));
-      const balRes = await fetch(
-        `${env.AXIOME_REST_URL}/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${balQuery}`,
-        { signal: AbortSignal.timeout(5000) },
+      const balRes = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${balQuery}`,
       );
       if (balRes.ok) {
         const balData = await balRes.json() as { data: { balance: string } };
@@ -270,14 +269,9 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
   try {
     // Step 1: Broadcast via Cosmos REST API (BROADCAST_MODE_SYNC)
     // This is a direct connection from our server to the chain node — no proxy overhead.
-    const broadcastRes = await fetch(`${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tx_bytes: txBytesBase64,
-        mode: 'BROADCAST_MODE_SYNC',
-      }),
-      signal: AbortSignal.timeout(5000),
+    const broadcastRes = await chainRestPost('/cosmos/tx/v1beta1/txs', {
+      tx_bytes: txBytesBase64,
+      mode: 'BROADCAST_MODE_SYNC',
     });
 
     const broadcastData = await broadcastRes.json() as {
@@ -313,10 +307,7 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
     while (Date.now() - pollStartTime < maxPollMs) {
       await new Promise(r => setTimeout(r, pollIntervalMs));
       try {
-        const txRes = await fetch(
-          `${env.AXIOME_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`,
-          { signal: AbortSignal.timeout(5000) },
-        );
+        const txRes = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`);
         if (txRes.ok) {
           const txData = await txRes.json() as {
             tx_response?: {
