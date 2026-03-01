@@ -12,7 +12,7 @@
 | PR-1 | DB indexes + query caches | IN PROGRESS | `perf/db-indexes-and-caches` |
 | PR-2 | Frontend render perf | PENDING | `perf/frontend-render` |
 | PR-3 | Async deposit 202 | PENDING | — |
-| PR-4 | Balance dedup + WS cleanup | PENDING | — |
+| PR-4 | Balance dedup + WS cleanup | DONE | `perf/balance-dedup-ws-cleanup` |
 | PR-5 | RPC failover | PENDING | — |
 | PR-6 | CometBFT WS indexer | PENDING | — |
 
@@ -75,6 +75,33 @@
 - Re-renders per second: ~100 (50 timers) → ~50 (still per-card, but memo prevents cascade)
 - Hidden tabs stop polling → -75% background API requests
 - Measurement: React DevTools Profiler, Network tab request count
+
+---
+
+## PR-4: Balance Dedup + WS Cleanup
+
+**Goal:** Reduce redundant balance polling/RPC calls. WS-aware refetch intervals. Increase chain cache TTL.
+**Risk:** LOW. Only affects polling intervals and cache TTL.
+**Rollback:** Revert commit.
+
+### Files Changed
+- `apps/api/src/routes/vault.ts` — chain cache TTL 10s → 30s
+- `apps/web/src/components/features/vault/balance-display.tsx` — WS-aware refetchInterval
+- `apps/web/src/hooks/use-wallet-balance.ts` — WS-aware refetchInterval for CW20 balance
+
+### Verification Checklist
+- [x] `pnpm --filter @coinflip/api typecheck` passes
+- [x] `pnpm --filter @coinflip/web typecheck` passes
+- [ ] Balance updates correctly after deposit/withdraw
+- [ ] Balance updates via WS events (no stale display)
+- [ ] When WS disconnected: polling every 15s
+- [ ] When WS connected: polling every 30s
+- [ ] Chain RPC calls reduced (check Railway logs)
+
+### Expected Effect
+- Chain RPC calls for balance: 6/min per user → 2/min (30s cache + 30s WS poll)
+- CW20 wallet balance polling: 4/min → 2/min when WS connected
+- Measurement: Network tab request count, Railway logs
 
 ---
 

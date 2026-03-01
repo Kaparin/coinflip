@@ -37,4 +37,21 @@ Each entry: file, lines changed, why, how to rollback.
 
 ## PR-2: Frontend Render Performance
 
-_(entries will be added as changes are made)_
+_(see PR-2 branch for details)_
+
+---
+
+## PR-4: Balance Dedup + WS Cleanup
+
+### Chain Cache
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/api/src/routes/vault.ts` | `chainCached` TTL from 10s → 30s | Balance endpoint adjusts for pending locks; 10s was too aggressive (~6 RPC/min/user). 30s reduces to ~2/min. `invalidateBalanceCache()` still works for immediate needs. | Change `30_000` back to `10_000` |
+
+### WS-aware Polling
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/components/features/vault/balance-display.tsx` | `refetchInterval: 15_000` → WS-aware function (30s when WS connected, 15s when disconnected, paused during balance grace period) | Last component using fixed 15s polling. When WS connected, events trigger instant invalidation. | Revert commit |
+| `apps/web/src/hooks/use-wallet-balance.ts` | `useWalletBalance` `refetchInterval: 15_000` → WS-aware function | CW20 wallet balance polled every 15s even with active WS. WS `balance_updated` events already invalidate this query. | Revert commit |

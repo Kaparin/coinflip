@@ -23,7 +23,8 @@ function extractTxHashFromError(err: unknown): string | null {
 }
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
-import { setBalanceGracePeriod } from '@/lib/balance-grace';
+import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
+import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 
@@ -318,7 +319,10 @@ export function BalanceDisplay() {
   const { data, isLoading } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: 15_000,
+      refetchInterval: () => {
+        if (isInBalanceGracePeriod()) return false;
+        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
+      },
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
