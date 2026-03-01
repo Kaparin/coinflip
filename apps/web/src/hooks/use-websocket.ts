@@ -73,7 +73,6 @@ export function useWebSocket({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isConnected, setIsConnected] = useState(false);
-  const [lastEvent, setLastEvent] = useState<WsEvent | null>(null);
   const isConnectedRef = useRef(false);
   const reconnectCountRef = useRef(0);
 
@@ -190,7 +189,6 @@ export function useWebSocket({
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data as string) as WsEvent;
-          setLastEvent(parsed);
 
           // Debounced targeted invalidation based on event type.
           // IMPORTANT: '/api/v1/bets/mine' has a DIFFERENT query key than '/api/v1/bets'
@@ -448,5 +446,5 @@ export function useWebSocket({
     connectWs();
   }, [connectWs]);
 
-  return { isConnected, lastEvent, reconnect };
+  return { isConnected, lastEvent: null, reconnect };
 }

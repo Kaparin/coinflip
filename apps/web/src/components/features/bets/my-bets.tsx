@@ -163,17 +163,19 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
   // Categorize bets (include 'canceling' with open bets so cards don't vanish instantly)
   // Filter out expired bets — they'll be auto-canceled on chain, no need to show cancel button
-  const now = Date.now();
-  const myOpenBets = myBets.filter(b => {
-    if (b.status !== 'open' && b.status !== 'canceling') return false;
-    if (b.maker?.toLowerCase() !== addrLower) return false;
-    const expiresAt = (b as any).expires_at;
-    if (expiresAt && new Date(expiresAt).getTime() <= now) return false;
-    return true;
-  });
-  const myAccepting = myBets.filter(b => b.status === 'accepting');
-  const myInProgress = myBets.filter(b => b.status === 'accepted');
-  const myResolved = myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || b.status === 'canceled');
+  const myOpenBets = useMemo(() => {
+    const now = Date.now();
+    return myBets.filter(b => {
+      if (b.status !== 'open' && b.status !== 'canceling') return false;
+      if (b.maker?.toLowerCase() !== addrLower) return false;
+      const expiresAt = (b as any).expires_at;
+      if (expiresAt && new Date(expiresAt).getTime() <= now) return false;
+      return true;
+    });
+  }, [myBets, addrLower]);
+  const myAccepting = useMemo(() => myBets.filter(b => b.status === 'accepting'), [myBets]);
+  const myInProgress = useMemo(() => myBets.filter(b => b.status === 'accepted'), [myBets]);
+  const myResolved = useMemo(() => myBets.filter(b => b.status === 'revealed' || b.status === 'timeout_claimed' || b.status === 'canceled'), [myBets]);
 
   // Track when each resolved bet was first seen client-side for smooth fade-out.
   // Server shows resolved bets for ~60s; we fade them out starting at ~50s client-side.

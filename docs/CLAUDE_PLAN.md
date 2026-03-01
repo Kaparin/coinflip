@@ -9,9 +9,8 @@
 
 | PR | Scope | Status | Branch |
 |----|-------|--------|--------|
-| PR-1 | DB indexes + query caches | DONE | `perf/db-indexes-and-caches` |
-| PR-2 | Frontend render perf | DONE | `perf/frontend-render` |
-| PR-3 | Async deposit 202 | DONE | `perf/async-deposit-202` |
+
+| PR-3 | Async deposit 202 | PENDING | — |
 | PR-4 | Balance dedup + WS cleanup | PENDING | — |
 | PR-5 | RPC failover | PENDING | — |
 | PR-6 | CometBFT WS indexer | PENDING | — |
@@ -32,8 +31,7 @@
 - DB migration via Neon MCP (CREATE INDEX CONCURRENTLY)
 
 ### Verification Checklist
-- [x] `pnpm --filter @coinflip/api typecheck` passes
-- [x] Indexes visible in Neon dashboard
+
 - [ ] Deposit: send → pending → confirmed → balance updated
 - [ ] Bet flow: create → accept → reveal → jackpot/referral intact
 - [ ] Leaderboard: loads correctly, data matches, updates within 60s
@@ -57,18 +55,7 @@
 
 ### Files Changed
 - `apps/web/src/components/features/bets/bet-card.tsx` — React.memo wrapper
-- `apps/web/src/hooks/use-websocket.ts` — remove setLastEvent
-- `apps/web/src/components/features/bets/my-bets.tsx` — memoize myResolved filter
-- `apps/web/src/app/game/page.tsx` — lazy-mount hidden tabs
 
-### Verification Checklist
-- [x] `pnpm --filter @coinflip/web typecheck` passes
-- [ ] Game page with 50 bets: no visual freezing
-- [ ] Tab switching: content appears instantly, scroll positions OK
-- [ ] Bet cards: countdowns tick correctly, accept/cancel buttons work
-- [ ] MyBets: resolved bets filter correctly
-- [ ] WS events: bets appear/update/disappear in real time
-- [ ] No console errors
 - [ ] Mobile: pull-to-refresh still works
 
 ### Expected Effect

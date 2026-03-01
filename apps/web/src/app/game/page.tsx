@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { useQueryClient } from '@tanstack/react-query';
 import { CreateBetForm } from '@/components/features/bets/create-bet-form';
@@ -32,6 +32,7 @@ const TAB_ORDER: Tab[] = ['bets', 'mybets', 'history', 'leaderboard'];
 export default function GamePage() {
   const [activeTab, setActiveTab] = useState<Tab>('bets');
   const activeTabRef = useRef<Tab>('bets');
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set(['bets']));
   const [showWsBanner, setShowWsBanner] = useState(false);
   const [eventNotification, setEventNotification] = useState<{ message: string; variant: 'success' | 'info' | 'warning' | 'error' } | null>(null);
   const queryClient = useQueryClient();
@@ -166,6 +167,12 @@ export default function GamePage() {
   const handleTabChange = useCallback((tab: Tab) => {
     activeTabRef.current = tab;
     setActiveTab(tab);
+    setVisitedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
   }, []);
 
   const setTabByDelta = useCallback((delta: number) => {
@@ -223,18 +230,25 @@ export default function GamePage() {
         </div>
 
         <div {...swipeHandlers} className="min-h-[200px]">
+          {/* Lazy-mount: tabs mount on first visit, stay mounted for scroll preservation */}
           <div style={{ display: activeTab === 'bets' ? 'block' : 'none' }}>
             <BetList pendingBets={pendingBets} />
           </div>
-          <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>
-            <MyBets pendingBets={pendingBets} />
-          </div>
-          <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
-            <HistoryList />
-          </div>
-          <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
-            <Leaderboard />
-          </div>
+          {visitedTabs.has('mybets') && (
+            <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>
+              <MyBets pendingBets={pendingBets} />
+            </div>
+          )}
+          {visitedTabs.has('history') && (
+            <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
+              <HistoryList />
+            </div>
+          )}
+          {visitedTabs.has('leaderboard') && (
+            <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
+              <Leaderboard />
+            </div>
+          )}
         </div>
       </div>
     </div>

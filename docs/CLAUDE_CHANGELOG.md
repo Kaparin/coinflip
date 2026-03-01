@@ -37,40 +37,27 @@ Each entry: file, lines changed, why, how to rollback.
 
 ## PR-2: Frontend Render Performance
 
-| File | Change | Why | Rollback |
-|------|--------|-----|----------|
-| `apps/web/src/components/features/bets/bet-card.tsx` | Wrapped with `React.memo()` | Prevents cascade re-renders from parent WS events. Each card has own timer; memo ensures only cards with changed props re-render. | Revert commit |
-| `apps/web/src/hooks/use-websocket.ts` | Removed `setLastEvent` state, return `lastEvent: null` hardcoded | Every WS message triggered state update → re-render of GamePage + all children. `lastEvent` was never consumed. | Revert commit |
-| `apps/web/src/components/features/bets/my-bets.tsx` | `useMemo` on filter results (`myOpenBets`, `myAccepting`, `myInProgress`, `myResolved`) | New array refs on every render → child re-renders even when data unchanged. | Revert commit |
-| `apps/web/src/app/game/page.tsx` | `visitedTabs` state + lazy-mount pattern for MyBets/History/Leaderboard | All 4 tabs mounted on load, firing API queries + timers when hidden. Now mount on first visit, stay mounted for scroll. | Revert commit |
-
----
-
-## PR-3: Async Deposit 202
-
-### Feature Flag
+### React.memo on BetCard
 
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
-| `apps/api/src/config/env.ts` | Added `DEPOSIT_ASYNC_MODE` env var (default `'false'`) | Controls whether deposit endpoint returns 202 (async) or blocks for confirmation (sync). Safe rollback: just set to `false`. | Remove env var or set to `false` |
+| `apps/web/src/components/features/bets/bet-card.tsx` | Wrapped component export with `memo()`. Changed `export function BetCard` → `export const BetCard = memo(function BetCard`. Added `memo` to imports. | Each BetCard has its own countdown timer that ticks every second. Without memo, a parent re-render (e.g., from WS events) re-renders ALL 50+ cards even when their props haven't changed. With memo, only cards with changed props re-render. | Revert commit |
 
-### Backend Route
-
-| File | Change | Why | Rollback |
-|------|--------|-----|----------|
-| `apps/api/src/routes/vault.ts` | Extracted `pollTxConfirmation()` helper. When `DEPOSIT_ASYNC_MODE=true`: release inflight guard, spawn background poll, return 202 immediately. Background poll emits `deposit_confirmed`/`deposit_failed` + `balance_updated` via WS. Sync path unchanged. | Deposit endpoint blocked for 5-30s waiting for chain confirmation. Async mode returns in ~2s. | Set `DEPOSIT_ASYNC_MODE=false` or revert commit |
-
-### Shared Types
+### Remove setLastEvent from useWebSocket
 
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
-| `packages/shared/src/types/index.ts` | Added `deposit_confirmed` and `deposit_failed` to `WsEventType` union | New WS events for async deposit notification | Revert commit |
+| `apps/web/src/hooks/use-websocket.ts` | Removed `useState<WsEvent \| null>` for lastEvent. Removed `setLastEvent(parsed)` call. Return `lastEvent: null` hardcoded to keep interface stable. | Every WS message triggered `setLastEvent()` → React state update → re-render of GamePage + all children. `lastEvent` was never consumed by any component. Removing it eliminates N re-renders per second from WS traffic. | Revert commit |
 
-### Frontend
+### Memoize MyBets filter results
 
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
-| `apps/web/src/hooks/use-websocket.ts` | Added `deposit_confirmed` / `deposit_failed` cases to switch — invalidate balance queries | Frontend needs to refetch balance when async deposit confirms or fails | Revert commit |
-| `apps/web/src/app/game/page.tsx` | Added toast notifications for `deposit_confirmed` and `deposit_failed` events | User needs visual feedback when async deposit completes | Revert commit |
-| `apps/web/src/lib/i18n/en.json` | Added `depositConfirmedWs` and `depositFailedWs` keys | i18n for new toast messages | Revert commit |
-| `apps/web/src/lib/i18n/ru.json` | Added `depositConfirmedWs` and `depositFailedWs` keys | i18n for new toast messages | Revert commit |
+| `apps/web/src/components/features/bets/my-bets.tsx` | Wrapped `myOpenBets`, `myAccepting`, `myInProgress`, `myResolved` filter computations with `useMemo()`. Added `useMemo` to imports. | Filter results created new array references on every render, causing child components to re-render even when data hadn't changed. `useMemo` ensures stable references when `myBets` array hasn't changed. | Revert commit |
+
+### Lazy-mount hidden tabs
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/app/game/page.tsx` | Added `visitedTabs` state (Set). Tabs mount on first visit, stay mounted (preserving scroll). BetList always mounted. MyBets/HistoryList/Leaderboard mount lazily. | Previously all 4 tabs mounted on page load, each firing their own API queries and running timers even when hidden. Lazy-mount means only visited tabs consume resources. Once visited, they stay mounted to preserve scroll position. | Revert commit |
+_(entries will be added as changes are made)_
