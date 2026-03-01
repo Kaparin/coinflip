@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
 export const profileReactions = pgTable(
@@ -14,5 +14,8 @@ export const profileReactions = pgTable(
     emoji: text('emoji').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique('uq_profile_reaction').on(t.fromUserId, t.toUserId)],
+  (t) => [
+    unique('uq_profile_reaction').on(t.fromUserId, t.toUserId),
+    index('profile_reactions_to_user_idx').on(t.toUserId),
+  ],
 );

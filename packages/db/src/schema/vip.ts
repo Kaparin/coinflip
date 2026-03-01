@@ -23,6 +23,7 @@ export const vipSubscriptions = pgTable(
   },
   (table) => [
     index('idx_vip_sub_user').on(table.userId),
+    index('idx_vip_sub_active').on(table.userId, table.expiresAt),
   ],
 );
 

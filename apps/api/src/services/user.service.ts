@@ -5,6 +5,42 @@ import { logger } from '../lib/logger.js';
 
 const ALLOWED_EMOJIS = ['👍', '🔥', '💎', '🎯', '👑', '💪', '🤝', '⚡'];
 
+// ─── Simple TTL cache for expensive queries ─────────────────────
+interface CacheEntry<T> { data: T; expiresAt: number }
+const queryCache = new Map<string, CacheEntry<unknown>>();
+
+function getCached<T>(key: string): T | undefined {
+  const entry = queryCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    queryCache.delete(key);
+    return undefined;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T, ttlMs: number): T {
+  queryCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  return data;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  nickname: string | null;
+  vip_tier: string | null;
+  vip_customization: { nameGradient: string; frameStyle: string; badgeIcon: string } | null;
+  total_bets: number;
+  wins: number;
+  total_wagered: string;
+  win_rate: number;
+}
+
+/** Cache TTL: 60 seconds for leaderboard/topWinner, 30s for per-user stats */
+const LEADERBOARD_CACHE_TTL = 60_000;
+const TOP_WINNER_CACHE_TTL = 60_000;
+const USER_STATS_CACHE_TTL = 30_000;
+
 export class UserService {
   private db = getDb();
 
@@ -235,6 +271,10 @@ export class UserService {
    * A user participates as maker or acceptor; wins are determined by winnerUserId.
    */
   async getUserStats(userId: string) {
+    const cacheKey = `user_stats:${userId}`;
+    const cached = getCached<{ total_bets: number; wins: number; losses: number; total_wagered: string; total_won: string }>(cacheKey);
+    if (cached) return cached;
+
     const resolvedStatuses = ['revealed', 'timeout_claimed'];
 
     const [stats] = await this.db
@@ -251,13 +291,14 @@ export class UserService {
             and ${bets.status} in ('revealed', 'timeout_claimed')`,
       );
 
-    return {
+    const result = {
       total_bets: stats?.totalBets ?? 0,
       wins: stats?.wins ?? 0,
       losses: stats?.losses ?? 0,
       total_wagered: stats?.totalWagered ?? '0',
       total_won: stats?.totalWon ?? '0',
     };
+    return setCache(cacheKey, result, USER_STATS_CACHE_TTL);
   }
 
   /**
@@ -265,6 +306,10 @@ export class UserService {
    * Only counts resolved bets (revealed / timeout_claimed).
    */
   async getLeaderboard(limit = 20, sortBy: 'wins' | 'wagered' | 'win_rate' = 'wins') {
+    const cacheKey = `leaderboard:${sortBy}:${limit}`;
+    const cached = getCached<LeaderboardEntry[]>(cacheKey);
+    if (cached) return cached;
+
     // Build a union of maker + acceptor participations, then aggregate
     const rows = await this.db.execute(sql`
       with participants as (
@@ -325,7 +370,7 @@ export class UserService {
       win_rate: string;
     }>;
 
-    return rawRows.map((row, i) => {
+    const result = rawRows.map((row, i) => {
       const vipTier = row.vip_tier ?? null;
       const hasCustom = vipTier === 'diamond' && (row.name_gradient || row.frame_style || row.badge_icon);
       return {
@@ -344,6 +389,7 @@ export class UserService {
         win_rate: parseFloat(String(row.win_rate)) || 0,
       };
     });
+    return setCache(cacheKey, result, LEADERBOARD_CACHE_TTL);
   }
   /**
    * Get recent resolved bets for a player (public profile) with pagination.
@@ -472,6 +518,11 @@ export class UserService {
     payout: string;
     resolved_at: string | null;
   } | null> {
+    const cacheKey = 'top_winner';
+    type TopWinnerResult = Awaited<ReturnType<UserService['getTopWinner']>>;
+    const cached = getCached<TopWinnerResult>(cacheKey);
+    if (cached !== undefined) return cached;
+
     const rows = await this.db.execute(sql`
       select
         u.address,
@@ -505,11 +556,11 @@ export class UserService {
       resolved_at: string | null;
     }>;
 
-    if (!rawRows.length) return null;
+    if (!rawRows.length) return setCache(cacheKey, null, TOP_WINNER_CACHE_TTL);
     const row = rawRows[0]!;
     const vipTier = row.vip_tier ?? null;
     const hasCustom = vipTier === 'diamond' && (row.name_gradient || row.frame_style || row.badge_icon);
-    return {
+    const result = {
       address: row.address,
       nickname: row.nickname,
       vip_tier: vipTier,
@@ -522,6 +573,7 @@ export class UserService {
       payout: row.payout,
       resolved_at: row.resolved_at ? String(row.resolved_at) : null,
     };
+    return setCache(cacheKey, result, TOP_WINNER_CACHE_TTL);
   }
   /**
    * Get aggregated reaction counts for a user's profile.

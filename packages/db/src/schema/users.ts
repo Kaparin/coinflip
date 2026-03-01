@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, bigint } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, bigint, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -12,4 +12,6 @@ export const users = pgTable('users', {
   telegramPhotoUrl: text('telegram_photo_url'),
   telegramLinkedAt: timestamp('telegram_linked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex('users_telegram_id_idx').on(table.telegramId),
+]);
