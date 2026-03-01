@@ -22,6 +22,8 @@ import { referralService } from './referral.service.js';
 import { vaultService } from './vault.service.js';
 import { jackpotService } from './jackpot.service.js';
 import { partnerService } from './partner.service.js';
+import { ChainWebSocketClient, rpcUrlToWsUrl } from '../lib/chain-ws.js';
+import type { CometBFTTxEvent } from '../lib/chain-ws.js';
 import type { Database } from '@coinflip/db';
 import type { WsEventType } from '@coinflip/shared/types';
 
@@ -40,6 +42,8 @@ export class IndexerService {
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private contractAddress: string;
   private isRunning = false;
+  private chainWs: ChainWebSocketClient | null = null;
+  private wsConnected = false;
 
   constructor() {
     this.contractAddress = env.COINFLIP_CONTRACT_ADDR;
@@ -75,7 +79,7 @@ export class IndexerService {
     }
   }
 
-  /** Start polling for new blocks */
+  /** Start polling (or WS mode) for new blocks */
   start(intervalMs = 3000): void {
     if (this.isRunning) return;
     if (!this.client) {
@@ -84,18 +88,35 @@ export class IndexerService {
     }
 
     this.isRunning = true;
-    this.pollInterval = setInterval(() => void this.pollNewBlocks(), intervalMs);
-    logger.info({ intervalMs }, 'Indexer polling started');
+
+    if (env.INDEXER_WS_MODE === 'true') {
+      this.startWsMode();
+      // Keep polling as fallback — only runs when WS is disconnected
+      this.pollInterval = setInterval(() => {
+        if (!this.wsConnected) {
+          void this.pollNewBlocks();
+        }
+      }, intervalMs);
+      logger.info({ intervalMs }, 'Indexer started in WS mode (polling as fallback)');
+    } else {
+      this.pollInterval = setInterval(() => void this.pollNewBlocks(), intervalMs);
+      logger.info({ intervalMs }, 'Indexer polling started');
+    }
   }
 
-  /** Stop polling */
+  /** Stop polling and WS */
   stop(): void {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
     }
+    if (this.chainWs) {
+      this.chainWs.stop();
+      this.chainWs = null;
+      this.wsConnected = false;
+    }
     this.isRunning = false;
-    logger.info('Indexer polling stopped');
+    logger.info('Indexer stopped');
   }
 
   /** Poll for new blocks and process events */
@@ -931,6 +952,8 @@ export class IndexerService {
       isRunning: this.isRunning,
       lastIndexedHeight: this.lastIndexedHeight,
       contractAddress: this.contractAddress,
+      wsMode: env.INDEXER_WS_MODE === 'true',
+      wsConnected: this.wsConnected,
     };
   }
 
@@ -941,6 +964,85 @@ export class IndexerService {
       this.client.disconnect();
       this.client = null;
     }
+  }
+
+  // ─── CometBFT WebSocket Mode ──────────────────────────────────
+
+  /** Start CometBFT WebSocket subscription for real-time events */
+  private startWsMode(): void {
+    const wsUrl = rpcUrlToWsUrl(env.AXIOME_RPC_URL);
+    this.chainWs = new ChainWebSocketClient(wsUrl);
+
+    const query = `tm.event='Tx' AND wasm._contract_address='${this.contractAddress}'`;
+
+    this.chainWs.start({
+      query,
+      onEvent: (event) => void this.onChainWsEvent(event),
+      onStatusChange: (connected) => {
+        const wasConnected = this.wsConnected;
+        this.wsConnected = connected;
+
+        if (connected && !wasConnected) {
+          // WS reconnected — backfill any blocks missed during disconnection
+          logger.info('CometBFT WS reconnected — backfilling missed blocks via polling');
+          void this.pollNewBlocks();
+        }
+      },
+    });
+
+    logger.info({ wsUrl, query }, 'CometBFT WS indexer started');
+  }
+
+  /** Handle a raw CometBFT WebSocket tx event */
+  private async onChainWsEvent(event: CometBFTTxEvent): Promise<void> {
+    // Update height tracking so polling knows where we are
+    if (event.height > this.lastIndexedHeight) {
+      this.lastIndexedHeight = event.height;
+    }
+
+    // Extract CoinFlip events from raw CometBFT wasm events
+    const coinflipEvents = this.extractCoinFlipEventsFromWs(event);
+
+    for (const cfEvent of coinflipEvents) {
+      try {
+        await this.handleEvent(cfEvent);
+      } catch (err) {
+        logger.error({ err, type: cfEvent.type, txHash: cfEvent.txHash }, 'Failed to handle WS event');
+      }
+    }
+  }
+
+  /** Parse raw CometBFT WS events into CoinFlipEvent format */
+  private extractCoinFlipEventsFromWs(event: CometBFTTxEvent): CoinFlipEvent[] {
+    const coinflipEvents: CoinFlipEvent[] = [];
+
+    for (const rawEvent of event.events) {
+      if (rawEvent.type !== 'wasm') continue;
+
+      const attrs: Record<string, string> = {};
+      let isOurContract = false;
+
+      for (const attr of rawEvent.attributes) {
+        if (attr.key === '_contract_address' && attr.value === this.contractAddress) {
+          isOurContract = true;
+        }
+        attrs[attr.key] = attr.value;
+      }
+
+      if (!isOurContract) continue;
+
+      const action = attrs.action;
+      if (action) {
+        coinflipEvents.push({
+          type: action.startsWith('coinflip.') ? action : `coinflip.${action}`,
+          attributes: attrs,
+          txHash: event.txHash,
+          height: event.height,
+        });
+      }
+    }
+
+    return coinflipEvents;
   }
 }
 

@@ -34,6 +34,8 @@ const envSchema = z.object({
   ENABLE_BACKGROUND_SWEEP: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
   /** Enable chain indexer (event polling). Default: true in prod, false in dev. */
   ENABLE_INDEXER: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
+  /** Use CometBFT WebSocket for real-time indexing instead of polling. Default: false. */
+  INDEXER_WS_MODE: z.string().default('false'),
 });
 
 export const env = envSchema.parse(process.env);
