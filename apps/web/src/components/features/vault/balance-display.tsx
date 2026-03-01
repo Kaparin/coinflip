@@ -230,14 +230,14 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
 
   return (
     <Modal open onClose={onClose} title={t('balance.coinGuideTitle')}>
-      <div className="space-y-4 pb-2">
+      <div className="space-y-3 pb-2 overflow-x-hidden">
         {/* Contract address — copyable */}
         <button
           type="button"
           onClick={handleCopy}
           className="w-full flex items-center gap-2 rounded-xl border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-primary)]/10 active:scale-[0.98]"
         >
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('balance.coinGuideContract')}</p>
             <p className="text-[11px] font-mono text-[var(--color-primary)] truncate">{COIN_CONTRACT}</p>
           </div>
@@ -256,11 +256,11 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
 
           return (
             <div key={idx} className="space-y-2">
-              <div className="flex items-start gap-2.5">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white text-xs font-bold">
+              <div className="flex items-start gap-2">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white text-[10px] font-bold">
                   {idx + 1}
                 </div>
-                <p className="text-xs text-[var(--color-text-secondary)] pt-0.5 leading-relaxed">
+                <p className="text-xs text-[var(--color-text-secondary)] pt-px leading-relaxed min-w-0">
                   {parts.map((part, i) =>
                     i % 2 === 1 ? <strong key={i} className="text-[var(--color-text)] font-semibold">{part}</strong> : part
                   )}
@@ -270,14 +270,14 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
               <button
                 type="button"
                 onClick={() => setExpandedImg(step.image)}
-                className="ml-8 block rounded-xl overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-primary)]/50 transition-colors active:scale-[0.98] shadow-sm"
+                className="ml-7 block max-w-[160px] rounded-xl overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-primary)]/50 transition-colors active:scale-[0.98] shadow-sm"
               >
                 <Image
                   src={step.image}
                   alt={`Step ${idx + 1}`}
-                  width={180}
-                  height={320}
-                  className="object-cover w-[180px] h-auto"
+                  width={160}
+                  height={284}
+                  className="w-full h-auto"
                 />
               </button>
             </div>
@@ -287,22 +287,22 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
         {/* Expanded image lightbox */}
         {expandedImg && (
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4"
             onClick={() => setExpandedImg(null)}
           >
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpandedImg(null); }}
-              className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
+              className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
             <Image
               src={expandedImg}
               alt="Guide screenshot"
               width={400}
               height={800}
-              className="max-h-[85vh] w-auto rounded-2xl object-contain shadow-2xl"
+              className="max-h-[85vh] max-w-full w-auto rounded-2xl object-contain shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
