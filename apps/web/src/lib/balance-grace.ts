@@ -21,6 +21,11 @@ export function setBalanceGracePeriod(ms: number): void {
   _graceUntil = Math.max(_graceUntil, Date.now() + ms);
 }
 
+/** Force-clear the grace period (e.g. when async deposit is confirmed/failed). */
+export function clearBalanceGracePeriod(): void {
+  _graceUntil = 0;
+}
+
 /** Returns true if currently within a deposit grace period. */
 export function isInBalanceGracePeriod(): boolean {
   return Date.now() < _graceUntil;

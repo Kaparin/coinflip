@@ -21,6 +21,7 @@ import { usePendingBets } from '@/hooks/use-pending-bets';
 import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { emitDepositEvent } from '@/lib/deposit-status-events';
 import { X } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import type { WsEvent } from '@coinflip/shared/types';
@@ -125,10 +126,12 @@ export default function GamePage() {
 
     // Deposit notifications (async mode)
     if (event.type === 'deposit_confirmed') {
+      emitDepositEvent({ type: 'confirmed', txHash: String(data?.tx_hash ?? '') });
       addToast('success', t('balance.depositConfirmedWs'));
     }
     if (event.type === 'deposit_failed') {
       const reason = String(data?.reason ?? '');
+      emitDepositEvent({ type: 'failed', txHash: String(data?.tx_hash ?? ''), reason });
       addToast('error', t('balance.depositFailedWs', { reason }));
     }
 

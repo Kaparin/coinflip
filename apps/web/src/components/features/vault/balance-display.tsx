@@ -23,10 +23,11 @@ function extractTxHashFromError(err: unknown): string | null {
 }
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
-import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
+import { setBalanceGracePeriod, clearBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { onDepositEvent } from '@/lib/deposit-status-events';
 
 /** Deposit presets in human-readable LAUNCH */
 const DEPOSIT_PRESETS = [100, 500, 1000];
@@ -336,7 +337,7 @@ export function BalanceDisplay() {
   const [showCoinGuide, setShowCoinGuide] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [depositStatus, setDepositStatus] = useState<'idle' | 'signing' | 'broadcasting' | 'success' | 'error'>('idle');
+  const [depositStatus, setDepositStatus] = useState<'idle' | 'signing' | 'broadcasting' | 'pending' | 'success' | 'error'>('idle');
   const [depositStep, setDepositStep] = useState<DepositStep>('connecting');
   const [depositError, setDepositError] = useState('');
   const [depositErrorTxHash, setDepositErrorTxHash] = useState<string | null>(null);
@@ -486,6 +487,13 @@ export function BalanceDisplay() {
       depositTimerRef.current = setInterval(() => {
         setDepositElapsed((prev) => prev + 1);
       }, 1000);
+    } else if (depositStatus === 'pending') {
+      // Keep timer running during pending (waiting for chain confirmation)
+      if (!depositTimerRef.current) {
+        depositTimerRef.current = setInterval(() => {
+          setDepositElapsed((prev) => prev + 1);
+        }, 1000);
+      }
     } else {
       if (depositTimerRef.current) {
         clearInterval(depositTimerRef.current);
@@ -496,6 +504,32 @@ export function BalanceDisplay() {
       if (depositTimerRef.current) clearInterval(depositTimerRef.current);
     };
   }, [depositStatus]);
+
+  // Listen for async deposit confirmation/failure via WS event bus
+  useEffect(() => {
+    if (depositStatus !== 'pending') return;
+    const unsub = onDepositEvent((event) => {
+      // Only react if the tx hash matches (or if we don't have one to compare)
+      if (depositTxHash && event.txHash && event.txHash !== depositTxHash) return;
+      if (event.type === 'confirmed') {
+        setDepositStatus('success');
+        // Now safe to release grace period and refetch
+        clearBalanceGracePeriod();
+        setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+        }, 500);
+      } else if (event.type === 'failed') {
+        setDepositError(event.reason || t('balance.depositFailed'));
+        setDepositStatus('error');
+        // Revert optimistic balance update
+        clearBalanceGracePeriod();
+        queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+        queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+      }
+    });
+    return unsub;
+  }, [depositStatus, depositTxHash, queryClient, t]);
 
   // --- Deposit via Web Wallet (optimized: sign locally, broadcast via server) ---
   const handleDeposit = useCallback(async () => {
@@ -556,11 +590,13 @@ export function BalanceDisplay() {
         return;
       }
 
-      // Step 4: Confirmed (or pending)
+      // Step 4: Confirmed or pending (async mode returns 202)
       setDepositStep('confirming');
       const result = broadcastData.data;
       setDepositTxHash(result.tx_hash);
-      setDepositStatus('success');
+
+      const isAsync = broadcastRes.status === 202 || result.status === 'pending';
+      setDepositStatus(isAsync ? 'pending' : 'success');
 
       // Optimistic update: immediately reflect deposit in balances
       const depositMicro = toMicroLaunch(parsedHuman);
@@ -586,14 +622,16 @@ export function BalanceDisplay() {
 
       // Protect optimistic update from stale WS-triggered refetches.
       // Server's chain cache may briefly hold pre-deposit balance (REST node lag).
-      setBalanceGracePeriod(8_000);
+      setBalanceGracePeriod(isAsync ? 120_000 : 8_000);
       queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
 
       // Refetch after grace period for eventual consistency
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-        queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
-      }, 8_000);
+      if (!isAsync) {
+        setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+        }, 8_000);
+      }
     } catch (err) {
       // If optimized flow fails, try legacy full client-side deposit as fallback
       try {
@@ -747,7 +785,7 @@ export function BalanceDisplay() {
 
       {/* ===== Deposit Modal ===== */}
       {showDeposit && (
-        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting'}>
+        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' || depositStatus === 'pending' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting' && depositStatus !== 'pending'}>
           <div className="p-5 max-w-sm w-full">
             {depositStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
@@ -766,6 +804,28 @@ export function BalanceDisplay() {
                   className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold btn-press">
                   {t('balance.collapse')}
                 </button>
+              </div>
+            ) : depositStatus === 'pending' ? (
+              <div className="text-center py-4">
+                <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-[var(--color-primary)]/15 mb-3">
+                  <Loader2 size={28} className="text-[var(--color-primary)] animate-spin" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">{t('balance.depositPending')}</h3>
+                <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-primary)]">
+                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={45} />
+                </p>
+                <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-[var(--color-primary)] hover:underline mb-2 break-all font-mono block">
+                  TX: {depositTxHash.slice(0, 16)}... →
+                </a>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                  {t('balance.depositPendingDesc')}
+                </p>
+                {depositElapsed > 0 && (
+                  <p className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                    {depositElapsed}s
+                  </p>
+                )}
               </div>
             ) : depositStatus === 'signing' || depositStatus === 'broadcasting' ? (
               <DepositProgressOverlay currentStep={depositStep} elapsedSec={depositElapsed} />
