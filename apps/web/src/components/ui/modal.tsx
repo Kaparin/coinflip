@@ -163,10 +163,12 @@ export function Modal({
           'w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
           'bg-[var(--color-surface)] shadow-2xl flex flex-col overflow-hidden',
           'transition-all duration-200',
-          // When keyboard open (viewportStyles set), use % of overlay; else vh
-          Object.keys(viewportStyles).length > 0 ? 'max-h-[90%]' : 'max-h-[90vh] sm:max-h-[85vh]',
+          // Fallback max-h for browsers without dvh support
+          Object.keys(viewportStyles).length > 0 ? 'max-h-[90%]' : 'max-h-[85vh] sm:max-h-[85vh]',
           visible ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4 sm:translate-y-0',
         ].join(' ')}
+        // dvh accounts for mobile browser chrome (URL bar); overrides class if supported
+        style={Object.keys(viewportStyles).length === 0 ? { maxHeight: '88dvh' } : undefined}
       >
         {/* Header: title + close button — compact on mobile */}
         <div className="flex items-center justify-between shrink-0 border-b border-[var(--color-border)] px-3 sm:px-6 py-2 sm:py-3">

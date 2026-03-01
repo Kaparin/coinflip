@@ -386,6 +386,20 @@ export function Header() {
                   <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
                 </button>
 
+                {/* VIP button — always visible in header */}
+                <button
+                  type="button"
+                  onClick={() => setVipModalOpen(true)}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors active:scale-95 ${
+                    vipStatus?.active
+                      ? 'text-amber-400 bg-amber-500/10'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
+                  }`}
+                  aria-label="VIP"
+                >
+                  <Crown size={18} />
+                </button>
+
                 <button type="button" onClick={() => { setMenuOpen(!menuOpen); setBalanceOpen(false); }}
                   className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]"
                   aria-label={t('header.toggleMenu')}>
@@ -426,22 +440,6 @@ export function Header() {
 
               {/* Quick links */}
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setVipModalOpen(true); setMenuOpen(false); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium ${
-                    vipStatus?.active
-                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold'
-                      : 'border-[var(--color-border)] bg-[var(--color-bg)]'
-                  }`}
-                >
-                  <Crown size={14} className={vipStatus?.active ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'} />
-                  {vipStatus?.active ? (
-                    <span className="capitalize">{vipStatus.tier} VIP</span>
-                  ) : (
-                    t('nav.vip')
-                  )}
-                </button>
                 {wallet.address && (
                   <a href={`${EXPLORER_URL}/address/${wallet.address}`} target="_blank" rel="noopener noreferrer"
                     onClick={() => setMenuOpen(false)}
