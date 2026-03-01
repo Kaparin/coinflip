@@ -482,26 +482,30 @@ export function BalanceDisplay() {
 
   // Elapsed time counter for deposit progress
   useEffect(() => {
+    // Clear any previous timer first
+    if (depositTimerRef.current) {
+      clearInterval(depositTimerRef.current);
+      depositTimerRef.current = null;
+    }
+
     if (depositStatus === 'signing' || depositStatus === 'broadcasting') {
       setDepositElapsed(0);
       depositTimerRef.current = setInterval(() => {
         setDepositElapsed((prev) => prev + 1);
       }, 1000);
     } else if (depositStatus === 'pending') {
-      // Keep timer running during pending (waiting for chain confirmation)
-      if (!depositTimerRef.current) {
-        depositTimerRef.current = setInterval(() => {
-          setDepositElapsed((prev) => prev + 1);
-        }, 1000);
-      }
-    } else {
+      // Continue timer during pending (don't reset — keep counting from broadcasting phase)
+      depositTimerRef.current = setInterval(() => {
+        setDepositElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    // else: timer stays cleared (idle, success, error)
+
+    return () => {
       if (depositTimerRef.current) {
         clearInterval(depositTimerRef.current);
         depositTimerRef.current = null;
       }
-    }
-    return () => {
-      if (depositTimerRef.current) clearInterval(depositTimerRef.current);
     };
   }, [depositStatus]);
 
@@ -530,6 +534,19 @@ export function BalanceDisplay() {
     });
     return unsub;
   }, [depositStatus, depositTxHash, queryClient, t]);
+
+  // Failsafe: if pending for >90s with no WS confirmation, auto-transition to success
+  // (the tx likely confirmed but the WS event was lost)
+  useEffect(() => {
+    if (depositStatus !== 'pending') return;
+    const failsafe = setTimeout(() => {
+      setDepositStatus('success');
+      clearBalanceGracePeriod();
+      queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+      queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+    }, 90_000);
+    return () => clearTimeout(failsafe);
+  }, [depositStatus, queryClient]);
 
   // --- Deposit via Web Wallet (optimized: sign locally, broadcast via server) ---
   const handleDeposit = useCallback(async () => {
@@ -622,7 +639,9 @@ export function BalanceDisplay() {
 
       // Protect optimistic update from stale WS-triggered refetches.
       // Server's chain cache may briefly hold pre-deposit balance (REST node lag).
-      setBalanceGracePeriod(isAsync ? 120_000 : 8_000);
+      // For async mode, use a short grace period — the pending state UI protects the user
+      // experience; we don't want to block subsequent withdrawal balance updates.
+      setBalanceGracePeriod(isAsync ? 15_000 : 8_000);
       queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
 
       // Refetch after grace period for eventual consistency
@@ -677,6 +696,11 @@ export function BalanceDisplay() {
     setDepositErrorTxHash(null);
     setDepositTxHash('');
     setDepositElapsed(0);
+    // Release grace period so subsequent operations (like withdrawals) aren't blocked
+    clearBalanceGracePeriod();
+    // Force refetch to get accurate balances
+    queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+    queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
   };
 
   const handleWithdraw = () => {
@@ -785,7 +809,7 @@ export function BalanceDisplay() {
 
       {/* ===== Deposit Modal ===== */}
       {showDeposit && (
-        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' || depositStatus === 'pending' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting' && depositStatus !== 'pending'}>
+        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting'}>
           <div className="p-5 max-w-sm w-full">
             {depositStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
