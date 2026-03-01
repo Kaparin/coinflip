@@ -60,3 +60,4 @@ Each entry: file, lines changed, why, how to rollback.
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
 | `apps/web/src/app/game/page.tsx` | Added `visitedTabs` state (Set). Tabs mount on first visit, stay mounted (preserving scroll). BetList always mounted. MyBets/HistoryList/Leaderboard mount lazily. | Previously all 4 tabs mounted on page load, each firing their own API queries and running timers even when hidden. Lazy-mount means only visited tabs consume resources. Once visited, they stay mounted to preserve scroll position. | Revert commit |
+_(entries will be added as changes are made)_
