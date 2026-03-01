@@ -1342,7 +1342,7 @@ export default function ProfilePage() {
         <CollapsibleSection
           title={t('vip.customization.title')}
           defaultOpen={false}
-          icon={<GiCutDiamond size={20} className="text-purple-400" />}
+          icon={<GiCutDiamond style={{ width: 20, height: 20 }} className="text-purple-400" />}
         >
           <DiamondCustomizationPanel />
         </CollapsibleSection>
