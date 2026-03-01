@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { FaCrown, FaStar } from 'react-icons/fa';
 import { GiCutDiamond } from 'react-icons/gi';
+import { AlertTriangle } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useVipConfig, useVipStatus, usePurchaseVip } from '@/hooks/use-vip';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { LaunchTokenIcon } from '@/components/ui';
 import { Modal } from '@/components/ui/modal';
 
 interface VipPurchaseModalProps {
@@ -37,6 +39,11 @@ const tierMeta: Record<string, {
   },
 };
 
+interface ConfirmInfo {
+  tier: string;
+  price: string;
+}
+
 export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
   const { t } = useTranslation();
   const { data: tiers } = useVipConfig();
@@ -44,16 +51,21 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
   const purchaseMut = usePurchaseVip();
   const { addToast } = useToast();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [confirmInfo, setConfirmInfo] = useState<ConfirmInfo | null>(null);
 
   if (!open) return null;
 
   const activeTiers = tiers?.filter((t) => t.isActive) ?? [];
+  const tierOrder: Record<string, number> = { silver: 1, gold: 2, diamond: 3 };
+  const currentTierLevel = status?.tier ? tierOrder[status.tier] ?? 0 : 0;
 
-  const handlePurchase = async (tier: string) => {
-    setSelectedTier(tier);
+  const handleConfirm = async () => {
+    if (!confirmInfo) return;
+    setSelectedTier(confirmInfo.tier);
     try {
-      await purchaseMut.mutateAsync(tier);
+      await purchaseMut.mutateAsync(confirmInfo.tier);
       addToast('success', t('vip.purchaseSuccess'));
+      setConfirmInfo(null);
       onClose();
     } catch (err) {
       addToast('error', getUserFriendlyError(err, t, 'generic'));
@@ -62,11 +74,111 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
     }
   };
 
-  const tierOrder: Record<string, number> = { silver: 1, gold: 2, diamond: 3 };
-  const currentTierLevel = status?.tier ? tierOrder[status.tier] ?? 0 : 0;
+  const handleClose = () => {
+    setConfirmInfo(null);
+    onClose();
+  };
 
+  // Confirmation screen
+  if (confirmInfo) {
+    const meta = tierMeta[confirmInfo.tier];
+    const Icon = meta?.icon ?? FaStar;
+    const isUpgrade = status?.active && currentTierLevel > 0;
+    const isLoading = purchaseMut.isPending;
+    const formattedPrice = formatLaunch(confirmInfo.price);
+
+    return (
+      <Modal open onClose={handleClose} title={t('vip.confirm.title')}>
+        <div className="space-y-4">
+          {/* Tier being purchased */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
+            <div className={`p-2.5 rounded-lg bg-gradient-to-r ${meta?.gradient ?? 'from-gray-400 to-gray-300'}`}>
+              <Icon size={22} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold capitalize">{confirmInfo.tier} VIP</h3>
+              <p className="text-xs text-[var(--color-text-secondary)]">{t('vip.confirm.duration')}</p>
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
+            <span className="text-sm text-[var(--color-text-secondary)]">{t('vip.confirm.charge')}</span>
+            <span className="flex items-center gap-1.5 text-sm font-bold">
+              {formattedPrice} <LaunchTokenIcon size={16} />
+            </span>
+          </div>
+
+          {/* Warnings */}
+          <div className="space-y-2">
+            {/* Funds deduction warning */}
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle size={16} className="shrink-0 text-amber-400 mt-0.5" />
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                {t('vip.confirm.deductionWarning', { amount: formattedPrice })}
+              </p>
+            </div>
+
+            {/* Non-refundable warning if upgrading */}
+            {isUpgrade && (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <AlertTriangle size={16} className="shrink-0 text-rose-400 mt-0.5" />
+                <p className="text-xs text-rose-200/90 leading-relaxed">
+                  {t('vip.confirm.noRefundWarning', { currentTier: status!.tier! })}
+                </p>
+              </div>
+            )}
+
+            {/* General info */}
+            <div className="p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
+              <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                <li className="flex items-start gap-2">
+                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  {t('vip.confirm.activateImmediately')}
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  {t('vip.confirm.noAutoRenew')}
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  {t('vip.confirm.nonRefundable')}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmInfo(null)}
+              disabled={isLoading}
+              className="flex-1 py-2.5 rounded-xl border border-[var(--color-border)] text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98] disabled:opacity-50"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={isLoading}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-70 bg-gradient-to-r ${meta?.gradient ?? 'from-gray-400 to-gray-300'} hover:opacity-90`}
+            >
+              {isLoading ? (
+                <span className="animate-pulse">{t('vip.purchasing')}</span>
+              ) : (
+                t('vip.confirm.confirmPurchase')
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Tier selection screen
   return (
-    <Modal open onClose={onClose} title={t('vip.title')}>
+    <Modal open onClose={handleClose} title={t('vip.title')}>
       <div className="space-y-3">
         {status?.active && (
           <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-sm">
@@ -81,7 +193,6 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
           if (!meta) return null;
           const Icon = meta.icon;
           const isCurrentOrLower = (tierOrder[config.tier] ?? 0) <= currentTierLevel;
-          const isLoading = purchaseMut.isPending && selectedTier === config.tier;
 
           return (
             <div
@@ -112,7 +223,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               </ul>
 
               <button
-                onClick={() => handlePurchase(config.tier)}
+                onClick={() => setConfirmInfo({ tier: config.tier, price: config.price })}
                 disabled={isCurrentOrLower || purchaseMut.isPending}
                 className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
                   isCurrentOrLower
@@ -120,9 +231,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
                     : `bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 active:scale-[0.98]`
                 }`}
               >
-                {isLoading ? (
-                  <span className="animate-pulse">{t('vip.purchasing')}</span>
-                ) : isCurrentOrLower ? (
+                {isCurrentOrLower ? (
                   currentTierLevel === (tierOrder[config.tier] ?? 0) ? t('vip.currentPlan') : t('vip.included')
                 ) : status?.active ? (
                   t('vip.upgrade')

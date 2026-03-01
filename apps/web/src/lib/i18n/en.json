@@ -929,6 +929,17 @@
       "superMegaJackpot": "Super Mega jackpot eligibility",
       "customization": "Profile customization (name gradient, frame style, badge icon)"
     },
+    "confirm": {
+      "title": "Confirm Purchase",
+      "duration": "30 days subscription",
+      "charge": "Will be charged",
+      "deductionWarning": "{amount} COIN will be deducted from your game balance immediately.",
+      "noRefundWarning": "Your current {currentTier} VIP subscription will be replaced. Remaining days will NOT be refunded.",
+      "activateImmediately": "Subscription activates immediately for 30 days",
+      "noAutoRenew": "Does not auto-renew — you can repurchase when it expires",
+      "nonRefundable": "All VIP purchases are final and non-refundable",
+      "confirmPurchase": "Confirm Purchase"
+    },
     "info": {
       "playerHasVip": "This player has a {tier} VIP subscription",
       "jackpotRequiresVip": "Participation in {jackpot} jackpot requires {tier} VIP or higher",
