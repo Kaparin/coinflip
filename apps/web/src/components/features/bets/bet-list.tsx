@@ -18,6 +18,7 @@ import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, i
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { LaunchTokenIcon } from '@/components/ui';
+import { InsufficientBalanceModal } from '@/components/features/vault/insufficient-balance-modal';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
@@ -100,6 +101,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
 
   // Confirmation modal state
   const [acceptTarget, setAcceptTarget] = useState<{ id: string; amount: number } | null>(null);
+  // Insufficient balance modal state
+  const [insufficientInfo, setInsufficientInfo] = useState<{ required: string; available: string } | null>(null);
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/v1/bets'] });
@@ -325,10 +328,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     const effectiveAvailable = availableMicro - pendingAcceptAmountRef.current;
 
     if (effectiveAvailable < betAmount) {
-      addToast('warning', t('bets.insufficientForAccept', {
-        amount: fromMicroLaunch(Number(bet.amount)).toLocaleString(),
-        available: fromMicroLaunch(Number(effectiveAvailable < 0n ? 0n : effectiveAvailable)).toLocaleString(),
-      }));
+      const availStr = String(effectiveAvailable < 0n ? 0n : effectiveAvailable);
+      setInsufficientInfo({ required: bet.amount, available: availStr });
       setAcceptTarget(null);
       return;
     }
@@ -457,6 +458,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
                 winner={(bet as any).winner}
                 acceptor={(bet as any).acceptor}
                 makerVipTier={(bet as any).maker_vip_tier}
+                makerVipCustomization={(bet as any).maker_vip_customization}
                 isBoosted={(bet as any).is_boosted}
                 isPinned={(bet as any).is_pinned}
                 pinSlot={(bet as any).pin_slot}
@@ -523,6 +525,13 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           );
         })()}
       </Modal>
+
+      <InsufficientBalanceModal
+        open={!!insufficientInfo}
+        onClose={() => setInsufficientInfo(null)}
+        requiredAmount={insufficientInfo?.required ?? '0'}
+        availableAmount={insufficientInfo?.available ?? '0'}
+      />
 
       <OnboardingModal
         isOpen={showOnboarding}

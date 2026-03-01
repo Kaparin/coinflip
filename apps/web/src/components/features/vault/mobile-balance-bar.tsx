@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Wallet } from 'lucide-react';
 import { useGetVaultBalance } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -33,6 +33,23 @@ export function MobileBalanceBar() {
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
   const [expanded, setExpanded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click/tap
+  useEffect(() => {
+    if (!expanded) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [expanded]);
 
   if (!isConnected) return null;
 
@@ -56,7 +73,7 @@ export function MobileBalanceBar() {
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   return (
-    <div className="md:hidden">
+    <div ref={containerRef} className="md:hidden">
       {/* Compact bar — tap to expand */}
       <button
         type="button"

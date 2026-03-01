@@ -208,6 +208,11 @@
     "acceptingBtn": "Accepting...",
     "acceptBetBtn": "Accept Bet",
     "insufficientForAccept": "Insufficient balance. You need {amount} COIN (available: {available}).",
+    "insufficientTitle": "Insufficient Balance",
+    "insufficientRequired": "Required",
+    "insufficientAvailable": "Available",
+    "insufficientShortfall": "Shortfall",
+    "insufficientDeposit": "Deposit",
     "failedToAccept": "Failed to accept bet."
   },
   "myBets": {
@@ -929,6 +934,49 @@
       "privileges": "Privileges",
       "getVip": "Get VIP",
       "learnMore": "Learn more about VIP"
+    },
+    "customization": {
+      "title": "Diamond Customization",
+      "nameGradient": "Name Gradient",
+      "frameStyle": "Avatar Frame",
+      "badgeIcon": "Badge Icon",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Customization saved!",
+      "default": "Default",
+      "gradient": {
+        "fire": "Fire",
+        "ocean": "Ocean",
+        "aurora": "Aurora",
+        "sunset": "Sunset",
+        "neon": "Neon",
+        "golden": "Golden",
+        "ice": "Ice",
+        "toxic": "Toxic",
+        "blood": "Blood"
+      },
+      "frame": {
+        "conic-spin": "Conic Spin",
+        "double-ring": "Double Ring",
+        "neon-pulse": "Neon Pulse",
+        "fire-ring": "Fire Ring",
+        "frost": "Frost",
+        "holographic": "Holographic",
+        "plasma": "Plasma",
+        "solar": "Solar",
+        "shadow": "Shadow"
+      },
+      "icon": {
+        "crown": "Crown",
+        "lightning": "Lightning",
+        "dragon": "Dragon",
+        "phoenix": "Phoenix",
+        "skull": "Skull",
+        "flame": "Flame",
+        "sword": "Swords",
+        "star": "Star",
+        "eye": "All-Seeing Eye"
+      }
     }
   },
   "boost": {

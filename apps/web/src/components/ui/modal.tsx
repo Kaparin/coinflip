@@ -19,6 +19,8 @@ export interface ModalProps {
   showCloseButton?: boolean;
   /** Show "Close" button at bottom. Default false. */
   showCloseButtonBottom?: boolean;
+  /** Close when clicking on the overlay background. Default true. Set false for forms to prevent accidental data loss. */
+  closeOnOverlayClick?: boolean;
   children: ReactNode;
 }
 
@@ -62,6 +64,7 @@ export function Modal({
   title,
   showCloseButton = true,
   showCloseButtonBottom = false,
+  closeOnOverlayClick = true,
   children,
 }: ModalProps) {
   const { t } = useTranslation();
@@ -130,9 +133,9 @@ export function Modal({
   const canClose = showCloseButton;
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (canClose && e.target === overlayRef.current) onCloseRef.current();
+      if (canClose && closeOnOverlayClick && e.target === overlayRef.current) onCloseRef.current();
     },
-    [canClose],
+    [canClose, closeOnOverlayClick],
   );
   const handleCloseClick = useCallback(() => onCloseRef.current(), []);
 

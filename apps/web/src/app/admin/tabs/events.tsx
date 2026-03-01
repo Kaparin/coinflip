@@ -718,7 +718,7 @@ export function EventsTab() {
       <PendingSponsoredRaffles onRefreshEvents={fetchEvents} />
 
       {/* Create Event Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Edit Event' : 'Create Event'}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Edit Event' : 'Create Event'} closeOnOverlayClick={false}>
         <div className="space-y-4">
           {/* Type & Title */}
           <div className="grid grid-cols-2 gap-3">
@@ -994,7 +994,7 @@ export function EventsTab() {
       </Modal>
 
       {/* Event Detail Modal */}
-      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setEditMode(false); }} title={detailEvent?.title ?? 'Event Details'}>
+      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setEditMode(false); }} title={detailEvent?.title ?? 'Event Details'} closeOnOverlayClick={false}>
         {detailEvent && (
           <div className="space-y-4">
             {/* Event info — inline edit for active events */}

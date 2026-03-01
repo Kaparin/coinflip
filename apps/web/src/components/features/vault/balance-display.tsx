@@ -22,6 +22,7 @@ function extractTxHashFromError(err: unknown): string | null {
   return m?.[1] ?? null;
 }
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
 import { setBalanceGracePeriod } from '@/lib/balance-grace';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -326,6 +327,8 @@ export function BalanceDisplay() {
   const queryClient = useQueryClient();
 
   const [showDeposit, setShowDeposit] = useState(false);
+  const { subscribe } = useDepositTrigger();
+  useEffect(() => subscribe(() => setShowDeposit(true)), [subscribe]);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showCoinGuide, setShowCoinGuide] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');

@@ -208,6 +208,11 @@
     "acceptingBtn": "Принятие...",
     "acceptBetBtn": "Принять ставку",
     "insufficientForAccept": "Недостаточно средств. Нужно {amount} COIN (доступно: {available}).",
+    "insufficientTitle": "Недостаточно средств",
+    "insufficientRequired": "Требуется",
+    "insufficientAvailable": "Доступно",
+    "insufficientShortfall": "Не хватает",
+    "insufficientDeposit": "Пополнить",
     "failedToAccept": "Не удалось принять ставку."
   },
   "myBets": {
@@ -929,6 +934,49 @@
       "privileges": "Привилегии",
       "getVip": "Получить VIP",
       "learnMore": "Узнать о VIP"
+    },
+    "customization": {
+      "title": "Кастомизация Diamond",
+      "nameGradient": "Градиент имени",
+      "frameStyle": "Рамка аватара",
+      "badgeIcon": "Иконка бейджа",
+      "save": "Сохранить",
+      "saving": "Сохранение...",
+      "saved": "Кастомизация сохранена!",
+      "default": "По умолчанию",
+      "gradient": {
+        "fire": "Огонь",
+        "ocean": "Океан",
+        "aurora": "Аврора",
+        "sunset": "Закат",
+        "neon": "Неон",
+        "golden": "Золотой",
+        "ice": "Лёд",
+        "toxic": "Токсичный",
+        "blood": "Кровавый"
+      },
+      "frame": {
+        "conic-spin": "Конический спин",
+        "double-ring": "Двойное кольцо",
+        "neon-pulse": "Неоновый пульс",
+        "fire-ring": "Огненное кольцо",
+        "frost": "Мороз",
+        "holographic": "Голографический",
+        "plasma": "Плазма",
+        "solar": "Солнечный",
+        "shadow": "Тень"
+      },
+      "icon": {
+        "crown": "Корона",
+        "lightning": "Молния",
+        "dragon": "Дракон",
+        "phoenix": "Феникс",
+        "skull": "Череп",
+        "flame": "Пламя",
+        "sword": "Мечи",
+        "star": "Звезда",
+        "eye": "Всевидящее Око"
+      }
     }
   },
   "boost": {
