@@ -223,10 +223,9 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
   });
 });
 
-/** Poll chain REST API for tx confirmation (2s interval, 30s timeout). */
-async function pollTxConfirmation(txHash: string): Promise<{ code: number; rawLog: string; height: number } | null> {
+/** Poll chain REST API for tx confirmation. */
+async function pollTxConfirmation(txHash: string, maxPollMs = 30_000): Promise<{ code: number; rawLog: string; height: number } | null> {
   const pollStartTime = Date.now();
-  const maxPollMs = 30_000;
   const pollIntervalMs = 2_000;
 
   while (Date.now() - pollStartTime < maxPollMs) {
@@ -389,13 +388,42 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
     const txResult = await pollTxConfirmation(txHash);
 
     if (!txResult) {
-      // Tx is in mempool but not confirmed within timeout — still likely to succeed
-      logger.warn({ txHash, address }, 'Deposit tx poll timeout — still in mempool');
+      // Tx is in mempool but not confirmed within 30s — spawn background poll
+      // so we still invalidate cache + sync balance when it eventually confirms.
+      logger.warn({ txHash, address }, 'Deposit tx poll timeout — continuing in background');
+
+      (async () => {
+        try {
+          const result = await pollTxConfirmation(txHash, 90_000);
+          if (!result) {
+            logger.warn({ txHash, address }, 'Deposit background poll timeout (90s) — giving up');
+            return;
+          }
+          if (result.code === 0) {
+            logger.info({ txHash, address, height: result.height }, 'Deposit confirmed in background');
+            invalidateBalanceCache(address);
+            const chainBalance = await getChainVaultBalance(address);
+            await vaultService.syncBalanceFromChain(
+              user.id,
+              chainBalance.available,
+              chainBalance.locked,
+              BigInt(result.height),
+            );
+            wsService.sendToAddress(address, {
+              type: 'balance_updated',
+              data: { available: chainBalance.available, locked: chainBalance.locked },
+            });
+          }
+        } catch (err) {
+          logger.error({ err, txHash, address }, 'Deposit background poll error');
+        }
+      })();
+
       return c.json({
         data: {
           status: 'pending',
           tx_hash: txHash,
-          message: 'Transaction submitted but not yet confirmed. It may still succeed.',
+          message: 'Transaction submitted but not yet confirmed. You will be notified when confirmed.',
         },
       });
     }
