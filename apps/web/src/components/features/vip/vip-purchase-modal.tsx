@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { FaCrown, FaStar, FaTimes } from 'react-icons/fa';
+import { FaCrown, FaStar } from 'react-icons/fa';
 import { GiCutDiamond } from 'react-icons/gi';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useVipConfig, useVipStatus, usePurchaseVip } from '@/hooks/use-vip';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { Modal } from '@/components/ui/modal';
 
 interface VipPurchaseModalProps {
   open: boolean;
@@ -65,83 +66,74 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
   const currentTierLevel = status?.tier ? tierOrder[status.tier] ?? 0 : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-[var(--color-surface)] border border-white/10 rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 animate-[scaleIn_0.2s_ease-out]">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">{t('vip.title')}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <FaTimes className="h-4 w-4" />
-          </button>
-        </div>
-
+    <Modal open onClose={onClose} title={t('vip.title')}>
+      <div className="space-y-3">
         {status?.active && (
-          <div className="mb-4 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-sm">
+          <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-sm">
             {t('vip.currentTier')}: <span className="font-bold capitalize">{status.tier}</span>
             {' '}&middot;{' '}
             {t('vip.expiresAt')}: {status.expiresAt ? new Date(status.expiresAt).toLocaleDateString() : '—'}
           </div>
         )}
 
-        <div className="grid gap-4">
-          {activeTiers.map((config) => {
-            const meta = tierMeta[config.tier];
-            if (!meta) return null;
-            const Icon = meta.icon;
-            const isCurrentOrLower = (tierOrder[config.tier] ?? 0) <= currentTierLevel;
-            const isLoading = purchaseMut.isPending && selectedTier === config.tier;
+        {activeTiers.map((config) => {
+          const meta = tierMeta[config.tier];
+          if (!meta) return null;
+          const Icon = meta.icon;
+          const isCurrentOrLower = (tierOrder[config.tier] ?? 0) <= currentTierLevel;
+          const isLoading = purchaseMut.isPending && selectedTier === config.tier;
 
-            return (
-              <div
-                key={config.tier}
-                className={`relative rounded-xl border border-white/10 p-4 transition-all hover:border-white/20 ${
-                  isCurrentOrLower ? 'opacity-50' : ''
+          return (
+            <div
+              key={config.tier}
+              className={`relative rounded-xl border border-white/10 p-3 sm:p-4 transition-all hover:border-white/20 ${
+                isCurrentOrLower ? 'opacity-50' : ''
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-lg bg-gradient-to-r ${meta.gradient}`}>
+                  <Icon size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold capitalize text-sm">{config.tier}</h3>
+                  <p className="text-xs text-white/50">
+                    {formatLaunch(config.price)} COIN / {t('vip.month')}
+                  </p>
+                </div>
+              </div>
+
+              <ul className="space-y-0.5 mb-3">
+                {meta.perks.map((perkKey) => (
+                  <li key={perkKey} className="text-xs text-white/70 flex items-center gap-2">
+                    <span className="text-green-400 text-[10px]">&#10003;</span>
+                    {t(perkKey)}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                onClick={() => handlePurchase(config.tier)}
+                disabled={isCurrentOrLower || purchaseMut.isPending}
+                className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
+                  isCurrentOrLower
+                    ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                    : `bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 active:scale-[0.98]`
                 }`}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`p-2 rounded-lg bg-gradient-to-r ${meta.gradient}`}>
-                    <Icon size={20} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold capitalize">{config.tier}</h3>
-                    <p className="text-sm text-white/50">
-                      {formatLaunch(config.price)} COIN / {t('vip.month')}
-                    </p>
-                  </div>
-                </div>
-
-                <ul className="space-y-1 mb-4">
-                  {meta.perks.map((perkKey) => (
-                    <li key={perkKey} className="text-sm text-white/70 flex items-center gap-2">
-                      <span className="text-green-400 text-xs">&#10003;</span>
-                      {t(perkKey)}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handlePurchase(config.tier)}
-                  disabled={isCurrentOrLower || purchaseMut.isPending}
-                  className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
-                    isCurrentOrLower
-                      ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                      : `bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 active:scale-[0.98]`
-                  }`}
-                >
-                  {isLoading ? (
-                    <span className="animate-pulse">{t('vip.purchasing')}</span>
-                  ) : isCurrentOrLower ? (
-                    currentTierLevel === (tierOrder[config.tier] ?? 0) ? t('vip.currentPlan') : t('vip.included')
-                  ) : status?.active ? (
-                    t('vip.upgrade')
-                  ) : (
-                    t('vip.subscribe')
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                {isLoading ? (
+                  <span className="animate-pulse">{t('vip.purchasing')}</span>
+                ) : isCurrentOrLower ? (
+                  currentTierLevel === (tierOrder[config.tier] ?? 0) ? t('vip.currentPlan') : t('vip.included')
+                ) : status?.active ? (
+                  t('vip.upgrade')
+                ) : (
+                  t('vip.subscribe')
+                )}
+              </button>
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </Modal>
   );
 }

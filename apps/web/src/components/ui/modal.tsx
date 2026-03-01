@@ -161,7 +161,7 @@ export function Modal({
         onPointerDown={(e) => e.stopPropagation()}
         className={[
           'w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
-          'bg-[var(--color-surface)] shadow-2xl flex flex-col',
+          'bg-[var(--color-surface)] shadow-2xl flex flex-col overflow-hidden',
           'transition-all duration-200',
           // When keyboard open (viewportStyles set), use % of overlay; else vh
           Object.keys(viewportStyles).length > 0 ? 'max-h-[90%]' : 'max-h-[90vh] sm:max-h-[85vh]',

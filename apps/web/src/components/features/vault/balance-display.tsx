@@ -230,12 +230,12 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
 
   return (
     <Modal open onClose={onClose} title={t('balance.coinGuideTitle')}>
-      <div className="space-y-3 pb-2 overflow-x-hidden">
+      <div className="space-y-3 pb-1">
         {/* Contract address — copyable */}
         <button
           type="button"
           onClick={handleCopy}
-          className="w-full flex items-center gap-2 rounded-xl border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-primary)]/10 active:scale-[0.98]"
+          className="w-full flex items-center gap-2 rounded-xl border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 px-3 py-2 text-left transition-colors hover:bg-[var(--color-primary)]/10 active:scale-[0.98]"
         >
           <div className="flex-1 min-w-0 overflow-hidden">
             <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('balance.coinGuideContract')}</p>
@@ -248,38 +248,37 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
           )}
         </button>
 
-        {/* Steps */}
+        {/* Steps — compact: thumbnail left, text right */}
         {GUIDE_STEPS.map((step, idx) => {
           const text = t(`balance.${step.key}`);
-          // Parse **bold** markers
           const parts = text.split(/\*\*(.*?)\*\*/g);
 
           return (
-            <div key={idx} className="space-y-2">
-              <div className="flex items-start gap-2">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white text-[10px] font-bold">
-                  {idx + 1}
-                </div>
-                <p className="text-xs text-[var(--color-text-secondary)] pt-px leading-relaxed min-w-0">
-                  {parts.map((part, i) =>
-                    i % 2 === 1 ? <strong key={i} className="text-[var(--color-text)] font-semibold">{part}</strong> : part
-                  )}
-                </p>
-              </div>
-              {/* Thumbnail */}
+            <div key={idx} className="flex items-start gap-2.5">
+              {/* Thumbnail — small, tappable */}
               <button
                 type="button"
                 onClick={() => setExpandedImg(step.image)}
-                className="ml-7 block max-w-[160px] rounded-xl overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-primary)]/50 transition-colors active:scale-[0.98] shadow-sm"
+                className="relative shrink-0 w-16 rounded-lg overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-primary)]/50 transition-colors active:scale-[0.97] shadow-sm"
               >
                 <Image
                   src={step.image}
                   alt={`Step ${idx + 1}`}
-                  width={160}
-                  height={284}
+                  width={64}
+                  height={114}
                   className="w-full h-auto"
                 />
+                {/* Step number overlay */}
+                <span className="absolute top-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-primary)] text-white text-[8px] font-bold shadow">
+                  {idx + 1}
+                </span>
               </button>
+              {/* Text */}
+              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed min-w-0 pt-0.5">
+                {parts.map((part, i) =>
+                  i % 2 === 1 ? <strong key={i} className="text-[var(--color-text)] font-semibold">{part}</strong> : part
+                )}
+              </p>
             </div>
           );
         })}

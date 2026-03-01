@@ -63,14 +63,14 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
       role="dialog"
       aria-modal="true"
       onClick={handleDismiss}
-      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
+      className={`fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
         visible ? 'opacity-100' : 'opacity-0'
       }`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-2xl border bg-[var(--color-surface)] shadow-2xl ${glowShadow} transition-all duration-300 overflow-hidden ${
-          visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+        className={`relative w-full sm:max-w-md max-h-[90vh] sm:max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl border bg-[var(--color-surface)] shadow-2xl ${glowShadow} transition-all duration-300 overflow-hidden ${
+          visible ? 'translate-y-0 sm:scale-100 opacity-100' : 'translate-y-full sm:translate-y-0 sm:scale-95 opacity-0'
         } ${borderColor}`}
       >
         {/* Gradient header strip */}
@@ -87,7 +87,7 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="p-5 space-y-4">
+          <div className="p-4 sm:p-5 space-y-4">
             {/* Icon */}
             <div className="flex flex-col items-center gap-2.5">
               <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${accentBg}/15`}>
@@ -125,7 +125,7 @@ export function AnnouncementModal({ open, onDismiss, title, message, priority, s
           </div>
 
           {/* Sticky button */}
-          <div className="sticky bottom-0 px-5 pb-5 pt-2 bg-gradient-to-t from-[var(--color-surface)] via-[var(--color-surface)] to-transparent">
+          <div className="sticky bottom-0 px-4 sm:px-5 pb-4 sm:pb-5 pt-2 bg-gradient-to-t from-[var(--color-surface)] via-[var(--color-surface)] to-transparent">
             <button
               type="button"
               onClick={handleDismiss}

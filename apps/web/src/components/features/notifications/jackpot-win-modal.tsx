@@ -120,19 +120,19 @@ export function JackpotWinModal({ open, onDismiss, tierName, amount }: JackpotWi
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md transition-opacity duration-300 ${
         visible ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={onDismiss}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center transition-all duration-500 ${
-          visible ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+        className={`relative w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6 text-center transition-all duration-500 ${
+          visible ? 'translate-y-0 sm:scale-100 opacity-100' : 'translate-y-full sm:translate-y-0 sm:scale-75 opacity-0'
         }`}
       >
         {/* Gradient background */}
-        <div className={`absolute inset-0 rounded-2xl bg-gradient-to-b ${theme.gradient} pointer-events-none`} />
+        <div className={`absolute inset-0 rounded-t-2xl sm:rounded-2xl bg-gradient-to-b ${theme.gradient} pointer-events-none`} />
 
         {/* Content */}
         <div className="relative z-10">

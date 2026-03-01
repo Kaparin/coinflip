@@ -104,11 +104,11 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
   const canSubmit = title.trim().length >= 3 && description.trim().length >= 3 && Number(prizeAmountHuman) >= 1 && startsAt && !submitMutation.isPending && !submitted;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[70] flex items-end md:items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div className={`fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className={`relative w-full max-w-md md:rounded-2xl rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : 'translate-y-8'} max-h-[85vh] overflow-y-auto`}>
+      <div className={`relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : 'translate-y-8'} max-h-[90vh] sm:max-h-[85vh] overflow-y-auto`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/15">
               <Trophy size={16} className="text-amber-400" />
