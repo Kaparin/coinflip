@@ -37,21 +37,27 @@ Each entry: file, lines changed, why, how to rollback.
 
 ## PR-2: Frontend Render Performance
 
-_(see PR-2 branch for details)_
-
----
-
-## PR-4: Balance Dedup + WS Cleanup
-
-### Chain Cache
+### React.memo on BetCard
 
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
-| `apps/api/src/routes/vault.ts` | `chainCached` TTL from 10s → 30s | Balance endpoint adjusts for pending locks; 10s was too aggressive (~6 RPC/min/user). 30s reduces to ~2/min. `invalidateBalanceCache()` still works for immediate needs. | Change `30_000` back to `10_000` |
+| `apps/web/src/components/features/bets/bet-card.tsx` | Wrapped component export with `memo()`. Changed `export function BetCard` → `export const BetCard = memo(function BetCard`. Added `memo` to imports. | Each BetCard has its own countdown timer that ticks every second. Without memo, a parent re-render (e.g., from WS events) re-renders ALL 50+ cards even when their props haven't changed. With memo, only cards with changed props re-render. | Revert commit |
 
-### WS-aware Polling
+### Remove setLastEvent from useWebSocket
 
 | File | Change | Why | Rollback |
 |------|--------|-----|----------|
-| `apps/web/src/components/features/vault/balance-display.tsx` | `refetchInterval: 15_000` → WS-aware function (30s when WS connected, 15s when disconnected, paused during balance grace period) | Last component using fixed 15s polling. When WS connected, events trigger instant invalidation. | Revert commit |
-| `apps/web/src/hooks/use-wallet-balance.ts` | `useWalletBalance` `refetchInterval: 15_000` → WS-aware function | CW20 wallet balance polled every 15s even with active WS. WS `balance_updated` events already invalidate this query. | Revert commit |
+| `apps/web/src/hooks/use-websocket.ts` | Removed `useState<WsEvent \| null>` for lastEvent. Removed `setLastEvent(parsed)` call. Return `lastEvent: null` hardcoded to keep interface stable. | Every WS message triggered `setLastEvent()` → React state update → re-render of GamePage + all children. `lastEvent` was never consumed by any component. Removing it eliminates N re-renders per second from WS traffic. | Revert commit |
+
+### Memoize MyBets filter results
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/components/features/bets/my-bets.tsx` | Wrapped `myOpenBets`, `myAccepting`, `myInProgress`, `myResolved` filter computations with `useMemo()`. Added `useMemo` to imports. | Filter results created new array references on every render, causing child components to re-render even when data hadn't changed. `useMemo` ensures stable references when `myBets` array hasn't changed. | Revert commit |
+
+### Lazy-mount hidden tabs
+
+| File | Change | Why | Rollback |
+|------|--------|-----|----------|
+| `apps/web/src/app/game/page.tsx` | Added `visitedTabs` state (Set). Tabs mount on first visit, stay mounted (preserving scroll). BetList always mounted. MyBets/HistoryList/Leaderboard mount lazily. | Previously all 4 tabs mounted on page load, each firing their own API queries and running timers even when hidden. Lazy-mount means only visited tabs consume resources. Once visited, they stay mounted to preserve scroll position. | Revert commit |
+_(entries will be added as changes are made)_

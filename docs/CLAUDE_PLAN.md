@@ -9,8 +9,7 @@
 
 | PR | Scope | Status | Branch |
 |----|-------|--------|--------|
-| PR-1 | DB indexes + query caches | IN PROGRESS | `perf/db-indexes-and-caches` |
-| PR-2 | Frontend render perf | PENDING | `perf/frontend-render` |
+
 | PR-3 | Async deposit 202 | PENDING | — |
 | PR-4 | Balance dedup + WS cleanup | DONE | `perf/balance-dedup-ws-cleanup` |
 | PR-5 | RPC failover | PENDING | — |
@@ -32,14 +31,13 @@
 - DB migration via Neon MCP (CREATE INDEX CONCURRENTLY)
 
 ### Verification Checklist
+
 - [ ] Deposit: send → pending → confirmed → balance updated
 - [ ] Bet flow: create → accept → reveal → jackpot/referral intact
 - [ ] Leaderboard: loads correctly, data matches, updates within 60s
 - [ ] TopWinner: displays correct winner, updates within 60s
 - [ ] User stats (/me): correct counts, updates within 60s
 - [ ] No errors in API logs after deploy
-- [ ] `pnpm --filter @coinflip/api typecheck` passes
-- [ ] Indexes visible in Neon dashboard
 
 ### Expected Effect
 - Leaderboard p95: ~500ms+ → <100ms (cached)
@@ -57,18 +55,7 @@
 
 ### Files Changed
 - `apps/web/src/components/features/bets/bet-card.tsx` — React.memo wrapper
-- `apps/web/src/hooks/use-websocket.ts` — remove setLastEvent
-- `apps/web/src/components/features/bets/my-bets.tsx` — memoize myResolved filter
-- `apps/web/src/app/game/page.tsx` — lazy-mount hidden tabs
 
-### Verification Checklist
-- [ ] Game page with 50 bets: no visual freezing
-- [ ] Tab switching: content appears instantly, scroll positions OK
-- [ ] Bet cards: countdowns tick correctly, accept/cancel buttons work
-- [ ] MyBets: resolved bets fade out correctly
-- [ ] WS events: bets appear/update/disappear in real time
-- [ ] No console errors
-- [ ] `pnpm --filter @coinflip/web typecheck` passes
 - [ ] Mobile: pull-to-refresh still works
 
 ### Expected Effect
