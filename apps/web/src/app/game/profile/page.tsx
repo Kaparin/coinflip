@@ -962,7 +962,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   );
 }
 
-function NicknameEditor({ currentNickname, address, loading }: { currentNickname: string | null; address: string; loading?: boolean }) {
+function NicknameEditor({ currentNickname, address, loading, vipNameClass }: { currentNickname: string | null; address: string; loading?: boolean; vipNameClass?: string }) {
   const { t } = useTranslation();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
@@ -1038,7 +1038,7 @@ function NicknameEditor({ currentNickname, address, loading }: { currentNickname
 
   return (
     <button type="button" onClick={startEditing}
-      className="group flex items-center gap-1.5 text-sm font-bold hover:text-[var(--color-primary)] transition-colors">
+      className={`group flex items-center gap-1.5 text-sm font-bold hover:text-[var(--color-primary)] transition-colors ${vipNameClass ?? ''}`}>
       <span>{currentNickname || t('profile.setNickname')}</span>
       <Pencil size={14} className="text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)] transition-colors" />
     </button>
@@ -1298,11 +1298,12 @@ export default function ProfilePage() {
             </div>
           </VipAvatarFrame>
           <div className="min-w-0 flex-1">
-            <div className={`flex items-center gap-2 ${getVipNameClass(vipStatus?.tier)}`}>
+            <div className="flex items-center gap-2">
               <NicknameEditor
                 currentNickname={(profileData as any)?.data?.nickname ?? null}
                 address={wallet.address ?? ''}
                 loading={profileLoading}
+                vipNameClass={getVipNameClass(vipStatus?.tier)}
               />
               <VipBadge tier={vipStatus?.tier} />
             </div>
