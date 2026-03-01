@@ -135,10 +135,7 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
                 </h3>
                 {requiredVip && vipBadgeStyle ? (
                   <span
-                    role="button"
-                    tabIndex={0}
                     onClick={() => setVipInfoOpen(true)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVipInfoOpen(true); } }}
                     className={`inline-flex shrink-0 items-center rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} font-bold leading-none ${vipBadgeStyle.text} cursor-pointer`}
                     style={{ gap: 2, padding: '2px 6px', fontSize: 9 }}
                   >

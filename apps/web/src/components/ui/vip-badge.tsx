@@ -72,10 +72,7 @@ export function VipBadge({ tier, badgeIcon, size = 'sm', showLabel = false, onCl
         fontSize: isSm ? 10 : 12,
       }}
       title={`${config.label} VIP`}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as any); } } : undefined}
     >
       <Icon style={{ width: iconPx, height: iconPx, display: 'block', flexShrink: 0 }} />
       {showLabel && <span>{config.label}</span>}
