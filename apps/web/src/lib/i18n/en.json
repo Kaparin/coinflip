@@ -926,7 +926,8 @@
       "boostsUnlimited": "Unlimited bet boosts",
       "largeJackpot": "Large jackpot eligibility",
       "megaJackpot": "Mega jackpot eligibility",
-      "superMegaJackpot": "Super Mega jackpot eligibility"
+      "superMegaJackpot": "Super Mega jackpot eligibility",
+      "customization": "Profile customization (name gradient, frame style, badge icon)"
     },
     "info": {
       "playerHasVip": "This player has a {tier} VIP subscription",

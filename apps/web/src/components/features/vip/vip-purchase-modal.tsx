@@ -32,7 +32,7 @@ const tierMeta: Record<string, {
   diamond: {
     icon: GiCutDiamond,
     gradient: 'from-purple-500 via-pink-500 to-red-500',
-    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot', 'vip.perks.superMegaJackpot'],
+    perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.customization', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot', 'vip.perks.superMegaJackpot'],
   },
 };
 
