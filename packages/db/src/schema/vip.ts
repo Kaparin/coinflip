@@ -33,6 +33,7 @@ export const vipSubscriptions = pgTable(
 export const vipConfig = pgTable('vip_config', {
   tier: text('tier').primaryKey(),
   price: numeric('price', { precision: 38, scale: 0 }).notNull(),
+  yearlyPrice: numeric('yearly_price', { precision: 38, scale: 0 }),
   isActive: integer('is_active').notNull().default(1),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

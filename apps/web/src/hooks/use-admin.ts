@@ -675,7 +675,7 @@ export function useAdminUpdateVipConfig() {
   const { address } = useWalletContext();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { tier: string; price?: string; isActive?: boolean }) =>
+    mutationFn: (body: { tier: string; price?: string; yearlyPrice?: string; isActive?: boolean }) =>
       adminFetch<{ status: string }>('/api/v1/admin/vip/config', address!, {
         method: 'PUT',
         body: JSON.stringify(body),

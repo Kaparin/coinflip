@@ -60,9 +60,9 @@ vipRouter.patch('/customization', authMiddleware, zValidator('json', VipCustomiz
 // POST /vip/purchase — buy VIP subscription
 vipRouter.post('/purchase', authMiddleware, zValidator('json', PurchaseVipRequestSchema), async (c) => {
   const user = c.get('user');
-  const { tier } = c.req.valid('json');
+  const { tier, period } = c.req.valid('json');
 
-  const result = await vipService.purchaseVip(user.id, tier);
+  const result = await vipService.purchaseVip(user.id, tier, period);
   return c.json({ success: true, expiresAt: result.expiresAt });
 });
 

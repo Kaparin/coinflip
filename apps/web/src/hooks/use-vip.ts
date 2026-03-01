@@ -9,6 +9,7 @@ import { getAuthHeaders } from '@/lib/auth-headers';
 interface VipTierConfig {
   tier: string;
   price: string;
+  yearlyPrice: string | null;
   isActive: boolean;
 }
 
@@ -80,10 +81,10 @@ export function useVipStatus(enabled = true) {
 export function usePurchaseVip() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (tier: string) => {
+    mutationFn: async ({ tier, period = 'monthly' }: { tier: string; period?: 'monthly' | 'yearly' }) => {
       return vipFetch<{ success: boolean; expiresAt: string }>('/api/v1/vip/purchase', {
         method: 'POST',
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier, period }),
       });
     },
     onSuccess: () => {

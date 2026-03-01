@@ -150,8 +150,11 @@ export const VIP_TIER = {
 
 export type VipTier = (typeof VIP_TIER)[keyof typeof VIP_TIER];
 
-/** VIP subscription duration in days */
+/** VIP subscription duration in days (monthly) */
 export const VIP_DURATION_DAYS = 30;
+
+/** VIP yearly subscription duration in days */
+export const VIP_YEARLY_DURATION_DAYS = 365;
 
 /** Default prices in micro-COIN (admin-editable via vip_config table) */
 export const VIP_DEFAULT_PRICES: Record<VipTier, string> = {

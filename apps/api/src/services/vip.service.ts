@@ -10,7 +10,7 @@ import { eq, sql, and, gt, isNull } from 'drizzle-orm';
 import { vipSubscriptions, vipConfig, boostUsage, treasuryLedger, vipCustomization } from '@coinflip/db/schema';
 import type { VipCustomization } from '@coinflip/shared/vip-customization';
 import { DEFAULT_VIP_CUSTOMIZATION } from '@coinflip/shared/vip-customization';
-import { VIP_DURATION_DAYS, BOOST_LIMITS } from '@coinflip/shared/constants';
+import { VIP_DURATION_DAYS, VIP_YEARLY_DURATION_DAYS, BOOST_LIMITS } from '@coinflip/shared/constants';
 import type { VipTier } from '@coinflip/shared/constants';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
@@ -76,12 +76,12 @@ class VipService {
    * Purchase a VIP subscription.
    * Deducts price from available balance, records treasury revenue.
    */
-  async purchaseVip(userId: string, tier: VipTier): Promise<{ expiresAt: string }> {
+  async purchaseVip(userId: string, tier: VipTier, period: 'monthly' | 'yearly' = 'monthly'): Promise<{ expiresAt: string }> {
     const db = getDb();
 
     // Get tier config + price
     const [config] = await db
-      .select({ price: vipConfig.price, isActive: vipConfig.isActive })
+      .select({ price: vipConfig.price, yearlyPrice: vipConfig.yearlyPrice, isActive: vipConfig.isActive })
       .from(vipConfig)
       .where(eq(vipConfig.tier, tier))
       .limit(1);
@@ -90,7 +90,10 @@ class VipService {
       throw Errors.validationError(`VIP tier "${tier}" is not available`);
     }
 
-    const price = config.price;
+    const price = period === 'yearly'
+      ? (config.yearlyPrice ?? config.price)
+      : config.price;
+    const durationDays = period === 'yearly' ? VIP_YEARLY_DURATION_DAYS : VIP_DURATION_DAYS;
 
     // Check if user already has active VIP of same or higher tier
     const existing = await this.getActiveVip(userId);
@@ -120,7 +123,7 @@ class VipService {
 
     // Calculate expiry
     const startedAt = new Date();
-    const expiresAt = new Date(startedAt.getTime() + VIP_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(startedAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     // Insert subscription
     await db.insert(vipSubscriptions).values({
@@ -173,16 +176,17 @@ class VipService {
   /**
    * Get VIP tier config (prices, active status) — public endpoint.
    */
-  async getConfig(): Promise<Array<{ tier: string; price: string; isActive: boolean }>> {
+  async getConfig(): Promise<Array<{ tier: string; price: string; yearlyPrice: string | null; isActive: boolean }>> {
     const db = getDb();
     const rows = await db
-      .select({ tier: vipConfig.tier, price: vipConfig.price, isActive: vipConfig.isActive })
+      .select({ tier: vipConfig.tier, price: vipConfig.price, yearlyPrice: vipConfig.yearlyPrice, isActive: vipConfig.isActive })
       .from(vipConfig)
       .orderBy(vipConfig.price);
 
     return rows.map((r) => ({
       tier: r.tier,
       price: r.price,
+      yearlyPrice: r.yearlyPrice,
       isActive: r.isActive === 1,
     }));
   }
@@ -288,10 +292,11 @@ class VipService {
   }
 
   /** Admin: update tier config (price, active status). */
-  async updateConfig(tier: string, updates: { price?: string; isActive?: boolean }): Promise<void> {
+  async updateConfig(tier: string, updates: { price?: string; yearlyPrice?: string; isActive?: boolean }): Promise<void> {
     const db = getDb();
     const setFields: Record<string, unknown> = { updatedAt: new Date() };
     if (updates.price !== undefined) setFields.price = updates.price;
+    if (updates.yearlyPrice !== undefined) setFields.yearlyPrice = updates.yearlyPrice;
     if (updates.isActive !== undefined) setFields.isActive = updates.isActive ? 1 : 0;
 
     await db

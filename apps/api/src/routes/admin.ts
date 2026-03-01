@@ -993,12 +993,13 @@ adminRouter.post('/vip/revoke', zValidator('json', AdminRevokeVipSchema), async 
 const AdminUpdateVipConfigSchema = z.object({
   tier: z.enum(['silver', 'gold', 'diamond']),
   price: z.string().optional(),
+  yearlyPrice: z.string().optional(),
   isActive: z.boolean().optional(),
 });
 
 adminRouter.put('/vip/config', zValidator('json', AdminUpdateVipConfigSchema), async (c) => {
   const body = c.req.valid('json');
-  await vipService.updateConfig(body.tier, { price: body.price, isActive: body.isActive });
+  await vipService.updateConfig(body.tier, { price: body.price, yearlyPrice: body.yearlyPrice, isActive: body.isActive });
   logger.info({ ...body, admin: c.get('address') }, 'admin: VIP config updated');
   return c.json({ data: { status: 'ok' } });
 });

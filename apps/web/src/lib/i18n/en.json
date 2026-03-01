@@ -911,6 +911,10 @@
   "vip": {
     "title": "VIP Subscription",
     "month": "month",
+    "year": "year",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save": "-{percent}%",
     "subscribe": "Subscribe",
     "upgrade": "Upgrade",
     "purchasing": "Processing...",
@@ -932,10 +936,12 @@
     "confirm": {
       "title": "Confirm Purchase",
       "duration": "30 days subscription",
+      "durationYearly": "365 days subscription",
       "charge": "Will be charged",
       "deductionWarning": "{amount} COIN will be deducted from your game balance immediately.",
       "noRefundWarning": "Your current {currentTier} VIP subscription will be replaced. Remaining days will NOT be refunded.",
       "activateImmediately": "Subscription activates immediately for 30 days",
+      "activateYearly": "Subscription activates immediately for 365 days",
       "noAutoRenew": "Does not auto-renew — you can repurchase when it expires",
       "nonRefundable": "All VIP purchases are final and non-refundable",
       "confirmPurchase": "Confirm Purchase"

@@ -8,22 +8,26 @@ import { useVipConfig } from '@/hooks/use-vip';
 import { StatCard, TableWrapper, ActionButton, shortAddr, timeAgo } from '../_shared';
 import { VipBadge } from '@/components/ui/vip-badge';
 
-function TierConfigRow({ tier, price, isActive }: { tier: string; price: string; isActive: boolean }) {
+function TierConfigRow({ tier, price, yearlyPrice, isActive }: { tier: string; price: string; yearlyPrice: string | null; isActive: boolean }) {
   const [editPrice, setEditPrice] = useState(() => fromMicroLaunch(Number(price)).toString());
+  const [editYearlyPrice, setEditYearlyPrice] = useState(() => yearlyPrice ? fromMicroLaunch(Number(yearlyPrice)).toString() : '');
   const [active, setActive] = useState(isActive);
   const updateMutation = useAdminUpdateVipConfig();
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setEditPrice(fromMicroLaunch(Number(price)).toString());
+    setEditYearlyPrice(yearlyPrice ? fromMicroLaunch(Number(yearlyPrice)).toString() : '');
     setActive(isActive);
-  }, [price, isActive]);
+  }, [price, yearlyPrice, isActive]);
 
-  const hasChanges = editPrice !== fromMicroLaunch(Number(price)).toString() || active !== isActive;
+  const origYearly = yearlyPrice ? fromMicroLaunch(Number(yearlyPrice)).toString() : '';
+  const hasChanges = editPrice !== fromMicroLaunch(Number(price)).toString() || editYearlyPrice !== origYearly || active !== isActive;
 
   const handleSave = async () => {
     const microPrice = toMicroLaunch(Number(editPrice)).toString();
-    await updateMutation.mutateAsync({ tier, price: microPrice, isActive: active });
+    const microYearly = editYearlyPrice ? toMicroLaunch(Number(editYearlyPrice)).toString() : undefined;
+    await updateMutation.mutateAsync({ tier, price: microPrice, yearlyPrice: microYearly, isActive: active });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -41,6 +45,20 @@ function TierConfigRow({ tier, price, isActive }: { tier: string; price: string;
             onChange={(e) => setEditPrice(e.target.value)}
             min={0}
             step={10}
+            className="w-28 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-sm tabular-nums focus:border-[var(--color-primary)] focus:outline-none"
+          />
+          <span className="text-xs text-[var(--color-text-secondary)]">COIN</span>
+        </div>
+      </td>
+      <td className="py-3">
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={editYearlyPrice}
+            onChange={(e) => setEditYearlyPrice(e.target.value)}
+            min={0}
+            step={10}
+            placeholder="—"
             className="w-28 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-sm tabular-nums focus:border-[var(--color-primary)] focus:outline-none"
           />
           <span className="text-xs text-[var(--color-text-secondary)]">COIN</span>
@@ -134,6 +152,7 @@ export function VipTab() {
               <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
                 <th className="py-2 text-left font-medium px-3">Tier</th>
                 <th className="py-2 text-left font-medium">Price / month</th>
+                <th className="py-2 text-left font-medium">Price / year</th>
                 <th className="py-2 text-left font-medium">Active</th>
                 <th className="py-2 text-right font-medium px-3" />
               </tr>
@@ -144,12 +163,13 @@ export function VipTab() {
                   key={t.tier}
                   tier={t.tier}
                   price={t.price}
+                  yearlyPrice={t.yearlyPrice}
                   isActive={t.isActive}
                 />
               ))}
               {!vipTiers?.length && (
                 <tr>
-                  <td colSpan={4} className="py-4 text-center text-[var(--color-text-secondary)]">
+                  <td colSpan={5} className="py-4 text-center text-[var(--color-text-secondary)]">
                     Loading...
                   </td>
                 </tr>

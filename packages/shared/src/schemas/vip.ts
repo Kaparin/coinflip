@@ -9,8 +9,14 @@ export const VipTierSchema = z
 
 // ---- Request schemas ----
 
+export const VipPeriodSchema = z
+  .enum(['monthly', 'yearly'])
+  .default('monthly')
+  .openapi({ description: 'Subscription period' });
+
 export const PurchaseVipRequestSchema = z.object({
   tier: VipTierSchema,
+  period: VipPeriodSchema,
 }).openapi({ ref: 'PurchaseVipRequest' });
 
 export const BoostBetRequestSchema = z.object({
@@ -30,6 +36,7 @@ export const VipConfigResponseSchema = z
       z.object({
         tier: VipTierSchema,
         price: z.string(),
+        yearlyPrice: z.string().nullable(),
         isActive: z.boolean(),
       }),
     ),
@@ -75,6 +82,7 @@ export const AdminGrantVipRequestSchema = z.object({
 
 export const AdminUpdateVipConfigRequestSchema = z.object({
   tier: VipTierSchema,
-  price: z.string().openapi({ description: 'Price in micro-COIN' }),
+  price: z.string().openapi({ description: 'Monthly price in micro-COIN' }),
+  yearlyPrice: z.string().optional().openapi({ description: 'Yearly price in micro-COIN' }),
   isActive: z.boolean().optional(),
 }).openapi({ ref: 'AdminUpdateVipConfigRequest' });
