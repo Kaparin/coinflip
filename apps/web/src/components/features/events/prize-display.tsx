@@ -3,6 +3,7 @@
 import { formatLaunch } from '@coinflip/shared/constants';
 import { Trophy, CheckCircle, Crown, Medal } from 'lucide-react';
 import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 
 interface PrizeEntry {
   place: number;
@@ -16,6 +17,7 @@ interface WinnerEntry {
   prizeAmount: string;
   prizeTxHash?: string | null;
   nickname?: string | null;
+  vip_tier?: string | null;
 }
 
 interface PrizeDisplayProps {
@@ -124,7 +126,9 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                     {/* Avatar or medal */}
                     {winner ? (
                       <div className="relative">
-                        <UserAvatar address={winner.address} size={config.avatarSize} />
+                        <VipAvatarFrame tier={winner.vip_tier ?? null}>
+                          <UserAvatar address={winner.address} size={config.avatarSize} />
+                        </VipAvatarFrame>
                         {winner.prizeTxHash && (
                           <CheckCircle
                             size={12}
@@ -140,7 +144,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
 
                     {/* Winner name or place label */}
                     {winner ? (
-                      <span className="text-[10px] font-medium truncate max-w-full text-center">
+                      <span className={`text-[10px] font-medium truncate max-w-full text-center ${getVipNameClass(winner.vip_tier ?? null)}`}>
                         {winner.nickname ?? shortAddr(winner.address)}
                       </span>
                     ) : null}
@@ -185,8 +189,10 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                   </div>
                   {winner ? (
                     <div className="flex items-center gap-2 min-w-0">
-                      <UserAvatar address={winner.address} size={22} />
-                      <span className="text-xs font-medium truncate">
+                      <VipAvatarFrame tier={winner.vip_tier ?? null}>
+                        <UserAvatar address={winner.address} size={22} />
+                      </VipAvatarFrame>
+                      <span className={`text-xs font-medium truncate ${getVipNameClass(winner.vip_tier ?? null)}`}>
                         {winner.nickname ?? shortAddr(winner.address)}
                       </span>
                     </div>

@@ -15,7 +15,7 @@ import { JackpotBanner } from '@/components/features/jackpot/jackpot-banner';
 import { TgWelcomeBanner } from '@/components/features/telegram/tg-welcome-banner';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { useWebSocket } from '@/hooks/use-websocket';
+import { useWebSocketContext } from '@/contexts/websocket-context';
 import { useNotifications } from '@/components/features/notifications/notification-provider';
 import { usePendingBets } from '@/hooks/use-pending-bets';
 import { useToast } from '@/components/ui/toast';
@@ -147,10 +147,14 @@ export default function GamePage() {
     }
   }, [handlePendingWsEvent, handleNotificationEvent, addToast, address, t]);
 
-  const { isConnected: wsConnected } = useWebSocket({ address, enabled: isConnected, onEvent: handleWsEvent });
+  // Subscribe to WS events from the layout-level WebSocket provider
+  const { isConnected: wsConnected, subscribe: subscribeWs } = useWebSocketContext();
+
+  useEffect(() => {
+    return subscribeWs(handleWsEvent);
+  }, [subscribeWs, handleWsEvent]);
 
   // Show WS banner only after sustained disconnection (3s delay).
-  // Prevents brief flash on page navigation when hook remounts.
   useEffect(() => {
     if (wsConnected || !isConnected) {
       setShowWsBanner(false);

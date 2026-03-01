@@ -730,23 +730,30 @@ class EventsService {
 
   async getWinnersForDistribution(eventId: string) {
     const db = getDb();
-    return db
-      .select({
-        userId: eventParticipants.userId,
-        address: users.address,
-        prizeAmount: eventParticipants.prizeAmount,
-        prizeTxHash: eventParticipants.prizeTxHash,
-        finalRank: eventParticipants.finalRank,
-      })
-      .from(eventParticipants)
-      .innerJoin(users, eq(users.id, eventParticipants.userId))
-      .where(
-        and(
-          eq(eventParticipants.eventId, eventId),
-          eq(eventParticipants.status, 'winner'),
-        ),
-      )
-      .orderBy(asc(eventParticipants.finalRank));
+    const rows = await db.execute(sql`
+      SELECT
+        ep.user_id AS "userId",
+        u.address,
+        u.profile_nickname AS nickname,
+        ep.prize_amount AS "prizeAmount",
+        ep.prize_tx_hash AS "prizeTxHash",
+        ep.final_rank AS "finalRank",
+        (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier
+      FROM event_participants ep
+      INNER JOIN users u ON u.id = ep.user_id
+      WHERE ep.event_id = ${eventId}
+        AND ep.status = 'winner'
+      ORDER BY ep.final_rank ASC
+    `);
+    return rows as unknown as Array<{
+      userId: string;
+      address: string;
+      nickname: string | null;
+      prizeAmount: string | null;
+      prizeTxHash: string | null;
+      finalRank: number | null;
+      vip_tier: string | null;
+    }>;
   }
 
   async markPrizeDistributed(eventId: string, userId: string, txHash: string) {
