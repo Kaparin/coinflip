@@ -59,16 +59,22 @@ function PlayerSide({
 
 const CONFETTI_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
 
+/** Deterministic pseudo-random based on seed — avoids hydration mismatch from Math.random() */
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed + 1) * 10000;
+  return x - Math.floor(x);
+}
+
 function Confetti() {
   const particles = useMemo(() =>
     Array.from({ length: 24 }, (_, i) => ({
       id: i,
-      left: `${Math.random() * 100}%`,
+      left: `${seededRandom(i * 7 + 1) * 100}%`,
       color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      delay: `${Math.random() * 0.6}s`,
-      duration: `${1 + Math.random() * 1}s`,
-      rotate: Math.random() * 360,
-      size: 4 + Math.random() * 4,
+      delay: `${seededRandom(i * 13 + 2) * 0.6}s`,
+      duration: `${1 + seededRandom(i * 17 + 3)}s`,
+      rotate: seededRandom(i * 23 + 4) * 360,
+      size: 4 + seededRandom(i * 31 + 5) * 4,
     })),
   []);
 

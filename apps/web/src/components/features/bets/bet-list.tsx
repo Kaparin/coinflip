@@ -146,6 +146,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     mutation: {
       onSuccess: (response: any, variables) => {
         const betId = String(variables.betId);
+        const betData = response?.data;
 
         const deductionId = acceptDeductionRef.current.get(betId);
         if (deductionId) {
@@ -195,7 +196,6 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
         // Instantly add the bet to my-bets cache so it appears in "My Bets"
         // without waiting for the debounced WS refetch (~1.5s gap).
         // Server returns the full bet object with status='accepting' + acceptor set.
-        const betData = response?.data;
         if (betData) {
           queryClient.setQueriesData(
             { queryKey: ['/api/v1/bets/mine'] },

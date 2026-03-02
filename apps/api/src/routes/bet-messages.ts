@@ -5,6 +5,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { betMessagesService } from '../services/bet-messages.service.js';
 import { wsService } from '../services/ws.service.js';
 import { AppError } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 import type { AppEnv } from '../types.js';
 
 export const betMessagesRouter = new Hono<AppEnv>();
@@ -17,24 +18,31 @@ betMessagesRouter.post('/:betId/messages', authMiddleware, zValidator('json', Be
   const betId = BigInt(raw);
   const { message } = c.req.valid('json');
 
-  const row = await betMessagesService.sendMessage({
-    betId,
-    userId: user.id,
-    message,
-  });
+  try {
+    const row = await betMessagesService.sendMessage({
+      betId,
+      userId: user.id,
+      message,
+    });
 
-  // Broadcast to all clients watching
-  wsService.emitBetMessage({
-    bet_id: betId.toString(),
-    id: row.id,
-    user_id: user.id,
-    address: user.address,
-    nickname: user.profileNickname ?? undefined,
-    message: row.message,
-    created_at: row.createdAt.toISOString(),
-  });
+    // Broadcast to all clients watching
+    wsService.emitBetMessage({
+      bet_id: betId.toString(),
+      id: row.id,
+      user_id: user.id,
+      address: user.address,
+      nickname: user.profileNickname ?? undefined,
+      message: row.message,
+      created_at: row.createdAt.toISOString(),
+    });
 
-  return c.json({ data: row });
+    return c.json({ data: row });
+  } catch (err) {
+    // Re-throw known AppErrors (rate limit, not found, etc.)
+    if (err instanceof AppError) throw err;
+    logger.error({ err, betId: betId.toString(), userId: user.id }, 'Failed to send bet message');
+    throw new AppError('INTERNAL_ERROR', 'Failed to send message', 500);
+  }
 });
 
 /** GET /api/v1/bets/:betId/messages — Get duel chat messages (public) */

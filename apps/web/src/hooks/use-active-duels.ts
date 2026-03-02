@@ -89,6 +89,8 @@ function revealWinner(betId: string, winner: string) {
 
 const FADE_OUT_DELAY = 10_000; // 10s after winner reveal
 const REMOVE_DELAY = 500; // after fade-out animation
+const STALE_DUEL_MAX_AGE = 90_000; // 90s — safety net for missed WS events
+const STALE_CLEANUP_INTERVAL = 30_000; // check every 30s
 
 /**
  * Hook to access and manage active duels.
@@ -179,8 +181,11 @@ export function useActiveDuels() {
         break;
       }
 
-      case 'bet_reverted': {
-        const betId = String(data.id);
+      case 'bet_reverted':
+      case 'accept_failed': {
+        // accept_failed uses { betId } key, bet_reverted uses { id } key
+        const betId = String(data.id ?? data.betId);
+        if (!betId || betId === 'undefined') break;
         // Clear all pending timers for this duel
         for (const [key, timer] of timersRef.current.entries()) {
           if (key.startsWith(betId)) {
@@ -206,9 +211,19 @@ export function useActiveDuels() {
     }
   }, []);
 
-  // Cleanup timers on unmount
+  // Stale duel cleanup — safety net for missed WS events (e.g. network blip).
+  // Duels older than 90s without a winner are removed to prevent ghost cards.
   useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      for (const [betId, duel] of duels) {
+        if (!duel.winner && now - duel.startedAt > STALE_DUEL_MAX_AGE) {
+          removeDuel(betId);
+        }
+      }
+    }, STALE_CLEANUP_INTERVAL);
     return () => {
+      clearInterval(interval);
       for (const t of timersRef.current.values()) clearTimeout(t);
     };
   }, []);

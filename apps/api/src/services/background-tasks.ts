@@ -384,7 +384,7 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
               }
               // Not resolved — revert
               if (pendingLockId) removePendingLock(address, pendingLockId);
-              await betService.revertAccepting(betId).catch(() => null);
+              const reverted = await betService.revertAccepting(betId).catch(() => null);
               await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
                 logger.warn({ err }, `${tag} — unlockFunds failed`));
               invalidateBalanceCache(address);
@@ -393,6 +393,11 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
                 txHash,
                 reason: 'Accept confirmation timed out. Please try again.',
               });
+              // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
+              if (reverted) {
+                const addressMap = await betService.buildAddressMap([reverted]);
+                wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+              }
             }
           } catch (err) {
             logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
@@ -406,7 +411,7 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
         // Transaction failed on chain — revert to "open"
         logger.error({ txHash, betId: betId.toString(), code: txResult.code, rawLog: txResult.rawLog }, `${tag} — tx failed`);
         if (pendingLockId) removePendingLock(address, pendingLockId);
-        await betService.revertAccepting(betId).catch(() => null);
+        const reverted = await betService.revertAccepting(betId).catch(() => null);
         await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
           logger.warn({ err }, `${tag} — unlockFunds failed`));
         invalidateBalanceCache(address);
@@ -415,6 +420,11 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
           txHash,
           reason: txResult.rawLog || 'Transaction failed on chain',
         });
+        // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
+        if (reverted) {
+          const addressMap = await betService.buildAddressMap([reverted]);
+          wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+        }
         return;
       }
 
@@ -442,7 +452,7 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
     } catch (err) {
       logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error`);
       if (pendingLockId) removePendingLock(address, pendingLockId);
-      await betService.revertAccepting(betId).catch(() => null);
+      const reverted = await betService.revertAccepting(betId).catch(() => null);
       await vaultService.unlockFunds(acceptorUserId, amount).catch(unlockErr =>
         logger.warn({ err: unlockErr }, `${tag} — unlockFunds failed`));
       invalidateBalanceCache(address);
@@ -451,6 +461,11 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
         txHash,
         reason: 'An unexpected error occurred. Please try again.',
       });
+      // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
+      if (reverted) {
+        const addressMap = await betService.buildAddressMap([reverted]).catch(() => new Map());
+        wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+      }
     }
   })();
 }

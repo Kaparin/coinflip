@@ -297,9 +297,25 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/bets/mine');
               break;
             }
-            case 'bet_reverted':
+            case 'bet_reverted': {
+              // Instantly revert the bet in open bets cache — it's "open" again.
+              // This makes the duel card disappear and the bet card reappear immediately.
+              const revertedBet = parsed.data as any;
+              const revertedBetId = String(revertedBet?.id);
+              if (revertedBetId) {
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return { ...old, data: old.data.map((b: any) =>
+                      String(b.id) === revertedBetId ? { ...b, ...revertedBet, status: 'open' } : b
+                    ) };
+                  },
+                );
+              }
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
+            }
             case 'bet_accepted':
             case 'bet_revealed':
             case 'bet_timeout_claimed': {
