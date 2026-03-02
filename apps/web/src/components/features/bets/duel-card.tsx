@@ -241,30 +241,32 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
               </div>
             </div>
           ) : isMergingPhase ? (
-            /* Avatar merge: logo fades out, large avatar coin spins + decelerates to winner */
+            /*
+             * Avatar merge: two layers with SPLIT opacity/3D structure.
+             * opacity on outer div, transform+preserve-3d on inner div.
+             * Mixing them on same element flattens 3D → breaks backface-visibility.
+             */
             <div className="relative" style={{ width: 88, height: 88 }}>
-              {/* Layer 1: Logo coin spinning + fading out */}
-              <div
-                className="absolute inset-0 animate-duel-coin-spin-fadeout"
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="duel-coin-face duel-coin-front">
-                  <Image src="/coin-token-logo.png" alt="COIN front" width={88} height={88} className="rounded-full" unoptimized />
-                </div>
-                <div className="duel-coin-face duel-coin-back-face">
-                  <Image src="/coin-token-logo.back.png" alt="COIN back" width={88} height={88} className="rounded-full" unoptimized />
+              {/* Layer 1: Logo coin — outer=fade, inner=spin+3d */}
+              <div className="absolute inset-0 animate-duel-coin-logo-fade">
+                <div className="w-full h-full animate-duel-coin-spin-3d">
+                  <div className="duel-coin-face duel-coin-front">
+                    <Image src="/coin-token-logo.png" alt="COIN front" width={88} height={88} className="rounded-full" unoptimized />
+                  </div>
+                  <div className="duel-coin-face duel-coin-back-face">
+                    <Image src="/coin-token-logo.back.png" alt="COIN back" width={88} height={88} className="rounded-full" unoptimized />
+                  </div>
                 </div>
               </div>
-              {/* Layer 2: Avatar coin — maker on front, acceptor on back */}
-              <div
-                className={`absolute inset-0 ${isWinnerMaker ? 'animate-duel-avatar-coin-to-front' : 'animate-duel-avatar-coin-to-back'}`}
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="duel-coin-face duel-coin-front">
-                  <UserAvatar address={duel.maker} size={88} className="rounded-full" />
-                </div>
-                <div className="duel-coin-face duel-coin-back-face">
-                  <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
+              {/* Layer 2: Avatar coin — outer=fade-in, inner=spin+3d (maker=front, acceptor=back) */}
+              <div className="absolute inset-0 animate-duel-avatar-coin-fade-in">
+                <div className={`w-full h-full ${isWinnerMaker ? 'animate-duel-avatar-coin-spin-to-front' : 'animate-duel-avatar-coin-spin-to-back'}`}>
+                  <div className="duel-coin-face duel-coin-front">
+                    <UserAvatar address={duel.maker} size={88} className="rounded-full" />
+                  </div>
+                  <div className="duel-coin-face duel-coin-back-face">
+                    <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
+                  </div>
                 </div>
               </div>
             </div>
