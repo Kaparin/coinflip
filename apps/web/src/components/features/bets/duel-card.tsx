@@ -29,6 +29,8 @@ function PlayerSide({
   vipCustomization,
   isWinner,
   isLoser,
+  isMerging,
+  side,
 }: {
   address: string;
   nickname?: string | null;
@@ -36,19 +38,27 @@ function PlayerSide({
   vipCustomization?: any;
   isWinner: boolean;
   isLoser: boolean;
+  isMerging: boolean;
+  side: 'left' | 'right';
 }) {
   const nameClass = getVipNameClass(vipTier, vipCustomization?.nameGradient);
   const frameStyle = vipCustomization?.frameStyle;
 
+  const mergeClass = isMerging
+    ? side === 'left' ? 'animate-duel-avatar-merge-left' : 'animate-duel-avatar-merge-right'
+    : '';
+
   return (
-    <Link href={`/game/profile/${address}`} className="flex flex-col items-center gap-1 group shrink-0">
+    <Link href={`/game/profile/${address}`} className={`flex flex-col items-center gap-1 group shrink-0 ${mergeClass}`}>
       <div className={`transition-all duration-500 ${isWinner ? 'animate-duel-winner' : ''} ${isLoser ? 'animate-duel-loser' : ''}`}>
         <VipAvatarFrame tier={vipTier} frameStyle={frameStyle}>
           <UserAvatar address={address} size={40} />
         </VipAvatarFrame>
       </div>
       <span
-        className={`text-[10px] font-medium truncate max-w-[80px] group-hover:underline ${nameClass || 'text-[var(--color-text-secondary)]'}`}
+        className={`text-[10px] font-medium truncate max-w-[80px] group-hover:underline transition-opacity duration-300 ${
+          isMerging ? 'opacity-0' : ''
+        } ${nameClass || 'text-[var(--color-text-secondary)]'}`}
         title={nickname || address}
       >
         {nickname || shortenAddress(address)}
@@ -115,6 +125,17 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
   const isWinnerMaker = duel.winner?.toLowerCase() === duel.maker.toLowerCase();
   const isWinnerAcceptor = duel.winner?.toLowerCase() === duel.acceptor.toLowerCase();
   const hasWinner = !!duel.winner;
+  const isMergingPhase = duel.phase === 'avatar-merge';
+  const isWinnerReveal = duel.phase === 'winner-reveal';
+
+  // Winner display data
+  const winnerDisplayName = isWinnerMaker
+    ? (duel.makerNickname || shortenAddress(duel.maker))
+    : (duel.acceptorNickname || shortenAddress(duel.acceptor));
+  const winnerVipTier = isWinnerMaker ? duel.makerVipTier : duel.acceptorVipTier;
+  const winnerVipCustomization = isWinnerMaker ? duel.makerVipCustomization : duel.acceptorVipCustomization;
+  const winnerNameClass = getVipNameClass(winnerVipTier, winnerVipCustomization?.nameGradient);
+  const winnerAddress = isWinnerMaker ? duel.maker : duel.acceptor;
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -151,7 +172,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
   return (
     <div
       className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 overflow-hidden ${
-        isFading ? 'animate-duel-fade-out' : 'animate-fade-up animate-duel-border-glow'
+        isFading ? 'animate-duel-fade-out' : `animate-fade-up ${isWinnerReveal ? 'animate-duel-border-glow-winner' : 'animate-duel-border-glow'}`
       }`}
     >
       {/* Confetti on winner reveal */}
@@ -181,22 +202,79 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
           nickname={duel.makerNickname}
           vipTier={duel.makerVipTier}
           vipCustomization={duel.makerVipCustomization}
-          isWinner={hasWinner && isWinnerMaker}
-          isLoser={hasWinner && !isWinnerMaker}
+          isWinner={isWinnerReveal && isWinnerMaker}
+          isLoser={isWinnerReveal && !isWinnerMaker}
+          isMerging={isMergingPhase}
+          side="left"
         />
 
-        {/* Center: spinning coin or winner text */}
+        {/* Center: spinning coin / avatar-merge / winner reveal */}
         <div className="flex flex-col items-center justify-center flex-1 py-1">
-          {duel.phase === 'winner-reveal' && duel.winner ? (
-            <div className="animate-duel-winner text-center">
-              <div className="text-xs font-bold text-emerald-400 mb-0.5">
-                {t('duel.winner')}
+          {isWinnerReveal && duel.winner ? (
+            /* Winner reveal: static coin on winner face + name + amount */
+            <div className="flex flex-col items-center">
+              <div className="animate-duel-coin-winner-glow">
+                <div
+                  className="duel-coin-3d"
+                  style={{ transform: `rotateY(${isWinnerMaker ? 0 : 180}deg)` }}
+                >
+                  <div className="duel-coin-face duel-coin-front">
+                    <UserAvatar address={duel.maker} size={44} className="rounded-full" />
+                  </div>
+                  <div className="duel-coin-face duel-coin-back-face">
+                    <UserAvatar address={duel.acceptor} size={44} className="rounded-full" />
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] text-[var(--color-text-secondary)]">
-                +{formatLaunch(String(BigInt(duel.amount) * 2n * 9n / 10n))}
+              <div className="animate-duel-winner-name text-center mt-1.5">
+                <Link href={`/game/profile/${winnerAddress}`} className="hover:underline">
+                  <span className={`text-[11px] font-bold ${winnerNameClass || 'text-emerald-400'}`}>
+                    {winnerDisplayName}
+                  </span>
+                </Link>
+                <div className="text-[10px] text-emerald-400/80 font-medium">
+                  +{formatLaunch(String(BigInt(duel.amount) * 2n * 9n / 10n))}
+                </div>
+              </div>
+            </div>
+          ) : isMergingPhase ? (
+            /* Avatar merge: logo fades out, avatar coin fades in + spins + decelerates */
+            <div className="relative w-[44px] h-[44px]">
+              {/* Layer 1: Logo coin spinning + fading out */}
+              <div className="absolute inset-0 duel-coin-3d animate-duel-coin-spin-fadeout">
+                <div className="duel-coin-face duel-coin-front">
+                  <Image
+                    src="/coin-token-logo.png"
+                    alt="COIN front"
+                    width={44}
+                    height={44}
+                    className="rounded-full"
+                    unoptimized
+                  />
+                </div>
+                <div className="duel-coin-face duel-coin-back-face">
+                  <Image
+                    src="/coin-token-logo.back.png"
+                    alt="COIN back"
+                    width={44}
+                    height={44}
+                    className="rounded-full"
+                    unoptimized
+                  />
+                </div>
+              </div>
+              {/* Layer 2: Avatar coin fading in + spinning + decelerating to winner */}
+              <div className={`absolute inset-0 duel-coin-3d ${isWinnerMaker ? 'animate-duel-avatar-coin-to-front' : 'animate-duel-avatar-coin-to-back'}`}>
+                <div className="duel-coin-face duel-coin-front">
+                  <UserAvatar address={duel.maker} size={44} className="rounded-full" />
+                </div>
+                <div className="duel-coin-face duel-coin-back-face">
+                  <UserAvatar address={duel.acceptor} size={44} className="rounded-full" />
+                </div>
               </div>
             </div>
           ) : (
+            /* Normal: spinning logo coin */
             <div className="duel-coin-3d animate-duel-coin-spin">
               <div className="duel-coin-face duel-coin-front">
                 <Image
@@ -232,8 +310,10 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
           nickname={duel.acceptorNickname}
           vipTier={duel.acceptorVipTier}
           vipCustomization={duel.acceptorVipCustomization}
-          isWinner={hasWinner && isWinnerAcceptor}
-          isLoser={hasWinner && !isWinnerAcceptor}
+          isWinner={isWinnerReveal && isWinnerAcceptor}
+          isLoser={isWinnerReveal && !isWinnerAcceptor}
+          isMerging={isMergingPhase}
+          side="right"
         />
       </div>
 

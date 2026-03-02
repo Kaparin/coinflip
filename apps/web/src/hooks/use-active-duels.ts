@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { WsEvent } from '@coinflip/shared/types';
 
-export type DuelPhase = 'flipping' | 'dueling' | 'resolving' | 'winner-reveal' | 'fade-out';
+export type DuelPhase = 'flipping' | 'dueling' | 'resolving' | 'avatar-merge' | 'winner-reveal' | 'fade-out';
 
 export interface DuelMessage {
   id: string;
@@ -163,20 +163,24 @@ export function useActiveDuels() {
         const winner = data.winner as string | undefined;
 
         if (duel) {
-          // Transition: resolving → winner-reveal → fade-out → remove
-          updatePhase(betId, 'resolving');
-          setTimeout(() => {
-            if (winner) {
-              revealWinner(betId, winner);
-            }
-            // Schedule fade-out
-            const t1 = setTimeout(() => {
-              updatePhase(betId, 'fade-out');
-              const t2 = setTimeout(() => removeDuel(betId), REMOVE_DELAY);
-              timersRef.current.set(`${betId}-remove`, t2);
-            }, FADE_OUT_DELAY);
-            timersRef.current.set(`${betId}-fadeout`, t1);
-          }, 1000);
+          // Set winner immediately (needed for avatar-merge stop angle) + resolving phase
+          setDuel(betId, { ...duel, phase: 'resolving', winner: winner ?? null });
+
+          // resolving(0) → avatar-merge(+800ms) → winner-reveal(+3800ms) → fade-out(+13800ms) → remove
+          const t1 = setTimeout(() => updatePhase(betId, 'avatar-merge'), 800);
+          timersRef.current.set(`${betId}-merge`, t1);
+
+          const t2 = setTimeout(() => {
+            if (winner) revealWinner(betId, winner);
+          }, 3800);
+          timersRef.current.set(`${betId}-reveal`, t2);
+
+          const t3 = setTimeout(() => {
+            updatePhase(betId, 'fade-out');
+            const t4 = setTimeout(() => removeDuel(betId), REMOVE_DELAY);
+            timersRef.current.set(`${betId}-remove`, t4);
+          }, 13800);
+          timersRef.current.set(`${betId}-fadeout`, t3);
         }
         break;
       }
