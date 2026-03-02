@@ -18,6 +18,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { useWebSocketContext } from '@/contexts/websocket-context';
 import { useNotifications } from '@/components/features/notifications/notification-provider';
 import { usePendingBets } from '@/hooks/use-pending-bets';
+import { useActiveDuels } from '@/hooks/use-active-duels';
 import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -54,11 +55,13 @@ export default function GamePage() {
   }, [queryClient]);
 
   const { pendingBets, addPending, handleWsEvent: handlePendingWsEvent } = usePendingBets();
+  const { duels, handleWsEvent: handleDuelWsEvent } = useActiveDuels();
 
   const { handleWsEvent: handleNotificationEvent } = useNotifications();
 
   const handleWsEvent = useCallback((event: WsEvent) => {
     handlePendingWsEvent(event);
+    handleDuelWsEvent(event);
     handleNotificationEvent(event);
 
     const data = event.data as any;
@@ -145,7 +148,7 @@ export default function GamePage() {
         variant: 'success',
       });
     }
-  }, [handlePendingWsEvent, handleNotificationEvent, addToast, address, t]);
+  }, [handlePendingWsEvent, handleDuelWsEvent, handleNotificationEvent, addToast, address, t]);
 
   // Subscribe to WS events from the layout-level WebSocket provider
   const { isConnected: wsConnected, subscribe: subscribeWs } = useWebSocketContext();
@@ -239,7 +242,7 @@ export default function GamePage() {
         <div {...swipeHandlers} className="min-h-[200px]">
           {/* Lazy-mount: tabs mount on first visit, stay mounted for scroll preservation */}
           <div style={{ display: activeTab === 'bets' ? 'block' : 'none' }}>
-            <BetList pendingBets={pendingBets} />
+            <BetList pendingBets={pendingBets} activeDuels={duels} />
           </div>
           {visitedTabs.has('mybets') && (
             <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>

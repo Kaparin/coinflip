@@ -16,3 +16,4 @@ export { vipSubscriptions, vipConfig, betPins, boostUsage, vipCustomization } fr
 export { platformConfig } from './platform-config';
 export { partnerConfig, partnerLedger } from './partner-treasury';
 export { newsPosts } from './news-posts';
+export { betMessages } from './bet-messages';

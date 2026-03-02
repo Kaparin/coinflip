@@ -24,7 +24,10 @@ import { useTranslation } from '@/lib/i18n';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
+import { FlipCard } from './flip-card';
+import { DuelCard } from './duel-card';
 import type { PendingBet } from '@/hooks/use-pending-bets';
+import type { ActiveDuel } from '@/hooks/use-active-duels';
 
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
 
@@ -48,9 +51,10 @@ const AMOUNT_FILTERS: { value: AmountFilter; label: string; min: number; max: nu
 
 interface BetListProps {
   pendingBets?: PendingBet[];
+  activeDuels?: Map<string, ActiveDuel>;
 }
 
-export function BetList({ pendingBets = [] }: BetListProps) {
+export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
   const [amountFilter, setAmountFilter] = useState<AmountFilter>('all');
   const [pendingBetId, setPendingBetId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'cancel' | 'accept' | null>(null);
@@ -101,6 +105,8 @@ export function BetList({ pendingBets = [] }: BetListProps) {
 
   // Confirmation modal state
   const [acceptTarget, setAcceptTarget] = useState<{ id: string; amount: number } | null>(null);
+  // Accept message for duel chat
+  const [acceptMessage, setAcceptMessage] = useState('');
   // Insufficient balance modal state
   const [insufficientInfo, setInsufficientInfo] = useState<{ required: string; available: string } | null>(null);
 
@@ -171,15 +177,17 @@ export function BetList({ pendingBets = [] }: BetListProps) {
           setBalanceGracePeriod(8_000);
         }
 
-        // Optimistically remove the accepted bet from the open bets cache
-        // so the card disappears instantly without waiting for WS + refetch.
+        // Update the bet status in open bets cache — keep it in the grid
+        // so FlipCard can animate the flip to duel card when WS event arrives.
         queryClient.setQueriesData(
           { queryKey: ['/api/v1/bets'] },
           (old: any) => {
             if (!old?.data) return old;
             return {
               ...old,
-              data: old.data.filter((b: any) => String(b.id) !== betId),
+              data: old.data.map((b: any) =>
+                String(b.id) === betId ? { ...b, ...(betData ?? {}), status: 'accepting' } : b
+              ),
             };
           },
         );
@@ -277,15 +285,18 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     return bets.filter((bet) => {
       // Hide own bets from Open Bets — they are managed in My Bets tab
       if (bet.maker === address) return false;
-      // Hide bets that user just accepted — removes card instantly without waiting for API
-      if (recentlyAcceptedIds.has(String(bet.id))) return false;
+      // Hide bets that user just accepted — UNLESS it has an active duel (stays in place, flips)
+      const betId = String(bet.id);
+      if (recentlyAcceptedIds.has(betId) && !(activeDuels?.has(betId))) return false;
+      // Hide stale 'accepting' bets with no active duel (server processed, duel ended)
+      if (bet.status === 'accepting' && !activeDuels?.has(betId)) return false;
       // Hide expired bets (past their expiry time)
       const expiresAt = (bet as any).expires_at;
       if (expiresAt && new Date(expiresAt).getTime() <= now) return false;
       const amount = Number(bet.amount);
       return amount >= range.min && amount <= range.max;
     });
-  }, [bets, amountFilter, address, recentlyAcceptedIds]);
+  }, [bets, amountFilter, address, recentlyAcceptedIds, activeDuels]);
 
   // Extract stable references to avoid re-creating callbacks on every render
   const cancelBet = cancelMutation.mutate;
@@ -311,6 +322,7 @@ export function BetList({ pendingBets = [] }: BetListProps) {
       setShowOnboarding(true);
       return;
     }
+    setAcceptMessage('');
     setAcceptTarget({ id, amount: Number(bet.amount) });
   }, [bets, oneClickEnabled]);
 
@@ -337,8 +349,12 @@ export function BetList({ pendingBets = [] }: BetListProps) {
     // Reserve this amount immediately (synchronous ref update)
     pendingAcceptAmountRef.current += betAmount;
 
+    // Capture message before closing modal
+    const msg = acceptMessage.trim().slice(0, 100) || undefined;
+
     // Close modal
     setAcceptTarget(null);
+    setAcceptMessage('');
 
     // Hide the card immediately (survives refetch race conditions)
     setRecentlyAcceptedIds(prev => new Set(prev).add(id));
@@ -353,13 +369,13 @@ export function BetList({ pendingBets = [] }: BetListProps) {
       try {
         await acceptBetAsync({
           betId: Number(id),
-          data: { guess: 'heads' }, // server ignores this, picks randomly
+          data: { guess: 'heads', ...(msg ? { message: msg } : {}) },
         });
       } catch {
         // Error already handled by mutation's onError callback
       }
     });
-  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, addToast, t]);
+  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, acceptMessage, addToast, t]);
 
   if (isLoading) {
     return (
@@ -438,36 +454,59 @@ export function BetList({ pendingBets = [] }: BetListProps) {
         </div>
       )}
 
+      {/* Orphan duel cards — duels whose bet is no longer in the open bets list */}
+      {activeDuels && (() => {
+        const gridBetIds = new Set(filteredBets.map(b => String(b.id)));
+        const orphanDuels = [...activeDuels.values()].filter(d => !gridBetIds.has(d.betId));
+        if (orphanDuels.length === 0) return null;
+        return (
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 mb-2">
+            {orphanDuels.map((duel) => (
+              <DuelCard key={duel.betId} duel={duel} />
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Bets grid */}
       {filteredBets.length > 0 ? (
         <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
           {filteredBets.map((bet, idx) => {
             const isMyBet = bet.maker === address;
+            const betId = String(bet.id);
+            const duel = activeDuels?.get(betId);
+
             return (
-              <BetCard
+              <FlipCard
                 key={bet.id}
-                id={String(bet.id)}
-                maker={bet.maker}
-                makerNickname={(bet as any).maker_nickname}
-                amount={Number(bet.amount)}
-                status={bet.status}
-                createdAt={new Date(bet.created_at)}
-                revealDeadline={(bet as any).reveal_deadline}
-                expiresAt={(bet as any).expires_at}
-                acceptedAt={(bet as any).accepted_at}
-                winner={(bet as any).winner}
-                acceptor={(bet as any).acceptor}
-                makerVipTier={(bet as any).maker_vip_tier}
-                makerVipCustomization={(bet as any).maker_vip_customization}
-                isBoosted={(bet as any).is_boosted}
-                isPinned={(bet as any).is_pinned}
-                pinSlot={(bet as any).pin_slot}
-                index={idx}
-                isMine={isMyBet}
-                pendingBetId={pendingBetId}
-                pendingAction={pendingAction}
-                onAccept={isMyBet || !isConnected ? undefined : handleAcceptClick}
-                onCancel={isMyBet ? handleCancelClick : undefined}
+                flipped={!!duel}
+                front={
+                  <BetCard
+                    id={betId}
+                    maker={bet.maker}
+                    makerNickname={(bet as any).maker_nickname}
+                    amount={Number(bet.amount)}
+                    status={bet.status}
+                    createdAt={new Date(bet.created_at)}
+                    revealDeadline={(bet as any).reveal_deadline}
+                    expiresAt={(bet as any).expires_at}
+                    acceptedAt={(bet as any).accepted_at}
+                    winner={(bet as any).winner}
+                    acceptor={(bet as any).acceptor}
+                    makerVipTier={(bet as any).maker_vip_tier}
+                    makerVipCustomization={(bet as any).maker_vip_customization}
+                    isBoosted={(bet as any).is_boosted}
+                    isPinned={(bet as any).is_pinned}
+                    pinSlot={(bet as any).pin_slot}
+                    index={idx}
+                    isMine={isMyBet}
+                    pendingBetId={pendingBetId}
+                    pendingAction={pendingAction}
+                    onAccept={isMyBet || !isConnected ? undefined : handleAcceptClick}
+                    onCancel={isMyBet ? handleCancelClick : undefined}
+                  />
+                }
+                back={duel ? <DuelCard duel={duel} /> : null}
               />
             );
           })}
@@ -503,6 +542,17 @@ export function BetList({ pendingBets = [] }: BetListProps) {
                   +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} />
                 </span>
               </div>
+
+              {/* Duel message (optional) */}
+              <input
+                type="text"
+                value={acceptMessage}
+                onChange={(e) => setAcceptMessage(e.target.value.slice(0, 100))}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmAccept()}
+                placeholder={t('duel.messagePlaceholder')}
+                maxLength={100}
+                className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:border-[var(--color-primary)]/50"
+              />
 
               {/* Buttons */}
               <div className="flex gap-3">

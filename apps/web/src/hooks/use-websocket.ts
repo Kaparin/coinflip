@@ -254,8 +254,8 @@ export function useWebSocket({
               break;
             }
             case 'bet_accepting': {
-              // Instantly remove the bet from open bets cache for ALL clients
-              // so the card disappears immediately — don't wait for debounced refetch.
+              // Update the bet status in open bets cache — keep it in the grid
+              // so FlipCard can animate the transition to the duel card in-place.
               const acceptingBet = parsed.data as any;
               const acceptingBetId = String(acceptingBet?.id);
               if (acceptingBetId) {
@@ -263,7 +263,9 @@ export function useWebSocket({
                   { queryKey: ['/api/v1/bets'] },
                   (old: any) => {
                     if (!old?.data) return old;
-                    return { ...old, data: old.data.filter((b: any) => String(b.id) !== acceptingBetId) };
+                    return { ...old, data: old.data.map((b: any) =>
+                      String(b.id) === acceptingBetId ? { ...b, ...acceptingBet, status: 'accepting' } : b
+                    ) };
                   },
                 );
                 // Add or update in my-bets cache for involved parties.
@@ -290,8 +292,9 @@ export function useWebSocket({
                   );
                 }
               }
-              // Still schedule background refetch to sync any missed data
-              scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine');
+              // Only invalidate my-bets — open bets cache keeps the bet for FlipCard animation.
+              // The next polling cycle (15-30s) will clean up the stale 'accepting' entry.
+              scheduleInvalidation('/api/v1/bets/mine');
               break;
             }
             case 'bet_reverted':
@@ -326,8 +329,9 @@ export function useWebSocket({
                   );
                 }
               }
+              // Skip '/api/v1/bets' invalidation — the bet stays in cache as 'accepting'
+              // for FlipCard duel animation. Cleaned up by filteredBets filter + next poll.
               scheduleInvalidation(
-                '/api/v1/bets',
                 '/api/v1/bets/mine',
                 '/api/v1/bets/history',
                 '/api/v1/vault/balance',
@@ -367,6 +371,9 @@ export function useWebSocket({
             case 'jackpot_won':
             case 'jackpot_reset':
               scheduleInvalidation('/api/v1/jackpot/active', '/api/v1/jackpot/history');
+              break;
+            case 'bet_message':
+              // No cache invalidation needed — handled by duel store via onEvent callback
               break;
           }
 

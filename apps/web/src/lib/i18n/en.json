@@ -1107,5 +1107,13 @@
     "haptics": "Vibration",
     "on": "On",
     "off": "Off"
+  },
+  "duel": {
+    "live": "LIVE",
+    "winner": "Winner!",
+    "determining": "Determining winner...",
+    "noMessages": "No messages yet",
+    "messagePlaceholder": "Message...",
+    "vs": "vs"
   }
 }

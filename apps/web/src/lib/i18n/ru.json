@@ -1107,5 +1107,13 @@
     "haptics": "Вибрация",
     "on": "Вкл",
     "off": "Выкл"
+  },
+  "duel": {
+    "live": "LIVE",
+    "winner": "Победитель!",
+    "determining": "Определяем победителя...",
+    "noMessages": "Пока нет сообщений",
+    "messagePlaceholder": "Сообщение...",
+    "vs": "vs"
   }
 }

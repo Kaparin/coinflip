@@ -73,6 +73,7 @@ export type WsEventType =
   | 'jackpot_reset'
   | 'deposit_confirmed'
   | 'deposit_failed'
+  | 'bet_message'
   | 'announcement';
 
 export type WsEvent = {

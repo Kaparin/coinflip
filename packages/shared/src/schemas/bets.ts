@@ -55,6 +55,7 @@ export const BatchCreateBetsRequestSchema = z
 export const AcceptBetRequestSchema = z
   .object({
     guess: SideSchema.openapi({ description: 'Acceptor guess: heads or tails' }),
+    message: z.string().max(100).optional().openapi({ description: 'Optional duel chat message (max 100 chars)' }),
   })
   .openapi({ ref: 'AcceptBetRequest' });
 
@@ -68,6 +69,13 @@ export const RevealRequestSchema = z
       .openapi({ description: 'Original secret (64 hex chars = 32 bytes)' }),
   })
   .openapi({ ref: 'RevealRequest' });
+
+// ---- Bet message (duel chat) ----
+export const BetMessageRequestSchema = z
+  .object({
+    message: z.string().min(1).max(100).openapi({ description: 'Chat message (1-100 chars)' }),
+  })
+  .openapi({ ref: 'BetMessageRequest' });
 
 // ---- Cancel bet ----
 export const CancelBetRequestSchema = z.object({}).openapi({ ref: 'CancelBetRequest' });

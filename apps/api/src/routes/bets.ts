@@ -48,6 +48,7 @@ import type { RelayResult } from '../services/relayer.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 import { resolveGasGranter } from '../lib/gas-granter.js';
 import { pinService } from '../services/pin.service.js';
+import { betMessagesService } from '../services/bet-messages.service.js';
 
 // Re-export pending bet counts from shared lib (avoids circular deps with background-tasks)
 import { getPendingBetCount, incrementPendingBetCount, decrementPendingBetCount } from '../lib/pending-counts.js';
@@ -583,10 +584,12 @@ betsRouter.post('/batch', authMiddleware, walletTxRateLimit, zValidator('json', 
 // Returns 202 IMMEDIATELY after tx enters mempool (~2s).
 // Bet status transitions: open → accepting → accepted (or reverts to open on failure).
 // Frontend is notified via WebSocket: bet_accepted or accept_failed.
-betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) => {
+betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, zValidator('json', AcceptBetRequestSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
   const betId = parseBetId(c.req.param('betId'));
+  const body = c.req.valid('json');
+  const acceptMessage = body.message?.trim().slice(0, 100) || undefined;
   // Server picks random guess — cryptographically secure
   const guess: 'heads' | 'tails' = secureCoinFlip();
 
@@ -730,6 +733,23 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, async (c) =
   // IMMEDIATELY broadcast to ALL clients — removes bet from everyone's "Open Bets"
   if (acceptingBet) {
     wsService.emitBetAccepting(formatBetResponse(acceptingBet, addressMap) as unknown as Record<string, unknown>);
+  }
+
+  // Save optional accept message to duel chat (fire-and-forget)
+  if (acceptMessage) {
+    betMessagesService.sendMessage({ betId, userId: user.id, message: acceptMessage })
+      .then((row) => {
+        wsService.emitBetMessage({
+          bet_id: betId.toString(),
+          id: row.id,
+          user_id: user.id,
+          address,
+          nickname: user.profileNickname ?? undefined,
+          message: row.message,
+          created_at: row.createdAt.toISOString(),
+        });
+      })
+      .catch(() => {}); // Non-critical — don't fail accept if message fails
   }
 
   // Fire-and-forget: confirm tx in background, update DB, notify via WS.

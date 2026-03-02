@@ -154,6 +154,11 @@ class WsService {
     this.broadcast({ type: 'jackpot_reset', data });
   }
 
+  /** Emit duel chat message */
+  emitBetMessage(data: Record<string, unknown>) {
+    this.broadcast({ type: 'bet_message', data });
+  }
+
   getClientCount(): number {
     return this.clients.size;
   }

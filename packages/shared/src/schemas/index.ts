@@ -5,6 +5,7 @@ export {
   RevealRequestSchema,
   CancelBetRequestSchema,
   ClaimTimeoutRequestSchema,
+  BetMessageRequestSchema,
 } from './bets.js';
 
 export {

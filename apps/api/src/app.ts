@@ -15,6 +15,7 @@ import { activityRouter } from './routes/activity.js';
 import { vipRouter } from './routes/vip.js';
 import { newsRouter } from './routes/news.js';
 import { announcementsRouter } from './routes/announcements.js';
+import { betMessagesRouter } from './routes/bet-messages.js';
 import { adminEventsRouter } from './routes/admin-events.js';
 import { adminTransactionsRouter } from './routes/admin-transactions.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -127,6 +128,7 @@ app.get('/api/v1/config/public', async (c) => {
 
 // ---- API routes ----
 app.route('/api/v1/bets', betsRouter);
+app.route('/api/v1/bets', betMessagesRouter);
 app.route('/api/v1/vault', vaultRouter);
 app.route('/api/v1/users', usersRouter);
 app.route('/api/v1/auth', authRouter);
