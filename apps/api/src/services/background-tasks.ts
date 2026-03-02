@@ -850,10 +850,24 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
         logger.warn({ betId: betId.toString(), dbStatus }, `${tag} — resolveBet returned null (already resolved)`);
       }
 
-      if (resolved && currentBet && currentBet.acceptorUserId) {
-        const totalPot = BigInt(currentBet.amount) * 2n;
-        referralService.distributeRewards(betId, totalPot, currentBet.makerUserId, currentBet.acceptorUserId)
-          .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — referral reward distribution failed`));
+      if (resolved && currentBet) {
+        // Fallback: resolve acceptorUserId from chain if missing
+        let acceptorId = currentBet.acceptorUserId;
+        if (!acceptorId && chainState?.acceptor) {
+          acceptorId = await resolveUserId(chainState.acceptor);
+          if (acceptorId) {
+            const db = (await import('../lib/db.js')).getDb();
+            const { bets: betsTable } = await import('@coinflip/db/schema');
+            const { eq: eqOp } = await import('drizzle-orm');
+            await db.update(betsTable).set({ acceptorUserId: acceptorId }).where(eqOp(betsTable.betId, betId));
+            logger.info({ betId: betId.toString(), acceptor: chainState.acceptor }, `${tag} — backfilled acceptorUserId from chain`);
+          }
+        }
+        if (acceptorId) {
+          const totalPot = BigInt(currentBet.amount) * 2n;
+          referralService.distributeRewards(betId, totalPot, currentBet.makerUserId, acceptorId)
+            .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — referral reward distribution failed`));
+        }
       }
     }
 

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart, Volume2, VolumeX, Vibrate, SmartphoneNfc } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
 import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -19,6 +19,9 @@ import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { soundManager } from '@/lib/sounds';
 import { haptics } from '@/lib/haptics';
+import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
+import { useToast } from '@/components/ui/toast';
 
 export function Header() {
   const { t, locale, setLocale } = useTranslation();
@@ -50,6 +53,31 @@ export function Header() {
   const [copied, setCopied] = useState(false);
   const [soundOn, setSoundOn] = useState(() => soundManager.isEnabled());
   const [hapticsOn, setHapticsOn] = useState(() => haptics.isEnabled());
+  const [refCode, setRefCode] = useState<string | null>(null);
+  const { addToast } = useToast();
+
+  // Fetch referral code when connected
+  useEffect(() => {
+    if (!wallet.isConnected) return;
+    const walletAddr = wallet.address;
+    fetch(`${API_URL}/api/v1/referral/code`, {
+      credentials: 'include',
+      headers: {
+        ...(walletAddr ? { 'x-wallet-address': walletAddr } : {}),
+        ...getAuthHeaders(),
+      },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data?.code) setRefCode(json.data.code); })
+      .catch(() => {});
+  }, [wallet.isConnected, wallet.address]);
+
+  const handleCopyReferralLink = useCallback(() => {
+    if (!refCode) return;
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/?ref=${refCode}`;
+    navigator.clipboard.writeText(url);
+    addToast('success', t('referral.linkCopied'));
+  }, [refCode, addToast, t]);
 
   const toggleSound = useCallback(() => {
     const next = !soundOn;
@@ -214,6 +242,17 @@ export function Header() {
                       t('nav.vip')
                     )}
                   </button>
+                  {refCode && (
+                    <button
+                      type="button"
+                      onClick={handleCopyReferralLink}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
+                      title={t('referral.copyLink')}
+                    >
+                      <UserPlus size={14} />
+                      {t('nav.invite')}
+                    </button>
+                  )}
                 </nav>
 
               </>
@@ -495,6 +534,13 @@ export function Header() {
                     <ExternalLink size={14} className="text-[var(--color-text-secondary)]" />
                     {t('common.explorer')}
                   </a>
+                )}
+                {refCode && (
+                  <button type="button" onClick={() => { handleCopyReferralLink(); setMenuOpen(false); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-400">
+                    <UserPlus size={14} />
+                    {t('nav.invite')}
+                  </button>
                 )}
                 {isAdmin && (
                   <Link href="/admin" onClick={() => setMenuOpen(false)}

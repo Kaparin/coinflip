@@ -13,8 +13,8 @@ import { env } from '../config/env.js';
 import { randomBytes } from 'node:crypto';
 import { configService } from './config.service.js';
 
-/** Cost to change referral branch, in micro-LAUNCH (1000 LAUNCH = 1_000_000_000 micro) */
-const CHANGE_BRANCH_COST_MICRO = '1000000000';
+/** Default cost to change referral branch, in micro-LAUNCH (1000 LAUNCH = 1_000_000_000 micro) */
+const DEFAULT_CHANGE_BRANCH_COST_MICRO = '1000000000';
 
 /**
  * Referral reward percentages from the TOTAL POT (2 × bet amount).
@@ -56,13 +56,16 @@ export class ReferralService {
    * Used by frontend to display dynamic percentages.
    */
   async getPublicConfig() {
-    const config = await getRewardConfig();
+    const [config, branchCost] = await Promise.all([
+      getRewardConfig(),
+      configService.getString('CHANGE_BRANCH_COST_MICRO', DEFAULT_CHANGE_BRANCH_COST_MICRO),
+    ]);
     return {
       level1Bps: Number(config.bpsByLevel[1]),
       level2Bps: Number(config.bpsByLevel[2]),
       level3Bps: Number(config.bpsByLevel[3]),
       maxBps: Number(config.maxBps),
-      changeBranchCostMicro: CHANGE_BRANCH_COST_MICRO,
+      changeBranchCostMicro: branchCost,
     };
   }
 
@@ -356,14 +359,14 @@ export class ReferralService {
     });
 
     logger.info(
-      { userId, newReferrerId: newReferrer.id, address: newReferrerAddress, cost: CHANGE_BRANCH_COST_MICRO },
+      { userId, newReferrerId: newReferrer.id, address: newReferrerAddress },
       `${tag} — branch changed`,
     );
   }
 
-  /** Cost to change branch, exposed for the route handler */
-  static get CHANGE_BRANCH_COST(): string {
-    return CHANGE_BRANCH_COST_MICRO;
+  /** Cost to change branch, exposed for the route handler (reads from config, cached 60s) */
+  static async getChangeBranchCost(): Promise<string> {
+    return configService.getString('CHANGE_BRANCH_COST_MICRO', DEFAULT_CHANGE_BRANCH_COST_MICRO);
   }
 
   /**
@@ -493,11 +496,15 @@ export class ReferralService {
     if (rewardMap.size === 0) return;
 
     // Enforce per-bet cap: total referral payout ≤ configurable MAX BPS of pot
+    // Sort by level (ascending) before cap-trimming so both players' L1 referrers
+    // are processed first, then L2, then L3. This prevents insertion-order bias
+    // where maker's chain always gets priority over acceptor's chain.
     const maxReward = (totalPot * rewardConfig.maxBps) / 10000n;
     let totalAllocated = 0n;
     const cappedRewards: Array<{ key: string; referrerId: string; amount: bigint; level: number; fromPlayer: string }> = [];
 
-    for (const [key, { amount, level, fromPlayer }] of rewardMap) {
+    const sortedEntries = [...rewardMap.entries()].sort((a, b) => a[1].level - b[1].level);
+    for (const [key, { amount, level, fromPlayer }] of sortedEntries) {
       const referrerId = key.split(':')[0]!;
       const remaining = maxReward - totalAllocated;
       if (remaining <= 0n) break;
@@ -722,12 +729,33 @@ export class ReferralService {
   }
 
   /**
-   * Get direct referrals list (people you invited).
+   * Get public referral stats for a user (no earnings, just counters).
+   * Used on public profile pages — no auth required.
    */
+  async getPublicStats(address: string): Promise<{ directInvites: number; teamSize: number } | null> {
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.address, address),
+    });
+    if (!user) return null;
+
+    const directInvites = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(referrals)
+      .where(eq(referrals.referrerUserId, user.id));
+
+    const teamSize = await this._countTeamSize(user.id);
+
+    return {
+      directInvites: directInvites[0]?.count ?? 0,
+      teamSize,
+    };
+  }
+
   async getDirectReferrals(userId: string) {
     const rows = await this.db
       .select({
         address: users.address,
+        nickname: users.profileNickname,
         joinedAt: referrals.createdAt,
       })
       .from(referrals)

@@ -619,7 +619,8 @@
     "events": "Events",
     "news": "News",
     "vip": "VIP",
-    "presale": "Buy COIN"
+    "presale": "Buy COIN",
+    "invite": "Invite"
   },
   "presale": {
     "title": "COIN Presale",
@@ -767,7 +768,8 @@
     "treasuryVault": "Treasury vault",
     "totalReferralPaid": "Total referral paid",
     "rewardSourceTitle": "Where rewards come from",
-    "rewardSourceDesc": "Rewards come from the platform commission (10% of each pot). When you claim, tokens are sent from the treasury vault directly to your Axiome wallet — not to your game vault. You can then deposit to play or keep them in your wallet."
+    "rewardSourceDesc": "Rewards come from the platform commission (10% of each pot). When you claim, tokens are sent from the treasury vault directly to your Axiome wallet — not to your game vault. You can then deposit to play or keep them in your wallet.",
+    "linkCopied": "Referral link copied!"
   },
   "events": {
     "title": "Events",

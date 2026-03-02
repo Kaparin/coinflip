@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { usePlayerProfile } from '@/hooks/use-player-profile';
 import { useUserAnnouncements } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -11,9 +11,10 @@ import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-fram
 import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone } from 'lucide-react';
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone, Users } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
+import { fetchPublicReferralStats, type PublicReferralStats } from '@/hooks/use-referral';
 import Link from 'next/link';
 import {
   GiTrophy,
@@ -361,8 +362,16 @@ export default function PlayerProfilePage() {
   const [copied, setCopied] = useState(false);
   const [reactingEmoji, setReactingEmoji] = useState<string | null>(null);
   const [selectedAch, setSelectedAch] = useState<string | null>(null);
+  const [refStats, setRefStats] = useState<PublicReferralStats | null>(null);
 
   const isOwnProfile = myAddress?.toLowerCase() === rawAddress?.toLowerCase();
+
+  // Fetch public referral stats
+  useEffect(() => {
+    if (rawAddress) {
+      fetchPublicReferralStats(rawAddress).then(setRefStats);
+    }
+  }, [rawAddress]);
 
   // Compute achievement data from progress
   const achProgressData = useMemo((): AchProgressData | null => {
@@ -609,6 +618,25 @@ export default function PlayerProfilePage() {
           />
         </div>
       </CollapsibleSection>
+
+      {/* Referral stats (public — counts only) */}
+      {refStats && (refStats.directInvites > 0 || refStats.teamSize > 0) && (
+        <CollapsibleSection
+          title={t('referral.title')}
+          icon={<Users size={18} />}
+          defaultOpen={false}
+          badge={
+            <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+              {refStats.teamSize}
+            </span>
+          }
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <StatCard label={t('referral.directInvites')} value={refStats.directInvites} />
+            <StatCard label={t('referral.teamSize')} value={refStats.teamSize} />
+          </div>
+        </CollapsibleSection>
+      )}
 
       {/* Achievements (collapsible) */}
       {achProgressData && (

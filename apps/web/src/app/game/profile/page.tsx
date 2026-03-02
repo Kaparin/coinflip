@@ -8,7 +8,7 @@ import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
-import { useReferral, fetchPlatformStats, fetchReferralConfig, type PlatformStats, type ReferralConfig } from '@/hooks/use-referral';
+import { useReferral, fetchPlatformStats, fetchReferralConfig, type PlatformStats, type ReferralConfig, type InviteEntry } from '@/hooks/use-referral';
 import { COMMISSION_BPS } from '@coinflip/shared/constants';
 import { UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
@@ -654,7 +654,7 @@ function ChangeBranchSection() {
 
 function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const { t } = useTranslation();
-  const { code, stats, claiming, claim, shareUrl } = useReferral(isConnected);
+  const { code, stats, invites, claiming, claim, shareUrl } = useReferral(isConnected);
   const [linkCopied, setLinkCopied] = useState(false);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [refConfig, setRefConfig] = useState<ReferralConfig | null>(null);
@@ -987,6 +987,40 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
           </div>
         </>
       )}
+
+      {/* My Invites — collapsible */}
+      <CollapsibleSection
+        title={t('referral.invites')}
+        icon={<Users size={18} />}
+        defaultOpen={false}
+        compact
+      >
+        {invites.length > 0 ? (
+          <div className="space-y-1.5">
+            {invites.map((inv) => (
+              <Link
+                key={inv.address}
+                href={`/game/profile/${inv.address}`}
+                className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-2.5 transition-colors hover:border-[var(--color-primary)]/30"
+              >
+                <UserAvatar address={inv.address} size={28} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate">
+                    {inv.nickname || `${inv.address.slice(0, 10)}...${inv.address.slice(-6)}`}
+                  </p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    {new Date(inv.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--color-text-secondary)] text-center py-3">
+            {t('referral.noInvites')}
+          </p>
+        )}
+      </CollapsibleSection>
 
       {/* Change Branch (paid feature) */}
       {isConnected && <ChangeBranchSection />}
@@ -1378,6 +1412,15 @@ export default function ProfilePage() {
         </CollapsibleSection>
       )}
 
+      {/* Referral Program — high up for discoverability */}
+      <CollapsibleSection
+        title={t('referral.title')}
+        defaultOpen={true}
+        icon={<Users size={20} />}
+      >
+        <ReferralSection isConnected={wallet.isConnected} />
+      </CollapsibleSection>
+
       {/* Telegram */}
       <CollapsibleSection
         title={t('profile.telegramSection')}
@@ -1412,15 +1455,6 @@ export default function ProfilePage() {
         icon={<Trophy size={20} className="text-amber-400" />}
       >
         <EventsInfoSection />
-      </CollapsibleSection>
-
-      {/* Referral Program */}
-      <CollapsibleSection
-        title={t('referral.title')}
-        defaultOpen={false}
-        icon={<Users size={20} />}
-      >
-        <ReferralSection isConnected={wallet.isConnected} />
       </CollapsibleSection>
 
       {/* Language switcher */}

@@ -881,10 +881,48 @@ export class IndexerService {
         .where(eq(bets.betId, betId))
         .limit(1);
 
-      if (!bet || !bet.acceptorUserId) return;
+      if (!bet) return;
+
+      // Fallback: if acceptorUserId is missing (e.g. startup sync, external interaction),
+      // try to resolve from on-chain acceptor address
+      let acceptorUserId = bet.acceptorUserId;
+      if (!acceptorUserId) {
+        try {
+          const { users } = await import('@coinflip/db/schema');
+          const chainQuery = JSON.stringify({ bet: { bet_id: Number(betId) } });
+          const encoded = Buffer.from(chainQuery).toString('base64');
+          const res = await chainRest(
+            `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+          );
+          if (res.ok) {
+            const data = (await res.json()) as { data: { acceptor?: string | null } };
+            const acceptorAddr = data.data?.acceptor;
+            if (acceptorAddr) {
+              const [userRow] = await this.db!
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.address, acceptorAddr))
+                .limit(1);
+              if (userRow) {
+                acceptorUserId = userRow.id;
+                // Backfill the bet record
+                await this.db!
+                  .update(bets)
+                  .set({ acceptorUserId: userRow.id })
+                  .where(eq(bets.betId, betId));
+                logger.info({ betId: betId.toString(), acceptorAddr }, 'Indexer: backfilled acceptorUserId from chain');
+              }
+            }
+          }
+        } catch (resolveErr) {
+          logger.warn({ err: resolveErr, betId: betId.toString() }, 'Indexer: failed to resolve acceptor from chain');
+        }
+      }
+
+      if (!acceptorUserId) return;
 
       const totalPot = BigInt(bet.amount) * 2n;
-      await referralService.distributeRewards(betId, totalPot, bet.makerUserId, bet.acceptorUserId);
+      await referralService.distributeRewards(betId, totalPot, bet.makerUserId, acceptorUserId);
     } catch (err) {
       logger.warn({ err, betId: betId.toString() }, 'Indexer: referral reward distribution failed');
     }

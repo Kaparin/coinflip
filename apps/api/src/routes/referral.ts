@@ -10,6 +10,8 @@ import { Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import { walletTxRateLimit } from '../middleware/rate-limit.js';
+import { getDb } from '../lib/db.js';
+import { treasuryLedger } from '@coinflip/db/schema';
 import type { AppEnv } from '../types.js';
 
 // Inflight guard for claim/change-branch operations (prevents concurrent chain txs)
@@ -47,6 +49,16 @@ referralRouter.get('/platform-stats', async (c) => {
 referralRouter.get('/config', async (c) => {
   const config = await referralService.getPublicConfig();
   return c.json({ data: config });
+});
+
+// GET /api/v1/referral/public-stats — Public: referral counters for a wallet address (no earnings)
+referralRouter.get('/public-stats', async (c) => {
+  const address = c.req.query('address')?.trim().toLowerCase();
+  if (!address || !address.startsWith('axm1')) {
+    return c.json({ data: null }, 400);
+  }
+  const stats = await referralService.getPublicStats(address);
+  return c.json({ data: stats });
 });
 
 // GET /api/v1/referral/code — Get or create referral code
@@ -127,7 +139,7 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
   const userId = c.get('user').id;
   const walletAddress = c.get('address');
   const { address: newReferrerAddr } = c.req.valid('json');
-  const cost = ReferralService.CHANGE_BRANCH_COST;
+  const cost = await ReferralService.getChangeBranchCost();
 
   // Inflight guard — prevent concurrent branch changes (double-withdraw risk)
   const branchKey = `branch:${userId}`;
@@ -408,6 +420,17 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
     { txHash: transferResult.txHash, userId, amount, from: treasuryAddr, to: address },
     'Referral claim: CW20 transfer to user confirmed',
   );
+
+  // Record in treasury ledger for audit trail
+  try {
+    await getDb().insert(treasuryLedger).values({
+      txhash: transferResult.txHash ?? '',
+      amount: `-${amount}`,
+      source: 'referral_payout',
+    });
+  } catch (ledgerErr) {
+    logger.warn({ err: ledgerErr, userId, amount }, 'Referral claim: treasury_ledger insert failed (non-critical)');
+  }
 
   invalidateBalanceCache(address);
   invalidateBalanceCache(treasuryAddr);

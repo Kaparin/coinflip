@@ -22,6 +22,12 @@ interface RewardEntry {
   createdAt: string;
 }
 
+export interface InviteEntry {
+  address: string;
+  nickname: string | null;
+  joinedAt: string;
+}
+
 function getWalletAddress(): string | null {
   if (typeof window === 'undefined') return null;
   return sessionStorage.getItem('coinflip_connected_address');
@@ -183,6 +189,7 @@ export function useReferral(isConnected: boolean) {
   const [code, setCode] = useState<string | null>(null);
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [rewards, setRewards] = useState<RewardEntry[]>([]);
+  const [invites, setInvites] = useState<InviteEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
 
@@ -201,12 +208,17 @@ export function useReferral(isConnected: boolean) {
     if (data) setRewards(data);
   }, []);
 
+  const fetchInvites = useCallback(async () => {
+    const data = await apiFetch<InviteEntry[]>('/api/v1/referral/invites');
+    if (data) setInvites(data);
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!isConnected) return;
     setLoading(true);
-    await Promise.all([fetchCode(), fetchStats(), fetchRewards()]);
+    await Promise.all([fetchCode(), fetchStats(), fetchRewards(), fetchInvites()]);
     setLoading(false);
-  }, [isConnected, fetchCode, fetchStats, fetchRewards]);
+  }, [isConnected, fetchCode, fetchStats, fetchRewards, fetchInvites]);
 
   const claim = useCallback(async (): Promise<{ ok: boolean; amount?: string; error?: string }> => {
     setClaiming(true);
@@ -242,7 +254,24 @@ export function useReferral(isConnected: boolean) {
     ? `${window.location.origin}/?ref=${code}`
     : null;
 
-  return { code, stats, rewards, loading, claiming, claim, refresh, shareUrl };
+  return { code, stats, rewards, invites, loading, claiming, claim, refresh, shareUrl };
+}
+
+/** Fetch public referral stats (invite count, team size) — no auth. */
+export interface PublicReferralStats {
+  directInvites: number;
+  teamSize: number;
+}
+
+export async function fetchPublicReferralStats(address: string): Promise<PublicReferralStats | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/referral/public-stats?address=${encodeURIComponent(address)}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Referral config from platform_config table. Public, no auth. */
