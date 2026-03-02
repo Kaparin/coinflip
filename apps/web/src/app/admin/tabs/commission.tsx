@@ -65,7 +65,7 @@ export function CommissionTab() {
         await updateConfig.mutateAsync({ key, value: val });
       }
       setEditingReferral(false);
-      setActionResult('Referral config saved');
+      setActionResult('Реферальный конфиг сохранён');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setActionResult(`Error: ${message}`);
@@ -79,7 +79,7 @@ export function CommissionTab() {
         <div className="space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <PieChart size={16} className="text-[var(--color-primary)]" />
-            Commission Distribution ({bd.commissionBps / 100}% of pot)
+            Распределение комиссии ({bd.commissionBps / 100}% от банка)
           </h3>
 
           {/* Visual bar */}
@@ -90,7 +90,7 @@ export function CommissionTab() {
                   className="bg-blue-500 flex items-center justify-center text-[9px] font-bold text-white"
                   style={{ width: `${(bd.referralMaxBps / bd.commissionBps) * 100}%` }}
                 >
-                  Ref {bd.referralMaxBps / 100}%
+                  Реф {bd.referralMaxBps / 100}%
                 </div>
               )}
               {bd.jackpotBps > 0 && (
@@ -98,7 +98,7 @@ export function CommissionTab() {
                   className="bg-purple-500 flex items-center justify-center text-[9px] font-bold text-white"
                   style={{ width: `${(bd.jackpotBps / bd.commissionBps) * 100}%` }}
                 >
-                  JP {bd.jackpotBps / 100}%
+                  ДП {bd.jackpotBps / 100}%
                 </div>
               )}
               {bd.partnerBps > 0 && (
@@ -106,7 +106,7 @@ export function CommissionTab() {
                   className="bg-teal-500 flex items-center justify-center text-[9px] font-bold text-white"
                   style={{ width: `${(bd.partnerBps / bd.commissionBps) * 100}%` }}
                 >
-                  Partners {bd.partnerBps / 100}%
+                  Партнёры {bd.partnerBps / 100}%
                 </div>
               )}
               {bd.treasuryBps > 0 && (
@@ -114,16 +114,16 @@ export function CommissionTab() {
                   className="bg-amber-500 flex items-center justify-center text-[9px] font-bold text-white"
                   style={{ width: `${(bd.treasuryBps / bd.commissionBps) * 100}%` }}
                 >
-                  Treasury {bd.treasuryBps / 100}%
+                  Казна {bd.treasuryBps / 100}%
                 </div>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatCard label="Referrals (max)" value={`${bd.referralMaxBps} BPS`} sub={`${bd.referralMaxBps / 100}% of pot`} />
-              <StatCard label="Jackpot" value={`${bd.jackpotBps} BPS`} sub={`${bd.jackpotBps / 100}% of pot`} />
-              <StatCard label="Partners" value={`${bd.partnerBps} BPS`} sub={`${bd.partnerBps / 100}% of pot`} />
-              <StatCard label="Treasury" value={`${bd.treasuryBps} BPS`} sub={`${bd.treasuryBps / 100}% of pot`} />
+              <StatCard label="Рефералы (макс)" value={`${bd.referralMaxBps} BPS`} sub={`${bd.referralMaxBps / 100}% от банка`} />
+              <StatCard label="Джекпот" value={`${bd.jackpotBps} BPS`} sub={`${bd.jackpotBps / 100}% от банка`} />
+              <StatCard label="Партнёры" value={`${bd.partnerBps} BPS`} sub={`${bd.partnerBps / 100}% от банка`} />
+              <StatCard label="Казна" value={`${bd.treasuryBps} BPS`} sub={`${bd.treasuryBps / 100}% от банка`} />
             </div>
 
             {!breakdown?.valid && breakdown?.error && (
@@ -145,13 +145,13 @@ export function CommissionTab() {
       {/* Referral Config */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold">Referral Levels</h3>
+          <h3 className="text-sm font-bold">Уровни рефералов</h3>
           {!editingReferral ? (
-            <ActionButton onClick={startEditReferral}>Edit</ActionButton>
+            <ActionButton onClick={startEditReferral}>Изменить</ActionButton>
           ) : (
             <div className="flex gap-2">
-              <ActionButton onClick={() => setEditingReferral(false)} variant="danger">Cancel</ActionButton>
-              <ActionButton onClick={saveReferral} variant="success" disabled={updateConfig.isPending}>Save</ActionButton>
+              <ActionButton onClick={() => setEditingReferral(false)} variant="danger">Отмена</ActionButton>
+              <ActionButton onClick={saveReferral} variant="success" disabled={updateConfig.isPending}>Сохранить</ActionButton>
             </div>
           )}
         </div>
@@ -159,22 +159,22 @@ export function CommissionTab() {
         {editingReferral ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Level 1 BPS</label>
+              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Уровень 1 BPS</label>
               <input type="number" value={refL1} onChange={(e) => setRefL1(e.target.value)}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Level 2 BPS</label>
+              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Уровень 2 BPS</label>
               <input type="number" value={refL2} onChange={(e) => setRefL2(e.target.value)}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Level 3 BPS</label>
+              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Уровень 3 BPS</label>
               <input type="number" value={refL3} onChange={(e) => setRefL3(e.target.value)}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Max Cap BPS</label>
+              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Макс. кап BPS</label>
               <input type="number" value={refMax} onChange={(e) => setRefMax(e.target.value)}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
             </div>
@@ -184,19 +184,19 @@ export function CommissionTab() {
             {bd && (
               <>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Level 1</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Уровень 1</p>
                   <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'REFERRAL_BPS_LEVEL_1')?.value ?? '300'} BPS</p>
                 </div>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Level 2</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Уровень 2</p>
                   <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'REFERRAL_BPS_LEVEL_2')?.value ?? '150'} BPS</p>
                 </div>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Level 3</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Уровень 3</p>
                   <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'REFERRAL_BPS_LEVEL_3')?.value ?? '50'} BPS</p>
                 </div>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Max Cap</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Макс. кап</p>
                   <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'MAX_REFERRAL_BPS_PER_BET')?.value ?? '500'} BPS</p>
                 </div>
               </>
@@ -208,19 +208,19 @@ export function CommissionTab() {
       {/* Partners */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold">Partner Treasury</h3>
+          <h3 className="text-sm font-bold">Партнёрская казна</h3>
           <ActionButton onClick={() => setShowAddForm(!showAddForm)}>
             <span className="flex items-center gap-1">
               <Plus size={12} />
-              Add Partner
+              Добавить
             </span>
           </ActionButton>
         </div>
 
         {showAddForm && (
           <AddPartnerForm
-            onSuccess={() => { setShowAddForm(false); setActionResult('Partner added'); }}
-            onError={(msg) => setActionResult(`Error: ${msg}`)}
+            onSuccess={() => { setShowAddForm(false); setActionResult('Партнёр добавлен'); }}
+            onError={(msg) => setActionResult(`Ошибка: ${msg}`)}
           />
         )}
 
@@ -229,12 +229,12 @@ export function CommissionTab() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-                  <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Name</th>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Address</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Имя</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Адрес</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">BPS</th>
-                  <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Status</th>
-                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Earned</th>
-                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Actions</th>
+                  <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Статус</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Заработано</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -250,7 +250,7 @@ export function CommissionTab() {
           </TableWrapper>
         ) : (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] py-8 text-center">
-            <p className="text-xs text-[var(--color-text-secondary)]">No partners configured</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">Партнёры не настроены</p>
           </div>
         )}
       </div>
@@ -285,13 +285,13 @@ function AddPartnerForm({
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4 space-y-3">
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
-          <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Name</label>
+          <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Имя</label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-            placeholder="Partner name"
+            placeholder="Имя партнёра"
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none" />
         </div>
         <div>
-          <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Wallet Address</label>
+          <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Адрес кошелька</label>
           <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
             placeholder="axm1..."
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs font-mono focus:border-[var(--color-primary)] focus:outline-none" />
@@ -304,7 +304,7 @@ function AddPartnerForm({
         </div>
       </div>
       <ActionButton onClick={handleSubmit} variant="success" disabled={addPartner.isPending || !name.trim() || !address.trim()}>
-        {addPartner.isPending ? 'Adding...' : 'Add Partner'}
+        {addPartner.isPending ? 'Добавление...' : 'Добавить партнёра'}
       </ActionButton>
     </div>
   );
@@ -320,7 +320,7 @@ function PartnerRow({ partner, onResult }: { partner: AdminPartner; onResult: (m
     try {
       await updatePartner.mutateAsync({ id: partner.id, bps: Number(editBps) });
       setEditing(false);
-      onResult('Partner updated');
+      onResult('Партнёр обновлён');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${message}`);
@@ -330,7 +330,7 @@ function PartnerRow({ partner, onResult }: { partner: AdminPartner; onResult: (m
   const handleDelete = async () => {
     try {
       await deletePartner.mutateAsync(partner.id);
-      onResult('Partner deactivated');
+      onResult('Партнёр деактивирован');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${message}`);
@@ -353,7 +353,7 @@ function PartnerRow({ partner, onResult }: { partner: AdminPartner; onResult: (m
         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
           partner.isActive === 1 ? 'bg-green-500/15 text-green-400' : 'bg-gray-500/15 text-gray-400'
         }`}>
-          {partner.isActive === 1 ? 'Active' : 'Inactive'}
+          {partner.isActive === 1 ? 'Активен' : 'Неактивен'}
         </span>
       </td>
       <td className="px-3 py-2 text-right tabular-nums">{formatLaunch(partner.totalEarned)}</td>
@@ -361,12 +361,12 @@ function PartnerRow({ partner, onResult }: { partner: AdminPartner; onResult: (m
         <div className="flex justify-end gap-1">
           {editing ? (
             <>
-              <ActionButton onClick={() => setEditing(false)} variant="danger">Cancel</ActionButton>
-              <ActionButton onClick={handleSave} variant="success" disabled={updatePartner.isPending}>Save</ActionButton>
+              <ActionButton onClick={() => setEditing(false)} variant="danger">Отмена</ActionButton>
+              <ActionButton onClick={handleSave} variant="success" disabled={updatePartner.isPending}>Сохранить</ActionButton>
             </>
           ) : (
             <>
-              <ActionButton onClick={() => setEditing(true)}>Edit</ActionButton>
+              <ActionButton onClick={() => setEditing(true)}>Изменить</ActionButton>
               {partner.isActive === 1 && (
                 <ActionButton onClick={handleDelete} variant="danger" disabled={deletePartner.isPending}>
                   <Trash2 size={12} />

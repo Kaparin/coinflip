@@ -37,20 +37,20 @@ import { PresaleTab } from './tabs/presale';
 type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news' | 'presale';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'users', icon: Users, label: 'Users' },
-  { id: 'bets', icon: Dices, label: 'Bets' },
-  { id: 'events', icon: Trophy, label: 'Events' },
-  { id: 'jackpot', icon: Gem, label: 'Jackpot' },
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд' },
+  { id: 'users', icon: Users, label: 'Юзеры' },
+  { id: 'bets', icon: Dices, label: 'Ставки' },
+  { id: 'events', icon: Trophy, label: 'Ивенты' },
+  { id: 'jackpot', icon: Gem, label: 'Джекпот' },
   { id: 'vip', icon: Crown, label: 'VIP' },
-  { id: 'commission', icon: PieChart, label: 'Commission' },
-  { id: 'transactions', icon: ArrowLeftRight, label: 'Txns' },
-  { id: 'announcements', icon: Megaphone, label: 'Announce' },
-  { id: 'news', icon: Newspaper, label: 'News' },
-  { id: 'presale', icon: ShoppingCart, label: 'Presale' },
-  { id: 'config', icon: Settings, label: 'Config' },
-  { id: 'diagnostics', icon: AlertTriangle, label: 'Diag' },
-  { id: 'actions', icon: Wrench, label: 'Actions' },
+  { id: 'commission', icon: PieChart, label: 'Комиссия' },
+  { id: 'transactions', icon: ArrowLeftRight, label: 'Транзакции' },
+  { id: 'announcements', icon: Megaphone, label: 'Анонсы' },
+  { id: 'news', icon: Newspaper, label: 'Новости' },
+  { id: 'presale', icon: ShoppingCart, label: 'Пресейл' },
+  { id: 'config', icon: Settings, label: 'Конфиг' },
+  { id: 'diagnostics', icon: AlertTriangle, label: 'Диагн.' },
+  { id: 'actions', icon: Wrench, label: 'Действия' },
 ];
 
 export default function AdminPage() {
@@ -58,7 +58,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4 space-y-4">
+    <div className="mx-auto max-w-6xl px-2 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)]/15">

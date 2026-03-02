@@ -43,15 +43,15 @@ interface WinnerRow {
 }
 
 const DURATION_PRESETS = [
-  { label: '1 hour', hours: 1 },
-  { label: '24 hours', hours: 24 },
-  { label: '3 days', hours: 72 },
-  { label: '7 days', hours: 168 },
+  { label: '1 час', hours: 1 },
+  { label: '24 часа', hours: 24 },
+  { label: '3 дня', hours: 72 },
+  { label: '7 дней', hours: 168 },
 ] as const;
 
 const PRIZE_PRESETS = [
-  { label: 'Top 3 (50/30/20%)', distribution: [50, 30, 20] },
-  { label: 'Top 5 (40/25/15/12/8%)', distribution: [40, 25, 15, 12, 8] },
+  { label: 'Топ 3 (50/30/20%)', distribution: [50, 30, 20] },
+  { label: 'Топ 5 (40/25/15/12/8%)', distribution: [40, 25, 15, 12, 8] },
 ] as const;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -75,7 +75,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
   if (isLoading || !pending || pending.length === 0) return null;
 
   const handleApprove = async (eventId: string) => {
-    if (!window.confirm('Approve this sponsored raffle? It will be activated (or scheduled).')) return;
+    if (!window.confirm('Одобрить спонсорский розыгрыш? Он будет активирован (или запланирован).')) return;
     await approveMut.mutateAsync(eventId);
     onRefreshEvents();
   };
@@ -95,7 +95,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
     <div className="rounded-xl border-2 border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
       <div className="flex items-center gap-2 mb-1">
         <Trophy size={14} className="text-amber-400" />
-        <span className="text-xs font-bold text-amber-400">Pending Sponsored Raffles ({pending.length})</span>
+        <span className="text-xs font-bold text-amber-400">Спонсорские розыгрыши на проверке ({pending.length})</span>
       </div>
       {pending.map((r) => (
         <div key={r.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
@@ -105,13 +105,13 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
               {r.description && <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{r.description}</div>}
               <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] text-[var(--color-text-secondary)]">
                 <span>{fmtDate(r.startsAt)} — {fmtDate(r.endsAt)}</span>
-                <span className="font-bold text-[var(--color-success)]">Prize: {formatLaunch(r.totalPrizePool)} COIN</span>
-                {r.pricePaid && <span>Paid: {formatLaunch(r.pricePaid)} COIN</span>}
+                <span className="font-bold text-[var(--color-success)]">Приз: {formatLaunch(r.totalPrizePool)} COIN</span>
+                {r.pricePaid && <span>Оплата: {formatLaunch(r.pricePaid)} COIN</span>}
               </div>
               {(r.sponsorNickname || r.sponsorAddress) && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--color-text-secondary)]">
                   <User size={10} />
-                  <span>Sponsor: {r.sponsorNickname || shortAddr(r.sponsorAddress ?? '')}</span>
+                  <span>Спонсор: {r.sponsorNickname || shortAddr(r.sponsorAddress ?? '')}</span>
                 </div>
               )}
             </div>
@@ -122,7 +122,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
                 disabled={approveMut.isPending}
                 className="rounded-lg bg-[var(--color-success)] px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-40"
               >
-                {approveMut.isPending ? '...' : 'Approve'}
+                {approveMut.isPending ? '...' : 'Одобрить'}
               </button>
               <button
                 type="button"
@@ -130,7 +130,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
                 disabled={rejectMut.isPending}
                 className="rounded-lg bg-[var(--color-danger)] px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-40"
               >
-                Reject
+                Отклонить
               </button>
             </div>
           </div>
@@ -139,7 +139,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
               <input
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Rejection reason (optional)"
+                placeholder="Причина отказа (необязательно)"
                 className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs focus:border-[var(--color-primary)] focus:outline-none"
               />
               <button
@@ -148,7 +148,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
                 disabled={rejectMut.isPending}
                 className="rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-40"
               >
-                {rejectMut.isPending ? '...' : 'Confirm Reject'}
+                {rejectMut.isPending ? '...' : 'Подтвердить отказ'}
               </button>
             </div>
           )}
@@ -217,7 +217,7 @@ export function EventsTab() {
         setEvents(json.data ?? []);
       }
     } catch {
-      setMessage('Failed to load events');
+      setMessage('Не удалось загрузить ивенты');
     } finally {
       setLoading(false);
     }
@@ -249,7 +249,7 @@ export function EventsTab() {
         );
       }
     } catch {
-      setMessage('Failed to load winners');
+      setMessage('Не удалось загрузить победителей');
     } finally {
       setWinnersLoading(false);
     }
@@ -278,15 +278,15 @@ export function EventsTab() {
       });
       if (res.ok) {
         const json = await res.json();
-        setMessage(json.data?.message ?? 'Distributed!');
+        setMessage(json.data?.message ?? 'Призы розданы!');
         fetchWinners(detailEvent.id);
         fetchEvents();
       } else {
         const err = await res.json();
-        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+        setMessage(`Ошибка: ${err?.error?.message ?? 'Неизвестная ошибка'}`);
       }
     } catch {
-      setMessage('Failed to distribute');
+      setMessage('Не удалось раздать призы');
     } finally {
       setDistLoading(null);
     }
@@ -305,15 +305,15 @@ export function EventsTab() {
         },
       );
       if (res.ok) {
-        setMessage('Prize distributed!');
+        setMessage('Приз отправлен!');
         fetchWinners(detailEvent.id);
         fetchEvents();
       } else {
         const err = await res.json();
-        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+        setMessage(`Ошибка: ${err?.error?.message ?? 'Неизвестная ошибка'}`);
       }
     } catch {
-      setMessage('Failed to distribute');
+      setMessage('Не удалось раздать призы');
     } finally {
       setDistLoading(null);
     }
@@ -328,24 +328,24 @@ export function EventsTab() {
 
   const formErrors = useMemo(() => {
     const errors: string[] = [];
-    if (!formTitle.trim()) errors.push('Title is required');
-    if (!formStartDate || !formStartTime) errors.push('Start date/time required');
-    if (!formEndDate || !formEndTime) errors.push('End date/time required');
+    if (!formTitle.trim()) errors.push('Название обязательно');
+    if (!formStartDate || !formStartTime) errors.push('Укажите дату/время начала');
+    if (!formEndDate || !formEndTime) errors.push('Укажите дату/время окончания');
     if (formStartDate && formStartTime) {
       const start = new Date(`${formStartDate}T${formStartTime}`);
-      if (start < new Date()) errors.push('Start date is in the past');
+      if (start < new Date()) errors.push('Дата начала в прошлом');
     }
     if (formStartDate && formStartTime && formEndDate && formEndTime) {
       const start = new Date(`${formStartDate}T${formStartTime}`);
       const end = new Date(`${formEndDate}T${formEndTime}`);
-      if (end <= start) errors.push('End must be after start');
+      if (end <= start) errors.push('Конец должен быть после начала');
     }
     const pool = Number(formPrizePool);
-    if (!pool || pool <= 0) errors.push('Prize pool is required');
-    if (prizes.length === 0) errors.push('At least one prize required');
-    if (prizes.some((p) => !p.amount || Number(p.amount) <= 0)) errors.push('All prizes must have amounts');
+    if (!pool || pool <= 0) errors.push('Призовой фонд обязателен');
+    if (prizes.length === 0) errors.push('Нужен хотя бы один приз');
+    if (prizes.some((p) => !p.amount || Number(p.amount) <= 0)) errors.push('У всех призов должны быть суммы');
     if (pool > 0 && prizesTotal > 0 && prizesTotal !== pool) {
-      errors.push(`Prizes sum (${prizesTotal}) \u2260 pool (${pool})`);
+      errors.push(`Сумма призов (${prizesTotal}) \u2260 фонд (${pool})`);
     }
     return errors;
   }, [formTitle, formStartDate, formStartTime, formEndDate, formEndTime, formPrizePool, prizes, prizesTotal]);
@@ -358,9 +358,9 @@ export function EventsTab() {
       const start = new Date(`${formStartDate}T${formStartTime}`);
       const end = new Date(`${formEndDate}T${formEndTime}`);
       const fmt = (d: Date) =>
-        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+        d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) +
         ' ' +
-        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       return `${fmt(start)} \u2014 ${fmt(end)}`;
     } catch {
       return null;
@@ -522,15 +522,15 @@ export function EventsTab() {
       });
 
       if (res.ok) {
-        setMessage(activate ? 'Event created & activated!' : 'Event created!');
+        setMessage(activate ? 'Ивент создан и активирован!' : 'Ивент создан!');
         setModalOpen(false);
         fetchEvents();
       } else {
         const err = await res.json();
-        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+        setMessage(`Ошибка: ${err?.error?.message ?? 'Неизвестная ошибка'}`);
       }
     } catch {
-      setMessage('Failed to create event');
+      setMessage('Не удалось создать ивент');
     } finally {
       setActionLoading(null);
     }
@@ -579,7 +579,7 @@ export function EventsTab() {
       });
 
       if (res.ok) {
-        setMessage('Event updated!');
+        setMessage('Ивент обновлён!');
         setEditMode(false);
         setEditingEventId(null);
         setModalOpen(false);
@@ -587,10 +587,10 @@ export function EventsTab() {
         fetchEvents();
       } else {
         const err = await res.json();
-        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+        setMessage(`Ошибка: ${err?.error?.message ?? 'Неизвестная ошибка'}`);
       }
     } catch {
-      setMessage('Failed to update event');
+      setMessage('Не удалось обновить ивент');
     } finally {
       setActionLoading(null);
     }
@@ -598,11 +598,11 @@ export function EventsTab() {
 
   const handleAction = async (eventId: string, action: string, opts?: { force?: boolean }) => {
     // Confirmations for destructive actions
-    if (action === 'delete' && !window.confirm('Delete this draft event? This cannot be undone.')) return;
-    if (action === 'cancel' && !window.confirm('Cancel this event and remove all participants? This cannot be undone.')) return;
-    if (action === 'activate' && !window.confirm('Activate this event? It will be visible to all users.')) return;
-    if (action === 'approve' && !window.confirm('Approve results and mark as completed? This finalizes the winners.')) return;
-    if (opts?.force && !window.confirm('Force recalculate? This will clear previous results and redo the calculation.')) return;
+    if (action === 'delete' && !window.confirm('Удалить черновик ивента? Это нельзя отменить.')) return;
+    if (action === 'cancel' && !window.confirm('Отменить ивент и удалить всех участников? Это нельзя отменить.')) return;
+    if (action === 'activate' && !window.confirm('Активировать ивент? Он станет виден всем пользователям.')) return;
+    if (action === 'approve' && !window.confirm('Подтвердить результаты и завершить? Победители будут зафиксированы.')) return;
+    if (opts?.force && !window.confirm('Пересчитать принудительно? Предыдущие результаты будут сброшены.')) return;
 
     setActionLoading(`${action}:${eventId}`);
     setMessage(null);
@@ -625,22 +625,22 @@ export function EventsTab() {
       });
       if (res.ok) {
         const actionLabels: Record<string, string> = {
-          activate: 'Event activated!',
-          cancel: 'Event canceled!',
-          delete: 'Event deleted!',
-          calculate: 'Results calculated!',
-          approve: 'Event approved!',
-          archive: 'Event archived!',
-          distribute: 'Prizes distributed!',
+          activate: 'Ивент активирован!',
+          cancel: 'Ивент отменён!',
+          delete: 'Ивент удалён!',
+          calculate: 'Результаты подсчитаны!',
+          approve: 'Результаты подтверждены!',
+          archive: 'Ивент архивирован!',
+          distribute: 'Призы розданы!',
         };
-        setMessage(actionLabels[action] ?? `${action} successful!`);
+        setMessage(actionLabels[action] ?? `${action} выполнено!`);
         fetchEvents();
       } else {
         const err = await res.json();
-        setMessage(`Error: ${err?.error?.message ?? 'Unknown error'}`);
+        setMessage(`Ошибка: ${err?.error?.message ?? 'Неизвестная ошибка'}`);
       }
     } catch {
-      setMessage(`Failed to ${action}`);
+      setMessage(`Не удалось: ${action}`);
     } finally {
       setActionLoading(null);
     }
@@ -659,9 +659,9 @@ export function EventsTab() {
   const formatConfig = (event: EventRow) => {
     if (!event.config) return null;
     const parts: string[] = [];
-    if (event.config.metric) parts.push(`metric: ${event.config.metric}`);
-    if (event.config.autoJoin) parts.push('auto-join');
-    if (event.config.maxParticipants) parts.push(`max: ${event.config.maxParticipants}`);
+    if (event.config.metric) parts.push(`метрика: ${event.config.metric}`);
+    if (event.config.autoJoin) parts.push('авто-вступление');
+    if (event.config.maxParticipants) parts.push(`макс: ${event.config.maxParticipants}`);
     return parts.length > 0 ? parts.join(' \u00b7 ') : null;
   };
 
@@ -672,7 +672,7 @@ export function EventsTab() {
       {message && (
         <div
           className={`rounded-lg px-3 py-2 text-xs font-medium ${
-            message.startsWith('Error') || message.startsWith('Failed')
+            message.startsWith('Ошибка') || message.startsWith('Не удалось')
               ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
               : 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
           }`}
@@ -682,26 +682,26 @@ export function EventsTab() {
       )}
 
       {/* Controls */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
           >
-            <option value="">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="calculating">Calculating</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
+            <option value="">Все статусы</option>
+            <option value="draft">Черновик</option>
+            <option value="active">Активен</option>
+            <option value="calculating">Подсчёт</option>
+            <option value="completed">Завершён</option>
+            <option value="archived">Архив</option>
           </select>
           <button
             type="button"
             onClick={fetchEvents}
             className="rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--color-surface)]"
           >
-            Refresh
+            Обновить
           </button>
         </div>
         <button
@@ -710,7 +710,7 @@ export function EventsTab() {
           className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)]"
         >
           <Plus size={14} />
-          Create Event
+          Создать ивент
         </button>
       </div>
 
@@ -718,47 +718,47 @@ export function EventsTab() {
       <PendingSponsoredRaffles onRefreshEvents={fetchEvents} />
 
       {/* Create Event Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Edit Event' : 'Create Event'} closeOnOverlayClick={false}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingEventId(null); }} title={editingEventId ? 'Изменить ивент' : 'Создать ивент'} closeOnOverlayClick={false}>
         <div className="space-y-4">
           {/* Type & Title */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Type</label>
+              <label className={labelCls}>Тип</label>
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as 'contest' | 'raffle')}
                 className={inputCls}
               >
-                <option value="contest">Contest</option>
-                <option value="raffle">Raffle</option>
+                <option value="contest">Контест</option>
+                <option value="raffle">Розыгрыш</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>Title</label>
+              <label className={labelCls}>Название</label>
               <input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
                 className={`${inputCls} ${formTouched && !formTitle.trim() ? 'border-[var(--color-danger)]!' : ''}`}
-                placeholder="Event title..."
+                placeholder="Название ивента..."
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className={labelCls}>Description</label>
+            <label className={labelCls}>Описание</label>
             <textarea
               value={formDesc}
               onChange={(e) => setFormDesc(e.target.value)}
               rows={2}
               className={inputCls}
-              placeholder="Optional description..."
+              placeholder="Описание (необязательно)..."
             />
           </div>
 
           {/* Duration presets */}
           <div>
-            <label className={labelCls}>Quick Duration</label>
+            <label className={labelCls}>Длительность</label>
             <div className="flex flex-wrap gap-1.5">
               {DURATION_PRESETS.map((preset) => (
                 <button
@@ -777,7 +777,7 @@ export function EventsTab() {
           {/* Date / Time inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Start Date</label>
+              <label className={labelCls}>Дата начала</label>
               <input
                 type="date"
                 value={formStartDate}
@@ -786,7 +786,7 @@ export function EventsTab() {
               />
             </div>
             <div>
-              <label className={labelCls}>Start Time</label>
+              <label className={labelCls}>Время начала</label>
               <input
                 type="time"
                 value={formStartTime}
@@ -795,7 +795,7 @@ export function EventsTab() {
               />
             </div>
             <div>
-              <label className={labelCls}>End Date</label>
+              <label className={labelCls}>Дата окончания</label>
               <input
                 type="date"
                 value={formEndDate}
@@ -804,7 +804,7 @@ export function EventsTab() {
               />
             </div>
             <div>
-              <label className={labelCls}>End Time</label>
+              <label className={labelCls}>Время окончания</label>
               <input
                 type="time"
                 value={formEndTime}
@@ -825,15 +825,15 @@ export function EventsTab() {
           {formType === 'contest' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Metric</label>
+                <label className={labelCls}>Метрика</label>
                 <select
                   value={formMetric}
                   onChange={(e) => setFormMetric(e.target.value as 'turnover' | 'wins' | 'profit')}
                   className={inputCls}
                 >
-                  <option value="turnover">Turnover</option>
-                  <option value="wins">Wins</option>
-                  <option value="profit">Profit</option>
+                  <option value="turnover">Оборот</option>
+                  <option value="wins">Победы</option>
+                  <option value="profit">Профит</option>
                 </select>
               </div>
               <div className="flex items-end pb-0.5">
@@ -844,7 +844,7 @@ export function EventsTab() {
                     onChange={(e) => setFormAutoJoin(e.target.checked)}
                     className="rounded"
                   />
-                  Auto-join (all players)
+                  Авто-вступление (все игроки)
                 </label>
               </div>
             </div>
@@ -853,12 +853,12 @@ export function EventsTab() {
           {/* Raffle config */}
           {formType === 'raffle' && (
             <div>
-              <label className={labelCls}>Max Participants (optional)</label>
+              <label className={labelCls}>Макс. участников (необязательно)</label>
               <input
                 value={formMaxParticipants}
                 onChange={(e) => setFormMaxParticipants(e.target.value)}
                 className={inputCls}
-                placeholder="Unlimited"
+                placeholder="Без ограничений"
                 type="number"
                 min="1"
               />
@@ -867,7 +867,7 @@ export function EventsTab() {
 
           {/* Prize Pool */}
           <div>
-            <label className={labelCls}>Total Prize Pool (COIN)</label>
+            <label className={labelCls}>Призовой фонд (COIN)</label>
             <input
               value={formPrizePool}
               onChange={(e) => setFormPrizePool(e.target.value)}
@@ -880,7 +880,7 @@ export function EventsTab() {
 
           {/* Prize presets */}
           <div>
-            <label className={labelCls}>Distribution Presets</label>
+            <label className={labelCls}>Шаблоны распределения</label>
             <div className="flex flex-wrap gap-1.5">
               {PRIZE_PRESETS.map((preset) => (
                 <button
@@ -900,7 +900,7 @@ export function EventsTab() {
           {/* Prizes editor */}
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className={labelCls}>Prizes</label>
+              <label className={labelCls}>Призы</label>
               <span
                 className={`text-[10px] font-bold ${
                   prizesTotal > 0 && Number(formPrizePool) > 0 && prizesTotal !== Number(formPrizePool)
@@ -908,7 +908,7 @@ export function EventsTab() {
                     : 'text-[var(--color-text-secondary)]'
                 }`}
               >
-                Total: {prizesTotal} / {formPrizePool || '0'} COIN
+                Итого: {prizesTotal} / {formPrizePool || '0'} COIN
               </span>
             </div>
 
@@ -922,7 +922,7 @@ export function EventsTab() {
                     value={prize.amount}
                     onChange={(e) => updatePrizeAmount(index, e.target.value)}
                     className={`flex-1 ${inputCls}`}
-                    placeholder="Amount"
+                    placeholder="Сумма"
                     type="number"
                     min="1"
                   />
@@ -945,7 +945,7 @@ export function EventsTab() {
               className="mt-1.5 flex items-center gap-1 rounded-lg border border-dashed border-[var(--color-border)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
             >
               <Plus size={10} />
-              Add Prize
+              Добавить место
             </button>
           </div>
 
@@ -968,7 +968,7 @@ export function EventsTab() {
               disabled={actionLoading === 'update' || (formTouched && !isFormValid)}
               className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
             >
-              {actionLoading === 'update' ? 'Saving...' : 'Save Changes'}
+              {actionLoading === 'update' ? 'Сохранение...' : 'Сохранить'}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -978,7 +978,7 @@ export function EventsTab() {
                 disabled={actionLoading === 'create' || actionLoading === 'create-activate' || (formTouched && !isFormValid)}
                 className="flex-1 rounded-lg border border-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 disabled:opacity-40 transition-colors"
               >
-                {actionLoading === 'create' ? 'Creating...' : 'Create as Draft'}
+                {actionLoading === 'create' ? 'Создание...' : 'Создать черновик'}
               </button>
               <button
                 type="button"
@@ -986,7 +986,7 @@ export function EventsTab() {
                 disabled={actionLoading === 'create' || actionLoading === 'create-activate' || (formTouched && !isFormValid)}
                 className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40 transition-colors"
               >
-                {actionLoading === 'create-activate' ? 'Creating...' : 'Create & Activate'}
+                {actionLoading === 'create-activate' ? 'Создание...' : 'Создать и активировать'}
               </button>
             </div>
           )}
@@ -994,28 +994,28 @@ export function EventsTab() {
       </Modal>
 
       {/* Event Detail Modal */}
-      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setEditMode(false); }} title={detailEvent?.title ?? 'Event Details'} closeOnOverlayClick={false}>
+      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setEditMode(false); }} title={detailEvent?.title ?? 'Подробности ивента'} closeOnOverlayClick={false}>
         {detailEvent && (
           <div className="space-y-4">
             {/* Event info — inline edit for active events */}
             {editMode ? (
               <div className="space-y-3">
                 <div>
-                  <label className={labelCls}>Title</label>
+                  <label className={labelCls}>Название</label>
                   <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Description</label>
+                  <label className={labelCls}>Описание</label>
                   <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} className={inputCls} />
                 </div>
                 {detailEvent.status === 'active' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelCls}>End Date</label>
+                      <label className={labelCls}>Дата окончания</label>
                       <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls}>End Time</label>
+                      <label className={labelCls}>Время окончания</label>
                       <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className={inputCls} />
                     </div>
                   </div>
@@ -1027,14 +1027,14 @@ export function EventsTab() {
                     disabled={editSaving}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    {editSaving ? 'Saving...' : 'Save'}
+                    {editSaving ? 'Сохранение...' : 'Сохранить'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditMode(false)}
                     className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
                   >
-                    Cancel
+                    Отмена
                   </button>
                 </div>
               </div>
@@ -1066,23 +1066,23 @@ export function EventsTab() {
                 )}
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-text-secondary)]">
                   <div>
-                    <span className="font-bold">Start:</span> {fmtDate(detailEvent.startsAt)}
+                    <span className="font-bold">Начало:</span> {fmtDate(detailEvent.startsAt)}
                   </div>
                   <div>
-                    <span className="font-bold">End:</span> {fmtDate(detailEvent.endsAt)}
+                    <span className="font-bold">Конец:</span> {fmtDate(detailEvent.endsAt)}
                   </div>
                   <div>
-                    <span className="font-bold">Prize Pool:</span> {formatLaunch(detailEvent.totalPrizePool)} COIN
+                    <span className="font-bold">Призовой фонд:</span> {formatLaunch(detailEvent.totalPrizePool)} COIN
                   </div>
                   <div>
-                    <span className="font-bold">Participants:</span> {detailEvent.participantCount}
+                    <span className="font-bold">Участников:</span> {detailEvent.participantCount}
                   </div>
                 </div>
                 {/* Config info */}
                 {detailEvent.config && (
                   <div className="text-[11px] text-[var(--color-text-secondary)]">
-                    <span className="font-bold">Config:</span>{' '}
-                    {formatConfig(detailEvent) ?? 'Default'}
+                    <span className="font-bold">Конфиг:</span>{' '}
+                    {formatConfig(detailEvent) ?? 'По умолчанию'}
                   </div>
                 )}
                 {/* ID for debugging */}
@@ -1108,7 +1108,7 @@ export function EventsTab() {
                   }}
                   className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
                 >
-                  <Pencil size={12} /> Edit
+                  <Pencil size={12} /> Изменить
                 </button>
               )}
               {detailEvent.status === 'draft' && (
@@ -1119,7 +1119,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <Play size={12} /> Activate
+                    <Play size={12} /> Активировать
                   </button>
                   <button
                     type="button"
@@ -1127,7 +1127,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <Trash2 size={12} /> Delete
+                    <Trash2 size={12} /> Удалить
                   </button>
                 </>
               )}
@@ -1139,7 +1139,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-warning)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <Calculator size={12} /> End &amp; Calculate
+                    <Calculator size={12} /> Завершить и подсчитать
                   </button>
                   <button
                     type="button"
@@ -1147,7 +1147,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <Ban size={12} /> Cancel
+                    <Ban size={12} /> Отменить
                   </button>
                 </>
               )}
@@ -1159,7 +1159,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-warning)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <RotateCcw size={12} /> {detailEvent.type === 'raffle' ? 'Redraw Winners' : 'Force Recalculate'}
+                    <RotateCcw size={12} /> {detailEvent.type === 'raffle' ? 'Перекрутить' : 'Пересчитать'}
                   </button>
                   <button
                     type="button"
@@ -1167,7 +1167,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <CheckCircle size={12} /> Approve Results
+                    <CheckCircle size={12} /> Подтвердить результаты
                   </button>
                 </>
               )}
@@ -1180,7 +1180,7 @@ export function EventsTab() {
                       disabled={distLoading === 'all'}
                       className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                     >
-                      <Send size={12} /> {distLoading === 'all' ? 'Distributing...' : 'Distribute All'}
+                      <Send size={12} /> {distLoading === 'all' ? 'Раздача...' : 'Раздать все'}
                     </button>
                   )}
                   <button
@@ -1189,7 +1189,7 @@ export function EventsTab() {
                     disabled={!!actionLoading}
                     className="flex items-center gap-1 rounded-lg bg-[var(--color-text-secondary)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
                   >
-                    <Archive size={12} /> Archive
+                    <Archive size={12} /> Архивировать
                   </button>
                 </>
               )}
@@ -1199,8 +1199,8 @@ export function EventsTab() {
             {detailEvent.status === 'completed' && winners.length > 0 && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)]">
-                  <span className="font-bold">Prize Distribution</span>
-                  <span>{distributedCount}/{winners.length} distributed</span>
+                  <span className="font-bold">Раздача призов</span>
+                  <span>{distributedCount}/{winners.length} отправлено</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-[var(--color-border)]">
                   <div
@@ -1216,10 +1216,10 @@ export function EventsTab() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <label className={labelCls}>Winners</label>
+                    <label className={labelCls}>Победители</label>
                     {winners.length > 0 && (
                       <span className="text-[10px] font-bold text-[var(--color-text-secondary)]">
-                        {distributedCount}/{winners.length} distributed
+                        {distributedCount}/{winners.length} отправлено
                       </span>
                     )}
                   </div>
@@ -1231,26 +1231,26 @@ export function EventsTab() {
                       className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-2.5 py-1 text-[10px] font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40"
                     >
                       <Send size={10} />
-                      {distLoading === 'all' ? 'Distributing...' : 'Distribute All'}
+                      {distLoading === 'all' ? 'Раздача...' : 'Раздать все'}
                     </button>
                   )}
                 </div>
 
                 {winnersLoading ? (
-                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">Loading winners...</div>
+                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">Загрузка победителей...</div>
                 ) : winners.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">No winners yet</div>
+                  <div className="py-4 text-center text-xs text-[var(--color-text-secondary)]">Победителей пока нет</div>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
                     <table className="w-full text-[11px]">
                       <thead>
                         <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Rank</th>
-                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Address</th>
-                          <th className="px-2 py-1.5 text-right font-bold text-[var(--color-text-secondary)]">Prize</th>
-                          <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Status</th>
+                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Место</th>
+                          <th className="px-2 py-1.5 text-left font-bold text-[var(--color-text-secondary)]">Адрес</th>
+                          <th className="px-2 py-1.5 text-right font-bold text-[var(--color-text-secondary)]">Приз</th>
+                          <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Статус</th>
                           {detailEvent.status === 'completed' && (
-                            <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Action</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[var(--color-text-secondary)]">Действие</th>
                           )}
                         </tr>
                       </thead>
@@ -1265,11 +1265,11 @@ export function EventsTab() {
                             <td className="px-2 py-1.5 text-center">
                               {w.prizeTxHash ? (
                                 <span className="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-success)]">
-                                  distributed
+                                  отправлен
                                 </span>
                               ) : (
                                 <span className="rounded-full bg-[var(--color-warning)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-warning)]">
-                                  pending
+                                  ожидание
                                 </span>
                               )}
                             </td>
@@ -1282,7 +1282,7 @@ export function EventsTab() {
                                     disabled={distLoading === w.userId || distLoading === 'all'}
                                     className="rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40"
                                   >
-                                    {distLoading === w.userId ? '...' : 'Send'}
+                                    {distLoading === w.userId ? '...' : 'Отправить'}
                                   </button>
                                 )}
                               </td>
@@ -1301,18 +1301,18 @@ export function EventsTab() {
 
       {/* Events list */}
       {loading ? (
-        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Loading...</div>
+        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Загрузка...</div>
       ) : events.length === 0 ? (
-        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">No events found</div>
+        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Ивенты не найдены</div>
       ) : (
         <div className="space-y-2">
           {events.map((event) => {
             const configStr = formatConfig(event);
             return (
               <div key={event.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-2">
+                    <div className="mb-1 flex items-center gap-2 flex-wrap">
                       {event.type === 'contest' ? (
                         <Target size={12} className="text-[var(--color-primary)]" />
                       ) : (
@@ -1337,8 +1337,8 @@ export function EventsTab() {
                       <span>
                         {fmtDate(event.startsAt)} &mdash; {fmtDate(event.endsAt)}
                       </span>
-                      <span>{event.participantCount} participants</span>
-                      <span>Prize: {formatLaunch(event.totalPrizePool)} COIN</span>
+                      <span>{event.participantCount} участн.</span>
+                      <span>Приз: {formatLaunch(event.totalPrizePool)} COIN</span>
                     </div>
                     {configStr && (
                       <div className="mt-1 text-[10px] italic text-[var(--color-text-secondary)]">{configStr}</div>
@@ -1352,7 +1352,7 @@ export function EventsTab() {
                       type="button"
                       onClick={() => openDetail(event)}
                       className="rounded-lg border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-                      title="Details"
+                      title="Подробности"
                     >
                       <Eye size={12} />
                     </button>
@@ -1365,7 +1365,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'activate')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Activate"
+                          title="Активировать"
                         >
                           <Play size={12} />
                         </button>
@@ -1374,7 +1374,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'delete')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Delete"
+                          title="Удалить"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1389,7 +1389,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'calculate')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="End & Calculate"
+                          title="Завершить и подсчитать"
                         >
                           <Calculator size={12} />
                         </button>
@@ -1398,7 +1398,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'cancel')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-danger)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Cancel Event"
+                          title="Отменить ивент"
                         >
                           <Ban size={12} />
                         </button>
@@ -1413,7 +1413,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'calculate', { force: true })}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-warning)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title={event.type === 'raffle' ? 'Redraw Winners' : 'Recalculate'}
+                          title={event.type === 'raffle' ? 'Перекрутить' : 'Пересчитать'}
                         >
                           <RotateCcw size={12} />
                         </button>
@@ -1422,7 +1422,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'approve')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-success)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Approve Results"
+                          title="Подтвердить результаты"
                         >
                           <CheckCircle size={12} />
                         </button>
@@ -1437,7 +1437,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'distribute')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Distribute Prizes"
+                          title="Раздать призы"
                         >
                           <Send size={12} />
                         </button>
@@ -1446,7 +1446,7 @@ export function EventsTab() {
                           onClick={() => handleAction(event.id, 'archive')}
                           disabled={!!actionLoading}
                           className="rounded-lg bg-[var(--color-text-secondary)] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
-                          title="Archive"
+                          title="Архивировать"
                         >
                           <Archive size={12} />
                         </button>

@@ -32,22 +32,22 @@ interface TxRow {
 }
 
 const ACTION_OPTIONS = [
-  { value: '', label: 'All actions' },
-  { value: 'create_bet', label: 'Create Bet' },
-  { value: 'accept_bet', label: 'Accept Bet' },
-  { value: 'accept_and_reveal', label: 'Accept & Reveal' },
-  { value: 'reveal', label: 'Reveal' },
-  { value: 'cancel_bet', label: 'Cancel Bet' },
-  { value: 'claim_timeout', label: 'Claim Timeout' },
-  { value: 'withdraw', label: 'Withdraw' },
-  { value: 'deposit', label: 'Deposit' },
-  { value: 'transfer', label: 'CW20 Transfer' },
+  { value: '', label: 'Все действия' },
+  { value: 'create_bet', label: 'Создать ставку' },
+  { value: 'accept_bet', label: 'Принять ставку' },
+  { value: 'accept_and_reveal', label: 'Принять и раскрыть' },
+  { value: 'reveal', label: 'Раскрыть' },
+  { value: 'cancel_bet', label: 'Отменить ставку' },
+  { value: 'claim_timeout', label: 'Таймаут' },
+  { value: 'withdraw', label: 'Вывод' },
+  { value: 'deposit', label: 'Депозит' },
+  { value: 'transfer', label: 'CW20 перевод' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
-  { value: 'true', label: 'Success' },
-  { value: 'false', label: 'Failed' },
+  { value: '', label: 'Все статусы' },
+  { value: 'true', label: 'Успех' },
+  { value: 'false', label: 'Ошибка' },
 ];
 
 const shortAddr = (addr: string) =>
@@ -126,8 +126,8 @@ export function TransactionsTab() {
       {/* Header */}
       <div className="flex items-center gap-2">
         <ArrowLeftRight size={16} className="text-[var(--color-primary)]" />
-        <span className="text-sm font-bold">Relayer Transactions</span>
-        <span className="text-[10px] text-[var(--color-text-secondary)]">({total} total)</span>
+        <span className="text-sm font-bold">Транзакции релеера</span>
+        <span className="text-[10px] text-[var(--color-text-secondary)]">({total} всего)</span>
       </div>
 
       {/* Filters */}
@@ -161,7 +161,7 @@ export function TransactionsTab() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search address / tx hash..."
+            placeholder="Поиск по адресу / хэшу..."
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs w-56 focus:border-[var(--color-primary)] focus:outline-none"
           />
           <button
@@ -178,27 +178,27 @@ export function TransactionsTab() {
           onClick={fetchTxs}
           className="rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--color-surface)]"
         >
-          Refresh
+          Обновить
         </button>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Loading...</div>
+        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Загрузка...</div>
       ) : txs.length === 0 ? (
-        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">No transactions found</div>
+        <div className="py-8 text-center text-xs text-[var(--color-text-secondary)]">Транзакции не найдены</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[var(--color-border)]">
           <table className="w-full text-[11px]">
             <thead>
               <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Date</th>
-                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Action</th>
-                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">User</th>
-                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Tx Hash</th>
-                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Description</th>
-                <th className="px-2 py-2 text-center font-bold text-[var(--color-text-secondary)]">Status</th>
-                <th className="px-2 py-2 text-right font-bold text-[var(--color-text-secondary)]">Duration</th>
+                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Дата</th>
+                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Действие</th>
+                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Пользователь</th>
+                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Хэш TX</th>
+                <th className="px-2 py-2 text-left font-bold text-[var(--color-text-secondary)]">Описание</th>
+                <th className="px-2 py-2 text-center font-bold text-[var(--color-text-secondary)]">Статус</th>
+                <th className="px-2 py-2 text-right font-bold text-[var(--color-text-secondary)]">Время</th>
               </tr>
             </thead>
             <tbody>
@@ -232,15 +232,15 @@ export function TransactionsTab() {
                   <td className="whitespace-nowrap px-2 py-1.5 text-center">
                     {tx.success === true ? (
                       <span className="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-success)]">
-                        success
+                        успех
                       </span>
                     ) : tx.success === false ? (
                       <span className="rounded-full bg-[var(--color-danger)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-danger)]">
-                        failed
+                        ошибка
                       </span>
                     ) : (
                       <span className="rounded-full bg-[var(--color-warning)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--color-warning)]">
-                        pending
+                        ожидание
                       </span>
                     )}
                   </td>
@@ -258,7 +258,7 @@ export function TransactionsTab() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
           <span>
-            Page {currentPage} of {totalPages}
+            Стр. {currentPage} из {totalPages}
           </span>
           <div className="flex items-center gap-1">
             <button

@@ -13,41 +13,41 @@ export function DiagnosticsTab() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        System health check — auto-refreshes every 30 seconds.
-        {d && <span className="ml-2">Last update: {new Date(d.timestamp).toLocaleTimeString()}</span>}
+        Проверка системы — авто-обновление каждые 30 секунд.
+        {d && <span className="ml-2">Обновлено: {new Date(d.timestamp).toLocaleTimeString()}</span>}
       </p>
 
       {/* Bet Status Distribution */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Bet Status Distribution
+          Распределение статусов ставок
         </h2>
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-          <StatCard label="Total" value={d?.bets.total ?? '...'} />
-          <StatCard label="Open" value={d?.bets.open ?? '...'} />
-          <StatCard label="Accepted" value={d?.bets.accepted ?? '...'} />
-          <StatCard label="Revealed" value={d?.bets.revealed ?? '...'} />
-          <StatCard label="Canceled" value={d?.bets.canceled ?? '...'} />
-          <StatCard label="Timeout" value={d?.bets.timeout ?? '...'} />
-          <StatCard label="Accepting" value={d?.bets.accepting ?? '...'} warn={(d?.bets.accepting ?? 0) > 0} />
-          <StatCard label="Canceling" value={d?.bets.canceling ?? '...'} warn={(d?.bets.canceling ?? 0) > 0} />
-          <StatCard label="Creating" value={d?.bets.creating ?? '...'} warn={(d?.bets.creating ?? 0) > 0} />
-          <StatCard label="Missing Secrets" value={d?.bets.missingSecrets ?? '...'} warn={(d?.bets.missingSecrets ?? 0) > 0} sub="accepted w/o secret" />
+          <StatCard label="Всего" value={d?.bets.total ?? '...'} />
+          <StatCard label="Открытых" value={d?.bets.open ?? '...'} />
+          <StatCard label="Принятых" value={d?.bets.accepted ?? '...'} />
+          <StatCard label="Раскрытых" value={d?.bets.revealed ?? '...'} />
+          <StatCard label="Отменённых" value={d?.bets.canceled ?? '...'} />
+          <StatCard label="Таймаут" value={d?.bets.timeout ?? '...'} />
+          <StatCard label="Принимаются" value={d?.bets.accepting ?? '...'} warn={(d?.bets.accepting ?? 0) > 0} />
+          <StatCard label="Отменяются" value={d?.bets.canceling ?? '...'} warn={(d?.bets.canceling ?? 0) > 0} />
+          <StatCard label="Создаются" value={d?.bets.creating ?? '...'} warn={(d?.bets.creating ?? 0) > 0} />
+          <StatCard label="Без секретов" value={d?.bets.missingSecrets ?? '...'} warn={(d?.bets.missingSecrets ?? 0) > 0} sub="принятые без секрета" />
         </div>
       </section>
 
       {/* Vault Health */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Vault Health
+          Здоровье хранилища
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label="Users with balance" value={d?.vault.totalUsers ?? '...'} />
-          <StatCard label="Total Available" value={d ? formatLaunch(d.vault.totalAvailable) : '...'} />
-          <StatCard label="Total Locked" value={d ? formatLaunch(d.vault.totalLocked) : '...'} />
-          <StatCard label="Users with locked" value={d?.vault.usersWithLocked ?? '...'} />
-          <StatCard label="Negative Available" value={d?.vault.negativeAvailable ?? '...'} warn={(d?.vault.negativeAvailable ?? 0) > 0} />
-          <StatCard label="Negative Locked" value={d?.vault.negativeLocked ?? '...'} warn={(d?.vault.negativeLocked ?? 0) > 0} />
+          <StatCard label="Юзеры с балансом" value={d?.vault.totalUsers ?? '...'} />
+          <StatCard label="Всего доступно" value={d ? formatLaunch(d.vault.totalAvailable) : '...'} />
+          <StatCard label="Всего заблокировано" value={d ? formatLaunch(d.vault.totalLocked) : '...'} />
+          <StatCard label="С заблокированными" value={d?.vault.usersWithLocked ?? '...'} />
+          <StatCard label="Отрицательный баланс" value={d?.vault.negativeAvailable ?? '...'} warn={(d?.vault.negativeAvailable ?? 0) > 0} />
+          <StatCard label="Отрицательная блокировка" value={d?.vault.negativeLocked ?? '...'} warn={(d?.vault.negativeLocked ?? 0) > 0} />
         </div>
       </section>
 
@@ -55,18 +55,18 @@ export function DiagnosticsTab() {
       {d?.stuckLockedFunds && d.stuckLockedFunds.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-danger)]">
-            Stuck Locked Funds ({d.stuckLockedFunds.length})
+            Застрявшие средства ({d.stuckLockedFunds.length})
           </h2>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Users with locked balance but no active bets. These funds are effectively frozen.
+            Пользователи с заблокированным балансом, но без активных ставок. Средства фактически заморожены.
           </p>
           <TableWrapper>
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  <th className="text-left px-3 py-2">Address</th>
-                  <th className="text-right px-3 py-2">Locked Amount</th>
-                  <th className="text-left px-3 py-2">User ID</th>
+                  <th className="text-left px-3 py-2">Адрес</th>
+                  <th className="text-right px-3 py-2">Заблокировано</th>
+                  <th className="text-left px-3 py-2">ID пользователя</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,12 +87,12 @@ export function DiagnosticsTab() {
       {d?.coinFlipStats && d.coinFlipStats.total > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Coin Flip Randomness (since server start)
+            Рандомность монетки (с запуска сервера)
           </h2>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard label="Heads" value={d.coinFlipStats.heads} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.heads / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
-            <StatCard label="Tails" value={d.coinFlipStats.tails} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.tails / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
-            <StatCard label="Total Flips" value={d.coinFlipStats.total} sub="crypto.randomBytes" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatCard label="Орёл" value={d.coinFlipStats.heads} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.heads / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
+            <StatCard label="Решка" value={d.coinFlipStats.tails} sub={`${d.coinFlipStats.total > 0 ? ((d.coinFlipStats.tails / d.coinFlipStats.total) * 100).toFixed(1) : 0}%`} />
+            <StatCard label="Всего бросков" value={d.coinFlipStats.total} sub="crypto.randomBytes" />
           </div>
         </section>
       )}
@@ -100,10 +100,10 @@ export function DiagnosticsTab() {
       {/* Pending Bet Secrets */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Pending Bet Secrets ({d?.pendingSecrets.count ?? '...'})
+          Ожидающие секреты ({d?.pendingSecrets.count ?? '...'})
         </h2>
         <p className="text-xs text-[var(--color-text-secondary)]">
-          Secrets stored before broadcast that haven&apos;t been consumed yet. Old entries ({'>'}1h) are auto-cleaned.
+          Секреты, сохранённые до бродкаста и ещё не использованные. Старые записи ({'>'}1ч) очищаются автоматически.
         </p>
 
         {pendingSecrets.data && pendingSecrets.data.length > 0 ? (
@@ -111,10 +111,10 @@ export function DiagnosticsTab() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  <th className="text-left px-3 py-2">Commitment</th>
-                  <th className="text-left px-3 py-2">Side</th>
-                  <th className="text-left px-3 py-2">TX Hash</th>
-                  <th className="text-left px-3 py-2">Age</th>
+                  <th className="text-left px-3 py-2">Коммитмент</th>
+                  <th className="text-left px-3 py-2">Сторона</th>
+                  <th className="text-left px-3 py-2">Хэш TX</th>
+                  <th className="text-left px-3 py-2">Возраст</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,7 +131,7 @@ export function DiagnosticsTab() {
           </TableWrapper>
         ) : (
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center text-xs text-green-400">
-            No pending secrets — all bets resolved normally
+            Нет ожидающих секретов — все ставки разрешены
           </div>
         )}
       </section>

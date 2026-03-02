@@ -49,7 +49,7 @@ export function AnnouncementsTab() {
     setLastResult(null);
     try {
       const result = await sendMutation.mutateAsync({ title: title.trim(), message: message.trim(), priority });
-      setLastResult(`Sent to ${result.sentCount} users`);
+      setLastResult(`Отправлено ${result.sentCount} польз.`);
       setTitle('');
       setMessage('');
       setPriority('normal');
@@ -64,7 +64,7 @@ export function AnnouncementsTab() {
   const handleDelete = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
-      setLastResult('Announcement deleted');
+      setLastResult('Анонс удалён');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setLastResult(`Error: ${msg}`);
@@ -84,9 +84,9 @@ export function AnnouncementsTab() {
               <Clock size={16} className="text-amber-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold">Pending Review</h3>
+              <h3 className="text-sm font-bold">Ожидают проверки</h3>
               <p className="text-[10px] text-[var(--color-text-secondary)]">
-                {pending.length} sponsored announcement{pending.length > 1 ? 's' : ''} awaiting approval
+                {pending.length} спонсорских анонсов ожидают одобрения
               </p>
             </div>
           </div>
@@ -110,27 +110,27 @@ export function AnnouncementsTab() {
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <Megaphone size={18} className="text-[var(--color-primary)]" />
-          <h3 className="text-sm font-bold">New Announcement</h3>
+          <h3 className="text-sm font-bold">Новый анонс</h3>
         </div>
 
         <div>
-          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Title</label>
+          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Заголовок</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Announcement title..."
+            placeholder="Заголовок анонса..."
             maxLength={200}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Message</label>
+          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Сообщение</label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Write your announcement..."
+            placeholder="Напишите ваш анонс..."
             maxLength={2000}
             rows={4}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none resize-none"
@@ -139,7 +139,7 @@ export function AnnouncementsTab() {
         </div>
 
         <div>
-          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Priority</label>
+          <label className="block text-[11px] font-medium text-[var(--color-text-secondary)] mb-1">Приоритет</label>
           <div className="flex gap-2">
             <button
               type="button"
@@ -151,7 +151,7 @@ export function AnnouncementsTab() {
               }`}
             >
               <Info size={12} />
-              Normal
+              Обычный
             </button>
             <button
               type="button"
@@ -163,7 +163,7 @@ export function AnnouncementsTab() {
               }`}
             >
               <AlertTriangle size={12} />
-              Important
+              Важный
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function AnnouncementsTab() {
           >
             <span className="flex items-center gap-1.5">
               <Send size={12} />
-              {sending ? 'Sending...' : 'Send to All Users'}
+              {sending ? 'Отправка...' : 'Отправить всем'}
             </span>
           </ActionButton>
         </div>
@@ -184,11 +184,11 @@ export function AnnouncementsTab() {
 
       {/* History — card-based */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold">Announcement History</h3>
+        <h3 className="text-sm font-bold">История анонсов</h3>
 
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] py-8 text-center">
-            <p className="text-xs text-[var(--color-text-secondary)]">No announcements yet</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">Анонсов пока нет</p>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -261,7 +261,7 @@ function AnnouncementCard({
   const handleApprove = async () => {
     try {
       await approve.mutateAsync(a.id);
-      onResult('Sponsored announcement approved & published');
+      onResult('Спонсорский анонс одобрен и опубликован');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${msg}`);
@@ -272,7 +272,7 @@ function AnnouncementCard({
     try {
       await reject.mutateAsync({ id: a.id, reason: rejectReason || undefined });
       setShowReject(false);
-      onResult('Sponsored announcement rejected, funds refunded');
+      onResult('Спонсорский анонс отклонён, средства возвращены');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${msg}`);
@@ -297,12 +297,12 @@ function AnnouncementCard({
             <AnnouncementStatusBadge status={a.status} />
             {a.priority === 'important' && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 text-amber-400 px-1.5 py-0.5 text-[9px] font-bold">
-                <AlertTriangle size={8} /> IMPORTANT
+                <AlertTriangle size={8} /> ВАЖНО
               </span>
             )}
             {isSponsored && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-teal-500/15 text-teal-400 px-1.5 py-0.5 text-[9px] font-bold">
-                SPONSORED
+                СПОНСОРСКИЙ
               </span>
             )}
           </div>
@@ -310,8 +310,8 @@ function AnnouncementCard({
           {/* Meta info */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[10px] text-[var(--color-text-secondary)]">
             <span>{timeAgo(a.createdAt)}</span>
-            {a.sentCount > 0 && <span>Sent to {a.sentCount} users</span>}
-            {a.pricePaid && <span>Paid: <span className="text-teal-400">{formatLaunch(a.pricePaid)} COIN</span></span>}
+            {a.sentCount > 0 && <span>Отправлено {a.sentCount} польз.</span>}
+            {a.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(a.pricePaid)} COIN</span></span>}
           </div>
 
           {/* Truncated message preview */}
@@ -335,14 +335,14 @@ function AnnouncementCard({
       {expanded && (
         <div className="px-4 pb-3">
           <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5">Full Message</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5">Полное сообщение</p>
             <p className="text-xs leading-relaxed whitespace-pre-wrap">{a.message}</p>
           </div>
 
           {a.scheduledAt && (
             <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-secondary)] mt-2">
               <Clock size={12} />
-              Scheduled for: {new Date(a.scheduledAt).toLocaleString()}
+              Запланировано на: {new Date(a.scheduledAt).toLocaleString()}
             </div>
           )}
         </div>
@@ -358,7 +358,7 @@ function AnnouncementCard({
                 type="text"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Rejection reason (optional)..."
+                placeholder="Причина отказа (опционально)..."
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
               />
               <div className="flex gap-2">
@@ -369,14 +369,14 @@ function AnnouncementCard({
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 py-2 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50"
                 >
                   {reject.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                  Reject & Refund
+                  Отклонить и вернуть
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowReject(false)}
                   className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                 >
-                  Cancel
+                  Отмена
                 </button>
               </div>
             </div>
@@ -392,7 +392,7 @@ function AnnouncementCard({
                     className="flex items-center gap-1.5 rounded-lg bg-green-500/15 border border-green-500/30 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50"
                   >
                     {approve.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                    Approve & Publish
+                    Одобрить и опубликовать
                   </button>
                   <button
                     type="button"
@@ -400,7 +400,7 @@ function AnnouncementCard({
                     className="flex items-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors"
                   >
                     <X size={12} />
-                    Reject
+                    Отклонить
                   </button>
                 </>
               )}
@@ -413,7 +413,7 @@ function AnnouncementCard({
                 className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
               >
                 <Trash2 size={12} />
-                Delete
+                Удалить
               </button>
             </div>
           )}
@@ -435,7 +435,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
   const handleApprove = async () => {
     try {
       await approve.mutateAsync(item.id);
-      onResult('Sponsored announcement approved & published');
+      onResult('Спонсорский анонс одобрен и опубликован');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${msg}`);
@@ -446,7 +446,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
     try {
       await reject.mutateAsync({ id: item.id, reason: rejectReason || undefined });
       setShowReject(false);
-      onResult('Sponsored announcement rejected, funds refunded');
+      onResult('Спонсорский анонс отклонён, средства возвращены');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       onResult(`Error: ${msg}`);
@@ -464,8 +464,8 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-bold truncate">{item.title}</h4>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
-            <span>From: <span className="text-[var(--color-text-primary)]">{item.userNickname || shortAddr(item.userAddress)}</span></span>
-            {item.pricePaid && <span>Paid: <span className="text-teal-400">{formatLaunch(item.pricePaid)} COIN</span></span>}
+            <span>От: <span className="text-[var(--color-text-primary)]">{item.userNickname || shortAddr(item.userAddress)}</span></span>
+            {item.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(item.pricePaid)} COIN</span></span>}
             <span>{timeAgo(item.createdAt)}</span>
           </div>
         </div>
@@ -485,14 +485,14 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
       {expanded && (
         <div className="px-4 pb-3 space-y-3">
           <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5">Message Preview</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5">Предпросмотр сообщения</p>
             <p className="text-xs leading-relaxed whitespace-pre-wrap">{item.message}</p>
           </div>
 
           {item.scheduledAt && (
             <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-secondary)]">
               <Clock size={12} />
-              Scheduled for: {new Date(item.scheduledAt).toLocaleString()}
+              Запланировано на: {new Date(item.scheduledAt).toLocaleString()}
             </div>
           )}
         </div>
@@ -506,7 +506,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
               type="text"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Rejection reason (optional)..."
+              placeholder="Причина отказа (опционально)..."
               className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
             />
             <div className="flex gap-2">
@@ -517,14 +517,14 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 py-2 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50"
               >
                 {reject.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                Reject & Refund
+                Отклонить и вернуть
               </button>
               <button
                 type="button"
                 onClick={() => setShowReject(false)}
                 className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
               >
-                Cancel
+                Отмена
               </button>
             </div>
           </div>
@@ -537,7 +537,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
               className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-green-500/15 border border-green-500/30 py-2 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50"
             >
               {approve.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={14} />}
-              Approve & Publish
+              Одобрить и опубликовать
             </button>
             <button
               type="button"
@@ -545,7 +545,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
               className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/15 border border-red-500/30 py-2 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors"
             >
               <X size={14} />
-              Reject
+              Отклонить
             </button>
           </div>
         )}

@@ -30,12 +30,12 @@ export function BetsTab() {
   return (
     <div className="space-y-4">
       {/* Sub-tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {[
-          { id: 'all' as const, label: 'All Bets' },
-          { id: 'stuck' as const, label: 'Stuck' },
-          { id: 'missing' as const, label: 'Missing Secrets' },
-          { id: 'orphaned' as const, label: 'Orphaned (Chain)' },
+          { id: 'all' as const, label: 'Все ставки' },
+          { id: 'stuck' as const, label: 'Зависшие' },
+          { id: 'missing' as const, label: 'Без секретов' },
+          { id: 'orphaned' as const, label: 'Осиротевшие (чейн)' },
         ].map(({ id, label }) => (
           <button
             key={id}
@@ -78,13 +78,13 @@ function AllBets() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
-        <SearchInput value={search} onChange={handleSearch} placeholder="Search bet ID, tx hash..." />
+        <SearchInput value={search} onChange={handleSearch} placeholder="Поиск по ID ставки, хэшу..." />
         <select
           value={status}
           onChange={(e) => { setStatus(e.target.value); setPage(0); }}
           className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:outline-none"
         >
-          <option value="">All statuses</option>
+          <option value="">Все статусы</option>
           {STATUS_FILTERS.filter(Boolean).map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
@@ -96,20 +96,20 @@ function AllBets() {
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
               <th className="text-left px-3 py-2">ID</th>
-              <th className="text-left px-3 py-2">Maker</th>
-              <th className="text-left px-3 py-2">Acceptor</th>
-              <th className="text-right px-3 py-2">Amount</th>
-              <th className="text-left px-3 py-2">Status</th>
-              <th className="text-left px-3 py-2">Secret</th>
-              <th className="text-left px-3 py-2">Created</th>
-              <th className="text-left px-3 py-2">Actions</th>
+              <th className="text-left px-3 py-2">Создатель</th>
+              <th className="text-left px-3 py-2">Принявший</th>
+              <th className="text-right px-3 py-2">Сумма</th>
+              <th className="text-left px-3 py-2">Статус</th>
+              <th className="text-left px-3 py-2">Секрет</th>
+              <th className="text-left px-3 py-2">Создана</th>
+              <th className="text-left px-3 py-2">Действия</th>
             </tr>
           </thead>
           <tbody>
             {bets.isLoading ? (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Loading...</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
             ) : !bets.data?.data.length ? (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">No bets found</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Ставки не найдены</td></tr>
             ) : (
               bets.data.data.map((b) => (
                 <tr key={b.betId} className="border-b border-[var(--color-border)]/50 last:border-0 hover:bg-[var(--color-surface)]/50">
@@ -119,7 +119,7 @@ function AllBets() {
                   <td className="px-3 py-2 text-right font-mono">{formatLaunch(b.amount)}</td>
                   <td className="px-3 py-2"><StatusBadge status={b.status} /></td>
                   <td className="px-3 py-2">
-                    <span className={b.hasSecret ? 'text-green-400' : 'text-red-400'}>{b.hasSecret ? 'Yes' : 'No'}</span>
+                    <span className={b.hasSecret ? 'text-green-400' : 'text-red-400'}>{b.hasSecret ? 'Да' : 'Нет'}</span>
                   </td>
                   <td className="px-3 py-2 text-[var(--color-text-secondary)]">{timeAgo(b.createdTime)}</td>
                   <td className="px-3 py-2">
@@ -128,12 +128,12 @@ function AllBets() {
                         variant="danger"
                         disabled={forceCancel.isPending}
                         onClick={() => {
-                          if (confirm(`Force-cancel bet #${b.betId}?`)) {
+                          if (confirm(`Принудительно отменить ставку #${b.betId}?`)) {
                             forceCancel.mutate(Number(b.betId));
                           }
                         }}
                       >
-                        Cancel
+                        Отменить
                       </ActionButton>
                     )}
                   </td>
@@ -164,7 +164,7 @@ function StuckBets() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        Bets in transitional states (creating/accepting/canceling) for more than 5 minutes.
+        Ставки в переходных состояниях (создание/принятие/отмена) более 5 минут.
       </p>
 
       <TableWrapper>
@@ -172,18 +172,18 @@ function StuckBets() {
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
               <th className="text-left px-3 py-2">ID</th>
-              <th className="text-right px-3 py-2">Amount</th>
-              <th className="text-left px-3 py-2">Status</th>
-              <th className="text-left px-3 py-2">Age</th>
-              <th className="text-left px-3 py-2">TX Hash</th>
-              <th className="text-left px-3 py-2">Actions</th>
+              <th className="text-right px-3 py-2">Сумма</th>
+              <th className="text-left px-3 py-2">Статус</th>
+              <th className="text-left px-3 py-2">Возраст</th>
+              <th className="text-left px-3 py-2">Хэш TX</th>
+              <th className="text-left px-3 py-2">Действия</th>
             </tr>
           </thead>
           <tbody>
             {stuck.isLoading ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
             ) : !stuck.data?.length ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-green-400">No stuck bets</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-green-400">Зависших ставок нет</td></tr>
             ) : (
               stuck.data.map((b) => (
                 <tr key={b.betId} className="border-b border-[var(--color-border)]/50 last:border-0">
@@ -197,12 +197,12 @@ function StuckBets() {
                       variant="danger"
                       disabled={forceCancel.isPending}
                       onClick={() => {
-                        if (confirm(`Force-cancel stuck bet #${b.betId}?`)) {
+                        if (confirm(`Принудительно отменить зависшую ставку #${b.betId}?`)) {
                           forceCancel.mutate(Number(b.betId));
                         }
                       }}
                     >
-                      Force Cancel
+                      Принудительная отмена
                     </ActionButton>
                   </td>
                 </tr>
@@ -222,7 +222,7 @@ function MissingSecrets() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        Accepted bets without maker_secret — auto-reveal cannot work. If &quot;Recoverable&quot; is Yes, the secret can be restored from pending_bet_secrets.
+        Принятые ставки без maker_secret — авто-раскрытие не работает. Если &quot;Восстанавливаемый&quot; = Да, секрет можно восстановить из pending_bet_secrets.
       </p>
 
       <TableWrapper>
@@ -230,18 +230,18 @@ function MissingSecrets() {
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
               <th className="text-left px-3 py-2">ID</th>
-              <th className="text-right px-3 py-2">Amount</th>
-              <th className="text-left px-3 py-2">Created</th>
-              <th className="text-left px-3 py-2">Accepted</th>
-              <th className="text-left px-3 py-2">Recoverable</th>
-              <th className="text-left px-3 py-2">Actions</th>
+              <th className="text-right px-3 py-2">Сумма</th>
+              <th className="text-left px-3 py-2">Создана</th>
+              <th className="text-left px-3 py-2">Принятие</th>
+              <th className="text-left px-3 py-2">Восстанавливаемый</th>
+              <th className="text-left px-3 py-2">Действия</th>
             </tr>
           </thead>
           <tbody>
             {missing.isLoading ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
             ) : !missing.data?.length ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-green-400">No missing secrets</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-green-400">Все секреты на месте</td></tr>
             ) : (
               missing.data.map((b) => (
                 <tr key={b.betId} className="border-b border-[var(--color-border)]/50 last:border-0">
@@ -251,7 +251,7 @@ function MissingSecrets() {
                   <td className="px-3 py-2 text-[var(--color-text-secondary)]">{timeAgo(b.acceptedTime)}</td>
                   <td className="px-3 py-2">
                     <span className={b.secretRecoverable ? 'text-green-400' : 'text-red-400'}>
-                      {b.secretRecoverable ? 'Yes' : 'No'}
+                      {b.secretRecoverable ? 'Да' : 'Нет'}
                     </span>
                   </td>
                   <td className="px-3 py-2">
@@ -261,7 +261,7 @@ function MissingSecrets() {
                         disabled={recoverSecret.isPending}
                         onClick={() => recoverSecret.mutate(Number(b.betId))}
                       >
-                        Recover
+                        Восстановить
                       </ActionButton>
                     )}
                   </td>
@@ -282,15 +282,15 @@ function OrphanedBets() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        Bets present on the blockchain but missing from the database. These are typically caused by failed background tasks during batch operations.
+        Ставки есть в блокчейне, но отсутствуют в БД. Обычно вызвано ошибками фоновых задач.
       </p>
 
       {orphaned.data && (
         <div className="flex gap-3 text-xs">
-          <span className="text-[var(--color-text-secondary)]">Chain: <strong>{orphaned.data.chainTotal}</strong> open</span>
-          <span className="text-[var(--color-text-secondary)]">DB: <strong>{orphaned.data.dbTotal}</strong> total</span>
+          <span className="text-[var(--color-text-secondary)]">Чейн: <strong>{orphaned.data.chainTotal}</strong> open</span>
+          <span className="text-[var(--color-text-secondary)]">БД: <strong>{orphaned.data.dbTotal}</strong> total</span>
           <span className={orphaned.data.orphanedCount > 0 ? 'text-yellow-400 font-bold' : 'text-green-400'}>
-            Orphaned: {orphaned.data.orphanedCount}
+            Осиротевшие: {orphaned.data.orphanedCount}
           </span>
         </div>
       )}
@@ -299,18 +299,18 @@ function OrphanedBets() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="text-left px-3 py-2">Chain ID</th>
-              <th className="text-left px-3 py-2">Maker</th>
-              <th className="text-right px-3 py-2">Amount</th>
-              <th className="text-left px-3 py-2">Secret</th>
-              <th className="text-left px-3 py-2">Actions</th>
+              <th className="text-left px-3 py-2">ID (чейн)</th>
+              <th className="text-left px-3 py-2">Создатель</th>
+              <th className="text-right px-3 py-2">Сумма</th>
+              <th className="text-left px-3 py-2">Секрет</th>
+              <th className="text-left px-3 py-2">Действия</th>
             </tr>
           </thead>
           <tbody>
             {orphaned.isLoading ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Querying chain...</td></tr>
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-[var(--color-text-secondary)]">Запрос к чейну...</td></tr>
             ) : !orphaned.data?.orphaned.length ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-green-400">No orphaned bets</td></tr>
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-green-400">Осиротевших ставок нет</td></tr>
             ) : (
               orphaned.data.orphaned.map((b) => (
                 <tr key={b.chainBetId} className="border-b border-[var(--color-border)]/50 last:border-0">
@@ -319,7 +319,7 @@ function OrphanedBets() {
                   <td className="px-3 py-2 text-right font-mono">{formatLaunch(b.amount)}</td>
                   <td className="px-3 py-2">
                     <span className={b.secretAvailable ? 'text-green-400' : 'text-red-400'}>
-                      {b.secretAvailable ? 'Available' : 'Missing'}
+                      {b.secretAvailable ? 'Доступен' : 'Отсутствует'}
                     </span>
                   </td>
                   <td className="px-3 py-2">
@@ -327,12 +327,12 @@ function OrphanedBets() {
                       variant="success"
                       disabled={importOrphaned.isPending}
                       onClick={() => {
-                        if (confirm(`Import bet #${b.chainBetId} from chain to DB?`)) {
+                        if (confirm(`Импортировать ставку #${b.chainBetId} из чейна в БД?`)) {
                           importOrphaned.mutate(b.chainBetId);
                         }
                       }}
                     >
-                      Import
+                      Импорт
                     </ActionButton>
                   </td>
                 </tr>

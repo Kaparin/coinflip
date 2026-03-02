@@ -34,7 +34,7 @@ export function NewsTab() {
   const handleDelete = async (id: string) => {
     try {
       await deleteNews.mutateAsync(id);
-      setActionResult('Post deleted');
+      setActionResult('Пост удалён');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setActionResult(`Error: ${message}`);
@@ -47,12 +47,12 @@ export function NewsTab() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper size={18} className="text-[var(--color-primary)]" />
-          <h3 className="text-sm font-bold">News Posts</h3>
+          <h3 className="text-sm font-bold">Новостные посты</h3>
         </div>
         <ActionButton onClick={() => { setShowForm(!showForm); setEditingPost(null); }}>
           <span className="flex items-center gap-1">
             <Plus size={12} />
-            New Post
+            Новый пост
           </span>
         </ActionButton>
       </div>
@@ -81,19 +81,19 @@ export function NewsTab() {
       {/* Posts Table */}
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-8 text-center">
-          <p className="text-xs text-[var(--color-text-secondary)]">No news posts yet</p>
+          <p className="text-xs text-[var(--color-text-secondary)]">Новостей пока нет</p>
         </div>
       ) : (
         <TableWrapper>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-                <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Title</th>
-                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Type</th>
-                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Priority</th>
-                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Status</th>
-                <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Published</th>
-                <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Actions</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Заголовок</th>
+                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Тип</th>
+                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Приоритет</th>
+                <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Статус</th>
+                <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Опубликован</th>
+                <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -117,11 +117,11 @@ export function NewsTab() {
                   <td className="px-3 py-2 text-center">
                     {post.isPublished === 1 ? (
                       <span className="inline-flex items-center gap-1 text-green-400">
-                        <Eye size={12} /> Published
+                        <Eye size={12} /> Опубликован
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]">
-                        <EyeOff size={12} /> Draft
+                        <EyeOff size={12} /> Черновик
                       </span>
                     )}
                   </td>
@@ -186,7 +186,7 @@ function NewsForm({
           priority,
           isPublished: isPublished ? 1 : 0,
         });
-        onSuccess('Post updated');
+        onSuccess('Пост обновлён');
       } else {
         await createNews.mutateAsync({
           type,
@@ -194,7 +194,7 @@ function NewsForm({
           content: content.trim(),
           priority,
         });
-        onSuccess('Post created');
+        onSuccess('Пост создан');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -206,52 +206,52 @@ function NewsForm({
 
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-      <h3 className="text-sm font-bold">{post ? 'Edit Post' : 'New Post'}</h3>
+      <h3 className="text-sm font-bold">{post ? 'Редактировать пост' : 'Новый пост'}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Title</label>
+          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Заголовок</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Post title..."
+            placeholder="Заголовок поста..."
             maxLength={200}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Type</label>
+          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Тип</label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
             disabled={!!post}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm disabled:opacity-50"
           >
-            <option value="update">Update</option>
-            <option value="announcement">Announcement</option>
+            <option value="update">Обновление</option>
+            <option value="announcement">Объявление</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Priority</label>
+          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Приоритет</label>
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm"
           >
-            <option value="normal">Normal</option>
-            <option value="important">Important</option>
+            <option value="normal">Обычный</option>
+            <option value="important">Важный</option>
           </select>
         </div>
 
         <div className="sm:col-span-2">
-          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Content</label>
+          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] mb-1">Содержание</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Write your post content..."
+            placeholder="Напишите содержание поста..."
             maxLength={5000}
             rows={5}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none resize-none"
@@ -262,7 +262,7 @@ function NewsForm({
 
       {post && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--color-text-secondary)]">Published</label>
+          <label className="text-xs text-[var(--color-text-secondary)]">Опубликован</label>
           <button
             type="button"
             onClick={() => setIsPublished(!isPublished)}
@@ -279,9 +279,9 @@ function NewsForm({
 
       <div className="flex gap-2">
         <ActionButton onClick={handleSubmit} variant="success" disabled={isPending || !title.trim() || !content.trim()}>
-          {isPending ? 'Saving...' : (post ? 'Update Post' : 'Create Post')}
+          {isPending ? 'Сохранение...' : (post ? 'Обновить пост' : 'Создать пост')}
         </ActionButton>
-        <ActionButton onClick={onCancel}>Cancel</ActionButton>
+        <ActionButton onClick={onCancel}>Отмена</ActionButton>
       </div>
     </div>
   );

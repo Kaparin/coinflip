@@ -44,14 +44,14 @@ export function UsersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Users ({users.data?.pagination.total ?? '...'})
+          Пользователи ({users.data?.pagination.total ?? '...'})
         </h2>
         <SearchInput
           value={search}
           onChange={handleSearch}
-          placeholder="Search address or nickname..."
+          placeholder="Поиск по адресу или нику..."
         />
       </div>
 
@@ -59,19 +59,19 @@ export function UsersTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="text-left px-4 py-2">Address</th>
-              <th className="text-left px-4 py-2">Nickname</th>
-              <th className="text-right px-4 py-2">Available</th>
-              <th className="text-right px-4 py-2">Locked</th>
-              <th className="text-right px-4 py-2">Bets</th>
-              <th className="text-left px-4 py-2">Joined</th>
+              <th className="text-left px-4 py-2">Адрес</th>
+              <th className="text-left px-4 py-2">Ник</th>
+              <th className="text-right px-4 py-2">Доступно</th>
+              <th className="text-right px-4 py-2">Заблокировано</th>
+              <th className="text-right px-4 py-2">Ставки</th>
+              <th className="text-left px-4 py-2">Дата рег.</th>
             </tr>
           </thead>
           <tbody>
             {users.isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
             ) : !users.data?.data.length ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">No users found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Пользователи не найдены</td></tr>
             ) : (
               users.data.data.map((u) => (
                 <tr
@@ -116,19 +116,19 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
   if (isLoading || !detail) {
     return (
       <div className="space-y-4">
-        <button type="button" onClick={onBack} className="text-xs text-[var(--color-primary)] hover:underline">&larr; Back to users</button>
-        <div className="text-center py-16 text-[var(--color-text-secondary)]">Loading user details...</div>
+        <button type="button" onClick={onBack} className="text-xs text-[var(--color-primary)] hover:underline">&larr; К списку</button>
+        <div className="text-center py-16 text-[var(--color-text-secondary)]">Загрузка данных пользователя...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <button type="button" onClick={onBack} className="text-xs text-[var(--color-primary)] hover:underline">&larr; Back to users</button>
+      <button type="button" onClick={onBack} className="text-xs text-[var(--color-primary)] hover:underline">&larr; К списку</button>
 
       {/* User Info */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-2">
-        <p className="text-sm font-bold">{detail.user.nickname || 'No nickname'}</p>
+        <p className="text-sm font-bold">{detail.user.nickname || 'Без ника'}</p>
         <p className="text-xs font-mono text-[var(--color-text-secondary)]">{detail.user.address}</p>
         <p className="text-[10px] text-[var(--color-text-secondary)]">ID: {detail.user.id}</p>
         <p className="text-[10px] text-[var(--color-text-secondary)]">Joined: {detail.user.createdAt ? new Date(detail.user.createdAt).toLocaleString() : '—'}</p>
@@ -136,19 +136,19 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
 
       {/* Vault — DB vs Chain (chain is source of truth for UI) */}
       <div className="space-y-2">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Vault</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Хранилище</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="DB Available" value={formatLaunch(detail.vault.available)} />
-          <StatCard label="DB Locked" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
+          <StatCard label="БД доступно" value={formatLaunch(detail.vault.available)} />
+          <StatCard label="БД заблокировано" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
           {detail.chainVault && (
             <>
-              <StatCard label="Chain Available" value={formatLaunch(detail.chainVault.available)} />
-              <StatCard label="Chain Locked" value={formatLaunch(detail.chainVault.locked)} warn={BigInt(detail.chainVault.locked) > 0n} />
+              <StatCard label="Чейн доступно" value={formatLaunch(detail.chainVault.available)} />
+              <StatCard label="Чейн заблокировано" value={formatLaunch(detail.chainVault.locked)} warn={BigInt(detail.chainVault.locked) > 0n} />
             </>
           )}
         </div>
         {detail.chainVault && (BigInt(detail.vault.locked) !== BigInt(detail.chainVault.locked)) && (
-          <p className="text-[11px] text-amber-500">DB/Chain mismatch — run sync-balances script to fix DB</p>
+          <p className="text-[11px] text-amber-500">Расхождение БД/Чейн — запустите sync-balances для исправления</p>
         )}
       </div>
 
@@ -156,7 +156,7 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
       {detail.chainUserBets?.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Bets on chain (user_bets)
+            Ставки в чейне (user_bets)
           </p>
           <TableWrapper>
             <table className="w-full text-xs">
@@ -183,7 +183,7 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
             </table>
           </TableWrapper>
           <p className="text-[11px] text-[var(--color-text-secondary)]">
-            Locked funds come from active bets (open/accepted). Resolve via cancel, reveal, or claim_timeout.
+            Заблокированные средства из активных ставок. Разрешается через отмену, раскрытие или claim_timeout.
           </p>
         </div>
       )}
@@ -191,7 +191,7 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
       {/* Bets */}
       <div className="space-y-2">
         <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Bets ({detail.bets.length})
+          Ставки ({detail.bets.length})
         </h3>
         <TableWrapper>
           <table className="w-full text-xs">
@@ -200,14 +200,14 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
                 <th className="text-left px-3 py-2">ID</th>
                 <th className="text-right px-3 py-2">Amount</th>
                 <th className="text-left px-3 py-2">Status</th>
-                <th className="text-left px-3 py-2">Side</th>
+                <th className="text-left px-3 py-2">Сторона</th>
                 <th className="text-left px-3 py-2">Secret</th>
                 <th className="text-left px-3 py-2">Created</th>
               </tr>
             </thead>
             <tbody>
               {detail.bets.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-6 text-center text-[var(--color-text-secondary)]">No bets</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-[var(--color-text-secondary)]">Нет ставок</td></tr>
               ) : (
                 detail.bets.map((b) => (
                   <tr key={b.betId} className="border-b border-[var(--color-border)]/50 last:border-0">

@@ -32,7 +32,7 @@ export function JackpotTab() {
   }
 
   if (!tiers || tiers.length === 0) {
-    return <p className="text-center text-[var(--color-text-secondary)] py-8">No jackpot tiers found</p>;
+    return <p className="text-center text-[var(--color-text-secondary)] py-8">Тиры джекпота не найдены</p>;
   }
 
   // Summary stats
@@ -43,10 +43,10 @@ export function JackpotTab() {
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Total Pooled" value={formatLaunch(totalPooled.toString())} sub="COIN" />
-        <StatCard label="Active Tiers" value={`${activeTiers} / ${tiers.length}`} />
-        <StatCard label="Drawing" value={drawingPools} warn={drawingPools > 0} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard label="Всего в пуле" value={formatLaunch(totalPooled.toString())} sub="COIN" />
+        <StatCard label="Активных тиров" value={`${activeTiers} / ${tiers.length}`} />
+        <StatCard label="Розыгрыш" value={drawingPools} warn={drawingPools > 0} />
       </div>
 
       {/* Tier Table */}
@@ -54,14 +54,14 @@ export function JackpotTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--color-surface)] text-left text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="px-4 py-2">Tier</th>
-              <th className="px-4 py-2">Target</th>
-              <th className="px-4 py-2">Min Games</th>
-              <th className="px-4 py-2">Active</th>
-              <th className="px-4 py-2">Pool Status</th>
-              <th className="px-4 py-2">Current / Target</th>
-              <th className="px-4 py-2">Progress</th>
-              <th className="px-4 py-2">Actions</th>
+              <th className="px-4 py-2">Тир</th>
+              <th className="px-4 py-2">Цель</th>
+              <th className="px-4 py-2">Мин. игр</th>
+              <th className="px-4 py-2">Активен</th>
+              <th className="px-4 py-2">Статус пула</th>
+              <th className="px-4 py-2">Текущий / Цель</th>
+              <th className="px-4 py-2">Прогресс</th>
+              <th className="px-4 py-2">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
@@ -143,7 +143,7 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
             {pool.status} #{pool.cycle}
           </span>
         ) : (
-          <span className="text-[10px] text-[var(--color-text-secondary)]">No pool</span>
+          <span className="text-[10px] text-[var(--color-text-secondary)]">Нет пула</span>
         )}
       </td>
       <td className="px-4 py-2.5 text-xs tabular-nums">
@@ -166,7 +166,7 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
         <div className="flex gap-1.5">
           {dirty && (
             <ActionButton onClick={handleSave} variant="success" disabled={updateTier.isPending}>
-              Save
+              Сохранить
             </ActionButton>
           )}
           {pool && pool.status === 'filling' && (
@@ -176,14 +176,14 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
                 variant="danger"
                 disabled={forceDraw.isPending}
               >
-                Draw
+                Розыгрыш
               </ActionButton>
               <ActionButton
                 onClick={() => resetPool.mutate(pool.id)}
                 variant="danger"
                 disabled={resetPool.isPending}
               >
-                Reset
+                Сброс
               </ActionButton>
             </>
           )}
@@ -193,7 +193,7 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
               variant="danger"
               disabled={forceDraw.isPending}
             >
-              Retry
+              Повтор
             </ActionButton>
           )}
         </div>

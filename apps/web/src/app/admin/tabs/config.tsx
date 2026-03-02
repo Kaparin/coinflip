@@ -39,41 +39,41 @@ function humanToMicro(human: string): string {
 
 const CATEGORY_ORDER = ['game', 'display', 'commission', 'sponsored', 'maintenance', 'general'];
 const CATEGORY_LABELS: Record<string, string> = {
-  game: 'Game Settings',
-  display: 'Display Settings',
-  commission: 'Commission',
-  sponsored: 'Sponsored Announcements',
-  maintenance: 'Maintenance',
-  general: 'General',
+  game: 'Настройки игры',
+  display: 'Настройки отображения',
+  commission: 'Комиссия',
+  sponsored: 'Спонсорские анонсы',
+  maintenance: 'Обслуживание',
+  general: 'Общие',
 };
 
 /** Human-readable labels for config keys */
 const KEY_LABELS: Record<string, string> = {
-  OPEN_BET_TTL_SECS: 'Open Bet TTL (seconds)',
-  REVEAL_TIMEOUT_SECS: 'Reveal Timeout (seconds)',
-  MIN_BET_AMOUNT: 'Min Bet (COIN)',
-  MAX_DAILY_AMOUNT: 'Max Daily Volume (COIN)',
-  MAX_OPEN_BETS_PER_USER: 'Max Open Bets Per User',
-  MAX_BATCH_SIZE: 'Max Batch Size',
-  BET_PRESETS: 'Bet Presets (COIN)',
-  LEADERBOARD_CACHE_TTL_MS: 'Leaderboard Cache TTL (ms)',
-  PIN_SLOTS: 'Pin Slots',
-  PIN_MIN_PRICE: 'Pin Min Price (COIN)',
-  PIN_OUTBID_MULTIPLIER: 'Pin Outbid Multiplier',
-  BIG_WIN_THRESHOLD: 'Big Win Threshold (COIN)',
-  MAINTENANCE_MODE: 'Maintenance Mode',
-  MAINTENANCE_MESSAGE: 'Maintenance Message',
-  SPONSORED_PRICE: 'Sponsored Price (COIN)',
-  SPONSORED_IS_ACTIVE: 'Sponsored Active',
-  SPONSORED_MIN_DELAY_MIN: 'Min Delay (minutes)',
-  SPONSORED_MAX_TITLE: 'Max Title Length',
-  SPONSORED_MAX_MESSAGE: 'Max Message Length',
-  COMMISSION_BPS: 'Commission (BPS)',
-  REFERRAL_BPS_LEVEL_1: 'Referral L1 (BPS)',
-  REFERRAL_BPS_LEVEL_2: 'Referral L2 (BPS)',
-  REFERRAL_BPS_LEVEL_3: 'Referral L3 (BPS)',
-  MAX_REFERRAL_BPS_PER_BET: 'Max Referral Cap (BPS)',
-  JACKPOT_TOTAL_BPS: 'Jackpot (BPS)',
+  OPEN_BET_TTL_SECS: 'TTL открытой ставки (сек)',
+  REVEAL_TIMEOUT_SECS: 'Таймаут раскрытия (сек)',
+  MIN_BET_AMOUNT: 'Мин. ставка (COIN)',
+  MAX_DAILY_AMOUNT: 'Макс. дневной объём (COIN)',
+  MAX_OPEN_BETS_PER_USER: 'Макс. ставок на юзера',
+  MAX_BATCH_SIZE: 'Макс. размер пакета',
+  BET_PRESETS: 'Пресеты ставок (COIN)',
+  LEADERBOARD_CACHE_TTL_MS: 'TTL кеша лидерборда (мс)',
+  PIN_SLOTS: 'Слотов для пинов',
+  PIN_MIN_PRICE: 'Мин. цена пина (COIN)',
+  PIN_OUTBID_MULTIPLIER: 'Множитель перебивки пина',
+  BIG_WIN_THRESHOLD: 'Порог большого выигрыша (COIN)',
+  MAINTENANCE_MODE: 'Режим обслуживания',
+  MAINTENANCE_MESSAGE: 'Сообщение обслуживания',
+  SPONSORED_PRICE: 'Цена спонсорства (COIN)',
+  SPONSORED_IS_ACTIVE: 'Спонсорство активно',
+  SPONSORED_MIN_DELAY_MIN: 'Мин. задержка (минуты)',
+  SPONSORED_MAX_TITLE: 'Макс. длина заголовка',
+  SPONSORED_MAX_MESSAGE: 'Макс. длина сообщения',
+  COMMISSION_BPS: 'Комиссия (BPS)',
+  REFERRAL_BPS_LEVEL_1: 'Реферал L1 (BPS)',
+  REFERRAL_BPS_LEVEL_2: 'Реферал L2 (BPS)',
+  REFERRAL_BPS_LEVEL_3: 'Реферал L3 (BPS)',
+  MAX_REFERRAL_BPS_PER_BET: 'Макс. кап рефералов (BPS)',
+  JACKPOT_TOTAL_BPS: 'Джекпот (BPS)',
 };
 
 export function ConfigTab() {
@@ -124,7 +124,7 @@ export function ConfigTab() {
     setSaveResult(null);
     try {
       const result = await toggleMaintenance.mutateAsync();
-      setSaveResult(`Maintenance mode: ${result.enabled ? 'ENABLED' : 'disabled'}`);
+      setSaveResult(`Режим обслуживания: ${result.enabled ? 'ВКЛЮЧЁН' : 'выключен'}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setSaveResult(`Error: ${message}`);
@@ -150,7 +150,7 @@ export function ConfigTab() {
     setSaveResult(null);
     try {
       await bulkUpdate.mutateAsync(changed);
-      setSaveResult(`Saved ${changed.length} setting(s) in ${CATEGORY_LABELS[category] ?? category}`);
+      setSaveResult(`Сохранено ${changed.length} настроек в ${CATEGORY_LABELS[category] ?? category}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setSaveResult(`Error: ${message}`);
@@ -170,11 +170,11 @@ export function ConfigTab() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className={maintenanceEnabled ? 'text-red-400' : 'text-[var(--color-text-secondary)]'} />
             <div>
-              <h3 className="text-sm font-bold">Maintenance Mode</h3>
+              <h3 className="text-sm font-bold">Режим обслуживания</h3>
               <p className="text-[11px] text-[var(--color-text-secondary)]">
                 {maintenanceEnabled
-                  ? 'Platform is DOWN. Users see 503.'
-                  : 'Platform is running normally.'}
+                  ? 'Платформа ВЫКЛЮЧЕНА. Пользователи видят 503.'
+                  : 'Платформа работает нормально.'}
               </p>
             </div>
           </div>
@@ -224,7 +224,7 @@ export function ConfigTab() {
                   >
                     <span className="flex items-center gap-1">
                       <Save size={12} />
-                      Save {changedCount}
+                      Сохранить {changedCount}
                     </span>
                   </ActionButton>
                 )}

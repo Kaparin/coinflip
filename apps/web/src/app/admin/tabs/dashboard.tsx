@@ -46,16 +46,16 @@ export function DashboardTab() {
     setWithdrawSuccess('');
     const humanAmount = parseFloat(withdrawAmount);
     if (!humanAmount || humanAmount <= 0) {
-      setWithdrawError('Enter a valid amount');
+      setWithdrawError('Введите корректную сумму');
       return;
     }
     const microAmount = toMicroLaunch(humanAmount);
     try {
       const result = await withdraw.mutateAsync(microAmount);
-      setWithdrawSuccess(`Withdrawn ${withdrawAmount} COIN. Tx: ${result.txHash}`);
+      setWithdrawSuccess(`Выведено ${withdrawAmount} COIN. Tx: ${result.txHash}`);
       setWithdrawAmount('');
     } catch (err) {
-      setWithdrawError(err instanceof Error ? err.message : 'Withdrawal failed');
+      setWithdrawError(err instanceof Error ? err.message : 'Ошибка вывода');
     }
   };
 
@@ -149,35 +149,35 @@ export function DashboardTab() {
       {/* Treasury Sweep */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Treasury Sweep
+          Сбор средств (Sweep)
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-4">
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Collect offchain_spent tokens from users&apos; vaults to treasury. Users paid for VIP/pins/announcements/raffles in DB,
-            but tokens remain in the contract.
+            Сбор offchain_spent токенов из хранилищ пользователей в казну. Пользователи оплатили VIP/пины/анонсы/розыгрыши в БД,
+            но токены остаются в контракте.
           </p>
 
           {/* Preview */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold">
-                Candidates: {sweepPreview.data?.candidates.length ?? '...'}
+                Кандидаты: {sweepPreview.data?.candidates.length ?? '...'}
               </span>
               <span className="text-xs font-bold text-[var(--color-primary)]">
-                Total sweepable: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} COIN
+                Всего к сбору: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} COIN
               </span>
             </div>
 
             {sweepPreview.data && sweepPreview.data.candidates.length > 0 && (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--color-border)]">
-                <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-bg)] border-b border-[var(--color-border)]">
-                  <span>Address</span>
-                  <span>Debt</span>
-                  <span>Chain Avail</span>
-                  <span>Sweepable</span>
+                <div className="hidden sm:grid grid-cols-4 gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-bg)] border-b border-[var(--color-border)]">
+                  <span>Адрес</span>
+                  <span>Долг</span>
+                  <span>Доступно (чейн)</span>
+                  <span>К сбору</span>
                 </div>
                 {sweepPreview.data.candidates.map((c) => (
-                  <div key={c.userId} className="grid grid-cols-4 gap-2 px-3 py-1.5 text-xs border-b border-[var(--color-border)]/30 last:border-0">
+                  <div key={c.userId} className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 px-3 py-1.5 text-xs border-b border-[var(--color-border)]/30 last:border-0">
                     <span className="font-mono truncate" title={c.address}>
                       {c.nickname || shortHash(c.address)}
                     </span>
@@ -192,7 +192,7 @@ export function DashboardTab() {
 
           {/* Execute */}
           <div className="flex items-center gap-3">
-            <label className="text-xs text-[var(--color-text-secondary)]">Max users:</label>
+            <label className="text-xs text-[var(--color-text-secondary)]">Макс. юзеров:</label>
             <input
               type="number"
               min={1}
@@ -216,20 +216,20 @@ export function DashboardTab() {
               }}
               className="rounded-xl bg-[var(--color-primary)] px-6 py-2 text-xs font-bold disabled:opacity-40 whitespace-nowrap"
             >
-              {sweepExecute.isPending || sweepStatus.data?.running ? 'Sweeping...' : 'Start Sweep'}
+              {sweepExecute.isPending || sweepStatus.data?.running ? 'Сбор...' : 'Начать сбор'}
             </button>
             <button
               type="button"
               onClick={() => sweepPreview.refetch()}
               className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs hover:bg-[var(--color-border)]/30 transition-colors"
             >
-              Refresh
+              Обновить
             </button>
           </div>
 
           {sweepExecute.error && (
             <p className="text-xs text-[var(--color-danger)]">
-              {sweepExecute.error instanceof Error ? sweepExecute.error.message : 'Sweep failed'}
+              {sweepExecute.error instanceof Error ? sweepExecute.error.message : 'Сбор не удался'}
             </p>
           )}
 
@@ -237,10 +237,10 @@ export function DashboardTab() {
           {sweepResult && (
             <div className="space-y-2">
               <div className="flex gap-4 text-xs">
-                <span className="text-[var(--color-success)]">Succeeded: {sweepResult.succeeded}</span>
-                <span className="text-[var(--color-danger)]">Failed: {sweepResult.failed}</span>
-                <span className="text-[var(--color-text-secondary)]">Skipped: {sweepResult.skipped}</span>
-                <span className="font-bold">Total swept: {fmtLaunch(sweepResult.totalSwept)} COIN</span>
+                <span className="text-[var(--color-success)]">Успешно: {sweepResult.succeeded}</span>
+                <span className="text-[var(--color-danger)]">Ошибки: {sweepResult.failed}</span>
+                <span className="text-[var(--color-text-secondary)]">Пропущено: {sweepResult.skipped}</span>
+                <span className="font-bold">Всего собрано: {fmtLaunch(sweepResult.totalSwept)} COIN</span>
               </div>
               {sweepResult.results.filter((r) => r.status !== 'skipped').length > 0 && (
                 <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--color-border)]">
@@ -272,7 +272,7 @@ export function DashboardTab() {
           {t('admin.commissionLedger')}
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
-          <div className="grid grid-cols-4 gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+          <div className="hidden sm:grid grid-cols-4 gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface)] border-b border-[var(--color-border)]">
             <span>{t('admin.time')}</span>
             <span>{t('admin.amount')}</span>
             <span>{t('admin.source')}</span>
@@ -285,7 +285,7 @@ export function DashboardTab() {
             <div className="px-4 py-8 text-center text-xs text-[var(--color-text-secondary)]">{t('admin.noCommission')}</div>
           ) : (
             ledger.data.data.map((entry) => (
-              <div key={entry.id} className="grid grid-cols-4 gap-2 px-4 py-2.5 text-xs border-b border-[var(--color-border)]/50 last:border-0 hover:bg-[var(--color-surface)]/50">
+              <div key={entry.id} className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 px-4 py-2.5 text-xs border-b border-[var(--color-border)]/50 last:border-0 hover:bg-[var(--color-surface)]/50">
                 <span className="text-[var(--color-text-secondary)]" title={entry.createdAt}>{timeAgo(entry.createdAt)}</span>
                 <span className="font-mono font-bold">+{fmtLaunch(entry.amount)}</span>
                 <span className="text-[var(--color-text-secondary)]">{entry.source}</span>

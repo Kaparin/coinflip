@@ -53,7 +53,7 @@ export function PresaleTab() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
       await signPresaleUpdateConfig(wallet, address, { enabled: !isEnabled });
-      setSuccess(isEnabled ? 'Presale disabled' : 'Presale enabled');
+      setSuccess(isEnabled ? 'Пресейл выключен' : 'Пресейл включён');
       refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -67,7 +67,7 @@ export function PresaleTab() {
     const num = parseInt(rateNum);
     const denom = parseInt(rateDenom);
     if (!num || !denom || num <= 0 || denom <= 0) {
-      setError('Rate numerator and denominator must be positive integers');
+      setError('Числитель и знаменатель должны быть положительными целыми');
       return;
     }
     clearMessages();
@@ -76,7 +76,7 @@ export function PresaleTab() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
       await signPresaleUpdateConfig(wallet, address, { rate_num: num, rate_denom: denom });
-      setSuccess(`Rate updated to ${num}/${denom}`);
+      setSuccess(`Курс обновлён: ${num}/${denom}`);
       setEditRate(false);
       refreshAll();
     } catch (err) {
@@ -90,7 +90,7 @@ export function PresaleTab() {
     if (!address || loading) return;
     const humanAmount = parseFloat(maxPerTx);
     if (isNaN(humanAmount) || humanAmount < 0) {
-      setError('Invalid amount');
+      setError('Некорректная сумма');
       return;
     }
     const micro = String(Math.floor(humanAmount * 1_000_000));
@@ -100,7 +100,7 @@ export function PresaleTab() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
       await signPresaleUpdateConfig(wallet, address, { max_per_tx: micro });
-      setSuccess(`Max per tx updated to ${humanAmount} AXM`);
+      setSuccess(`Макс. за TX обновлён: ${humanAmount} AXM`);
       setEditMaxTx(false);
       refreshAll();
     } catch (err) {
@@ -114,7 +114,7 @@ export function PresaleTab() {
     if (!address || loading) return;
     const humanAmount = parseFloat(withdrawAxmAmount);
     if (!humanAmount || humanAmount <= 0) {
-      setError('Enter a valid amount');
+      setError('Введите корректную сумму');
       return;
     }
     const micro = String(Math.floor(humanAmount * 1_000_000));
@@ -124,7 +124,7 @@ export function PresaleTab() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
       await signPresaleWithdrawAxm(wallet, address, micro);
-      setSuccess(`Withdrew ${humanAmount} AXM`);
+      setSuccess(`Выведено ${humanAmount} AXM`);
       setWithdrawAxmAmount('');
       refreshAll();
     } catch (err) {
@@ -143,7 +143,7 @@ export function PresaleTab() {
       if (!wallet) throw new Error('Wallet not available');
       // 0 = withdraw all
       await signPresaleWithdrawAxm(wallet, address, '0');
-      setSuccess('Withdrew all AXM');
+      setSuccess('Выведены все AXM');
       setWithdrawAxmAmount('');
       refreshAll();
     } catch (err) {
@@ -157,7 +157,7 @@ export function PresaleTab() {
     if (!address || loading) return;
     const humanAmount = parseFloat(withdrawCoinAmount);
     if (!humanAmount || humanAmount <= 0) {
-      setError('Enter a valid amount');
+      setError('Введите корректную сумму');
       return;
     }
     const micro = String(Math.floor(humanAmount * 1_000_000));
@@ -167,7 +167,7 @@ export function PresaleTab() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
       await signPresaleWithdrawCoin(wallet, address, micro);
-      setSuccess(`Withdrew ${humanAmount} COIN`);
+      setSuccess(`Выведено ${humanAmount} COIN`);
       setWithdrawCoinAmount('');
       refreshAll();
     } catch (err) {
@@ -181,7 +181,7 @@ export function PresaleTab() {
     return (
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center">
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Presale contract not configured. Set <code>NEXT_PUBLIC_PRESALE_CONTRACT</code> in environment.
+          Контракт пресейла не настроен. Установите <code>NEXT_PUBLIC_PRESALE_CONTRACT</code> в переменных окружения.
         </p>
       </div>
     );
@@ -193,7 +193,7 @@ export function PresaleTab() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShoppingCart size={18} className="text-[var(--color-primary)]" />
-          <h2 className="text-lg font-bold">Presale Management</h2>
+          <h2 className="text-lg font-bold">Управление пресейлом</h2>
         </div>
         <button
           type="button"
@@ -201,7 +201,7 @@ export function PresaleTab() {
           className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-[11px] font-medium hover:bg-[var(--color-surface-hover)]"
         >
           <RefreshCw size={12} />
-          Refresh
+          Обновить
         </button>
       </div>
 
@@ -228,21 +228,21 @@ export function PresaleTab() {
           {/* Status + Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">Status</p>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">Статус</p>
               <p className={`text-sm font-bold ${isEnabled ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
-                {isEnabled ? 'Active' : 'Disabled'}
+                {isEnabled ? 'Активен' : 'Выключен'}
               </p>
             </div>
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">Rate</p>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">Курс</p>
               <p className="text-sm font-bold">1 AXM = {(status?.rate_num ?? 1) / (status?.rate_denom ?? 1)} COIN</p>
             </div>
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">COIN Pool</p>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">Пул COIN</p>
               <p className="text-sm font-bold">{fmtMicro(status?.coin_available ?? '0')}</p>
             </div>
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">AXM Collected</p>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">AXM собрано</p>
               <p className="text-sm font-bold">{fmtMicro(status?.axm_balance ?? '0')}</p>
             </div>
           </div>
@@ -252,14 +252,14 @@ export function PresaleTab() {
             <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
               <TrendingUp size={14} className="text-[var(--color-text-secondary)]" />
               <div>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">Total AXM Raised</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)]">Всего AXM собрано</p>
                 <p className="text-sm font-bold">{fmtMicro(config?.total_axm_received ?? '0')} AXM</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
               <Coins size={14} className="text-[var(--color-text-secondary)]" />
               <div>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">Total COIN Sold</p>
+                <p className="text-[10px] text-[var(--color-text-secondary)]">Всего COIN продано</p>
                 <p className="text-sm font-bold">{fmtMicro(config?.total_coin_sold ?? '0')} COIN</p>
               </div>
             </div>
@@ -269,15 +269,15 @@ export function PresaleTab() {
           <div className="space-y-3">
             <h3 className="text-sm font-bold flex items-center gap-1.5">
               <Settings size={14} />
-              Controls
+              Управление
             </h3>
 
             {/* Toggle Enable/Disable */}
             <div className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
               <div>
-                <p className="text-xs font-medium">Presale Status</p>
+                <p className="text-xs font-medium">Статус пресейла</p>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  {isEnabled ? 'Presale is active and visible to users' : 'Presale is disabled and hidden from users'}
+                  {isEnabled ? 'Пресейл активен и виден пользователям' : 'Пресейл выключен и скрыт от пользователей'}
                 </p>
               </div>
               <button
@@ -293,9 +293,9 @@ export function PresaleTab() {
                 {loading === 'toggle' ? (
                   <Loader2 size={12} className="animate-spin" />
                 ) : isEnabled ? (
-                  <><PowerOff size={12} /> Disable</>
+                  <><PowerOff size={12} /> Выключить</>
                 ) : (
-                  <><Power size={12} /> Enable</>
+                  <><Power size={12} /> Включить</>
                 )}
               </button>
             </div>
@@ -304,9 +304,9 @@ export function PresaleTab() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium">Exchange Rate</p>
+                  <p className="text-xs font-medium">Обменный курс</p>
                   <p className="text-[10px] text-[var(--color-text-secondary)]">
-                    Current: {config?.rate_num ?? 1} / {config?.rate_denom ?? 1} (1 AXM = {(config?.rate_num ?? 1) / (config?.rate_denom ?? 1)} COIN)
+                    Текущий: {config?.rate_num ?? 1} / {config?.rate_denom ?? 1} (1 AXM = {(config?.rate_num ?? 1) / (config?.rate_denom ?? 1)} COIN)
                   </p>
                 </div>
                 {!editRate && (
@@ -319,26 +319,26 @@ export function PresaleTab() {
                     }}
                     className="text-[10px] font-medium text-[var(--color-primary)] hover:underline"
                   >
-                    Edit
+                    Изменить
                   </button>
                 )}
               </div>
               {editRate && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="number"
                     value={rateNum}
                     onChange={(e) => setRateNum(e.target.value)}
-                    placeholder="Numerator"
-                    className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
+                    placeholder="Числитель"
+                    className="min-w-0 flex-1 basis-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
                   />
                   <span className="text-xs font-bold">/</span>
                   <input
                     type="number"
                     value={rateDenom}
                     onChange={(e) => setRateDenom(e.target.value)}
-                    placeholder="Denominator"
-                    className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
+                    placeholder="Знаменатель"
+                    className="min-w-0 flex-1 basis-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
                   />
                   <button
                     type="button"
@@ -346,14 +346,14 @@ export function PresaleTab() {
                     disabled={!!loading}
                     className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
                   >
-                    {loading === 'rate' ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                    {loading === 'rate' ? <Loader2 size={12} className="animate-spin" /> : 'Сохранить'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditRate(false)}
                     className="text-xs text-[var(--color-text-secondary)] hover:underline"
                   >
-                    Cancel
+                    Отмена
                   </button>
                 </div>
               )}
@@ -363,9 +363,9 @@ export function PresaleTab() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium">Max Per Transaction</p>
+                  <p className="text-xs font-medium">Макс. за транзакцию</p>
                   <p className="text-[10px] text-[var(--color-text-secondary)]">
-                    Current: {config?.max_per_tx === '0' ? 'No limit' : `${fmtMicro(config?.max_per_tx ?? '0')} AXM`}
+                    Текущий: {config?.max_per_tx === '0' ? 'Без лимита' : `${fmtMicro(config?.max_per_tx ?? '0')} AXM`}
                   </p>
                 </div>
                 {!editMaxTx && (
@@ -377,7 +377,7 @@ export function PresaleTab() {
                     }}
                     className="text-[10px] font-medium text-[var(--color-primary)] hover:underline"
                   >
-                    Edit
+                    Изменить
                   </button>
                 )}
               </div>
@@ -387,7 +387,7 @@ export function PresaleTab() {
                     type="number"
                     value={maxPerTx}
                     onChange={(e) => setMaxPerTx(e.target.value)}
-                    placeholder="0 = no limit"
+                    placeholder="0 = без лимита"
                     className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
                   />
                   <span className="text-xs text-[var(--color-text-secondary)]">AXM</span>
@@ -397,14 +397,14 @@ export function PresaleTab() {
                     disabled={!!loading}
                     className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
                   >
-                    {loading === 'maxTx' ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                    {loading === 'maxTx' ? <Loader2 size={12} className="animate-spin" /> : 'Сохранить'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditMaxTx(false)}
                     className="text-xs text-[var(--color-text-secondary)] hover:underline"
                   >
-                    Cancel
+                    Отмена
                   </button>
                 </div>
               )}
@@ -414,14 +414,14 @@ export function PresaleTab() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
               <p className="text-xs font-medium flex items-center gap-1.5">
                 <ArrowUpFromLine size={12} />
-                Withdraw Collected AXM
+                Вывести собранные AXM
               </p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   value={withdrawAxmAmount}
                   onChange={(e) => setWithdrawAxmAmount(e.target.value)}
-                  placeholder="Amount in AXM"
+                  placeholder="Сумма в AXM"
                   className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
                 />
                 <button
@@ -430,7 +430,7 @@ export function PresaleTab() {
                   disabled={!!loading}
                   className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
                 >
-                  {loading === 'withdrawAxm' ? <Loader2 size={12} className="animate-spin" /> : 'Withdraw'}
+                  {loading === 'withdrawAxm' ? <Loader2 size={12} className="animate-spin" /> : 'Вывести'}
                 </button>
                 <button
                   type="button"
@@ -438,7 +438,7 @@ export function PresaleTab() {
                   disabled={!!loading}
                   className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-bold hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
                 >
-                  All
+                  Всё
                 </button>
               </div>
             </div>
@@ -447,14 +447,14 @@ export function PresaleTab() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
               <p className="text-xs font-medium flex items-center gap-1.5">
                 <ArrowDownToLine size={12} />
-                Withdraw Unsold COIN
+                Вывести непроданные COIN
               </p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   value={withdrawCoinAmount}
                   onChange={(e) => setWithdrawCoinAmount(e.target.value)}
-                  placeholder="Amount in COIN"
+                  placeholder="Сумма в COIN"
                   className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
                 />
                 <button
@@ -463,7 +463,7 @@ export function PresaleTab() {
                   disabled={!!loading}
                   className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
                 >
-                  {loading === 'withdrawCoin' ? <Loader2 size={12} className="animate-spin" /> : 'Withdraw'}
+                  {loading === 'withdrawCoin' ? <Loader2 size={12} className="animate-spin" /> : 'Вывести'}
                 </button>
               </div>
             </div>
@@ -471,7 +471,7 @@ export function PresaleTab() {
 
           {/* Contract info */}
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <p className="text-[10px] text-[var(--color-text-secondary)]">Contract Address</p>
+            <p className="text-[10px] text-[var(--color-text-secondary)]">Адрес контракта</p>
             <p className="text-xs font-mono break-all">{PRESALE_CONTRACT}</p>
           </div>
         </>

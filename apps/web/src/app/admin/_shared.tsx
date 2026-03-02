@@ -24,12 +24,12 @@ export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return '-';
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'только что';
+  if (mins < 60) return `${mins} мин назад`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}ч назад`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}д назад`;
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -74,10 +74,10 @@ export function Pagination({ page, total, limit, hasMore, onPageChange }: {
       </span>
       <div className="flex gap-2">
         <button type="button" disabled={page === 0} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-xs disabled:opacity-30">
-          Prev
+          Назад
         </button>
         <button type="button" disabled={!hasMore} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-xs disabled:opacity-30">
-          Next
+          Далее
         </button>
       </div>
     </div>
@@ -91,7 +91,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none w-full max-w-xs"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none w-full sm:max-w-xs"
     />
   );
 }

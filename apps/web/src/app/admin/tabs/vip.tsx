@@ -79,12 +79,12 @@ function TierConfigRow({ tier, price, yearlyPrice, isActive }: { tier: string; p
       </td>
       <td className="py-3 text-right">
         <div className="flex items-center justify-end gap-2">
-          {saved && <span className="text-xs text-emerald-400">Saved</span>}
+          {saved && <span className="text-xs text-emerald-400">Сохранено</span>}
           <ActionButton
             onClick={handleSave}
             disabled={!hasChanges || updateMutation.isPending}
           >
-            {updateMutation.isPending ? 'Saving...' : 'Save'}
+            {updateMutation.isPending ? 'Сохранение...' : 'Сохранить'}
           </ActionButton>
         </div>
       </td>
@@ -132,28 +132,28 @@ export function VipTab() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Active VIPs" value={stats?.active_count ?? 0} />
+        <StatCard label="Активных VIP" value={stats?.active_count ?? 0} />
         <StatCard label="Silver" value={stats?.silver_count ?? 0} />
         <StatCard label="Gold" value={stats?.gold_count ?? 0} />
         <StatCard label="Diamond" value={stats?.diamond_count ?? 0} />
-        <StatCard label="Total Revenue" value={stats ? formatLaunch(stats.total_revenue) : '0'} sub="COIN" />
-        <StatCard label="This Week" value={stats ? formatLaunch(stats.week_revenue) : '0'} sub="COIN" />
+        <StatCard label="Общий доход" value={stats ? formatLaunch(stats.total_revenue) : '0'} sub="COIN" />
+        <StatCard label="За неделю" value={stats ? formatLaunch(stats.week_revenue) : '0'} sub="COIN" />
       </div>
 
       {/* Tier Config */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-2 mb-4">
           <Settings size={18} className="text-[var(--color-text-secondary)]" />
-          <h3 className="text-sm font-bold">Tier Pricing</h3>
+          <h3 className="text-sm font-bold">Цены по тарифам</h3>
         </div>
         <TableWrapper>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
-                <th className="py-2 text-left font-medium px-3">Tier</th>
-                <th className="py-2 text-left font-medium">Price / month</th>
-                <th className="py-2 text-left font-medium">Price / year</th>
-                <th className="py-2 text-left font-medium">Active</th>
+                <th className="py-2 text-left font-medium px-3">Тариф</th>
+                <th className="py-2 text-left font-medium">Цена / мес</th>
+                <th className="py-2 text-left font-medium">Цена / год</th>
+                <th className="py-2 text-left font-medium">Активен</th>
                 <th className="py-2 text-right font-medium px-3" />
               </tr>
             </thead>
@@ -170,7 +170,7 @@ export function VipTab() {
               {!vipTiers?.length && (
                 <tr>
                   <td colSpan={5} className="py-4 text-center text-[var(--color-text-secondary)]">
-                    Loading...
+                    Загрузка...
                   </td>
                 </tr>
               )}
@@ -183,14 +183,14 @@ export function VipTab() {
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <Crown size={18} className="text-amber-400" />
-          <h3 className="text-sm font-bold">Grant VIP</h3>
+          <h3 className="text-sm font-bold">Выдать VIP</h3>
         </div>
         <div className="flex gap-2 flex-wrap">
           <input
             type="text"
             value={grantUserId}
             onChange={(e) => setGrantUserId(e.target.value)}
-            placeholder="User ID (UUID)"
+            placeholder="ID пользователя (UUID)"
             className="flex-1 min-w-[200px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none"
           />
           <select
@@ -211,7 +211,7 @@ export function VipTab() {
             className="w-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm"
           />
           <ActionButton onClick={handleGrant} disabled={!grantUserId.trim() || grantMutation.isPending}>
-            {grantMutation.isPending ? 'Granting...' : 'Grant'}
+            {grantMutation.isPending ? 'Выдача...' : 'Выдать'}
           </ActionButton>
         </div>
         {actionResult && (
@@ -221,16 +221,16 @@ export function VipTab() {
 
       {/* Subscribers Table */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-        <h3 className="text-sm font-bold mb-4">Active Subscribers</h3>
+        <h3 className="text-sm font-bold mb-4">Активные подписчики</h3>
         <TableWrapper>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
-                <th className="py-2 text-left font-medium">User</th>
-                <th className="py-2 text-left font-medium">Tier</th>
-                <th className="py-2 text-left font-medium">Paid</th>
-                <th className="py-2 text-left font-medium">Expires</th>
-                <th className="py-2 text-right font-medium">Actions</th>
+                <th className="py-2 text-left font-medium">Пользователь</th>
+                <th className="py-2 text-left font-medium">Тариф</th>
+                <th className="py-2 text-left font-medium">Оплата</th>
+                <th className="py-2 text-left font-medium">Истекает</th>
+                <th className="py-2 text-right font-medium">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -250,7 +250,7 @@ export function VipTab() {
                       disabled={revokeMutation.isPending}
                       variant="danger"
                     >
-                      Revoke
+                      Отозвать
                     </ActionButton>
                   </td>
                 </tr>
@@ -258,7 +258,7 @@ export function VipTab() {
               {subscribers.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-4 text-center text-[var(--color-text-secondary)]">
-                    No active VIP subscribers
+                    Нет активных VIP подписчиков
                   </td>
                 </tr>
               )}

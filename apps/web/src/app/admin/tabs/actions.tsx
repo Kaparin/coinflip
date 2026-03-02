@@ -18,7 +18,7 @@ export function ActionsTab() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        Manual admin actions for fixing stuck states. Use with caution — these operations directly modify the database.
+        Ручные действия админа для исправления зависших состояний. Используйте осторожно — операции напрямую изменяют БД.
       </p>
 
       <HealSystemAction />
@@ -48,22 +48,21 @@ function HealSystemAction() {
   };
 
   const counters: Array<{ label: string; key: keyof HealResult; color: string }> = [
-    { label: 'Secrets recovered', key: 'secretsRecovered', color: 'text-green-400' },
-    { label: 'Synced from chain', key: 'syncedFromChain', color: 'text-blue-400' },
-    { label: 'Reveals triggered', key: 'revealsTriggered', color: 'text-yellow-400' },
-    { label: 'Timeouts claimed', key: 'timeoutsClaimed', color: 'text-orange-400' },
-    { label: 'Transitional reverted', key: 'transitionalReverted', color: 'text-purple-400' },
-    { label: 'Funds unlocked', key: 'fundsUnlocked', color: 'text-cyan-400' },
-    { label: 'Orphans imported', key: 'orphansImported', color: 'text-pink-400' },
+    { label: 'Секретов восстановлено', key: 'secretsRecovered', color: 'text-green-400' },
+    { label: 'Синхронизировано с чейна', key: 'syncedFromChain', color: 'text-blue-400' },
+    { label: 'Раскрытий запущено', key: 'revealsTriggered', color: 'text-yellow-400' },
+    { label: 'Таймаутов получено', key: 'timeoutsClaimed', color: 'text-orange-400' },
+    { label: 'Переходов откачено', key: 'transitionalReverted', color: 'text-purple-400' },
+    { label: 'Средств разблокировано', key: 'fundsUnlocked', color: 'text-cyan-400' },
+    { label: 'Сирот импортировано', key: 'orphansImported', color: 'text-pink-400' },
   ];
 
   return (
     <div className="rounded-xl border-2 border-[var(--color-primary)] bg-[var(--color-surface)] p-5 space-y-4">
       <div>
-        <h3 className="text-base font-bold">Heal System</h3>
+        <h3 className="text-base font-bold">Исцеление системы</h3>
         <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-          One-click fix for all stuck bets. Recovers secrets, syncs chain state, triggers reveals,
-          claims timeouts, reverts stuck transitions, unlocks orphaned funds, and imports missing bets.
+          Одним нажатием: восстановление секретов, синхронизация с чейном, запуск раскрытий, клейм таймаутов, откат зависших переходов, разблокировка средств, импорт недостающих ставок.
         </p>
       </div>
 
@@ -73,7 +72,7 @@ function HealSystemAction() {
         onClick={handleHeal}
         className="w-full rounded-xl bg-[var(--color-primary)] px-6 py-3 text-sm font-bold disabled:opacity-40 transition-opacity"
       >
-        {heal.isPending ? 'Healing...' : 'Heal System'}
+        {heal.isPending ? 'Исцеление...' : 'Исцелить систему'}
       </button>
 
       {result && (
@@ -92,7 +91,7 @@ function HealSystemAction() {
           </div>
           {result.errors.length > 0 && (
             <div className="mt-2 space-y-1">
-              <p className="text-[var(--color-danger)] font-bold">Errors:</p>
+              <p className="text-[var(--color-danger)] font-bold">Ошибки:</p>
               {result.errors.map((err, i) => (
                 <p key={i} className="text-[var(--color-danger)] text-[11px] break-all">{err}</p>
               ))}
@@ -130,8 +129,8 @@ function ContractSweepAction() {
 
   return (
     <ActionCard
-      title="Sweep Orphaned COIN from CoinFlip Contract"
-      description={`Recover COIN tokens stuck on the CoinFlip contract that are not tracked in any vault balance. These tokens were orphaned after a state reset. Contract: ${COINFLIP_CONTRACT.slice(0, 16)}...`}
+      title="Сбор осиротевших COIN из контракта"
+      description={`Восстановление COIN токенов, застрявших в контракте CoinFlip и не привязанных к балансам. Контракт: ${COINFLIP_CONTRACT.slice(0, 16)}...`}
     >
       <button
         type="button"
@@ -139,7 +138,7 @@ function ContractSweepAction() {
         onClick={handleSweep}
         className="flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold disabled:opacity-40"
       >
-        {loading ? <><Loader2 size={12} className="animate-spin" /> Sweeping...</> : 'Sweep Orphaned Tokens'}
+        {loading ? <><Loader2 size={12} className="animate-spin" /> Сбор...</> : 'Собрать осиротевшие токены'}
       </button>
       {result && <ResultMsg type={result.type} msg={result.msg} />}
     </ActionCard>
@@ -154,7 +153,7 @@ function UnlockFundsAction() {
 
   const handleSubmit = async () => {
     setResult(null);
-    if (!userId || !amount) { setResult({ type: 'error', msg: 'Both fields required' }); return; }
+    if (!userId || !amount) { setResult({ type: 'error', msg: 'Оба поля обязательны' }); return; }
     try {
       const res = await unlock.mutateAsync({ userId, amount });
       setResult({ type: 'success', msg: res.message });
@@ -167,22 +166,22 @@ function UnlockFundsAction() {
 
   return (
     <ActionCard
-      title="Unlock Stuck Funds"
-      description="Force-unlock locked funds for a user. Use when a user has locked balance but no active bets (visible in Diagnostics tab)."
+      title="Разблокировать застрявшие средства"
+      description="Принудительная разблокировка средств пользователя. Используйте, когда заблокированный баланс есть, но активных ставок нет (видно в Диагностике)."
     >
       <div className="flex gap-3 flex-wrap">
         <input
           type="text"
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
-          placeholder="User ID (UUID)"
+          placeholder="ID пользователя (UUID)"
           className="flex-1 min-w-[200px] rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <input
           type="text"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount (micro COIN)"
+          placeholder="Сумма (micro COIN)"
           className="w-40 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <button
@@ -191,7 +190,7 @@ function UnlockFundsAction() {
           onClick={handleSubmit}
           className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-bold disabled:opacity-40"
         >
-          {unlock.isPending ? 'Unlocking...' : 'Unlock'}
+          {unlock.isPending ? 'Разблокировка...' : 'Разблокировать'}
         </button>
       </div>
       {result && <ResultMsg type={result.type} msg={result.msg} />}
@@ -206,7 +205,7 @@ function ForceCancelAction() {
 
   const handleSubmit = async () => {
     setResult(null);
-    if (!betId) { setResult({ type: 'error', msg: 'Bet ID required' }); return; }
+    if (!betId) { setResult({ type: 'error', msg: 'Требуется ID ставки' }); return; }
     try {
       const res = await forceCancel.mutateAsync(Number(betId));
       setResult({ type: 'success', msg: res.message });
@@ -218,15 +217,15 @@ function ForceCancelAction() {
 
   return (
     <ActionCard
-      title="Force Cancel Bet"
-      description="Force a bet into 'canceled' state and unlock funds for both participants. Use for stuck bets that the sweep can't resolve."
+      title="Принудительная отмена ставки"
+      description="Принудительный перевод ставки в статус 'canceled' и разблокировка средств обоих участников. Для зависших ставок, которые sweep не может решить."
     >
       <div className="flex gap-3">
         <input
           type="number"
           value={betId}
           onChange={(e) => setBetId(e.target.value)}
-          placeholder="Bet ID"
+          placeholder="ID ставки"
           className="w-32 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <button
@@ -235,7 +234,7 @@ function ForceCancelAction() {
           onClick={handleSubmit}
           className="rounded-xl bg-[var(--color-danger)] px-4 py-2 text-xs font-bold disabled:opacity-40"
         >
-          {forceCancel.isPending ? 'Canceling...' : 'Force Cancel'}
+          {forceCancel.isPending ? 'Отмена...' : 'Принудительно отменить'}
         </button>
       </div>
       {result && <ResultMsg type={result.type} msg={result.msg} />}
@@ -250,7 +249,7 @@ function RecoverSecretAction() {
 
   const handleSubmit = async () => {
     setResult(null);
-    if (!betId) { setResult({ type: 'error', msg: 'Bet ID required' }); return; }
+    if (!betId) { setResult({ type: 'error', msg: 'Требуется ID ставки' }); return; }
     try {
       const res = await recover.mutateAsync(Number(betId));
       setResult({ type: 'success', msg: res.message });
@@ -262,15 +261,15 @@ function RecoverSecretAction() {
 
   return (
     <ActionCard
-      title="Recover Missing Secret"
-      description="Recover maker_secret from pending_bet_secrets table and attach it to a bet. This enables auto-reveal for bets that were imported without secrets."
+      title="Восстановить секрет"
+      description="Восстановление maker_secret из таблицы pending_bet_secrets. Активирует авто-раскрытие для импортированных ставок без секретов."
     >
       <div className="flex gap-3">
         <input
           type="number"
           value={betId}
           onChange={(e) => setBetId(e.target.value)}
-          placeholder="Bet ID"
+          placeholder="ID ставки"
           className="w-32 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <button
@@ -279,7 +278,7 @@ function RecoverSecretAction() {
           onClick={handleSubmit}
           className="rounded-xl bg-green-600 px-4 py-2 text-xs font-bold disabled:opacity-40"
         >
-          {recover.isPending ? 'Recovering...' : 'Recover Secret'}
+          {recover.isPending ? 'Восстановление...' : 'Восстановить секрет'}
         </button>
       </div>
       {result && <ResultMsg type={result.type} msg={result.msg} />}
@@ -294,7 +293,7 @@ function ImportOrphanedAction() {
 
   const handleSubmit = async () => {
     setResult(null);
-    if (!chainBetId) { setResult({ type: 'error', msg: 'Chain Bet ID required' }); return; }
+    if (!chainBetId) { setResult({ type: 'error', msg: 'Требуется ID ставки из чейна' }); return; }
     try {
       const res = await importOrphaned.mutateAsync(Number(chainBetId));
       setResult({ type: 'success', msg: res.message });
@@ -306,15 +305,15 @@ function ImportOrphanedAction() {
 
   return (
     <ActionCard
-      title="Import Orphaned Bet"
-      description="Import a specific bet from the blockchain into the database. Automatically recovers the secret if available in pending_bet_secrets."
+      title="Импорт осиротевшей ставки"
+      description="Импорт конкретной ставки из блокчейна в БД. Автоматически восстанавливает секрет из pending_bet_secrets если доступен."
     >
       <div className="flex gap-3">
         <input
           type="number"
           value={chainBetId}
           onChange={(e) => setChainBetId(e.target.value)}
-          placeholder="Chain Bet ID"
+          placeholder="ID ставки (чейн)"
           className="w-32 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-[var(--color-primary)] focus:outline-none font-mono"
         />
         <button
@@ -323,7 +322,7 @@ function ImportOrphanedAction() {
           onClick={handleSubmit}
           className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-bold disabled:opacity-40"
         >
-          {importOrphaned.isPending ? 'Importing...' : 'Import from Chain'}
+          {importOrphaned.isPending ? 'Импорт...' : 'Импорт из чейна'}
         </button>
       </div>
       {result && <ResultMsg type={result.type} msg={result.msg} />}
