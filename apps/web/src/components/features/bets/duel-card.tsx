@@ -195,81 +195,76 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
         </div>
       </div>
 
-      {/* Players */}
-      <div className="flex items-start justify-between mb-3">
-        <PlayerSide
-          address={duel.maker}
-          nickname={duel.makerNickname}
-          vipTier={duel.makerVipTier}
-          vipCustomization={duel.makerVipCustomization}
-          isWinner={isWinnerReveal && isWinnerMaker}
-          isLoser={isWinnerReveal && !isWinnerMaker}
-          isMerging={isMergingPhase}
-          side="left"
-        />
+      {/* Players + Center coin */}
+      <div className={`flex items-center mb-3 ${isWinnerReveal ? 'justify-center' : 'justify-between'}`}>
+        {/* Side avatars: hidden during winner-reveal (they merged into coin) */}
+        {!isWinnerReveal && (
+          <PlayerSide
+            address={duel.maker}
+            nickname={duel.makerNickname}
+            vipTier={duel.makerVipTier}
+            vipCustomization={duel.makerVipCustomization}
+            isWinner={false}
+            isLoser={false}
+            isMerging={isMergingPhase}
+            side="left"
+          />
+        )}
 
         {/* Center: spinning coin / avatar-merge / winner reveal */}
-        <div className="flex flex-col items-center justify-center flex-1 py-1">
+        <div className={`flex flex-col items-center justify-center py-1 ${isWinnerReveal ? '' : 'flex-1'}`}>
           {isWinnerReveal && duel.winner ? (
-            /* Winner reveal: static coin on winner face + name + amount */
+            /* Winner reveal: static large coin on winner face + name + amount */
             <div className="flex flex-col items-center">
               <div className="animate-duel-coin-winner-glow">
                 <div
-                  className="duel-coin-3d"
+                  className="duel-coin-3d-large"
                   style={{ transform: `rotateY(${isWinnerMaker ? 0 : 180}deg)` }}
                 >
                   <div className="duel-coin-face duel-coin-front">
-                    <UserAvatar address={duel.maker} size={44} className="rounded-full" />
+                    <UserAvatar address={duel.maker} size={88} className="rounded-full" />
                   </div>
                   <div className="duel-coin-face duel-coin-back-face">
-                    <UserAvatar address={duel.acceptor} size={44} className="rounded-full" />
+                    <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
                   </div>
                 </div>
               </div>
-              <div className="animate-duel-winner-name text-center mt-1.5">
+              <div className="animate-duel-winner-name text-center mt-2">
                 <Link href={`/game/profile/${winnerAddress}`} className="hover:underline">
-                  <span className={`text-[11px] font-bold ${winnerNameClass || 'text-emerald-400'}`}>
+                  <span className={`text-xs font-bold ${winnerNameClass || 'text-emerald-400'}`}>
                     {winnerDisplayName}
                   </span>
                 </Link>
-                <div className="text-[10px] text-emerald-400/80 font-medium">
+                <div className="text-[11px] text-emerald-400/80 font-medium">
                   +{formatLaunch(String(BigInt(duel.amount) * 2n * 9n / 10n))}
                 </div>
               </div>
             </div>
           ) : isMergingPhase ? (
-            /* Avatar merge: logo fades out, avatar coin fades in + spins + decelerates */
-            <div className="relative w-[44px] h-[44px]">
+            /* Avatar merge: logo fades out, large avatar coin spins + decelerates to winner */
+            <div className="relative" style={{ width: 88, height: 88 }}>
               {/* Layer 1: Logo coin spinning + fading out */}
-              <div className="absolute inset-0 duel-coin-3d animate-duel-coin-spin-fadeout">
+              <div
+                className="absolute inset-0 animate-duel-coin-spin-fadeout"
+                style={{ transformStyle: 'preserve-3d' }}
+              >
                 <div className="duel-coin-face duel-coin-front">
-                  <Image
-                    src="/coin-token-logo.png"
-                    alt="COIN front"
-                    width={44}
-                    height={44}
-                    className="rounded-full"
-                    unoptimized
-                  />
+                  <Image src="/coin-token-logo.png" alt="COIN front" width={88} height={88} className="rounded-full" unoptimized />
                 </div>
                 <div className="duel-coin-face duel-coin-back-face">
-                  <Image
-                    src="/coin-token-logo.back.png"
-                    alt="COIN back"
-                    width={44}
-                    height={44}
-                    className="rounded-full"
-                    unoptimized
-                  />
+                  <Image src="/coin-token-logo.back.png" alt="COIN back" width={88} height={88} className="rounded-full" unoptimized />
                 </div>
               </div>
-              {/* Layer 2: Avatar coin fading in + spinning + decelerating to winner */}
-              <div className={`absolute inset-0 duel-coin-3d ${isWinnerMaker ? 'animate-duel-avatar-coin-to-front' : 'animate-duel-avatar-coin-to-back'}`}>
+              {/* Layer 2: Avatar coin — maker on front, acceptor on back */}
+              <div
+                className={`absolute inset-0 ${isWinnerMaker ? 'animate-duel-avatar-coin-to-front' : 'animate-duel-avatar-coin-to-back'}`}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
                 <div className="duel-coin-face duel-coin-front">
-                  <UserAvatar address={duel.maker} size={44} className="rounded-full" />
+                  <UserAvatar address={duel.maker} size={88} className="rounded-full" />
                 </div>
                 <div className="duel-coin-face duel-coin-back-face">
-                  <UserAvatar address={duel.acceptor} size={44} className="rounded-full" />
+                  <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
                 </div>
               </div>
             </div>
@@ -277,24 +272,10 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
             /* Normal: spinning logo coin */
             <div className="duel-coin-3d animate-duel-coin-spin">
               <div className="duel-coin-face duel-coin-front">
-                <Image
-                  src="/coin-token-logo.png"
-                  alt="COIN front"
-                  width={44}
-                  height={44}
-                  className="rounded-full"
-                  unoptimized
-                />
+                <Image src="/coin-token-logo.png" alt="COIN front" width={44} height={44} className="rounded-full" unoptimized />
               </div>
               <div className="duel-coin-face duel-coin-back-face">
-                <Image
-                  src="/coin-token-logo.back.png"
-                  alt="COIN back"
-                  width={44}
-                  height={44}
-                  className="rounded-full"
-                  unoptimized
-                />
+                <Image src="/coin-token-logo.back.png" alt="COIN back" width={44} height={44} className="rounded-full" unoptimized />
               </div>
             </div>
           )}
@@ -305,16 +286,18 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
           )}
         </div>
 
-        <PlayerSide
-          address={duel.acceptor}
-          nickname={duel.acceptorNickname}
-          vipTier={duel.acceptorVipTier}
-          vipCustomization={duel.acceptorVipCustomization}
-          isWinner={isWinnerReveal && isWinnerAcceptor}
-          isLoser={isWinnerReveal && !isWinnerAcceptor}
-          isMerging={isMergingPhase}
-          side="right"
-        />
+        {!isWinnerReveal && (
+          <PlayerSide
+            address={duel.acceptor}
+            nickname={duel.acceptorNickname}
+            vipTier={duel.acceptorVipTier}
+            vipCustomization={duel.acceptorVipCustomization}
+            isWinner={false}
+            isLoser={false}
+            isMerging={isMergingPhase}
+            side="right"
+          />
+        )}
       </div>
 
       {/* Chat area */}
