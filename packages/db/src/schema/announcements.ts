@@ -14,4 +14,9 @@ export const announcements = pgTable('announcements', {
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   rejectedReason: text('rejected_reason'),
   pricePaid: numeric('price_paid', { precision: 38, scale: 0 }),
+  // i18n columns
+  titleEn: text('title_en'),
+  titleRu: text('title_ru'),
+  messageEn: text('message_en'),
+  messageRu: text('message_ru'),
 });

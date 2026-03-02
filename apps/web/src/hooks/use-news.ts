@@ -19,13 +19,14 @@ interface NewsFeedPage {
   nextCursor: string | null;
 }
 
-export function useNewsFeed(types?: string) {
+export function useNewsFeed(types?: string, lang?: string) {
   return useInfiniteQuery({
-    queryKey: ['/api/v1/news', types],
+    queryKey: ['/api/v1/news', types, lang],
     queryFn: async ({ pageParam }): Promise<NewsFeedPage> => {
       const params = new URLSearchParams({ limit: '20' });
       if (pageParam) params.set('cursor', pageParam as string);
       if (types) params.set('types', types);
+      if (lang) params.set('lang', lang);
 
       const res = await fetch(`${API_URL}/api/v1/news?${params}`);
       if (!res.ok) throw new Error('Failed to fetch news');

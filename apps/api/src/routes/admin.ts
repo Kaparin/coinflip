@@ -21,6 +21,7 @@ import { configService } from '../services/config.service.js';
 import { partnerService } from '../services/partner.service.js';
 import { newsService } from '../services/news.service.js';
 import { announcementService } from '../services/announcement.service.js';
+import { translationService } from '../services/translation.service.js';
 import { treasurySweepService } from '../services/treasury-sweep.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
@@ -825,6 +826,9 @@ adminRouter.post('/announcements', zValidator('json', AnnouncementCreateSchema),
   const { title, message, priority } = c.req.valid('json');
   const db = getDb();
 
+  // Auto-translate
+  const i18n = await translationService.translateAnnouncement(title, message);
+
   // Get all user IDs
   const allUsers = await db.select({ id: users.id }).from(users);
   const sentCount = allUsers.length;
@@ -835,6 +839,10 @@ adminRouter.post('/announcements', zValidator('json', AnnouncementCreateSchema),
     message,
     priority,
     sentCount,
+    titleEn: i18n.titleEn,
+    titleRu: i18n.titleRu,
+    messageEn: i18n.messageEn,
+    messageRu: i18n.messageRu,
   }).returning({ id: announcements.id });
 
   // Insert notification for each user
@@ -856,7 +864,16 @@ adminRouter.post('/announcements', zValidator('json', AnnouncementCreateSchema),
   // Broadcast via WebSocket to all connected clients
   wsService.broadcast({
     type: 'announcement',
-    data: { id: announcement!.id, title, message, priority },
+    data: {
+      id: announcement!.id,
+      title,
+      message,
+      priority,
+      titleEn: i18n.titleEn,
+      titleRu: i18n.titleRu,
+      messageEn: i18n.messageEn,
+      messageRu: i18n.messageRu,
+    },
   });
 
   logger.info({ announcementId: announcement!.id, sentCount, admin: c.get('address') }, 'admin: announcement sent');

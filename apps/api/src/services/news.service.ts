@@ -9,6 +9,7 @@ import { newsPosts } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { configService } from './config.service.js';
+import { translationService } from './translation.service.js';
 
 export interface NewsFeedItem {
   id: string;
@@ -25,6 +26,7 @@ class NewsService {
     cursor?: string;
     limit?: number;
     types?: string[];
+    lang?: 'en' | 'ru';
   } = {}): Promise<{ items: NewsFeedItem[]; nextCursor: string | null }> {
     const db = getDb();
     const limit = options.limit ?? 20;
@@ -41,12 +43,23 @@ class NewsService {
     const unionParts: ReturnType<typeof sql>[] = [];
 
     if (allowedTypes.includes('news_post')) {
+      const titleExpr = options.lang === 'en'
+        ? sql`COALESCE(np.title_en, np.title)`
+        : options.lang === 'ru'
+          ? sql`COALESCE(np.title_ru, np.title)`
+          : sql`np.title`;
+      const contentExpr = options.lang === 'en'
+        ? sql`COALESCE(np.content_en, np.content)`
+        : options.lang === 'ru'
+          ? sql`COALESCE(np.content_ru, np.content)`
+          : sql`np.content`;
+
       unionParts.push(sql`
         SELECT
           'post_' || np.id AS id,
           'news_post' AS type,
-          np.title AS title,
-          np.content AS content,
+          ${titleExpr} AS title,
+          ${contentExpr} AS content,
           np.published_at AS ts,
           jsonb_build_object('priority', np.priority, 'type', np.type) AS metadata
         FROM news_posts np
@@ -55,12 +68,23 @@ class NewsService {
     }
 
     if (allowedTypes.includes('announcement')) {
+      const annTitleExpr = options.lang === 'en'
+        ? sql`COALESCE(a.title_en, a.title)`
+        : options.lang === 'ru'
+          ? sql`COALESCE(a.title_ru, a.title)`
+          : sql`a.title`;
+      const annMsgExpr = options.lang === 'en'
+        ? sql`COALESCE(a.message_en, a.message)`
+        : options.lang === 'ru'
+          ? sql`COALESCE(a.message_ru, a.message)`
+          : sql`a.message`;
+
       unionParts.push(sql`
         SELECT
           'ann_' || a.id AS id,
           'announcement' AS type,
-          a.title AS title,
-          a.message AS content,
+          ${annTitleExpr} AS title,
+          ${annMsgExpr} AS content,
           a.created_at AS ts,
           jsonb_build_object(
             'priority', a.priority,
@@ -167,6 +191,10 @@ class NewsService {
 
   async createPost(data: { type: string; title: string; content: string; priority?: string; isPublished?: number }) {
     const db = getDb();
+
+    // Auto-translate
+    const i18n = await translationService.translateContent(data.title, data.content);
+
     const [row] = await db
       .insert(newsPosts)
       .values({
@@ -175,6 +203,10 @@ class NewsService {
         content: data.content,
         priority: data.priority ?? 'normal',
         isPublished: data.isPublished ?? 1,
+        titleEn: i18n.titleEn,
+        titleRu: i18n.titleRu,
+        contentEn: i18n.contentEn,
+        contentRu: i18n.contentRu,
       })
       .returning();
     return row!;
@@ -182,9 +214,32 @@ class NewsService {
 
   async updatePost(id: string, data: { title?: string; content?: string; priority?: string; isPublished?: number }) {
     const db = getDb();
+
+    // Re-translate if title or content changed
+    let i18n: { titleEn: string; titleRu: string; contentEn: string; contentRu: string } | null = null;
+    if (data.title || data.content) {
+      // Need both values for translation — fetch current if one is missing
+      let title = data.title;
+      let content = data.content;
+      if (!title || !content) {
+        const [existing] = await db.select({ title: newsPosts.title, content: newsPosts.content }).from(newsPosts).where(eq(newsPosts.id, id)).limit(1);
+        if (existing) {
+          title = title ?? existing.title;
+          content = content ?? existing.content;
+        }
+      }
+      if (title && content) {
+        i18n = await translationService.translateContent(title, content);
+      }
+    }
+
     await db
       .update(newsPosts)
-      .set({ ...data, updatedAt: new Date() })
+      .set({
+        ...data,
+        updatedAt: new Date(),
+        ...(i18n ? { titleEn: i18n.titleEn, titleRu: i18n.titleRu, contentEn: i18n.contentEn, contentRu: i18n.contentRu } : {}),
+      })
       .where(eq(newsPosts.id, id));
   }
 

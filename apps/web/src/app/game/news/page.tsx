@@ -19,7 +19,7 @@ const FILTER_OPTIONS: Array<{ value: string; labelKey: string; icon: typeof News
 ];
 
 export default function NewsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { isConnected } = useWalletContext();
   const [filter, setFilter] = useState('');
   const [showSponsored, setShowSponsored] = useState(false);
@@ -30,7 +30,7 @@ export default function NewsPage() {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = useNewsFeed(filter || undefined);
+  } = useNewsFeed(filter || undefined, locale);
 
   const allItems = useMemo(
     () => data?.pages.flatMap((p) => p.data) ?? [],

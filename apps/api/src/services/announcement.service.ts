@@ -14,6 +14,7 @@ import { AppError } from '../lib/errors.js';
 import { configService } from './config.service.js';
 import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
+import { translationService } from './translation.service.js';
 
 class AnnouncementService {
   /** Get sponsored announcement config */
@@ -64,6 +65,9 @@ class AnnouncementService {
 
     const db = getDb();
 
+    // Auto-translate
+    const i18n = await translationService.translateAnnouncement(title, message);
+
     // Insert announcement with pending status — refund on failure
     let ann: { id: string } | undefined;
     try {
@@ -77,6 +81,10 @@ class AnnouncementService {
           status: 'pending',
           scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
           pricePaid: config.price,
+          titleEn: i18n.titleEn,
+          titleRu: i18n.titleRu,
+          messageEn: i18n.messageEn,
+          messageRu: i18n.messageRu,
         })
         .returning({ id: announcements.id });
       ann = row;
@@ -238,6 +246,10 @@ class AnnouncementService {
         priority: ann.priority,
         sponsorAddress,
         sponsorNickname,
+        titleEn: ann.titleEn,
+        titleRu: ann.titleRu,
+        messageEn: ann.messageEn,
+        messageRu: ann.messageRu,
       },
     });
   }

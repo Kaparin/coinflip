@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingNotifications, useMarkNotificationRead, type Notification } from '@/hooks/use-notifications';
+import { useTranslation } from '@/lib/i18n';
 import { JackpotWinModal } from './jackpot-win-modal';
 import { AnnouncementModal } from './announcement-modal';
 import { EventStartModal } from './event-start-modal';
@@ -34,6 +35,10 @@ interface QueuedNotification {
   priority?: 'normal' | 'important' | 'sponsored';
   sponsorAddress?: string;
   sponsorNickname?: string;
+  titleEn?: string;
+  titleRu?: string;
+  messageEn?: string;
+  messageRu?: string;
   // event_started fields
   eventId?: string;
   eventType?: string;
@@ -42,8 +47,21 @@ interface QueuedNotification {
   endsAt?: string;
 }
 
+/** Pick locale-aware text from i18n fields with fallback */
+function pickLocalized(
+  locale: string,
+  original: string | undefined,
+  en?: string,
+  ru?: string,
+): string {
+  if (locale === 'en' && en) return en;
+  if (locale === 'ru' && ru) return ru;
+  return original ?? '';
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { isConnected, address } = useWalletContext();
+  const { locale } = useTranslation();
   const { data: pendingNotifications } = usePendingNotifications(isConnected);
   const markRead = useMarkNotificationRead();
 
@@ -123,6 +141,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           priority: (data.priority as 'normal' | 'important' | 'sponsored') ?? 'normal',
           sponsorAddress: data.sponsorAddress ? String(data.sponsorAddress) : undefined,
           sponsorNickname: data.sponsorNickname ? String(data.sponsorNickname) : undefined,
+          titleEn: data.titleEn ? String(data.titleEn) : undefined,
+          titleRu: data.titleRu ? String(data.titleRu) : undefined,
+          messageEn: data.messageEn ? String(data.messageEn) : undefined,
+          messageRu: data.messageRu ? String(data.messageRu) : undefined,
         },
       ]);
     } else if (event.type === 'event_started') {
@@ -194,8 +216,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         <AnnouncementModal
           open={true}
           onDismiss={handleDismiss}
-          title={current.title ?? ''}
-          message={current.message ?? ''}
+          title={pickLocalized(locale, current.title, current.titleEn, current.titleRu)}
+          message={pickLocalized(locale, current.message, current.messageEn, current.messageRu)}
           priority={current.priority ?? 'normal'}
           sponsorAddress={current.sponsorAddress}
           sponsorNickname={current.sponsorNickname}

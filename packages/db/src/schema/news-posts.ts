@@ -12,6 +12,11 @@ export const newsPosts = pgTable(
     publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // i18n columns
+    titleEn: text('title_en'),
+    titleRu: text('title_ru'),
+    contentEn: text('content_en'),
+    contentRu: text('content_ru'),
   },
   (table) => [
     index('news_posts_published_idx').on(table.isPublished, table.publishedAt),
