@@ -285,10 +285,12 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     return bets.filter((bet) => {
       // Hide own bets from Open Bets — they are managed in My Bets tab
       if (bet.maker === address) return false;
-      // Hide bets that user just accepted — UNLESS it has an active duel (stays in place, flips)
       const betId = String(bet.id);
-      if (recentlyAcceptedIds.has(betId) && !(activeDuels?.has(betId))) return false;
-      // Hide stale 'accepting' bets with no active duel (server processed, duel ended)
+      // Keep recently-accepted bets visible so FlipCard can animate the 3D flip
+      // when the duel arrives via WS. Don't hide them prematurely.
+      if (recentlyAcceptedIds.has(betId)) return true;
+      // Hide stale 'accepting' bets with no active duel (from before page load, or duel ended).
+      // recentlyAcceptedIds above protects this-session accepts from being filtered.
       if (bet.status === 'accepting' && !activeDuels?.has(betId)) return false;
       // Hide expired bets (past their expiry time)
       const expiresAt = (bet as any).expires_at;
@@ -502,7 +504,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
                     isMine={isMyBet}
                     pendingBetId={pendingBetId}
                     pendingAction={pendingAction}
-                    onAccept={isMyBet || !isConnected ? undefined : handleAcceptClick}
+                    onAccept={isMyBet || !isConnected || recentlyAcceptedIds.has(betId) ? undefined : handleAcceptClick}
                     onCancel={isMyBet ? handleCancelClick : undefined}
                   />
                 }
