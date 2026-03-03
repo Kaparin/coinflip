@@ -90,6 +90,14 @@ authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
 
   logger.info({ address: normalizedAddress }, 'Wallet authenticated via signature');
 
+  // Auto-assign to admin referrer if user has no referral link.
+  // (Frontend registerCapturedRef handles explicit ref codes; this covers the no-code case.)
+  setTimeout(() => {
+    referralService.autoAssignDefaultReferrer(user.id).catch((err) => {
+      logger.warn({ err, userId: user.id }, 'Failed to auto-assign default referrer after verify');
+    });
+  }, 5000);
+
   // Return token in body too — iOS Safari blocks third-party cookies (ITP),
   // so the frontend stores this token and sends it as Authorization: Bearer header.
   return c.json({
