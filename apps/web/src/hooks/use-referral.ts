@@ -100,6 +100,17 @@ export async function registerCapturedRef(): Promise<boolean> {
     localStorage.removeItem(REF_STORAGE_KEY);
     return true;
   }
+
+  // If user already has a referrer, clear the stored code (no point retrying)
+  try {
+    const json = await res.json();
+    if (json?.error?.code === 'ALREADY_HAS_REFERRER') {
+      localStorage.removeItem(REF_STORAGE_KEY);
+    }
+  } catch {
+    // ignore parse error
+  }
+
   return false;
 }
 
@@ -220,31 +231,45 @@ export function useReferral(isConnected: boolean) {
     setLoading(false);
   }, [isConnected, fetchCode, fetchStats, fetchRewards, fetchInvites]);
 
-  const claim = useCallback(async (): Promise<{ ok: boolean; amount?: string; error?: string }> => {
+  const claim = useCallback(async (): Promise<{ ok: boolean; amount?: string; error?: string; errorCode?: string }> => {
     setClaiming(true);
     try {
       const walletAddress = getWalletAddress();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60_000); // 60s timeout for on-chain tx
+
       const res = await fetch(`${API_URL}/api/v1/referral/claim`, {
         method: 'POST',
         credentials: 'include',
+        signal: controller.signal,
         headers: {
           ...(walletAddress ? { 'x-wallet-address': walletAddress } : {}),
           ...getAuthHeaders(),
         },
       });
+      clearTimeout(timeout);
+
       if (res.ok) {
         const json = await res.json();
-        await fetchStats();
+        // Refresh both stats and rewards after successful claim
+        await Promise.all([fetchStats(), fetchRewards()]);
         return { ok: true, amount: json?.data?.claimed };
       }
       const json = await res.json().catch(() => null);
-      return { ok: false, error: json?.error?.message ?? 'Claim failed' };
-    } catch {
+      return {
+        ok: false,
+        error: json?.error?.message ?? 'Claim failed',
+        errorCode: json?.error?.code,
+      };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return { ok: false, error: 'Claim timed out. Your balance is safe — please try again.' };
+      }
       return { ok: false, error: 'Network error' };
     } finally {
       setClaiming(false);
     }
-  }, [fetchStats]);
+  }, [fetchStats, fetchRewards]);
 
   useEffect(() => {
     if (isConnected) refresh();
@@ -281,6 +306,7 @@ export interface ReferralConfig {
   level3Bps: number;
   maxBps: number;
   changeBranchCostMicro: string;
+  minimumClaimMicro: string;
 }
 
 export async function fetchReferralConfig(): Promise<ReferralConfig | null> {

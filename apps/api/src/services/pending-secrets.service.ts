@@ -121,14 +121,14 @@ class PendingSecretsService {
    */
   async cleanup(maxAgeMs = 24 * 60 * 60 * 1000): Promise<number> {
     try {
-      const cutoff = new Date(Date.now() - maxAgeMs);
+      const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
       const { sql: sqlTag } = await import('drizzle-orm');
       const { bets } = await import('@coinflip/db/schema');
 
       // Only delete old secrets where no bet needs them
       const result = await this.db.delete(pendingBetSecrets)
         .where(
-          sqlTag`${pendingBetSecrets.createdAt} < ${cutoff}
+          sqlTag`${pendingBetSecrets.createdAt} < ${cutoff}::timestamptz
             AND NOT EXISTS (
               SELECT 1 FROM ${bets}
               WHERE ${bets.commitment} = ${pendingBetSecrets.commitment}

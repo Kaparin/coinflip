@@ -814,7 +814,12 @@ export function BalanceDisplay() {
 
       {/* ===== Deposit Modal ===== */}
       {showDeposit && (
-        <Modal open onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit} showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting'}>
+        <Modal
+          open
+          onClose={depositStatus === 'signing' || depositStatus === 'broadcasting' ? () => {} : resetDeposit}
+          showCloseButton={depositStatus !== 'signing' && depositStatus !== 'broadcasting'}
+          closeOnOverlayClick={false}
+        >
           <div className="p-5 max-w-sm w-full">
             {depositStatus === 'success' ? (
               <div className="text-center py-4 animate-fade-up">
@@ -939,6 +944,7 @@ export function BalanceDisplay() {
           open
           onClose={(withdrawMutation.isPending || withdrawStatus === 'signing') ? () => {} : () => { setShowWithdraw(false); setWithdrawAmount(''); setWithdrawStatus('idle'); setWithdrawError(''); setWithdrawErrorTxHash(null); }}
           showCloseButton={!withdrawMutation.isPending && withdrawStatus !== 'signing'}
+          closeOnOverlayClick={false}
         >
           <div className="p-5 max-w-sm w-full">
             {withdrawStatus === 'success' ? (

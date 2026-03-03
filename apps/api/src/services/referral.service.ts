@@ -1,4 +1,4 @@
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, or, sql, desc, gte } from 'drizzle-orm';
 import {
   referralCodes,
   referrals,
@@ -6,6 +6,7 @@ import {
   referralBalances,
   users,
   vaultBalances,
+  bets,
 } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
@@ -56,9 +57,10 @@ export class ReferralService {
    * Used by frontend to display dynamic percentages.
    */
   async getPublicConfig() {
-    const [config, branchCost] = await Promise.all([
+    const [config, branchCost, minimumClaim] = await Promise.all([
       getRewardConfig(),
       configService.getString('CHANGE_BRANCH_COST_MICRO', DEFAULT_CHANGE_BRANCH_COST_MICRO),
+      configService.getString('MINIMUM_CLAIM_AMOUNT_MICRO', '10000000'),
     ]);
     return {
       level1Bps: Number(config.bpsByLevel[1]),
@@ -66,6 +68,7 @@ export class ReferralService {
       level3Bps: Number(config.bpsByLevel[3]),
       maxBps: Number(config.maxBps),
       changeBranchCostMicro: branchCost,
+      minimumClaimMicro: minimumClaim,
     };
   }
 
@@ -94,27 +97,27 @@ export class ReferralService {
 
   /**
    * Register a referral: link a new user to their referrer via code.
-   * Returns true if registered, false if already has a referrer or code invalid.
+   * Returns { success, reason } with specific error codes.
    */
-  async registerReferral(userId: string, code: string): Promise<boolean> {
+  async registerReferral(userId: string, code: string): Promise<{ success: boolean; reason?: string }> {
     const codeRow = await this.db.query.referralCodes.findFirst({
       where: eq(referralCodes.code, code.toUpperCase()),
     });
-    if (!codeRow) return false;
+    if (!codeRow) return { success: false, reason: 'INVALID_CODE' };
 
     // Prevent self-referral
-    if (codeRow.ownerUserId === userId) return false;
+    if (codeRow.ownerUserId === userId) return { success: false, reason: 'SELF_REFERRAL' };
 
     // Check if user already has a referrer
     const existing = await this.db.query.referrals.findFirst({
       where: eq(referrals.userId, userId),
     });
-    if (existing) return false;
+    if (existing) return { success: false, reason: 'ALREADY_HAS_REFERRER' };
 
     // Prevent cycles: walk up referrer's chain to ensure userId is not an ancestor
     if (await this._wouldCreateCycle(userId, codeRow.ownerUserId)) {
       logger.warn({ userId, referrerId: codeRow.ownerUserId }, 'Referral registration blocked — would create cycle');
-      return false;
+      return { success: false, reason: 'WOULD_CREATE_CYCLE' };
     }
 
     try {
@@ -136,9 +139,9 @@ export class ReferralService {
       }
 
       logger.info({ userId, referrerId: codeRow.ownerUserId, code }, 'Referral registered');
-      return true;
+      return { success: true };
     } catch {
-      return false; // Unique constraint violation
+      return { success: false, reason: 'ALREADY_HAS_REFERRER' }; // Unique constraint violation
     }
   }
 
@@ -387,6 +390,28 @@ export class ReferralService {
   }
 
   /**
+   * Count resolved bets between a pair of users in the last 24 hours.
+   * Used for wash-trading detection.
+   */
+  private async _getPairBetCount24h(userA: string, userB: string): Promise<number> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(bets)
+      .where(
+        and(
+          sql`${bets.status} IN ('revealed', 'timeout_claimed')`,
+          gte(bets.resolvedTime, sql`${cutoff}::timestamptz`),
+          or(
+            and(eq(bets.makerUserId, userA), eq(bets.acceptorUserId, userB)),
+            and(eq(bets.makerUserId, userB), eq(bets.acceptorUserId, userA)),
+          ),
+        ),
+      );
+    return row?.count ?? 0;
+  }
+
+  /**
    * Check if setting referrerId as the referrer of userId would create a cycle.
    * Walks up referrerId's chain to ensure userId doesn't appear as an ancestor.
    */
@@ -465,6 +490,17 @@ export class ReferralService {
 
     if (existingRewards.length > 0) {
       logger.debug({ betId: betIdStr }, `${tag} — rewards already distributed, skipping (idempotent)`);
+      return;
+    }
+
+    // ─── Anti-wash-trading: skip rewards if pair exceeded daily bet limit ───
+    const washLimit = await configService.getNumber('WASH_TRADE_PAIR_DAILY_LIMIT', 20);
+    const pairCount = await this._getPairBetCount24h(makerUserId, acceptorUserId);
+    if (pairCount > washLimit) {
+      logger.warn(
+        { betId: betIdStr, makerUserId, acceptorUserId, pairCount, washLimit },
+        `${tag} — wash-trading detected, skipping referral rewards`,
+      );
       return;
     }
 

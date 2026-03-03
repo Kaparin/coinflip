@@ -349,18 +349,42 @@ export class RelayerService {
           return result;
         }
 
-        // Step 2: Poll for tx inclusion with timeout
+        // Step 2: Poll for tx inclusion with timeout (dual-channel: RPC + REST)
         const pollStartTime = Date.now();
-        const maxPollMs = 25_000; // 25 seconds — covers 3+ Axiome blocks
+        const maxPollMs = 30_000; // 30 seconds — covers 4+ Axiome blocks
         const pollIntervalMs = 2_000;
         let txResult: { code: number; rawLog: string; height: number; events: unknown[] } | null = null;
 
         while (Date.now() - pollStartTime < maxPollMs) {
           await new Promise(r => setTimeout(r, pollIntervalMs));
-          try {
-            const txRes = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`);
-            if (txRes.ok) {
-              const txData = await txRes.json() as {
+
+          // Try Tendermint RPC (fast) and LCD REST (fallback) in parallel
+          const [rpcResult, restResult] = await Promise.all([
+            // Tendermint RPC — reads block store directly, faster than LCD indexer
+            fetch(`${env.AXIOME_RPC_URL}/tx?hash=${txHash.startsWith('0x') ? txHash : `0x${txHash}`}`, {
+              signal: AbortSignal.timeout(3000),
+            }).then(async (res) => {
+              if (!res.ok) return null;
+              const data = await res.json() as {
+                result?: {
+                  tx_result?: { code: number; log?: string; events?: Array<{ type: string; attributes: Array<{ key: string; value: string }> }> };
+                  height?: string;
+                };
+              };
+              if (data.result?.tx_result) {
+                return {
+                  code: data.result.tx_result.code,
+                  rawLog: data.result.tx_result.log ?? '',
+                  height: Number(data.result.height ?? 0),
+                  events: data.result.tx_result.events ?? [],
+                };
+              }
+              return null;
+            }).catch(() => null),
+            // LCD REST — slower but more reliable
+            chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`).then(async (res) => {
+              if (!res.ok) return null;
+              const txData = await res.json() as {
                 tx_response?: {
                   code: number;
                   raw_log?: string;
@@ -369,18 +393,19 @@ export class RelayerService {
                 };
               };
               if (txData.tx_response) {
-                txResult = {
+                return {
                   code: txData.tx_response.code,
                   rawLog: txData.tx_response.raw_log ?? '',
                   height: Number(txData.tx_response.height ?? 0),
                   events: txData.tx_response.events ?? [],
                 };
-                break;
               }
-            }
-          } catch {
-            // tx not yet indexed — keep polling
-          }
+              return null;
+            }).catch(() => null),
+          ]);
+
+          txResult = rpcResult ?? restResult;
+          if (txResult) break;
         }
 
         if (!txResult) {

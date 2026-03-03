@@ -55,7 +55,7 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
   const [localError, setLocalError] = useState('');
 
   // "Who invited you?" state — only shown on 'confirm' step when wallet has no referrer
-  const [inviterOpen, setInviterOpen] = useState(false);
+  const [inviterOpen, setInviterOpen] = useState(true);
   const [inviterAddr, setInviterAddr] = useState('');
   const [inviterStatus, setInviterStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [inviterError, setInviterError] = useState('');
@@ -80,7 +80,17 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
     setStep('success');
 
     if (inviterAddr.trim() && !hasRefCode) {
-      registerByAddress(inviterAddr.trim()).catch(() => {});
+      registerByAddress(inviterAddr.trim())
+        .then((res) => {
+          if (res.ok) {
+            console.info('[ConnectWallet] Referral registered successfully');
+          } else {
+            console.warn('[ConnectWallet] Referral registration failed:', res.reason);
+          }
+        })
+        .catch((err) => {
+          console.warn('[ConnectWallet] Referral registration error:', err);
+        });
     }
 
     setMnemonic('');
@@ -174,10 +184,23 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
 
   /** Confirm and connect — the useEffect above handles success/close */
   const handleConfirmConnect = useCallback(async () => {
+    // Validate inviter address format before connecting (if provided)
+    const trimmedInviter = inviterAddr.trim();
+    if (trimmedInviter && !hasRefCode) {
+      if (!trimmedInviter.startsWith('axm1') || trimmedInviter.length < 20) {
+        setInviterError(t('auth.inviterNotFound'));
+        return;
+      }
+      // Prevent self-referral client-side
+      if (derivedAddress && trimmedInviter.toLowerCase() === derivedAddress.toLowerCase()) {
+        setInviterError(t('auth.inviterSelf'));
+        return;
+      }
+    }
     isInFlightRef.current = true;
     const cleanMnemonic = mnemonicWords.join(' ');
     await connectWithMnemonic(cleanMnemonic, pin, rememberMe);
-  }, [mnemonicWords, pin, rememberMe, connectWithMnemonic]);
+  }, [mnemonicWords, pin, rememberMe, connectWithMnemonic, inviterAddr, hasRefCode, derivedAddress, t]);
 
   /** Unlock saved wallet — the useEffect above handles success/close */
   const handleUnlock = useCallback(async () => {
@@ -438,21 +461,27 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
 
                 {/* "Who invited you?" — only for new wallets without a referrer and no ref code from URL */}
                 {!hasRefCode && !derivedHasReferrer && (
-                  <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
+                  <div className={`rounded-xl border overflow-hidden ${inviterOpen ? 'border-amber-500/40 bg-amber-500/5' : 'border-[var(--color-border)]'}`}>
                     <button
                       type="button"
                       onClick={() => setInviterOpen((v) => !v)}
-                      className="flex w-full items-center justify-between px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/10 transition-colors"
+                      className="flex w-full items-center justify-between px-3 py-2.5 text-xs font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/10 transition-colors"
                     >
                       <span className="flex items-center gap-2">
-                        <UserPlus size={14} />
+                        <UserPlus size={14} className="text-amber-500" />
                         {t('auth.whoInvited')}
                       </span>
                       <ChevronDown size={14} className={`transition-transform ${inviterOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {inviterOpen && (
-                      <div className="px-3 pb-3 space-y-2 border-t border-[var(--color-border)]">
-                        <p className="text-[10px] text-[var(--color-text-secondary)] pt-2">
+                      <div className="px-3 pb-3 space-y-2 border-t border-amber-500/20">
+                        <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 mt-2">
+                          <Shield size={14} className="text-amber-500 shrink-0" />
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                            {t('auth.autoAssignWarning')}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-[var(--color-text-secondary)]">
                           {t('auth.whoInvitedHint')}
                         </p>
                         <input
@@ -468,9 +497,6 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                           autoComplete="off"
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs font-mono placeholder:text-[var(--color-text-secondary)]/40 focus:border-[var(--color-primary)] focus:outline-none"
                         />
-                        <p className="text-[9px] text-[var(--color-text-secondary)]">
-                          {t('auth.inviterOptional')}
-                        </p>
                         {inviterError && (
                           <p className="text-[10px] text-[var(--color-danger)]">{inviterError}</p>
                         )}

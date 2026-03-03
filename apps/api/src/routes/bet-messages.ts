@@ -51,17 +51,23 @@ betMessagesRouter.get('/:betId/messages', async (c) => {
   if (!/^\d+$/.test(raw)) throw new AppError('BET_NOT_FOUND', 'Bet not found', 404);
   const betId = BigInt(raw);
 
-  const messages = await betMessagesService.getMessages(betId);
+  try {
+    const messages = await betMessagesService.getMessages(betId);
 
-  return c.json({
-    data: messages.map((m) => ({
-      id: m.id,
-      bet_id: m.betId.toString(),
-      user_id: m.userId,
-      address: m.address,
-      nickname: m.nickname,
-      message: m.message,
-      created_at: m.createdAt.toISOString(),
-    })),
-  });
+    return c.json({
+      data: messages.map((m) => ({
+        id: m.id,
+        bet_id: m.betId.toString(),
+        user_id: m.userId,
+        address: m.address,
+        nickname: m.nickname ?? undefined,
+        message: m.message,
+        created_at: m.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error({ err, betId: betId.toString() }, 'Failed to fetch bet messages');
+    throw new AppError('INTERNAL_ERROR', 'Failed to fetch messages', 500);
+  }
 });

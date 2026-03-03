@@ -659,6 +659,11 @@ body {
 .flip-card-face-visible {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  /* Isolate nested 3D (e.g. duel coin) from flip-card 3D context.
+     Prevents iOS Safari bug where nested preserve-3d breaks backface-visibility. */
+  transform-style: flat;
+  visibility: visible;
+  transition: visibility 0s 0s;
 }
 /* Hidden face — absolute positioned, doesn't affect height */
 .flip-card-face-hidden {
@@ -668,7 +673,12 @@ body {
   width: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transform-style: flat;
   pointer-events: none;
+  /* Belt-and-suspenders: hide after flip animation completes (0.8s matches transition).
+     Fixes iOS Safari where backface-visibility is ignored with nested 3D contexts. */
+  visibility: hidden;
+  transition: visibility 0s 0.8s;
 }
 /* Back face is rotated 180deg so it's invisible by default */
 .flip-card-back {

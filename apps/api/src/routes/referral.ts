@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { referralService, ReferralService } from '../services/referral.service.js';
 import { treasuryService } from '../services/treasury.service.js';
+import { configService } from '../services/config.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getChainVaultBalance, invalidateBalanceCache } from './vault.js';
 import { relayerService } from '../services/relayer.js';
@@ -74,10 +75,18 @@ const RegisterSchema = z.object({ code: z.string().min(1).max(20) });
 referralRouter.post('/register', authMiddleware, walletTxRateLimit, zValidator('json', RegisterSchema), async (c) => {
   const userId = c.get('user').id;
   const { code } = c.req.valid('json');
-  const success = await referralService.registerReferral(userId, code);
+  const result = await referralService.registerReferral(userId, code);
 
-  if (!success) {
-    return c.json({ error: { code: 'INVALID_CODE', message: 'Invalid code or already registered' } }, 400);
+  if (!result.success) {
+    const messages: Record<string, string> = {
+      INVALID_CODE: 'Invalid referral code',
+      SELF_REFERRAL: 'Cannot refer yourself',
+      ALREADY_HAS_REFERRER: 'You already have a referrer',
+      WOULD_CREATE_CYCLE: 'This referral would create a circular chain',
+    };
+    return c.json({
+      error: { code: result.reason, message: messages[result.reason!] ?? 'Failed to register' },
+    }, 400);
   }
   return c.json({ data: { registered: true } });
 });
@@ -318,6 +327,19 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
 
   let amount: string | null = null;
   try {
+  // Step 0: Check minimum claim threshold
+  const balance = await referralService.getBalance(userId);
+  const minimumClaimMicro = await configService.getNumber('MINIMUM_CLAIM_AMOUNT_MICRO', 10_000_000);
+  if (BigInt(balance.unclaimed) < BigInt(minimumClaimMicro)) {
+    const minCoin = (minimumClaimMicro / 1_000_000).toString();
+    return c.json({
+      error: {
+        code: 'BELOW_MINIMUM_CLAIM',
+        message: `Minimum claim amount is ${minCoin} COIN. Keep playing to accumulate more rewards.`,
+      },
+    }, 400);
+  }
+
   // Step 1: Atomically zero out unclaimed balance in DB
   amount = await referralService.claimRewards(userId);
 
@@ -393,14 +415,26 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
       'Referral claim: CW20 transfer to user FAILED — attempting to re-deposit to vault',
     );
 
-    // Best-effort: re-deposit tokens back to treasury vault
+    // Best-effort: re-deposit tokens back to treasury vault via CW20 Send
     try {
-      await relayerService.relayDeposit(treasuryAddr);
-      logger.info({ amount, treasuryAddr }, 'Referral claim: tokens re-deposited to treasury vault');
+      const reDepositResult = await relayerService.submitExecOnContract(
+        treasuryAddr,
+        cw20Addr,
+        { send: { contract: env.COINFLIP_CONTRACT_ADDR, amount, msg: btoa(JSON.stringify({ deposit: {} })) } },
+        'CoinFlip referral claim refund',
+      );
+      if (reDepositResult.success) {
+        logger.info({ txHash: reDepositResult.txHash, amount, treasuryAddr }, 'Referral claim: tokens re-deposited to treasury vault');
+      } else {
+        logger.error(
+          { reDepositResult, amount, treasuryAddr },
+          'Referral claim: re-deposit FAILED — tokens remain in treasury wallet, needs manual resolution',
+        );
+      }
     } catch (reDepositErr) {
       logger.error(
         { err: reDepositErr, amount, treasuryAddr },
-        'Referral claim: re-deposit ALSO failed — tokens remain in treasury wallet, needs manual resolution',
+        'Referral claim: re-deposit threw — tokens remain in treasury wallet, needs manual resolution',
       );
     }
 

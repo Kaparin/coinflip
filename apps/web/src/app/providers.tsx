@@ -62,7 +62,11 @@ function WalletModalBridge({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isConnected && !registeredRef.current) {
       registeredRef.current = true;
-      registerCapturedRef();
+      registerCapturedRef().catch((err) => {
+        console.warn('[Providers] Failed to register captured ref code:', err);
+        // Allow retry on next connect
+        registeredRef.current = false;
+      });
     }
   }, [isConnected]);
 

@@ -96,7 +96,7 @@ authRouter.post('/verify', zValidator('json', VerifySchema), async (c) => {
     referralService.autoAssignDefaultReferrer(user.id).catch((err) => {
       logger.warn({ err, userId: user.id }, 'Failed to auto-assign default referrer after verify');
     });
-  }, 5000);
+  }, 2000);
 
   // Return token in body too — iOS Safari blocks third-party cookies (ITP),
   // so the frontend stores this token and sends it as Authorization: Bearer header.
@@ -264,7 +264,7 @@ authRouter.post('/connect', zValidator('json', ConnectRequestSchema), async (c) 
     referralService.autoAssignDefaultReferrer(user.id).catch((err) => {
       logger.warn({ err, userId: user.id }, 'Failed to auto-assign default referrer');
     });
-  }, 5000);
+  }, 2000);
 
   // SECURITY: Only set session cookie in development.
   // In production, clients MUST use /auth/challenge + /auth/verify (signature-based).

@@ -430,7 +430,8 @@
     "inviterNotFound": "User with this address not found",
     "inviterSelf": "Cannot enter your own address",
     "inviterRegistered": "Referral registered!",
-    "inviterAlready": "You already have a referrer"
+    "inviterAlready": "You already have a referrer",
+    "autoAssignWarning": "If you don't specify who invited you, you'll be automatically placed in the default referral branch."
   },
   "onboarding": {
     "enableTitle": "Activate Game Account",
@@ -719,6 +720,7 @@
     "nothingToClaim": "Nothing to claim",
     "claimSuccess": "Rewards sent to your wallet!",
     "claimFailed": "Failed to claim rewards. Please try again.",
+    "belowMinimumClaim": "Minimum claim amount is {min} COIN. Keep playing to accumulate more rewards.",
     "level": "Level {level}",
     "levelDesc1": "Direct invite",
     "levelDesc2": "Level 2 referral",

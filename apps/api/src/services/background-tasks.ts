@@ -32,11 +32,48 @@ interface TxPollResult {
   events: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
 }
 
-/** Poll chain REST API for tx inclusion by hash. Returns result or null.
+/**
+ * Query tx via Tendermint RPC (port 26657) — typically faster than LCD REST
+ * because it reads from the block store directly, bypassing the LCD indexer.
+ */
+async function queryTxViaRpc(txHash: string): Promise<TxPollResult | null> {
+  try {
+    // Tendermint RPC expects 0x-prefixed hex hash
+    const hash = txHash.startsWith('0x') ? txHash : `0x${txHash}`;
+    const res = await fetch(`${env.AXIOME_RPC_URL}/tx?hash=${hash}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      result?: {
+        tx_result?: {
+          code: number;
+          log?: string;
+          events?: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
+        };
+        height?: string;
+      };
+    };
+    if (data.result?.tx_result) {
+      return {
+        found: true,
+        code: data.result.tx_result.code,
+        rawLog: data.result.tx_result.log ?? '',
+        height: Number(data.result.height ?? 0),
+        events: data.result.tx_result.events ?? [],
+      };
+    }
+  } catch {
+    // RPC unavailable — fall through to REST
+  }
+  return null;
+}
+
+/** Poll chain for tx inclusion by hash using dual-channel: Tendermint RPC (fast) + LCD REST (fallback).
  *  Uses progressive intervals: starts fast (500ms) and backs off to cap. */
 async function pollForTx(
   txHash: string,
-  maxMs = 25_000,
+  maxMs = 40_000,
   startIntervalMs = 500,
 ): Promise<TxPollResult | null> {
   const start = Date.now();
@@ -51,11 +88,13 @@ async function pollForTx(
     }
     first = false;
 
-    try {
-      const res = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`, {
+    // Try both channels in parallel — whichever finds the tx first wins
+    const [rpcResult, restResult] = await Promise.all([
+      queryTxViaRpc(txHash),
+      chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`, {
         signal: AbortSignal.timeout(3000),
-      });
-      if (res.ok) {
+      }).then(async (res) => {
+        if (!res.ok) return null;
         const data = await res.json() as {
           tx_response?: {
             code: number;
@@ -71,12 +110,14 @@ async function pollForTx(
             rawLog: data.tx_response.raw_log ?? '',
             height: Number(data.tx_response.height ?? 0),
             events: data.tx_response.events ?? [],
-          };
+          } as TxPollResult;
         }
-      }
-    } catch {
-      // Not indexed yet — keep polling
-    }
+        return null;
+      }).catch(() => null),
+    ]);
+
+    if (rpcResult) return rpcResult;
+    if (restResult) return restResult;
   }
 
   return null;
@@ -382,6 +423,19 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
                 invalidateBalanceCache(address);
                 return;
               }
+
+              // Second attempt: poll chain REST one more time (LCD indexer might be lagging)
+              const retryResult = await pollForTx(txHash, 15_000);
+              if (retryResult?.found && retryResult.code === 0) {
+                const syncedRetry = await syncBetFromChain(betId);
+                if (syncedRetry) {
+                  logger.info({ betId: betId.toString() }, `${tag} — synced on retry after extended timeout`);
+                  if (pendingLockId) removePendingLock(address, pendingLockId);
+                  invalidateBalanceCache(address);
+                  return;
+                }
+              }
+
               // Not resolved — revert
               if (pendingLockId) removePendingLock(address, pendingLockId);
               const reverted = await betService.revertAccepting(betId).catch(() => null);
@@ -402,7 +456,7 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
           } catch (err) {
             logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
           }
-        }, 30_000);
+        }, 60_000);
 
         return;
       }
