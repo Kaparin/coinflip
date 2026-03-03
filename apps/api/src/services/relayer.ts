@@ -482,6 +482,27 @@ export class RelayerService {
           continue;
         }
 
+        // Connection / RPC errors — reconnect client and retry
+        const isConnectionError =
+          errorMsg.includes('ECONNREFUSED') ||
+          errorMsg.includes('ECONNRESET') ||
+          errorMsg.includes('ETIMEDOUT') ||
+          errorMsg.includes('socket hang up') ||
+          errorMsg.includes('fetch failed') ||
+          errorMsg.includes('network error') ||
+          errorMsg.includes('Failed to fetch') ||
+          errorMsg.includes('WebSocket') ||
+          errorMsg.includes('Could not establish connection');
+        if (attempt < 2 && isConnectionError) {
+          logger.warn({ errorMsg, attempt }, 'RPC connection error — reconnecting client and retrying');
+          try {
+            await this.reconnectClient();
+          } catch (reconnectErr) {
+            logger.error({ err: reconnectErr }, 'Failed to reconnect relayer client');
+          }
+          continue;
+        }
+
         // "tx already exists in cache" — tx was sent before and is pending in mempool
         if (errorMsg.includes('tx already exists in cache')) {
           logger.warn(
@@ -493,7 +514,7 @@ export class RelayerService {
             timeout: true,
             error: 'Transaction is already pending in the mempool. Please wait for it to be included.',
           };
-          await relayerTxLogService.logComplete(logId, { success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          await relayerTxLogService.logComplete(logId, { rawLog: errorMsg, success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
           return result;
         }
 
@@ -516,12 +537,12 @@ export class RelayerService {
             txHash: pendingTxHash,
             error: 'Transaction was submitted but not yet confirmed. It may still succeed.',
           };
-          await relayerTxLogService.logComplete(logId, { txHash: pendingTxHash, success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+          await relayerTxLogService.logComplete(logId, { txHash: pendingTxHash, rawLog: errorMsg, success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
           return result;
         }
 
         result = { success: false, error: errorMsg };
-        await relayerTxLogService.logComplete(logId, { success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
+        await relayerTxLogService.logComplete(logId, { rawLog: errorMsg, success: false, durationMs: Date.now() - startTime, attempt: lastAttempt });
         return result;
       }
     }
@@ -670,6 +691,28 @@ export class RelayerService {
   /** Get sequence manager state (for health checks) */
   getSequenceState() {
     return this.sequenceManager.getState();
+  }
+
+  /** Reconnect the Tendermint RPC client (for recovery after connection errors) */
+  private async reconnectClient(): Promise<void> {
+    try {
+      if (this.client) {
+        this.client.disconnect();
+      }
+    } catch { /* ignore disconnect errors */ }
+
+    const registry = createRegistry();
+    this.client = await SigningStargateClient.connectWithSigner(
+      env.AXIOME_RPC_URL,
+      this.wallet!,
+      {
+        registry,
+        gasPrice: GasPrice.fromString(`0.025${FEE_DENOM}`),
+      },
+    );
+    // Refresh sequence after reconnect
+    await this.sequenceManager.handleSequenceMismatch();
+    logger.info('Relayer client reconnected successfully');
   }
 
   /** Disconnect client */
