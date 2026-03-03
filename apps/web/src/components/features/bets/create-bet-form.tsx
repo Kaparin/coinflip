@@ -461,8 +461,8 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                   : t('wager.enterAmount')}
           </button>
 
-          {/* ─── Batch Mode ─── */}
-          {isConnected && (
+          {/* ─── Batch Mode (temporarily hidden) ─── */}
+          {false && isConnected && (
             <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] tracking-wide">
