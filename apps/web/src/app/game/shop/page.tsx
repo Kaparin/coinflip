@@ -382,10 +382,10 @@ export default function ShopPage() {
               disabled={!isEnabled || isBuying || (isConnected && !canAfford) || coinAmount > coinAvailable}
               className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
             >
-              {/* Labels */}
-              {!hasFirstPurchase && (
-                <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-warning)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                  x2
+              {/* Bonus badge */}
+              {!hasFirstPurchase && bonusAmount > 0 && (
+                <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                  +{fmtNum(bonusAmount)}
                 </div>
               )}
               {tier.label === 'popular' && (
@@ -399,6 +399,14 @@ export default function ShopPage() {
                 </div>
               )}
 
+              {/* COIN amount — top */}
+              <div className="flex items-center gap-1 mt-1">
+                <LaunchTokenIcon size={16} />
+                <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
+                  {fmtNum(coinAmount)} COIN
+                </p>
+              </div>
+
               {/* Image */}
               <div className="relative h-20 w-20 my-2">
                 <Image
@@ -411,29 +419,12 @@ export default function ShopPage() {
               </div>
 
               {/* Name */}
-              <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">{t(tier.nameKey)}</p>
+              <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
 
-              {/* COIN amount */}
-              <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
-                {fmtNum(coinAmount)}
-              </p>
-              <div className="flex items-center gap-0.5">
-                <LaunchTokenIcon size={12} />
-                <span className="text-[10px] font-medium text-[var(--color-text-secondary)]">COIN</span>
-              </div>
-
-              {/* Bonus */}
-              {!hasFirstPurchase && bonusAmount > 0 && (
-                <p className="mt-0.5 flex items-center gap-0.5 text-[10px] font-bold text-[var(--color-success)]">
-                  <Sparkles size={10} />
-                  +{fmtNum(bonusAmount)} {t('shop.bonusLabel')}
-                </p>
-              )}
-
-              {/* Price */}
-              <div className="mt-1 flex items-center gap-1">
-                <AxmIcon size={14} />
-                <span className="text-xs font-bold">{tier.axmPrice} AXM</span>
+              {/* Price — large with AXM icon */}
+              <div className="mt-1 flex items-center gap-1.5">
+                <AxmIcon size={18} />
+                <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
               </div>
             </button>
           );

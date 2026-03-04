@@ -642,12 +642,12 @@
     "confirmBonusInfo": "x2 bonus will be automatically credited to your game balance.",
     "confirmBuy": "Buy for {price}",
     "chest": {
-      "pouch": "Pouch",
-      "casket": "Casket",
-      "chest": "Chest",
-      "grand": "Grand Chest",
-      "royal": "Royal Chest",
-      "legendary": "Legendary Chest"
+      "pouch": "Coin Pouch",
+      "casket": "Coin Casket",
+      "chest": "Coin Chest",
+      "grand": "Grand Coin Chest",
+      "royal": "Royal Coin Chest",
+      "legendary": "Legendary Coin Chest"
     }
   },
   "presale": {
