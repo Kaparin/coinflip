@@ -14,6 +14,9 @@ export const shopPurchases = pgTable(
     coinAmount: numeric('coin_amount', { precision: 38, scale: 0 }).notNull(),
     bonusCredited: numeric('bonus_credited', { precision: 38, scale: 0 }).notNull().default('0'),
     txHash: text('tx_hash').notNull().unique(),
+    coinTxHash: text('coin_tx_hash'),
+    bonusTxHash: text('bonus_tx_hash'),
+    status: text('status').notNull().default('confirmed'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

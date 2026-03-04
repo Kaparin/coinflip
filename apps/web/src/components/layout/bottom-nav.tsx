@@ -6,7 +6,7 @@ import { Puzzle, User, Trophy, Newspaper, Store } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetActiveEvents } from '@coinflip/api-client';
 import { useTranslation } from '@/lib/i18n';
-import { PRESALE_CONTRACT } from '@/lib/constants';
+import { TREASURY_ADDRESS } from '@/lib/constants';
 
 const BASE_NAV_ITEMS = [
   {
@@ -32,7 +32,7 @@ const PRESALE_NAV_ITEM = {
   icon: <Store size={20} />,
 };
 
-const NAV_ITEMS = PRESALE_CONTRACT
+const NAV_ITEMS = TREASURY_ADDRESS
   ? [BASE_NAV_ITEMS[0]!, PRESALE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
   : BASE_NAV_ITEMS;
 

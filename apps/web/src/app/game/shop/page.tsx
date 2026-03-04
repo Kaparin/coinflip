@@ -1,35 +1,53 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { CheckCircle, ExternalLink, Loader2, Store, TrendingUp, Coins, AlertTriangle, Clock, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { CheckCircle, ExternalLink, Loader2, Store, AlertTriangle, ArrowRight, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useNativeBalance } from '@/hooks/use-wallet-balance';
-import { usePresaleConfig, usePresaleStatus } from '@/hooks/use-presale';
 import { useGrantStatus } from '@/hooks/use-grant-status';
+import { useWebSocketContext } from '@/contexts/websocket-context';
 import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
-import { signPresaleBuy, signDepositTxBytes } from '@/lib/wallet-signer';
+import { signBankSendSync, signDepositTxBytes } from '@/lib/wallet-signer';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { Modal } from '@/components/ui/modal';
-import { PRESALE_CONTRACT, EXPLORER_URL, API_URL } from '@/lib/constants';
+import { EXPLORER_URL, API_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
-import { CHEST_TIERS, type ChestTier } from './chest-config';
+import { CHEST_TIERS, mergeTierConfig, type ChestTier } from './chest-config';
 import Image from 'next/image';
 
-type BuyStep = 'signing' | 'broadcasting' | 'confirming';
+type BuyStep = 'signing' | 'broadcasting';
 
 export default function ShopPage() {
   const { t } = useTranslation();
   const { isConnected, address, getWallet } = useWalletContext();
   const queryClient = useQueryClient();
   const { data: nativeBalance } = useNativeBalance(address);
-  const { data: presaleConfig, isLoading: configLoading } = usePresaleConfig();
-  const { data: presaleStatus, isLoading: statusLoading } = usePresaleStatus();
   const { data: grantStatus } = useGrantStatus();
   const oneClickEnabled = grantStatus?.authz_granted ?? false;
+
+  // Load tier config from server
+  const { data: shopConfig, isLoading: configLoading } = useQuery({
+    queryKey: ['shop', 'config'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/v1/shop/config`);
+      if (!res.ok) return { tiers: [], enabled: false };
+      const json = await res.json();
+      return json.data as { tiers: Array<{ tier: number; axmPrice: number; coinAmount: number }>; enabled: boolean };
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const isEnabled = shopConfig?.enabled ?? false;
+  const tiers = useMemo(
+    () => shopConfig?.tiers?.length ? mergeTierConfig(shopConfig.tiers) : CHEST_TIERS,
+    [shopConfig?.tiers],
+  );
 
   // Shop purchase status
   const { data: purchaseStatus } = useQuery({
@@ -57,10 +75,14 @@ export default function ShopPage() {
   const [error, setError] = useState<string | null>(null);
   const [successTx, setSuccessTx] = useState<{
     txHash: string;
-    coinAmount: string;
-    axmAmount: string;
-    bonusCredited: string;
-    pending?: boolean;
+    coinAmount: number;
+    bonusAmount: number;
+  } | null>(null);
+
+  // Purchase failure modal (from WS event)
+  const [purchaseFailure, setPurchaseFailure] = useState<{
+    txHash: string;
+    reason: string;
   } | null>(null);
 
   // Post-purchase deposit flow
@@ -70,29 +92,47 @@ export default function ShopPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const nativeHuman = Number(nativeBalance ?? '0') / 1_000_000;
-  const rateNum = presaleStatus?.rate_num ?? 1;
-  const rateDenom = presaleStatus?.rate_denom ?? 1;
-  const coinAvailable = Number(presaleStatus?.coin_available ?? '0') / 1_000_000;
-  const totalAxmRaised = Number(presaleConfig?.total_axm_received ?? '0') / 1_000_000;
-  const totalCoinSold = Number(presaleConfig?.total_coin_sold ?? '0') / 1_000_000;
-  const isEnabled = presaleStatus?.enabled ?? false;
-  const isLoading = configLoading || statusLoading;
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
-
-  const getCoinForTier = (tier: ChestTier) => tier.axmPrice * rateNum / rateDenom;
 
   const refreshBalances = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
     queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
-    queryClient.invalidateQueries({ queryKey: ['presale'] });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'purchase-status'] });
+    queryClient.invalidateQueries({ queryKey: ['shop', 'config'] });
   }, [queryClient]);
+
+  // WS listeners for background purchase confirmation
+  const { subscribe } = useWebSocketContext();
+
+  useEffect(() => {
+    const unsub = subscribe((event) => {
+      if (event.type === 'purchase_confirmed') {
+        const data = event.data as { coin_amount?: string; coin_tx_hash?: string };
+        // Auto-trigger deposit after COIN arrives on wallet
+        setSuccessTx((prev) => {
+          if (prev) {
+            return { ...prev, coinAmount: Number(data.coin_amount ?? prev.coinAmount) };
+          }
+          return prev;
+        });
+        refreshBalances();
+      } else if (event.type === 'purchase_failed') {
+        const data = event.data as { tx_hash?: string; reason?: string };
+        setPurchaseFailure({
+          txHash: data.tx_hash ?? '',
+          reason: data.reason ?? '',
+        });
+        refreshBalances();
+      }
+    });
+    return unsub;
+  }, [subscribe, refreshBalances]);
 
   const handleDeposit = useCallback(async () => {
     if (!address || !successTx || isDepositing) return;
-    const coinAmount = parseFloat(successTx.coinAmount.replace(/,/g, ''));
+    const coinAmount = successTx.coinAmount;
     if (!coinAmount || coinAmount <= 0) return;
 
     setIsDepositing(true);
@@ -143,7 +183,6 @@ export default function ShopPage() {
     if (!address || isBuying) return;
 
     const microAxm = Math.floor(tier.axmPrice * 1_000_000);
-    const coinOutput = getCoinForTier(tier);
 
     setError(null);
     setSuccessTx(null);
@@ -155,16 +194,16 @@ export default function ShopPage() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('Wallet not available');
 
-      const result = await signPresaleBuy(wallet, address, String(microAxm), (step) => {
-        setBuyStep(step);
-      });
+      // Sign bank.MsgSend(AXM → treasury) + broadcast_tx_sync
+      const { txHash } = await signBankSendSync(
+        wallet, address, String(microAxm),
+        (step) => setBuyStep(step),
+      );
 
-      const microCoin = String(Math.floor(coinOutput * 1_000_000));
-
-      // Confirm purchase on backend
-      let bonusCredited = '0';
+      // Tell server about the purchase — server verifies tx + sends real COIN
+      let isFirstPurchase = false;
       try {
-        const confirmRes = await fetch(`${API_URL}/api/v1/shop/confirm-purchase`, {
+        const res = await fetch(`${API_URL}/api/v1/shop/instant-buy`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -172,38 +211,29 @@ export default function ShopPage() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            tx_hash: result.txHash,
+            tx_hash: txHash,
             chest_tier: tier.tier,
-            axm_amount: String(microAxm),
-            coin_amount: microCoin,
           }),
         });
-        if (confirmRes.ok) {
-          const confirmData = await confirmRes.json();
-          bonusCredited = confirmData.data?.bonus_credited ?? '0';
+        if (res.ok) {
+          const data = await res.json();
+          isFirstPurchase = data.data?.is_first_purchase ?? false;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || 'Server rejected purchase');
         }
-      } catch {
-        // Non-critical — purchase still happened on-chain
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Server rejected purchase') throw err;
+        // Non-critical — tx is already in mempool
       }
 
-      const bonusHuman = Number(bonusCredited) / 1_000_000;
+      const bonusAmount = isFirstPurchase ? tier.coinAmount : 0;
 
-      if (result.timedOut) {
-        setSuccessTx({
-          txHash: result.txHash,
-          coinAmount: fmtNum(coinOutput),
-          axmAmount: fmtNum(tier.axmPrice),
-          bonusCredited: fmtNum(bonusHuman),
-          pending: true,
-        });
-      } else {
-        setSuccessTx({
-          txHash: result.txHash,
-          coinAmount: fmtNum(coinOutput),
-          axmAmount: fmtNum(tier.axmPrice),
-          bonusCredited: fmtNum(bonusHuman),
-        });
-      }
+      setSuccessTx({
+        txHash,
+        coinAmount: tier.coinAmount + bonusAmount,
+        bonusAmount,
+      });
 
       // Close confirmation modal on success
       setSelectedTier(null);
@@ -216,12 +246,12 @@ export default function ShopPage() {
       setIsBuying(false);
       setBuyStep(null);
     }
-  }, [address, isBuying, getWallet, refreshBalances, t, rateNum, rateDenom]);
+  }, [address, isBuying, getWallet, refreshBalances, t]);
 
-  if (!PRESALE_CONTRACT) {
+  if (!TREASURY_ADDRESS) {
     return (
       <div className="mx-auto max-w-lg px-4 py-12 text-center">
-        <p className="text-[var(--color-text-secondary)]">{t('presale.noContract')}</p>
+        <p className="text-[var(--color-text-secondary)]">{t('shop.noTreasury')}</p>
       </div>
     );
   }
@@ -237,41 +267,18 @@ export default function ShopPage() {
         <p className="text-xs text-[var(--color-text-secondary)]">{t('shop.subtitle')}</p>
       </div>
 
-      {/* Stats bar */}
-      {isLoading ? (
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-center">
-            <p className="text-[10px] text-[var(--color-text-secondary)]">{t('presale.rate')}</p>
-            <p className="text-sm font-bold text-[var(--color-primary)]">1:{rateNum / rateDenom}</p>
-          </div>
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-center">
-            <p className="text-[10px] text-[var(--color-text-secondary)]">{t('presale.available')}</p>
-            <p className="text-sm font-bold">{fmtNum(coinAvailable)}</p>
-          </div>
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-center">
-            <p className="text-[10px] text-[var(--color-text-secondary)]">{t('presale.totalSold')}</p>
-            <p className="text-sm font-bold">{fmtNum(totalCoinSold)}</p>
-          </div>
+      {/* Loading */}
+      {configLoading && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
         </div>
       )}
 
       {/* Disabled notice */}
-      {!isLoading && !isEnabled && (
+      {!configLoading && !isEnabled && (
         <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-4 py-3">
           <AlertTriangle size={16} className="text-[var(--color-warning)] shrink-0" />
-          <p className="text-xs font-medium text-[var(--color-warning)]">{t('presale.disabled')}</p>
-        </div>
-      )}
-
-      {/* Sold out notice */}
-      {!isLoading && isEnabled && coinAvailable === 0 && (
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3">
-          <AlertTriangle size={16} className="text-[var(--color-danger)] shrink-0" />
-          <p className="text-xs font-medium text-[var(--color-danger)]">{t('presale.soldOut')}</p>
+          <p className="text-xs font-medium text-[var(--color-warning)]">{t('shop.disabled')}</p>
         </div>
       )}
 
@@ -282,31 +289,26 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Success card */}
+      {/* Success card — COIN is being sent / was sent */}
       {successTx && (
-        <div className={`rounded-xl border px-4 py-3 space-y-3 ${
-          successTx.pending
-            ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10'
-            : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
-        }`}>
+        <div className="rounded-xl border px-4 py-3 space-y-3 border-[var(--color-success)]/30 bg-[var(--color-success)]/10">
           <div className="flex items-center gap-2">
-            {successTx.pending ? (
-              <Clock size={16} className="text-[var(--color-warning)]" />
-            ) : (
-              <CheckCircle size={16} className="text-[var(--color-success)]" />
-            )}
-            <p className={`text-xs font-bold ${successTx.pending ? 'text-[var(--color-warning)]' : 'text-[var(--color-success)]'}`}>
-              {successTx.pending ? t('presale.pendingTitle') : t('shop.chestOpened')}
+            <CheckCircle size={16} className="text-[var(--color-success)]" />
+            <p className="text-xs font-bold text-[var(--color-success)]">
+              {t('shop.instantSuccess')}
             </p>
           </div>
           <div className="text-[10px] text-[var(--color-text-secondary)] space-y-0.5">
-            <p>{t('shop.received', { amount: successTx.coinAmount })}</p>
-            {successTx.bonusCredited !== '0' && (
+            <p>{t('shop.received', { amount: fmtNum(successTx.coinAmount) })}</p>
+            {successTx.bonusAmount > 0 && (
               <p className="text-[var(--color-success)] font-bold">
-                +{successTx.bonusCredited} COIN {t('shop.bonusLabel')}
+                +{fmtNum(successTx.bonusAmount)} COIN {t('shop.bonusLabel')}
               </p>
             )}
           </div>
+          <p className="text-[10px] text-[var(--color-text-secondary)]">
+            {t('shop.coinSending')}
+          </p>
           <a
             href={`${EXPLORER_URL}/transactions/${successTx.txHash}`}
             target="_blank"
@@ -317,7 +319,7 @@ export default function ShopPage() {
           </a>
 
           {/* Auto-deposit buttons */}
-          {!successTx.pending && !depositDone && (
+          {!depositDone && (
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
@@ -361,95 +363,82 @@ export default function ShopPage() {
       )}
 
       {/* Chest Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {CHEST_TIERS.map((tier) => {
-          const coinAmount = getCoinForTier(tier);
-          const bonusAmount = !hasFirstPurchase ? coinAmount : 0;
-          const canAfford = nativeHuman >= tier.axmPrice;
+      {!configLoading && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {tiers.map((tier) => {
+            const bonusAmount = !hasFirstPurchase ? tier.coinAmount : 0;
+            const canAfford = nativeHuman >= tier.axmPrice;
 
-          return (
-            <button
-              key={tier.tier}
-              type="button"
-              onClick={() => {
-                if (!isConnected) {
-                  (window as any).__walletContext?.connect?.();
-                  return;
-                }
-                setError(null);
-                setSelectedTier(tier);
-              }}
-              disabled={!isEnabled || isBuying || (isConnected && !canAfford) || coinAmount > coinAvailable}
-              className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
-            >
-              {/* Bonus badge */}
-              {!hasFirstPurchase && bonusAmount > 0 && (
-                <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                  +{fmtNum(bonusAmount)}
+            return (
+              <button
+                key={tier.tier}
+                type="button"
+                onClick={() => {
+                  if (!isConnected) {
+                    (window as any).__walletContext?.connect?.();
+                    return;
+                  }
+                  setError(null);
+                  setSelectedTier(tier);
+                }}
+                disabled={!isEnabled || isBuying || (isConnected && !canAfford)}
+                className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
+              >
+                {/* Bonus badge */}
+                {!hasFirstPurchase && bonusAmount > 0 && (
+                  <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                    +{fmtNum(bonusAmount)}
+                  </div>
+                )}
+                {tier.label === 'popular' && (
+                  <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                    {t('shop.popular')}
+                  </div>
+                )}
+                {tier.label === 'bestValue' && (
+                  <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                    {t('shop.bestValue')}
+                  </div>
+                )}
+
+                {/* COIN amount — top */}
+                <div className="flex items-center gap-1 mt-1">
+                  <LaunchTokenIcon size={16} />
+                  <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
+                    {fmtNum(tier.coinAmount)} COIN
+                  </p>
                 </div>
-              )}
-              {tier.label === 'popular' && (
-                <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                  {t('shop.popular')}
+
+                {/* Image */}
+                <div className="relative h-20 w-20 my-2">
+                  <Image
+                    src={tier.image}
+                    alt={t(tier.nameKey)}
+                    fill
+                    className="object-contain drop-shadow-lg"
+                    sizes="80px"
+                  />
                 </div>
-              )}
-              {tier.label === 'bestValue' && (
-                <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                  {t('shop.bestValue')}
+
+                {/* Name */}
+                <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
+
+                {/* Price — large with AXM icon */}
+                <div className="mt-1 flex items-center gap-1.5">
+                  <AxmIcon size={18} />
+                  <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
                 </div>
-              )}
-
-              {/* COIN amount — top */}
-              <div className="flex items-center gap-1 mt-1">
-                <LaunchTokenIcon size={16} />
-                <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
-                  {fmtNum(coinAmount)} COIN
-                </p>
-              </div>
-
-              {/* Image */}
-              <div className="relative h-20 w-20 my-2">
-                <Image
-                  src={tier.image}
-                  alt={t(tier.nameKey)}
-                  fill
-                  className="object-contain drop-shadow-lg"
-                  sizes="80px"
-                />
-              </div>
-
-              {/* Name */}
-              <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
-
-              {/* Price — large with AXM icon */}
-              <div className="mt-1 flex items-center gap-1.5">
-                <AxmIcon size={18} />
-                <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* First purchase banner */}
       {!hasFirstPurchase && isConnected && (
         <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5 px-4 py-3">
           <Sparkles size={16} className="text-[var(--color-warning)] shrink-0" />
           <p className="text-[11px] font-medium text-[var(--color-warning)]">{t('shop.firstPurchaseBanner')}</p>
-        </div>
-      )}
-
-      {/* Stats footer */}
-      {!isLoading && (
-        <div className="flex items-center justify-center gap-6 text-[10px] text-[var(--color-text-secondary)]">
-          <div className="flex items-center gap-1">
-            <TrendingUp size={12} />
-            <span className="flex items-center gap-0.5">{t('presale.totalRaised')}: {fmtNum(totalAxmRaised)} <AxmIcon size={10} /></span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Coins size={12} />
-            <span>{t('presale.totalSold')}: {fmtNum(totalCoinSold)} COIN</span>
-          </div>
         </div>
       )}
 
@@ -489,7 +478,7 @@ export default function ShopPage() {
                 <span className="text-[var(--color-text-secondary)]">{t('shop.confirmReceive')}</span>
                 <span className="flex items-center gap-1 font-bold text-[var(--color-primary)]">
                   <LaunchTokenIcon size={14} />
-                  {fmtNum(getCoinForTier(selectedTier))} COIN
+                  {fmtNum(selectedTier.coinAmount)} COIN
                 </span>
               </div>
               {!hasFirstPurchase && (
@@ -497,7 +486,7 @@ export default function ShopPage() {
                   <span className="text-[var(--color-text-secondary)]">{t('shop.confirmBonus')}</span>
                   <span className="flex items-center gap-1 font-bold text-[var(--color-success)]">
                     <Sparkles size={14} />
-                    +{fmtNum(getCoinForTier(selectedTier))} COIN
+                    +{fmtNum(selectedTier.coinAmount)} COIN
                   </span>
                 </div>
               )}
@@ -534,7 +523,6 @@ export default function ShopPage() {
                     <Loader2 size={16} className="animate-spin" />
                     {buyStep === 'signing' ? t('presale.stepSigning')
                       : buyStep === 'broadcasting' ? t('presale.stepBroadcasting')
-                      : buyStep === 'confirming' ? t('presale.stepConfirming')
                       : t('presale.buying')}
                   </>
                 ) : (
@@ -551,6 +539,42 @@ export default function ShopPage() {
                 </button>
               )}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Purchase Failed Modal (from WS background confirmation) */}
+      <Modal
+        open={!!purchaseFailure}
+        onClose={() => setPurchaseFailure(null)}
+        title={t('shop.purchaseFailedTitle')}
+      >
+        {purchaseFailure && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <XCircle size={20} className="text-[var(--color-danger)]" />
+              <p className="text-sm font-bold text-[var(--color-danger)]">{t('shop.purchaseFailedTitle')}</p>
+            </div>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              {t('shop.purchaseFailedDetail')}
+            </p>
+            {purchaseFailure.txHash && (
+              <a
+                href={`${EXPLORER_URL}/transactions/${purchaseFailure.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-primary)] hover:underline"
+              >
+                {t('presale.txHash')} <ExternalLink size={10} />
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => setPurchaseFailure(null)}
+              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
+            >
+              {t('shop.purchaseFailedOk')}
+            </button>
           </div>
         )}
       </Modal>

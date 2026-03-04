@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Store, Power, PowerOff, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Loader2, CheckCircle, AlertTriangle, TrendingUp, Coins, Settings, ShoppingBag, Users, Package } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Store, Power, PowerOff, RefreshCw, Loader2, CheckCircle, AlertTriangle, Save, ShoppingBag, Users, Package, Wallet } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWalletContext } from '@/contexts/wallet-context';
-import { usePresaleConfig, usePresaleStatus } from '@/hooks/use-presale';
-import { signPresaleUpdateConfig, signPresaleWithdrawAxm, signPresaleWithdrawCoin } from '@/lib/wallet-signer';
-import { PRESALE_CONTRACT, API_URL } from '@/lib/constants';
+import { API_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { CHEST_TIERS } from '@/app/game/shop/chest-config';
+
+type TierConfig = {
+  tier: number;
+  axmPrice: number;
+  coinAmount: number;
+};
 
 type ShopStats = {
   totalPurchases: number;
@@ -25,15 +28,34 @@ type ShopStats = {
     coinAmount: string;
     bonusCredited: string;
     txHash: string;
+    status: string;
     createdAt: string;
   }>;
 };
 
+type AdminConfig = {
+  tiers: TierConfig[];
+  enabled: boolean;
+  treasuryBalance: string;
+};
+
 export function ShopTab() {
-  const { address, getWallet } = useWalletContext();
   const queryClient = useQueryClient();
-  const { data: config, isLoading: configLoading, refetch: refetchConfig } = usePresaleConfig();
-  const { data: status, isLoading: statusLoading, refetch: refetchStatus } = usePresaleStatus();
+
+  // Admin config (tiers + enabled + treasury balance)
+  const { data: adminConfig, isLoading: configLoading, refetch: refetchConfig } = useQuery({
+    queryKey: ['admin', 'shop-config'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/v1/shop/admin/config`, {
+        headers: { ...getAuthHeaders() },
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data as AdminConfig;
+    },
+    staleTime: 15_000,
+  });
 
   // Shop stats
   const { data: shopStats, refetch: refetchShopStats } = useQuery({
@@ -55,21 +77,18 @@ export function ShopTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Rate editing
-  const [editRate, setEditRate] = useState(false);
-  const [rateNum, setRateNum] = useState('');
-  const [rateDenom, setRateDenom] = useState('');
+  // Tier editing
+  const [editingTiers, setEditingTiers] = useState<TierConfig[] | null>(null);
 
-  // Max per tx editing
-  const [editMaxTx, setEditMaxTx] = useState(false);
-  const [maxPerTx, setMaxPerTx] = useState('');
+  // Initialize editing tiers from server config
+  useEffect(() => {
+    if (adminConfig?.tiers && !editingTiers) {
+      setEditingTiers(adminConfig.tiers);
+    }
+  }, [adminConfig?.tiers]);
 
-  // Withdraw amounts
-  const [withdrawAxmAmount, setWithdrawAxmAmount] = useState('');
-  const [withdrawCoinAmount, setWithdrawCoinAmount] = useState('');
-
-  const isLoading = configLoading || statusLoading;
-  const isEnabled = status?.enabled ?? false;
+  const isEnabled = adminConfig?.enabled ?? false;
+  const treasuryBalance = Number(adminConfig?.treasuryBalance ?? '0') / 1_000_000;
 
   const fmtMicro = (micro: string) => (Number(micro) / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -77,19 +96,22 @@ export function ShopTab() {
 
   const refreshAll = useCallback(() => {
     refetchConfig();
-    refetchStatus();
     refetchShopStats();
-    queryClient.invalidateQueries({ queryKey: ['presale'] });
-  }, [refetchConfig, refetchStatus, refetchShopStats, queryClient]);
+    queryClient.invalidateQueries({ queryKey: ['shop'] });
+  }, [refetchConfig, refetchShopStats, queryClient]);
 
   const handleToggleEnabled = useCallback(async () => {
-    if (!address || loading) return;
+    if (loading) return;
     clearMessages();
     setLoading('toggle');
     try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleUpdateConfig(wallet, address, { enabled: !isEnabled });
+      const res = await fetch(`${API_URL}/api/v1/shop/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: !isEnabled }),
+      });
+      if (!res.ok) throw new Error('Failed to update config');
       setSuccess(isEnabled ? 'Магазин выключен' : 'Магазин включён');
       refreshAll();
     } catch (err) {
@@ -97,136 +119,40 @@ export function ShopTab() {
     } finally {
       setLoading(null);
     }
-  }, [address, getWallet, isEnabled, loading, refreshAll]);
+  }, [isEnabled, loading, refreshAll]);
 
-  const handleUpdateRate = useCallback(async () => {
-    if (!address || loading) return;
-    const num = parseInt(rateNum);
-    const denom = parseInt(rateDenom);
-    if (!num || !denom || num <= 0 || denom <= 0) {
-      setError('Числитель и знаменатель должны быть положительными целыми');
-      return;
-    }
+  const handleSaveTiers = useCallback(async () => {
+    if (loading || !editingTiers) return;
     clearMessages();
-    setLoading('rate');
+    setLoading('tiers');
     try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleUpdateConfig(wallet, address, { rate_num: num, rate_denom: denom });
-      setSuccess(`Курс обновлён: ${num}/${denom}`);
-      setEditRate(false);
+      const res = await fetch(`${API_URL}/api/v1/shop/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
+        body: JSON.stringify({ tiers: editingTiers }),
+      });
+      if (!res.ok) throw new Error('Failed to update tiers');
+      setSuccess('Цены обновлены');
       refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(null);
     }
-  }, [address, getWallet, rateNum, rateDenom, loading, refreshAll]);
+  }, [editingTiers, loading, refreshAll]);
 
-  const handleUpdateMaxTx = useCallback(async () => {
-    if (!address || loading) return;
-    const humanAmount = parseFloat(maxPerTx);
-    if (isNaN(humanAmount) || humanAmount < 0) {
-      setError('Некорректная сумма');
-      return;
-    }
-    const micro = String(Math.floor(humanAmount * 1_000_000));
-    clearMessages();
-    setLoading('maxTx');
-    try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleUpdateConfig(wallet, address, { max_per_tx: micro });
-      setSuccess(`Макс. за TX обновлён: ${humanAmount} AXM`);
-      setEditMaxTx(false);
-      refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(null);
-    }
-  }, [address, getWallet, maxPerTx, loading, refreshAll]);
-
-  const handleWithdrawAxm = useCallback(async () => {
-    if (!address || loading) return;
-    const humanAmount = parseFloat(withdrawAxmAmount);
-    if (!humanAmount || humanAmount <= 0) {
-      setError('Введите корректную сумму');
-      return;
-    }
-    const micro = String(Math.floor(humanAmount * 1_000_000));
-    clearMessages();
-    setLoading('withdrawAxm');
-    try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleWithdrawAxm(wallet, address, micro);
-      setSuccess(`Выведено ${humanAmount} AXM`);
-      setWithdrawAxmAmount('');
-      refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(null);
-    }
-  }, [address, getWallet, withdrawAxmAmount, loading, refreshAll]);
-
-  const handleWithdrawAllAxm = useCallback(async () => {
-    if (!address || loading) return;
-    clearMessages();
-    setLoading('withdrawAxm');
-    try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleWithdrawAxm(wallet, address, '0');
-      setSuccess('Выведены все AXM');
-      setWithdrawAxmAmount('');
-      refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(null);
-    }
-  }, [address, getWallet, loading, refreshAll]);
-
-  const handleWithdrawCoin = useCallback(async () => {
-    if (!address || loading) return;
-    const humanAmount = parseFloat(withdrawCoinAmount);
-    if (!humanAmount || humanAmount <= 0) {
-      setError('Введите корректную сумму');
-      return;
-    }
-    const micro = String(Math.floor(humanAmount * 1_000_000));
-    clearMessages();
-    setLoading('withdrawCoin');
-    try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-      await signPresaleWithdrawCoin(wallet, address, micro);
-      setSuccess(`Выведено ${humanAmount} COIN`);
-      setWithdrawCoinAmount('');
-      refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(null);
-    }
-  }, [address, getWallet, withdrawCoinAmount, loading, refreshAll]);
+  const updateTier = (tier: number, field: 'axmPrice' | 'coinAmount', value: string) => {
+    if (!editingTiers) return;
+    setEditingTiers(editingTiers.map((t) =>
+      t.tier === tier ? { ...t, [field]: parseFloat(value) || 0 } : t,
+    ));
+  };
 
   const tierName = (tier: number) => {
     const chest = CHEST_TIERS.find((c) => c.tier === tier);
-    return chest ? `Tier ${tier}` : `Tier ${tier}`;
+    return chest ? `T${tier}` : `T${tier}`;
   };
-
-  if (!PRESALE_CONTRACT) {
-    return (
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center">
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Контракт не настроен. Установите <code>NEXT_PUBLIC_PRESALE_CONTRACT</code> в переменных окружения.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -258,6 +184,100 @@ export function ShopTab() {
           <CheckCircle size={14} className="text-[var(--color-success)] shrink-0" />
           <p className="text-xs text-[var(--color-success)]">{success}</p>
         </div>
+      )}
+
+      {/* ========= STATUS + TREASURY ========= */}
+      {configLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-[var(--color-primary)]" />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <p className="text-[10px] text-[var(--color-text-secondary)]">Статус</p>
+              <p className={`text-sm font-bold ${isEnabled ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+                {isEnabled ? 'Активен' : 'Выключен'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <p className="text-[10px] text-[var(--color-text-secondary)] flex items-center gap-1">
+                <Wallet size={10} /> Баланс казны (COIN)
+              </p>
+              <p className="text-sm font-bold">{treasuryBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          {/* Toggle Enable/Disable */}
+          <div className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <div>
+              <p className="text-xs font-medium">Статус магазина</p>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">
+                {isEnabled ? 'Магазин активен и виден пользователям' : 'Магазин выключен и скрыт от пользователей'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleEnabled}
+              disabled={!!loading}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                isEnabled
+                  ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20'
+                  : 'bg-[var(--color-success)]/10 text-[var(--color-success)] hover:bg-[var(--color-success)]/20'
+              } disabled:opacity-50`}
+            >
+              {loading === 'toggle' ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : isEnabled ? (
+                <><PowerOff size={12} /> Выключить</>
+              ) : (
+                <><Power size={12} /> Включить</>
+              )}
+            </button>
+          </div>
+
+          {/* ========= TIER PRICE EDITOR ========= */}
+          <h3 className="text-sm font-bold flex items-center gap-1.5">
+            <Package size={14} />
+            Цены по тирам
+          </h3>
+
+          {editingTiers && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-2 text-[10px] text-[var(--color-text-secondary)] px-1">
+                <span>Тир</span>
+                <span>Цена (AXM)</span>
+                <span>COIN за покупку</span>
+              </div>
+              {editingTiers.map((tier) => (
+                <div key={tier.tier} className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
+                  <span className="text-xs font-bold w-8">{tierName(tier.tier)}</span>
+                  <input
+                    type="number"
+                    value={tier.axmPrice}
+                    onChange={(e) => updateTier(tier.tier, 'axmPrice', e.target.value)}
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
+                  />
+                  <input
+                    type="number"
+                    value={tier.coinAmount}
+                    onChange={(e) => updateTier(tier.tier, 'coinAmount', e.target.value)}
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleSaveTiers}
+                disabled={!!loading}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
+              >
+                {loading === 'tiers' ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                Сохранить цены
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* ========= SHOP PURCHASES STATS ========= */}
@@ -321,6 +341,11 @@ export function ShopTab() {
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-bold shrink-0">T{p.chestTier}</span>
                       <span className="text-[var(--color-text-secondary)] truncate font-mono">{p.address.slice(0, 8)}...{p.address.slice(-4)}</span>
+                      <span className={`px-1 rounded text-[8px] font-bold ${
+                        p.status === 'confirmed' ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                        : p.status === 'failed' ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'
+                        : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+                      }`}>{p.status}</span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span>{fmtMicro(p.axmAmount)} AXM</span>
@@ -336,270 +361,6 @@ export function ShopTab() {
               </div>
             </div>
           )}
-        </>
-      )}
-
-      {/* ========= CONTRACT MANAGEMENT ========= */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-[var(--color-primary)]" />
-        </div>
-      ) : (
-        <>
-          {/* Status + Stats */}
-          <h3 className="text-sm font-bold flex items-center gap-1.5">
-            <Settings size={14} />
-            Контракт
-          </h3>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">Статус</p>
-              <p className={`text-sm font-bold ${isEnabled ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
-                {isEnabled ? 'Активен' : 'Выключен'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">Курс</p>
-              <p className="text-sm font-bold">1 AXM = {(status?.rate_num ?? 1) / (status?.rate_denom ?? 1)} COIN</p>
-            </div>
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">Пул COIN</p>
-              <p className="text-sm font-bold">{fmtMicro(status?.coin_available ?? '0')}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[10px] text-[var(--color-text-secondary)]">AXM собрано</p>
-              <p className="text-sm font-bold">{fmtMicro(status?.axm_balance ?? '0')}</p>
-            </div>
-          </div>
-
-          {/* Totals */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <TrendingUp size={14} className="text-[var(--color-text-secondary)]" />
-              <div>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">Всего AXM собрано</p>
-                <p className="text-sm font-bold">{fmtMicro(config?.total_axm_received ?? '0')} AXM</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <Coins size={14} className="text-[var(--color-text-secondary)]" />
-              <div>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">Всего COIN продано</p>
-                <p className="text-sm font-bold">{fmtMicro(config?.total_coin_sold ?? '0')} COIN</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold flex items-center gap-1.5">
-              <Settings size={14} />
-              Управление
-            </h3>
-
-            {/* Toggle Enable/Disable */}
-            <div className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <div>
-                <p className="text-xs font-medium">Статус магазина</p>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  {isEnabled ? 'Магазин активен и виден пользователям' : 'Магазин выключен и скрыт от пользователей'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleToggleEnabled}
-                disabled={!!loading}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
-                  isEnabled
-                    ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20'
-                    : 'bg-[var(--color-success)]/10 text-[var(--color-success)] hover:bg-[var(--color-success)]/20'
-                } disabled:opacity-50`}
-              >
-                {loading === 'toggle' ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : isEnabled ? (
-                  <><PowerOff size={12} /> Выключить</>
-                ) : (
-                  <><Power size={12} /> Включить</>
-                )}
-              </button>
-            </div>
-
-            {/* Rate */}
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium">Обменный курс</p>
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">
-                    Текущий: {config?.rate_num ?? 1} / {config?.rate_denom ?? 1} (1 AXM = {(config?.rate_num ?? 1) / (config?.rate_denom ?? 1)} COIN)
-                  </p>
-                </div>
-                {!editRate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditRate(true);
-                      setRateNum(String(config?.rate_num ?? 1));
-                      setRateDenom(String(config?.rate_denom ?? 1));
-                    }}
-                    className="text-[10px] font-medium text-[var(--color-primary)] hover:underline"
-                  >
-                    Изменить
-                  </button>
-                )}
-              </div>
-              {editRate && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="number"
-                    value={rateNum}
-                    onChange={(e) => setRateNum(e.target.value)}
-                    placeholder="Числитель"
-                    className="min-w-0 flex-1 basis-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                  />
-                  <span className="text-xs font-bold">/</span>
-                  <input
-                    type="number"
-                    value={rateDenom}
-                    onChange={(e) => setRateDenom(e.target.value)}
-                    placeholder="Знаменатель"
-                    className="min-w-0 flex-1 basis-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleUpdateRate}
-                    disabled={!!loading}
-                    className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
-                  >
-                    {loading === 'rate' ? <Loader2 size={12} className="animate-spin" /> : 'Сохранить'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditRate(false)}
-                    className="text-xs text-[var(--color-text-secondary)] hover:underline"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Max Per Tx */}
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium">Макс. за транзакцию</p>
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">
-                    Текущий: {config?.max_per_tx === '0' ? 'Без лимита' : `${fmtMicro(config?.max_per_tx ?? '0')} AXM`}
-                  </p>
-                </div>
-                {!editMaxTx && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditMaxTx(true);
-                      setMaxPerTx(config?.max_per_tx === '0' ? '0' : String(Number(config?.max_per_tx ?? '0') / 1_000_000));
-                    }}
-                    className="text-[10px] font-medium text-[var(--color-primary)] hover:underline"
-                  >
-                    Изменить
-                  </button>
-                )}
-              </div>
-              {editMaxTx && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={maxPerTx}
-                    onChange={(e) => setMaxPerTx(e.target.value)}
-                    placeholder="0 = без лимита"
-                    className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)]">AXM</span>
-                  <button
-                    type="button"
-                    onClick={handleUpdateMaxTx}
-                    disabled={!!loading}
-                    className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
-                  >
-                    {loading === 'maxTx' ? <Loader2 size={12} className="animate-spin" /> : 'Сохранить'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditMaxTx(false)}
-                    className="text-xs text-[var(--color-text-secondary)] hover:underline"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Withdraw AXM */}
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
-              <p className="text-xs font-medium flex items-center gap-1.5">
-                <ArrowUpFromLine size={12} />
-                Вывести собранные AXM
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={withdrawAxmAmount}
-                  onChange={(e) => setWithdrawAxmAmount(e.target.value)}
-                  placeholder="Сумма в AXM"
-                  className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={handleWithdrawAxm}
-                  disabled={!!loading}
-                  className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
-                >
-                  {loading === 'withdrawAxm' ? <Loader2 size={12} className="animate-spin" /> : 'Вывести'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleWithdrawAllAxm}
-                  disabled={!!loading}
-                  className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-bold hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-                >
-                  Всё
-                </button>
-              </div>
-            </div>
-
-            {/* Withdraw COIN */}
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
-              <p className="text-xs font-medium flex items-center gap-1.5">
-                <ArrowDownToLine size={12} />
-                Вывести непроданные COIN
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={withdrawCoinAmount}
-                  onChange={(e) => setWithdrawCoinAmount(e.target.value)}
-                  placeholder="Сумма в COIN"
-                  className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={handleWithdrawCoin}
-                  disabled={!!loading}
-                  className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
-                >
-                  {loading === 'withdrawCoin' ? <Loader2 size={12} className="animate-spin" /> : 'Вывести'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Contract info */}
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <p className="text-[10px] text-[var(--color-text-secondary)]">Адрес контракта</p>
-            <p className="text-xs font-mono break-all">{PRESALE_CONTRACT}</p>
-          </div>
         </>
       )}
     </div>

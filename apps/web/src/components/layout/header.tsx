@@ -12,7 +12,7 @@ import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
 import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
-import { ADMIN_ADDRESS, EXPLORER_URL, PRESALE_CONTRACT } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
@@ -206,7 +206,7 @@ export function Header() {
                       </span>
                     )}
                   </Link>
-                  {PRESALE_CONTRACT && (
+                  {TREASURY_ADDRESS && (
                     <Link href="/game/shop"
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         pathname?.startsWith('/game/shop')

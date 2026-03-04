@@ -18,7 +18,7 @@ import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { SigningStargateClient, GasPrice, calculateFee } from '@cosmjs/stargate';
 import { DEFAULT_GAS_PRICE } from '@coinflip/shared/chain';
-import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, PRESALE_CONTRACT } from '@/lib/constants';
+import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TREASURY_ADDRESS } from '@/lib/constants';
 import { toMicroLaunch } from '@coinflip/shared/constants';
 import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
@@ -396,68 +396,55 @@ export async function signDirectWithdraw(
   };
 }
 
-// ---- Presale: Buy COIN with native AXM ----
+// ---- Shop: Send AXM to treasury via bank.MsgSend + broadcast_tx_sync ----
 
 /**
- * Fixed gas for presale buy.
- * MsgExecuteContract with native funds + CW20 transfer sub-message uses ~250k-400k gas.
- * 600k provides headroom. Eliminates the `simulate` RPC call that 'auto' requires.
+ * Fixed gas limit for bank.MsgSend.
+ * bank.MsgSend typically uses 60k-100k gas.
+ * 150k provides headroom. Eliminates the `simulate` RPC call.
  */
-const PRESALE_BUY_GAS_LIMIT = 600_000;
-
-export interface PresaleBuyResult {
-  txHash: string;
-  height?: number;
-  /** True if the tx was submitted but confirmation timed out (may still succeed) */
-  timedOut?: boolean;
-}
+const BANK_SEND_GAS_LIMIT = 150_000;
 
 /**
- * Buy COIN tokens by sending native AXM to the presale contract.
- * Uses cached client + fixed gas for speed. Handles timeout gracefully.
+ * Sign a bank.MsgSend(AXM → treasury) and broadcast via broadcast_tx_sync.
+ * Returns txHash as soon as the tx enters the mempool (~100ms after sign).
+ * Does NOT wait for block inclusion — caller handles confirmation separately.
  *
  * @param wallet - CosmJS wallet instance
- * @param address - Buyer's axm1... address
- * @param microAxmAmount - Amount in uaxm (micro-AXM) to spend
- * @param onStep - Progress callback: 'signing' | 'broadcasting' | 'confirming'
+ * @param address - Sender's axm1... address
+ * @param microAxmAmount - Amount in uaxm (micro-AXM) to send
+ * @param onStep - Progress callback
+ * @returns { txHash } immediately after mempool acceptance
  */
-export async function signPresaleBuy(
+export async function signBankSendSync(
   wallet: DirectSecp256k1HdWallet,
   address: string,
   microAxmAmount: string,
-  onStep?: (step: 'signing' | 'broadcasting' | 'confirming') => void,
-): Promise<PresaleBuyResult> {
+  onStep?: (step: 'signing' | 'broadcasting') => void,
+): Promise<{ txHash: string }> {
   onStep?.('signing');
 
-  let client: SigningCosmWasmClient;
-  try {
-    client = await getCachedCosmWasmClient(wallet);
-  } catch {
-    clearSigningClientCache();
-    client = await getCachedCosmWasmClient(wallet);
-  }
+  const client = await getStargateClient(wallet);
 
   const msg = {
-    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-    value: MsgExecuteContract.fromPartial({
-      sender: address,
-      contract: PRESALE_CONTRACT,
-      msg: new TextEncoder().encode(JSON.stringify({ buy: {} })),
-      funds: [{ denom: 'uaxm', amount: microAxmAmount }],
-    }),
+    typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+    value: {
+      fromAddress: address,
+      toAddress: TREASURY_ADDRESS,
+      amount: [{ denom: 'uaxm', amount: microAxmAmount }],
+    },
   };
 
-  const fee = calculateFee(PRESALE_BUY_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+  const fee = calculateFee(BANK_SEND_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
   let txRaw: TxRaw;
   try {
-    txRaw = await client.sign(address, [msg], fee, 'COIN Presale purchase');
+    txRaw = await client.sign(address, [msg], fee, 'COIN Shop purchase');
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : '';
     if (errMsg.includes('WebSocket') || errMsg.includes('socket') || errMsg.includes('connect')) {
-      clearSigningClientCache();
-      const freshClient = await getCachedCosmWasmClient(wallet);
-      txRaw = await freshClient.sign(address, [msg], fee, 'COIN Presale purchase');
+      const freshClient = await getStargateClient(wallet);
+      txRaw = await freshClient.sign(address, [msg], fee, 'COIN Shop purchase');
     } else {
       throw err;
     }
@@ -467,65 +454,28 @@ export async function signPresaleBuy(
 
   const txBytes = TxRaw.encode(txRaw).finish();
 
-  try {
-    const result = await client.broadcastTx(txBytes);
-    onStep?.('confirming');
+  // Use broadcast_tx_sync — returns after mempool check, does NOT wait for block inclusion
+  const rpcUrl = getRpcUrl();
+  const hexTx = Array.from(txBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const res = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${hexTx}`);
 
-    if (result.code !== 0) {
-      throw new Error(result.rawLog || `Transaction failed with code ${result.code}`);
-    }
-
-    return {
-      txHash: result.transactionHash,
-      height: result.height,
-    };
-  } catch (err) {
-    // CosmJS throws on timeout: "Transaction with ID XXXX was submitted but was not yet found on the chain"
-    const errMsg = err instanceof Error ? err.message : String(err);
-    const hashMatch = errMsg.match(/Transaction with ID ([A-Fa-f0-9]+)/i);
-    if (hashMatch?.[1]) {
-      // Transaction was broadcast but confirmation timed out — it likely succeeded
-      return {
-        txHash: hashMatch[1],
-        timedOut: true,
-      };
-    }
-    throw err;
+  if (!res.ok) {
+    throw new Error(`broadcast_tx_sync failed: HTTP ${res.status}`);
   }
-}
 
-// ---- Presale Admin: Update Config ----
-
-export async function signPresaleUpdateConfig(
-  wallet: DirectSecp256k1HdWallet,
-  address: string,
-  config: {
-    rate_num?: number;
-    rate_denom?: number;
-    enabled?: boolean;
-    max_per_tx?: string;
-  },
-): Promise<{ txHash: string; height: number }> {
-  const client = await getCosmWasmClient(wallet);
-
-  const msg: Record<string, unknown> = {};
-  if (config.rate_num !== undefined) msg.rate_num = config.rate_num;
-  if (config.rate_denom !== undefined) msg.rate_denom = config.rate_denom;
-  if (config.enabled !== undefined) msg.enabled = config.enabled;
-  if (config.max_per_tx !== undefined) msg.max_per_tx = config.max_per_tx;
-
-  const result = await client.execute(
-    address,
-    PRESALE_CONTRACT,
-    { update_config: msg },
-    'auto',
-    'Presale config update',
-  );
-
-  return {
-    txHash: result.transactionHash,
-    height: result.height,
+  const data = await res.json() as {
+    result?: { hash?: string; code?: number; log?: string };
   };
+
+  if (!data.result?.hash) {
+    throw new Error(`broadcast_tx_sync: no hash in response`);
+  }
+
+  if (data.result.code !== 0) {
+    throw new Error(data.result.log || `Transaction rejected by mempool (code ${data.result.code})`);
+  }
+
+  return { txHash: data.result.hash };
 }
 
 // ---- CoinFlip Admin: Sweep orphaned tokens ----
@@ -556,48 +506,3 @@ export async function signCoinflipAdminSweep(
   };
 }
 
-// ---- Presale Admin: Withdraw AXM ----
-
-export async function signPresaleWithdrawAxm(
-  wallet: DirectSecp256k1HdWallet,
-  address: string,
-  microAmount: string,
-): Promise<{ txHash: string; height: number }> {
-  const client = await getCosmWasmClient(wallet);
-
-  const result = await client.execute(
-    address,
-    PRESALE_CONTRACT,
-    { withdraw_axm: { amount: microAmount } },
-    'auto',
-    'Presale AXM withdraw',
-  );
-
-  return {
-    txHash: result.transactionHash,
-    height: result.height,
-  };
-}
-
-// ---- Presale Admin: Withdraw COIN ----
-
-export async function signPresaleWithdrawCoin(
-  wallet: DirectSecp256k1HdWallet,
-  address: string,
-  microAmount: string,
-): Promise<{ txHash: string; height: number }> {
-  const client = await getCosmWasmClient(wallet);
-
-  const result = await client.execute(
-    address,
-    PRESALE_CONTRACT,
-    { withdraw_coin: { amount: microAmount } },
-    'auto',
-    'Presale COIN withdraw',
-  );
-
-  return {
-    txHash: result.transactionHash,
-    height: result.height,
-  };
-}
