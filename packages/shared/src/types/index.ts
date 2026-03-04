@@ -74,7 +74,9 @@ export type WsEventType =
   | 'deposit_confirmed'
   | 'deposit_failed'
   | 'bet_message'
-  | 'announcement';
+  | 'announcement'
+  | 'purchase_confirmed'
+  | 'purchase_failed';
 
 export type WsEvent = {
   type: WsEventType;

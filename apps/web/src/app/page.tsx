@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Coins } from 'lucide-react';
+import Image from 'next/image';
 import { useTranslation } from '@/lib/i18n';
 
 export default function LandingPage() {
@@ -11,8 +11,15 @@ export default function LandingPage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
       {/* Hero */}
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)] animate-pulse-glow mb-2">
-          <Coins size={40} strokeWidth={1.5} />
+        <div className="relative flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center mb-2">
+          <Image
+            src="/logo-landing.png"
+            alt="Heads or Tails"
+            width={112}
+            height={112}
+            priority
+            className="object-contain"
+          />
         </div>
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
           Heads or <span className="text-[var(--color-primary)]">Tails</span>

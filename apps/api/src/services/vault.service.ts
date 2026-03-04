@@ -236,6 +236,32 @@ export class VaultService {
   }
 
   /**
+   * Deduct from user's bonus balance (rollback on failed shop purchase).
+   * Allows negative bonus — represents a "debt" that will be covered by future credits.
+   */
+  async deductBonus(userId: string, amount: string) {
+    const result = await this.db
+      .update(vaultBalances)
+      .set({
+        bonus: sql`${vaultBalances.bonus}::numeric - ${amount}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(eq(vaultBalances.userId, userId))
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ userId, amount }, 'deductBonus: no balance row found');
+      return null;
+    }
+
+    logger.info(
+      { userId, amount, newBonus: result[0]?.bonus },
+      'Bonus deducted (rollback)',
+    );
+    return result[0];
+  }
+
+  /**
    * Credit prize to user's bonus balance. This is separate from on-chain
    * available and is NOT overwritten by syncBalanceFromChain.
    * Bonus is an off-chain prize credit displayed alongside chain balance.
