@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, ShoppingCart, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
 import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -207,14 +207,14 @@ export function Header() {
                     )}
                   </Link>
                   {PRESALE_CONTRACT && (
-                    <Link href="/game/presale"
+                    <Link href="/game/shop"
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                        pathname?.startsWith('/game/presale')
+                        pathname?.startsWith('/game/shop')
                           ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                           : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                       }`}>
-                      <ShoppingCart size={14} />
-                      {t('nav.presale')}
+                      <Store size={14} />
+                      {t('nav.shop')}
                     </Link>
                   )}
                   <Link href="/game/news"

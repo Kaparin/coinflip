@@ -621,7 +621,34 @@
     "news": "News",
     "vip": "VIP",
     "presale": "Buy COIN",
+    "shop": "Shop",
     "invite": "Invite"
+  },
+  "shop": {
+    "title": "COIN Shop",
+    "subtitle": "Choose a chest and get COIN tokens instantly",
+    "buy": "Buy",
+    "popular": "Popular",
+    "bestValue": "Best Value",
+    "chestOpened": "Chest opened!",
+    "received": "You received {amount} COIN",
+    "bonusLabel": "bonus",
+    "firstPurchaseBanner": "First purchase gets x2 bonus — extra COIN credited to your game balance!",
+    "confirmTitle": "Confirm Purchase",
+    "confirmPrice": "Price",
+    "confirmReceive": "You receive",
+    "confirmBonus": "First buy bonus",
+    "confirmInfo": "COIN tokens are sent to your wallet instantly after the transaction is confirmed on the blockchain.",
+    "confirmBonusInfo": "x2 bonus will be automatically credited to your game balance.",
+    "confirmBuy": "Buy for {price}",
+    "chest": {
+      "pouch": "Pouch",
+      "casket": "Casket",
+      "chest": "Chest",
+      "grand": "Grand Chest",
+      "royal": "Royal Chest",
+      "legendary": "Legendary Chest"
+    }
   },
   "presale": {
     "title": "COIN Presale",

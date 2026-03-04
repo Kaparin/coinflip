@@ -16,7 +16,7 @@ import {
   Settings,
   PieChart,
   Newspaper,
-  ShoppingCart,
+  Store,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { DashboardTab } from './tabs/dashboard';
@@ -32,9 +32,9 @@ import { VipTab } from './tabs/vip';
 import { ConfigTab } from './tabs/config';
 import { CommissionTab } from './tabs/commission';
 import { NewsTab } from './tabs/news';
-import { PresaleTab } from './tabs/presale';
+import { ShopTab } from './tabs/shop';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news' | 'presale';
+type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news' | 'shop';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд' },
@@ -47,7 +47,7 @@ const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'transactions', icon: ArrowLeftRight, label: 'Транзакции' },
   { id: 'announcements', icon: Megaphone, label: 'Анонсы' },
   { id: 'news', icon: Newspaper, label: 'Новости' },
-  { id: 'presale', icon: ShoppingCart, label: 'Пресейл' },
+  { id: 'shop', icon: Store, label: 'Магазин' },
   { id: 'config', icon: Settings, label: 'Конфиг' },
   { id: 'diagnostics', icon: AlertTriangle, label: 'Диагн.' },
   { id: 'actions', icon: Wrench, label: 'Действия' },
@@ -104,7 +104,7 @@ export default function AdminPage() {
       {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'commission' && <CommissionTab />}
       {activeTab === 'news' && <NewsTab />}
-      {activeTab === 'presale' && <PresaleTab />}
+      {activeTab === 'shop' && <ShopTab />}
     </div>
   );
 }

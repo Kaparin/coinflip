@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Puzzle, User, Trophy, Newspaper, ShoppingCart } from 'lucide-react';
+import { Puzzle, User, Trophy, Newspaper, Store } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetActiveEvents } from '@coinflip/api-client';
 import { useTranslation } from '@/lib/i18n';
@@ -27,9 +27,9 @@ const BASE_NAV_ITEMS = [
 ];
 
 const PRESALE_NAV_ITEM = {
-  href: '/game/presale',
-  labelKey: 'nav.presale' as const,
-  icon: <ShoppingCart size={20} />,
+  href: '/game/shop',
+  labelKey: 'nav.shop' as const,
+  icon: <Store size={20} />,
 };
 
 const NAV_ITEMS = PRESALE_CONTRACT
