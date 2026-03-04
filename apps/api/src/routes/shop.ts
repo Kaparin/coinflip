@@ -178,47 +178,63 @@ async function queryTxViaRpc(txHash: string) {
   try {
     const hash = txHash.startsWith('0x') ? txHash : `0x${txHash}`;
     const res = await fetch(`${env.AXIOME_RPC_URL}/tx?hash=${hash}`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logger.debug({ txHash, status: res.status }, 'RPC tx query: non-ok status');
+      return null;
+    }
     const data = await res.json() as {
       result?: { tx_result?: { code: number; log?: string }; height?: string };
     };
     if (data.result?.tx_result) {
       return { code: data.result.tx_result.code, rawLog: data.result.tx_result.log ?? '' };
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    logger.debug({ txHash, err: err instanceof Error ? err.message : String(err) }, 'RPC tx query error');
+  }
   return null;
 }
 
-async function pollForTxSimple(txHash: string, maxMs = 60_000): Promise<{ code: number; rawLog: string } | null> {
+async function pollForTxSimple(txHash: string, maxMs = 90_000): Promise<{ code: number; rawLog: string } | null> {
   const start = Date.now();
-  let interval = 1000;
+  let interval = 2000;
+  let attempt = 0;
 
   while (Date.now() - start < maxMs) {
     await new Promise(r => setTimeout(r, interval));
-    interval = Math.min(interval * 1.5, 3000);
+    interval = Math.min(interval * 1.3, 5000);
+    attempt++;
 
     // Try RPC first (faster)
     const rpcResult = await queryTxViaRpc(txHash);
-    if (rpcResult) return rpcResult;
+    if (rpcResult) {
+      logger.info({ txHash, attempt, elapsed: Date.now() - start }, 'pollForTx: found via RPC');
+      return rpcResult;
+    }
 
     // Fallback to REST
     try {
       const restRes = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(5000),
       });
       if (restRes.ok) {
         const data = await restRes.json() as {
           tx_response?: { code: number; raw_log?: string };
         };
         if (data.tx_response) {
+          logger.info({ txHash, attempt, elapsed: Date.now() - start }, 'pollForTx: found via REST');
           return { code: data.tx_response.code, rawLog: data.tx_response.raw_log ?? '' };
         }
+      } else {
+        logger.debug({ txHash, attempt, status: restRes.status }, 'REST tx query: non-ok status');
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      logger.debug({ txHash, attempt, err: err instanceof Error ? err.message : String(err) }, 'REST tx query error');
+    }
   }
 
+  logger.warn({ txHash, attempts: attempt, elapsed: Date.now() - start }, 'pollForTx: timed out');
   return null;
 }
 
@@ -233,7 +249,8 @@ function resolveShopPurchaseInBackground(
   (async () => {
     const db = getDb();
     try {
-      const result = await pollForTxSimple(txHash, 60_000);
+      logger.info({ purchaseId, txHash }, 'Shop purchase: starting background resolution');
+      const result = await pollForTxSimple(txHash, 90_000);
 
       if (result && result.code === 0) {
         // AXM payment confirmed on-chain — now send real COIN from treasury
