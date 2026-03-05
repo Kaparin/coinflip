@@ -1,7 +1,7 @@
 /**
  * Activity Service — unified chronological feed of all user operations.
  *
- * Combines bet wins/losses, referral rewards, and jackpot wins via UNION ALL.
+ * Combines bet wins/losses, referral rewards, jackpot wins, shop purchases, and VIP purchases via UNION ALL.
  * Cursor-based pagination by timestamp.
  */
 
@@ -9,9 +9,11 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
+export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase';
+
 export interface ActivityItem {
   id: string;
-  type: 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win';
+  type: ActivityType;
   amount: string;
   timestamp: string;
   metadata: Record<string, unknown>;
@@ -31,7 +33,7 @@ class ActivityService {
     // Build type filter
     const allowedTypes = options.types?.length
       ? options.types
-      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win'];
+      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase'];
 
     const unionParts: ReturnType<typeof sql>[] = [];
 
@@ -136,6 +138,44 @@ class ActivityService {
         INNER JOIN jackpot_tiers jt ON jt.id = jp.tier_id
         WHERE jp.winner_user_id = ${userId}
           AND jp.status = 'completed'
+      `);
+    }
+
+    // Shop purchases
+    if (allowedTypes.includes('shop_purchase')) {
+      unionParts.push(sql`
+        SELECT
+          'shop_' || sp.id AS id,
+          'shop_purchase' AS type,
+          sp.coin_amount::text AS amount,
+          sp.created_at AS ts,
+          jsonb_build_object(
+            'chestTier', sp.chest_tier,
+            'axmAmount', sp.axm_amount,
+            'coinAmount', sp.coin_amount,
+            'bonusCredited', sp.bonus_credited
+          ) AS metadata
+        FROM shop_purchases sp
+        WHERE sp.user_id = ${userId}
+          AND sp.status = 'confirmed'
+      `);
+    }
+
+    // VIP purchases
+    if (allowedTypes.includes('vip_purchase')) {
+      unionParts.push(sql`
+        SELECT
+          'vip_' || vs.id AS id,
+          'vip_purchase' AS type,
+          vs.price_paid::text AS amount,
+          vs.created_at AS ts,
+          jsonb_build_object(
+            'tier', vs.tier,
+            'pricePaid', vs.price_paid,
+            'expiresAt', vs.expires_at
+          ) AS metadata
+        FROM vip_subscriptions vs
+        WHERE vs.user_id = ${userId}
       `);
     }
 

@@ -244,10 +244,9 @@
   "history": {
     "connectToView": "Connect wallet to view history",
     "failedToLoad": "Failed to load history",
-    "gamesTab": "Games",
-    "systemTab": "System",
-    "allTab": "All",
-    "games": "Games",
+    "filterAll": "All",
+    "filterCompleted": "Completed",
+    "filterOther": "Pending & Other",
     "winRate": "Win Rate",
     "netPnl": "Net P&L",
     "created": "Created",
@@ -266,7 +265,7 @@
     "openStatus": "Open",
     "refunded": "Refunded",
     "noGames": "No games played yet",
-    "noSystemEvents": "No system events yet",
+    "noPending": "No pending or canceled bets",
     "noHistory": "No history yet",
     "maker": "Creator",
     "acceptorLabel": "Acceptor",
@@ -289,8 +288,8 @@
     "heads": "Heads",
     "tails": "Tails",
     "noOpponent": "Waiting...",
-    "tabAll": "All",
-    "tabGames": "Games",
+    "tabActivity": "Activity",
+    "tabMyBets": "My Bets",
     "tabRewards": "Rewards"
   },
   "topWinner": {
@@ -902,13 +901,12 @@
     "jackpotDismiss": "Awesome!"
   },
   "activity": {
-    "tabAll": "All",
-    "tabGames": "Games",
-    "tabRewards": "Rewards",
     "betWin": "Won vs {opponent}",
     "betLoss": "Lost vs {opponent}",
     "referralReward": "Referral reward (L{level} from {from})",
     "jackpotWin": "{tier} Jackpot won!",
+    "shopPurchase": "Chest Tier {tier} purchased",
+    "vipPurchase": "{tier} VIP subscription",
     "loadMore": "Load more",
     "noActivity": "No activity yet"
   },

@@ -9,15 +9,15 @@ import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-fram
 import { formatLaunch, fromMicroLaunch, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { EXPLORER_URL } from '@/lib/constants';
-import { ChevronDown, ExternalLink, Trophy, Skull, Clock, Ban, Hourglass, Coins, Settings, History, Gift } from 'lucide-react';
+import { ChevronDown, ExternalLink, Trophy, Skull, Clock, Ban, Hourglass, History, Gift, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { ActivityFeed } from './activity-list';
 
 /** Top-level tabs for the unified History section */
-type TopTab = 'all' | 'games' | 'rewards';
+type TopTab = 'activity' | 'bets' | 'rewards';
 
-/** Sub-tabs within the Games detail view */
-type GamesSubTab = 'resolved' | 'system' | 'all';
+/** Filter within the Bets view */
+type BetsFilter = 'all' | 'resolved' | 'other';
 
 function truncAddr(addr: string): string {
   return addr.length > 14 ? `${addr.slice(0, 8)}…${addr.slice(-4)}` : addr;
@@ -216,9 +216,9 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
   );
 }
 
-/** Detailed bet history — expandable cards with TX links */
+/** Detailed bet history — expandable cards */
 function BetHistoryDetail() {
-  const [subTab, setSubTab] = useState<GamesSubTab>('resolved');
+  const [filter, setFilter] = useState<BetsFilter>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const { address, isConnected } = useWalletContext();
   const { t } = useTranslation();
@@ -235,23 +235,23 @@ function BetHistoryDetail() {
 
   const bets = data?.data ?? [];
 
-  const { gameBets, systemBets } = useMemo(() => {
-    const games: Bet[] = [];
-    const system: Bet[] = [];
+  const { resolvedBets, otherBets } = useMemo(() => {
+    const resolved: Bet[] = [];
+    const other: Bet[] = [];
 
     for (const bet of bets) {
       const isResolved = bet.status === 'revealed' || bet.status === 'timeout_claimed';
       if (isResolved) {
-        games.push(bet);
+        resolved.push(bet);
       } else {
-        system.push(bet);
+        other.push(bet);
       }
     }
 
-    return { gameBets: games, systemBets: system };
+    return { resolvedBets: resolved, otherBets: other };
   }, [bets]);
 
-  const displayBets = subTab === 'resolved' ? gameBets : subTab === 'system' ? systemBets : bets;
+  const displayBets = filter === 'resolved' ? resolvedBets : filter === 'other' ? otherBets : bets;
 
   if (!isConnected) {
     return (
@@ -282,30 +282,30 @@ function BetHistoryDetail() {
 
   const fmtHuman = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-  const SUB_TABS: { id: GamesSubTab; label: string; count: number }[] = [
-    { id: 'resolved', label: t('history.gamesTab'), count: gameBets.length },
-    { id: 'system', label: t('history.systemTab'), count: systemBets.length },
-    { id: 'all', label: t('history.allTab'), count: bets.length },
+  const FILTERS: { id: BetsFilter; label: string; count: number }[] = [
+    { id: 'all', label: t('history.filterAll'), count: bets.length },
+    { id: 'resolved', label: t('history.filterCompleted'), count: resolvedBets.length },
+    { id: 'other', label: t('history.filterOther'), count: otherBets.length },
   ];
 
   return (
     <div>
-      {/* Sub-tab navigation */}
-      <div className="flex gap-1 mb-3 overflow-x-auto scrollbar-hide">
-        {SUB_TABS.map((item) => (
+      {/* Filter pills */}
+      <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
+        {FILTERS.map((item) => (
           <button
             key={item.id}
             type="button"
-            onClick={() => setSubTab(item.id)}
-            className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              subTab === item.id
-                ? 'bg-[var(--color-border)] text-[var(--color-text)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+            onClick={() => setFilter(item.id)}
+            className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
+              filter === item.id
+                ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30'
+                : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
             }`}
           >
             {item.label}
             {item.count > 0 && (
-              <span className="ml-1 opacity-50">{item.count}</span>
+              <span className="ml-1 opacity-60">{item.count}</span>
             )}
           </button>
         ))}
@@ -459,11 +459,11 @@ function BetHistoryDetail() {
       ) : (
         <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
-            {subTab === 'resolved' ? <Coins size={32} strokeWidth={1.5} /> : subTab === 'system' ? <Settings size={32} strokeWidth={1.5} /> : <History size={32} strokeWidth={1.5} />}
+            <History size={32} strokeWidth={1.5} />
           </div>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {subTab === 'resolved' ? t('history.noGames') :
-             subTab === 'system' ? t('history.noSystemEvents') :
+            {filter === 'resolved' ? t('history.noGames') :
+             filter === 'other' ? t('history.noPending') :
              t('history.noHistory')}
           </p>
         </div>
@@ -472,30 +472,30 @@ function BetHistoryDetail() {
   );
 }
 
-/** Unified History tab with All/Games/Rewards top-level tabs */
+/** Unified History tab with Activity/My Bets/Rewards top-level tabs */
 export function HistoryList() {
-  const [topTab, setTopTab] = useState<TopTab>('all');
+  const [topTab, setTopTab] = useState<TopTab>('activity');
   const { t } = useTranslation();
 
   const TOP_TABS: { id: TopTab; label: string; icon: typeof History }[] = [
-    { id: 'all', label: t('history.tabAll'), icon: History },
-    { id: 'games', label: t('history.tabGames'), icon: Trophy },
+    { id: 'activity', label: t('history.tabActivity'), icon: Zap },
+    { id: 'bets', label: t('history.tabMyBets'), icon: History },
     { id: 'rewards', label: t('history.tabRewards'), icon: Gift },
   ];
 
   return (
     <div>
       {/* Top-level tabs */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+      <div className="flex gap-1 mb-4 rounded-lg bg-[var(--color-surface)] p-1 border border-[var(--color-border)]">
         {TOP_TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setTopTab(tab.id)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               topTab === tab.id
                 ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
             <tab.icon size={12} />
@@ -505,8 +505,8 @@ export function HistoryList() {
       </div>
 
       {/* Tab content */}
-      {topTab === 'all' && <ActivityFeed />}
-      {topTab === 'games' && <BetHistoryDetail />}
+      {topTab === 'activity' && <ActivityFeed />}
+      {topTab === 'bets' && <BetHistoryDetail />}
       {topTab === 'rewards' && <ActivityFeed types="referral_reward,jackpot_win" />}
     </div>
   );

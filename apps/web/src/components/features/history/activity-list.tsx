@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy, Skull, Gift, History } from 'lucide-react';
+import { Trophy, Skull, Gift, History, ShoppingBag, Crown } from 'lucide-react';
 import { GiOpenTreasureChest } from 'react-icons/gi';
 import Link from 'next/link';
 
@@ -64,6 +64,20 @@ const TYPE_CONFIG: Record<ActivityType, {
     borderClass: 'border-rose-400/20',
     sign: '+',
   },
+  shop_purchase: {
+    icon: ShoppingBag,
+    colorClass: 'text-teal-400',
+    bgClass: 'bg-teal-400/15',
+    borderClass: 'border-teal-400/20',
+    sign: '+',
+  },
+  vip_purchase: {
+    icon: Crown,
+    colorClass: 'text-amber-400',
+    bgClass: 'bg-amber-400/15',
+    borderClass: 'border-amber-400/20',
+    sign: '-',
+  },
 };
 
 function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?: Record<string, string | number>) => string }) {
@@ -94,6 +108,16 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
       const tierName = meta.tierName as string;
       const displayName = t(`jackpot.tiers.${tierName}`) || tierName;
       description = t('activity.jackpotWin', { tier: displayName });
+      break;
+    }
+    case 'shop_purchase': {
+      const chestTier = meta.chestTier as number;
+      description = t('activity.shopPurchase', { tier: String(chestTier) });
+      break;
+    }
+    case 'vip_purchase': {
+      const tier = meta.tier as string;
+      description = t('activity.vipPurchase', { tier });
       break;
     }
     default:

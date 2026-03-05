@@ -351,8 +351,40 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
       {/* Input (participants only) */}
       {isParticipant && duel.phase !== 'fade-out' && (
-        <div className="flex gap-1.5 relative">
-          <div className="flex-1 relative">
+        <div className="relative">
+          {/* Emoji picker popup — above input */}
+          {showEmojis && (
+            <div
+              ref={emojiRef}
+              className="absolute bottom-full left-0 right-0 mb-1.5 p-2 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] shadow-lg z-30 max-h-[140px] overflow-y-auto"
+            >
+              <div className="grid grid-cols-8 gap-1">
+                {CHAT_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => insertEmoji(emoji)}
+                    className="text-lg leading-none p-1.5 rounded-lg hover:bg-[var(--color-primary)]/10 active:scale-90 transition-all text-center"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-1.5 items-center">
+            <button
+              type="button"
+              onClick={() => setShowEmojis((v) => !v)}
+              className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-lg border transition-colors ${
+                showEmojis
+                  ? 'bg-[var(--color-primary)]/15 border-[var(--color-primary)]/30 text-[var(--color-primary)]'
+                  : 'bg-[var(--color-bg)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <Smile size={14} />
+            </button>
             <input
               ref={inputRef}
               type="text"
@@ -361,42 +393,17 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={t('duel.messagePlaceholder')}
               disabled={sending}
-              className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] pl-2.5 pr-8 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:border-[var(--color-primary)]/50 disabled:opacity-50"
+              className="flex-1 min-w-0 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-2.5 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:border-[var(--color-primary)]/50 disabled:opacity-50"
             />
             <button
               type="button"
-              onClick={() => setShowEmojis((v) => !v)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+              onClick={handleSend}
+              disabled={!msgInput.trim() || sending}
+              className="shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30 disabled:opacity-30 transition-colors"
             >
-              <Smile size={14} />
+              <Send size={14} />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!msgInput.trim() || sending}
-            className="shrink-0 rounded-lg bg-[var(--color-primary)]/20 px-2.5 py-1.5 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30 disabled:opacity-30 transition-colors"
-          >
-            <Send size={14} />
-          </button>
-          {/* Emoji picker popup */}
-          {showEmojis && (
-            <div
-              ref={emojiRef}
-              className="absolute bottom-full right-0 mb-1 p-2 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] shadow-lg z-30 w-[220px] grid grid-cols-8 gap-0.5"
-            >
-              {CHAT_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => insertEmoji(emoji)}
-                  className="text-base leading-none p-1 rounded hover:bg-[var(--color-primary)]/10 transition-colors text-center"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

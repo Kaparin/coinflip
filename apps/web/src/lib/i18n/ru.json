@@ -244,10 +244,9 @@
   "history": {
     "connectToView": "Подключите кошелёк для просмотра истории",
     "failedToLoad": "Не удалось загрузить историю",
-    "gamesTab": "Игры",
-    "systemTab": "Система",
-    "allTab": "Все",
-    "games": "Игры",
+    "filterAll": "Все",
+    "filterCompleted": "Завершённые",
+    "filterOther": "Ожидание и другое",
     "winRate": "Винрейт",
     "netPnl": "Чистый P&L",
     "created": "Создал",
@@ -266,7 +265,7 @@
     "openStatus": "Открыта",
     "refunded": "Возвращено",
     "noGames": "Игр пока нет",
-    "noSystemEvents": "Системных событий нет",
+    "noPending": "Нет ожидающих или отменённых ставок",
     "noHistory": "История пуста",
     "maker": "Создатель",
     "acceptorLabel": "Принявший",
@@ -289,8 +288,8 @@
     "heads": "Орёл",
     "tails": "Решка",
     "noOpponent": "Ожидание...",
-    "tabAll": "Все",
-    "tabGames": "Игры",
+    "tabActivity": "Активность",
+    "tabMyBets": "Мои Ставки",
     "tabRewards": "Награды"
   },
   "topWinner": {
@@ -902,13 +901,12 @@
     "jackpotDismiss": "Круто!"
   },
   "activity": {
-    "tabAll": "Все",
-    "tabGames": "Игры",
-    "tabRewards": "Награды",
     "betWin": "Выигрыш vs {opponent}",
     "betLoss": "Проигрыш vs {opponent}",
     "referralReward": "Реферальная награда (L{level} от {from})",
     "jackpotWin": "Джекпот {tier} выигран!",
+    "shopPurchase": "Покупка сундука Тир {tier}",
+    "vipPurchase": "Подписка {tier} VIP",
     "loadMore": "Загрузить ещё",
     "noActivity": "Пока нет активности"
   },

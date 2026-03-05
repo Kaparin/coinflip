@@ -10,7 +10,7 @@ export const activityRouter = new Hono<AppEnv>();
 const ActivityQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  types: z.string().optional(), // comma-separated: 'bet_win,bet_loss,referral_reward,jackpot_win'
+  types: z.string().optional(), // comma-separated: 'bet_win,bet_loss,referral_reward,jackpot_win,shop_purchase,vip_purchase'
 });
 
 // GET /api/v1/activity — unified activity feed (auth required)
