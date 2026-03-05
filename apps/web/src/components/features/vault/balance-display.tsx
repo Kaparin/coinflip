@@ -1053,8 +1053,8 @@ export function BalanceDisplay() {
         </Modal>
       )}
 
-      {/* ===== COIN Guide Modal ===== */}
-      <CoinGuideModal open={showCoinGuide} onClose={() => setShowCoinGuide(false)} />
+      {/* ===== COIN Guide Modal (CW20 mode only) ===== */}
+      {!isAxmMode() && <CoinGuideModal open={showCoinGuide} onClose={() => setShowCoinGuide(false)} />}
     </>
   );
 }
