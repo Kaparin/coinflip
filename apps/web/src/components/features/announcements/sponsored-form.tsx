@@ -6,6 +6,7 @@ import { Megaphone, X, Send, Loader2, CheckCircle, Clock, ShieldCheck, CalendarC
 import { useTranslation } from '@/lib/i18n';
 import { useSponsoredConfig, useSubmitSponsored } from '@/hooks/use-sponsored';
 import { formatLaunch } from '@coinflip/shared/constants';
+import { GAME_TOKEN } from '@/lib/constants';
 
 /** Get min datetime-local value (now + minDelayMinutes) */
 function getMinScheduleTime(minDelayMinutes: number): string {
@@ -111,7 +112,7 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
             <div>
               <h3 className="text-sm font-bold">{t('sponsored.title')}</h3>
               <p className="text-[10px] text-[var(--color-text-secondary)]">
-                {t('sponsored.price')}: {formatLaunch(price)} COIN
+                {t('sponsored.price')}: {formatLaunch(price)} {GAME_TOKEN}
               </p>
             </div>
           </div>
@@ -253,7 +254,7 @@ export function SponsoredForm({ open, onClose }: SponsoredFormProps) {
                 ) : (
                   <Send size={16} />
                 )}
-                {t('sponsored.submit')} ({formatLaunch(price)} COIN)
+                {t('sponsored.submit')} ({formatLaunch(price)} {GAME_TOKEN})
               </button>
             </div>
           )}

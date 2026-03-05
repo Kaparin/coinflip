@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { GameTokenIcon } from '@/components/ui';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { useTranslation } from '@/lib/i18n';
+import { GAME_TOKEN } from '@/lib/constants';
 import {
   BET_PRESETS,
   BET_PRESET_LABELS,
@@ -306,7 +307,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           <div className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
             <span className="font-semibold text-[var(--color-text)]">{parsedAmount.toLocaleString()}</span>
             <GameTokenIcon size={45} />
-            <span>COIN</span>
+            <span>{GAME_TOKEN}</span>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] animate-pulse mt-1">
             {t('common.confirming')}

@@ -7,6 +7,7 @@ import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { useSponsoredRaffleConfig, useSubmitSponsoredRaffle } from '@/hooks/use-sponsored-raffle';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
+import { GAME_TOKEN } from '@/lib/constants';
 
 /** Duration preset options in hours */
 const DURATION_PRESETS = [
@@ -192,7 +193,7 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <GameTokenIcon size={28} />
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</span>
                 </div>
               </div>
             </div>

@@ -17,6 +17,7 @@ import { useBoostBet, usePinBet, useVipStatus, usePinSlots } from '@/hooks/use-v
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import type { PendingBet } from '@/hooks/use-pending-bets';
 import { extractErrorPayload, isActionInProgress, getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { GAME_TOKEN } from '@/lib/constants';
 
 interface MyBetsProps {
   /** Bets submitted but not yet confirmed on chain */
@@ -376,7 +377,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
         </div>
         {isRevealed && (
           <p className={`text-xs font-bold ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
-            {isWinner ? `+${payout} COIN` : `-${formatLaunch(bet.amount)} COIN`}
+            {isWinner ? `+${payout} ${GAME_TOKEN}` : `-${formatLaunch(bet.amount)} ${GAME_TOKEN}`}
           </p>
         )}
       </div>

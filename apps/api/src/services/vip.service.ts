@@ -16,7 +16,6 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { Errors } from '../lib/errors.js';
 import { vaultService } from './vault.service.js';
-import { gameDenom } from '../config/env.js';
 
 /** Simple LRU-ish cache for active VIP tier lookups (60s TTL) */
 const vipCache = new Map<string, { tier: VipTier; expiresAt: string; cachedAt: number }>();
@@ -116,10 +115,10 @@ class VipService {
         );
     }
 
-    // Atomic deduct from available balance
-    const deducted = await vaultService.deductBalance(userId, price);
+    // Atomic deduct from COIN balance (VIP is paid in COIN utility token)
+    const deducted = await vaultService.deductCoin(userId, price);
     if (!deducted) {
-      throw Errors.insufficientBalance(price, '(check your balance)');
+      throw Errors.insufficientBalance(price, '(check your COIN balance)');
     }
 
     // Calculate expiry
@@ -139,7 +138,7 @@ class VipService {
     await db.insert(treasuryLedger).values({
       txhash: `vip_${crypto.randomUUID()}`,
       amount: price,
-      denom: gameDenom(),
+      denom: 'COIN',
       source: 'vip_subscription',
     });
 

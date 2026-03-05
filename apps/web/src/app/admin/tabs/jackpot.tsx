@@ -10,6 +10,7 @@ import {
 } from '@/hooks/use-admin';
 import { StatCard, TableWrapper, ActionButton } from '../_shared';
 import { formatLaunch } from '@coinflip/shared/constants';
+import { GAME_TOKEN } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
 const TIER_LABELS: Record<string, string> = {
@@ -44,7 +45,7 @@ export function JackpotTab() {
     <div className="space-y-4">
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="Всего в пуле" value={formatLaunch(totalPooled.toString())} sub="COIN" />
+        <StatCard label="Всего в пуле" value={formatLaunch(totalPooled.toString())} sub={GAME_TOKEN} />
         <StatCard label="Активных тиров" value={`${activeTiers} / ${tiers.length}`} />
         <StatCard label="Розыгрыш" value={drawingPools} warn={drawingPools > 0} />
       </div>

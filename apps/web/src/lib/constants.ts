@@ -29,6 +29,9 @@ export function isAxmMode(): boolean {
   return GAME_CURRENCY === 'axm';
 }
 
+/** Label for the game currency token — "AXM" when in AXM mode, "COIN" when in COIN mode */
+export const GAME_TOKEN = isAxmMode() ? 'AXM' : 'COIN';
+
 /** Contract addresses */
 export const COINFLIP_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_CONTRACT ?? '';
 export const COINFLIP_NATIVE_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_NATIVE_CONTRACT ?? '';

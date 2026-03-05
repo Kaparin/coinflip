@@ -8,6 +8,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { SponsoredForm } from '@/components/features/announcements/sponsored-form';
 import { UserAvatar } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
+import { GAME_TOKEN } from '@/lib/constants';
 import Link from 'next/link';
 
 const FILTER_OPTIONS: Array<{ value: string; labelKey: string; icon: typeof Newspaper }> = [
@@ -234,11 +235,11 @@ function BigWinContent({ item }: { item: NewsFeedItem }) {
       <p className="text-xs truncate">
         <span className="font-bold text-amber-400">{winner}</span>
         <span className="text-[var(--color-text-secondary)]"> {t('news.won')} </span>
-        <span className="font-bold text-green-400">{payoutStr ? formatLaunch(payoutStr) : '?'} COIN</span>
+        <span className="font-bold text-green-400">{payoutStr ? formatLaunch(payoutStr) : '?'} {GAME_TOKEN}</span>
       </p>
       {amountStr && (
         <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
-          {t('news.betSize')}: {formatLaunch(amountStr)} COIN
+          {t('news.betSize')}: {formatLaunch(amountStr)} {GAME_TOKEN}
         </p>
       )}
     </div>
@@ -263,7 +264,7 @@ function JackpotWinContent({ item }: { item: NewsFeedItem }) {
       </p>
       {amountStr && (
         <p className="text-[10px] text-green-400 font-bold mt-0.5">
-          {formatLaunch(amountStr)} COIN
+          {formatLaunch(amountStr)} {GAME_TOKEN}
         </p>
       )}
     </div>

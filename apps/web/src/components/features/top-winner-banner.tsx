@@ -5,6 +5,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { useTranslation } from '@/lib/i18n';
+import { GAME_TOKEN } from '@/lib/constants';
 import Link from 'next/link';
 import { Crown, ChevronRight } from 'lucide-react';
 
@@ -68,7 +69,7 @@ export function TopWinnerBanner() {
               </div>
               <div className="flex items-center justify-end gap-0.5 mt-0.5">
                 <GameTokenIcon size={10} />
-                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">COIN</span>
+                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">{GAME_TOKEN}</span>
               </div>
             </div>
             <ChevronRight size={14} className="text-[var(--color-text-secondary)] group-hover:text-amber-400 transition-colors shrink-0" />

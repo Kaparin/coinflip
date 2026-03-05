@@ -14,6 +14,7 @@ import {
 } from '@/hooks/use-admin';
 import type { SweepSummary } from '@/hooks/use-admin';
 import { useTranslation } from '@/lib/i18n';
+import { GAME_TOKEN } from '@/lib/constants';
 import { StatCard, shortHash, timeAgo } from '../_shared';
 
 function fmtLaunch(micro: string | number): string {
@@ -52,7 +53,7 @@ export function DashboardTab() {
     const microAmount = toMicroLaunch(humanAmount);
     try {
       const result = await withdraw.mutateAsync(microAmount);
-      setWithdrawSuccess(`Выведено ${withdrawAmount} COIN. Tx: ${result.txHash}`);
+      setWithdrawSuccess(`Выведено ${withdrawAmount} ${GAME_TOKEN}. Tx: ${result.txHash}`);
       setWithdrawAmount('');
     } catch (err) {
       setWithdrawError(err instanceof Error ? err.message : 'Ошибка вывода');
@@ -164,7 +165,7 @@ export function DashboardTab() {
                 Кандидаты: {sweepPreview.data?.candidates.length ?? '...'}
               </span>
               <span className="text-xs font-bold text-[var(--color-primary)]">
-                Всего к сбору: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} COIN
+                Всего к сбору: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} {GAME_TOKEN}
               </span>
             </div>
 
@@ -240,7 +241,7 @@ export function DashboardTab() {
                 <span className="text-[var(--color-success)]">Успешно: {sweepResult.succeeded}</span>
                 <span className="text-[var(--color-danger)]">Ошибки: {sweepResult.failed}</span>
                 <span className="text-[var(--color-text-secondary)]">Пропущено: {sweepResult.skipped}</span>
-                <span className="font-bold">Всего собрано: {fmtLaunch(sweepResult.totalSwept)} COIN</span>
+                <span className="font-bold">Всего собрано: {fmtLaunch(sweepResult.totalSwept)} {GAME_TOKEN}</span>
               </div>
               {sweepResult.results.filter((r) => r.status !== 'skipped').length > 0 && (
                 <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--color-border)]">

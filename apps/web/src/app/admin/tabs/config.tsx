@@ -10,6 +10,7 @@ import {
 } from '@/hooks/use-admin';
 import { ActionButton } from '../_shared';
 import { LAUNCH_MULTIPLIER } from '@coinflip/shared/constants';
+import { GAME_TOKEN } from '@/lib/constants';
 
 /**
  * Keys whose values are stored as micro-LAUNCH (6 decimals).
@@ -53,19 +54,19 @@ const CATEGORY_LABELS: Record<string, string> = {
 const KEY_LABELS: Record<string, string> = {
   OPEN_BET_TTL_SECS: 'TTL открытой ставки (сек)',
   REVEAL_TIMEOUT_SECS: 'Таймаут раскрытия (сек)',
-  MIN_BET_AMOUNT: 'Мин. ставка (COIN)',
-  MAX_DAILY_AMOUNT: 'Макс. дневной объём (COIN)',
+  MIN_BET_AMOUNT: `Мин. ставка (${GAME_TOKEN})`,
+  MAX_DAILY_AMOUNT: `Макс. дневной объём (${GAME_TOKEN})`,
   MAX_OPEN_BETS_PER_USER: 'Макс. ставок на юзера',
   MAX_BATCH_SIZE: 'Макс. размер пакета',
-  BET_PRESETS: 'Пресеты ставок (COIN)',
+  BET_PRESETS: `Пресеты ставок (${GAME_TOKEN})`,
   LEADERBOARD_CACHE_TTL_MS: 'TTL кеша лидерборда (мс)',
   PIN_SLOTS: 'Слотов для пинов',
   PIN_MIN_PRICE: 'Мин. цена пина (COIN)',
   PIN_OUTBID_MULTIPLIER: 'Множитель перебивки пина',
-  BIG_WIN_THRESHOLD: 'Порог большого выигрыша (COIN)',
+  BIG_WIN_THRESHOLD: `Порог большого выигрыша (${GAME_TOKEN})`,
   MAINTENANCE_MODE: 'Режим обслуживания',
   MAINTENANCE_MESSAGE: 'Сообщение обслуживания',
-  SPONSORED_PRICE: 'Цена спонсорства (COIN)',
+  SPONSORED_PRICE: `Цена спонсорства (${GAME_TOKEN})`,
   SPONSORED_IS_ACTIVE: 'Спонсорство активно',
   SPONSORED_MIN_DELAY_MIN: 'Мин. задержка (минуты)',
   SPONSORED_MAX_TITLE: 'Макс. длина заголовка',
@@ -75,8 +76,8 @@ const KEY_LABELS: Record<string, string> = {
   REFERRAL_BPS_LEVEL_2: 'Реферал L2 (BPS)',
   REFERRAL_BPS_LEVEL_3: 'Реферал L3 (BPS)',
   MAX_REFERRAL_BPS_PER_BET: 'Макс. кап рефералов (BPS)',
-  CHANGE_BRANCH_COST_MICRO: 'Цена смены ветки (COIN)',
-  MINIMUM_CLAIM_AMOUNT_MICRO: 'Мин. сумма клейма (COIN)',
+  CHANGE_BRANCH_COST_MICRO: `Цена смены ветки (${GAME_TOKEN})`,
+  MINIMUM_CLAIM_AMOUNT_MICRO: `Мин. сумма клейма (${GAME_TOKEN})`,
   WASH_TRADE_PAIR_DAILY_LIMIT: 'Лимит пар/24ч (анти-абьюз)',
   JACKPOT_TOTAL_BPS: 'Джекпот (BPS)',
 };
@@ -320,7 +321,7 @@ function ConfigField({
     <div>
       <label className="flex items-baseline gap-1 text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 uppercase tracking-wider">
         <span className="truncate">{label}</span>
-        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">COIN</span>}
+        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">{GAME_TOKEN}</span>}
       </label>
       <input
         type={config.valueType === 'number' || isMicroLaunch ? 'number' : 'text'}

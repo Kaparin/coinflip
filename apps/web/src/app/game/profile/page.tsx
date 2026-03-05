@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, ACTIVE_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID, isAxmMode } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, ACTIVE_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID, isAxmMode, GAME_TOKEN } from '@/lib/constants';
 import { walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
 import { useTranslation } from '@/lib/i18n';
 import { useReferral, fetchPlatformStats, fetchReferralConfig, type PlatformStats, type ReferralConfig, type InviteEntry } from '@/hooks/use-referral';
@@ -646,14 +646,14 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
             <p className="text-lg font-extrabold text-[var(--color-primary)]">
               {platformStats ? formatLaunch(BigInt(platformStats.treasuryVaultAvailable)) : '—'}
             </p>
-            <p className="text-[9px] text-[var(--color-text-secondary)]">COIN</p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</p>
           </div>
           <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3">
             <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.totalReferralPaid')}</p>
             <p className="text-lg font-extrabold text-[var(--color-success)]">
               {platformStats ? formatLaunch(BigInt(platformStats.totalReferralPaid)) : '—'}
             </p>
-            <p className="text-[9px] text-[var(--color-text-secondary)]">COIN</p>
+            <p className="text-[9px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</p>
           </div>
         </div>
       </CollapsibleSection>
@@ -759,25 +759,25 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--color-text-secondary)]">{t('referral.exampleWinner')}</span>
-                      <span className="font-bold">{fmt(winnerPayout)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({fmt(100 - COMMISSION_BPS / 100)}%)</span></span>
+                      <span className="font-bold">{fmt(winnerPayout)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({fmt(100 - COMMISSION_BPS / 100)}%)</span></span>
                     </div>
                     <div className="h-px bg-[var(--color-border)]" />
                     <div className="flex justify-between text-[11px]">
                       <span className="text-violet-400">{t('referral.exampleL1')}</span>
-                      <span className="font-bold text-violet-400">{fmt(exL1)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l1Bps)})</span></span>
+                      <span className="font-bold text-violet-400">{fmt(exL1)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l1Bps)})</span></span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-blue-400">{t('referral.exampleL2')}</span>
-                      <span className="font-bold text-blue-400">{fmt(exL2)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l2Bps)})</span></span>
+                      <span className="font-bold text-blue-400">{fmt(exL2)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l2Bps)})</span></span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-teal-400">{t('referral.exampleL3')}</span>
-                      <span className="font-bold text-teal-400">{fmt(exL3)} COIN <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l3Bps)})</span></span>
+                      <span className="font-bold text-teal-400">{fmt(exL3)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l3Bps)})</span></span>
                     </div>
                     <div className="h-px bg-[var(--color-border)]" />
                     <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
-                      <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} COIN <span className="font-normal">({bpsToPercent(COMMISSION_BPS - totalRefBps)})</span></span>
+                      <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} {GAME_TOKEN} <span className="font-normal">({bpsToPercent(COMMISSION_BPS - totalRefBps)})</span></span>
                     </div>
                   </div>
                 );
@@ -864,7 +864,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     {t('referral.claiming')}
                   </>
                 ) : (
-                  `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} COIN)`
+                  `${t('referral.claim')} (${formatLaunch(unclaimedAmount)} ${GAME_TOKEN})`
                 )}
               </button>
             )}
@@ -886,7 +886,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between">
-                        <p className="text-sm font-bold">{earned} <span className="text-[10px] font-normal text-[var(--color-text-secondary)]">COIN</span></p>
+                        <p className="text-sm font-bold">{earned} <span className="text-[10px] font-normal text-[var(--color-text-secondary)]">{GAME_TOKEN}</span></p>
                         <span className={`text-xs font-bold ${textColor}`}>{pct}</span>
                       </div>
                       <p className="text-[10px] text-[var(--color-text-secondary)]">

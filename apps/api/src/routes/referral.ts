@@ -10,7 +10,7 @@ import { getChainVaultBalance, invalidateBalanceCache } from './vault.js';
 import { relayerService } from '../services/relayer.js';
 import { Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode, gameDenom } from '../config/env.js';
 import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import { getDb } from '../lib/db.js';
 import { treasuryLedger } from '@coinflip/db/schema';
@@ -186,6 +186,7 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
     await getDb().insert(treasuryLedger).values({
       txhash: `branch_change:${userId}:${Date.now()}`,
       amount: cost,
+      denom: gameDenom(),
       source: 'branch_change_fee',
     });
   } catch (ledgerErr) {
@@ -261,7 +262,7 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
     return c.json({
       error: {
         code: 'BELOW_MINIMUM_CLAIM',
-        message: `Minimum claim amount is ${minCoin} COIN. Keep playing to accumulate more rewards.`,
+        message: `Minimum claim amount is ${minCoin} ${gameDenom()}. Keep playing to accumulate more rewards.`,
       },
     }, 400);
   }
@@ -406,6 +407,7 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
     await getDb().insert(treasuryLedger).values({
       txhash: transferResult.txHash ?? '',
       amount: `-${amount}`,
+      denom: gameDenom(),
       source: 'referral_payout',
     });
   } catch (ledgerErr) {
