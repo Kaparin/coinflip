@@ -47,7 +47,7 @@ export function JackpotBanner() {
               width={80}
               height={80}
               className="relative drop-shadow-[0_0_8px_rgba(251,113,133,0.4)]"
-              unoptimized
+              sizes="80px"
             />
           </div>
 
