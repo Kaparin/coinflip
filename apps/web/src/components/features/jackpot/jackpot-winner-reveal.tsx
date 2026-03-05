@@ -59,7 +59,7 @@ export function JackpotWinnerReveal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-500 ${
+      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 transition-all duration-500 ${
         visible ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={onClose}

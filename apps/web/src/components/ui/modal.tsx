@@ -150,7 +150,7 @@ export function Modal({
       onClick={handleOverlayClick}
       style={viewportStyles}
       className={[
-        'fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4',
+        'fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4',
         'bg-black/60 backdrop-blur-sm',
         'transition-[opacity,height,top] duration-200 ease-out',
         visible ? 'opacity-100' : 'opacity-0',
