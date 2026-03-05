@@ -11,9 +11,10 @@ import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-fram
 import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone, Users } from 'lucide-react';
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone, Users, Gift } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
+import { getAuthHeaders } from '@/lib/auth-headers';
 import { fetchPublicReferralStats, type PublicReferralStats } from '@/hooks/use-referral';
 import Link from 'next/link';
 import {
@@ -25,6 +26,8 @@ import {
   GiChart,
   GiSwordClash,
   GiOpenTreasureChest,
+  GiThreeFriends,
+  GiSandsOfTime,
 } from 'react-icons/gi';
 import type { IconType } from 'react-icons';
 
@@ -62,6 +65,8 @@ const TIER_BG = [
 
 const TIER_KEYS = ['', 'tierBronze', 'tierSilver', 'tierGold', 'tierPlatinum', 'tierDiamond'] as const;
 
+const TIER_REWARDS = [0, 5, 25, 100, 500, 2000] as const;
+
 // ─── Achievement Category Definitions ────────────────────
 
 interface AchievementTier {
@@ -84,6 +89,8 @@ interface AchProgressData {
   max_win_streak: number;
   net_pnl: number;      // in micro
   total_won: number;     // in micro
+  unique_opponents: number;
+  active_days: number;
 }
 
 const MICRO = 1_000_000;
@@ -93,11 +100,11 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     id: 'victor',
     icon: GiTrophy,
     tiers: [
-      { threshold: 100, label: '100' },
+      { threshold: 10, label: '10' },
+      { threshold: 50, label: '50' },
+      { threshold: 200, label: '200' },
+      { threshold: 500, label: '500' },
       { threshold: 1_000, label: '1K' },
-      { threshold: 5_000, label: '5K' },
-      { threshold: 10_000, label: '10K' },
-      { threshold: 25_000, label: '25K' },
     ],
     getValue: (p) => p.wins,
   },
@@ -105,11 +112,11 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     id: 'warrior',
     icon: GiCrossedSwords,
     tiers: [
-      { threshold: 1_000, label: '1K' },
+      { threshold: 25, label: '25' },
+      { threshold: 100, label: '100' },
+      { threshold: 500, label: '500' },
+      { threshold: 1_500, label: '1.5K' },
       { threshold: 5_000, label: '5K' },
-      { threshold: 10_000, label: '10K' },
-      { threshold: 50_000, label: '50K' },
-      { threshold: 100_000, label: '100K' },
     ],
     getValue: (p) => p.total_bets,
   },
@@ -117,11 +124,11 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     id: 'high_roller',
     icon: GiCrownCoin,
     tiers: [
+      { threshold: 100 * MICRO, label: '100' },
+      { threshold: 500 * MICRO, label: '500' },
+      { threshold: 1_000 * MICRO, label: '1K' },
       { threshold: 5_000 * MICRO, label: '5K' },
       { threshold: 10_000 * MICRO, label: '10K' },
-      { threshold: 50_000 * MICRO, label: '50K' },
-      { threshold: 100_000 * MICRO, label: '100K' },
-      { threshold: 500_000 * MICRO, label: '500K' },
     ],
     getValue: (p) => p.max_bet,
   },
@@ -129,11 +136,11 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     id: 'volume',
     icon: GiCoins,
     tiers: [
-      { threshold: 100_000 * MICRO, label: '100K' },
+      { threshold: 1_000 * MICRO, label: '1K' },
+      { threshold: 10_000 * MICRO, label: '10K' },
+      { threshold: 50_000 * MICRO, label: '50K' },
+      { threshold: 200_000 * MICRO, label: '200K' },
       { threshold: 1_000_000 * MICRO, label: '1M' },
-      { threshold: 5_000_000 * MICRO, label: '5M' },
-      { threshold: 10_000_000 * MICRO, label: '10M' },
-      { threshold: 50_000_000 * MICRO, label: '50M' },
     ],
     getValue: (p) => p.total_wagered,
   },
@@ -141,11 +148,11 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     id: 'streak',
     icon: GiChainLightning,
     tiers: [
-      { threshold: 300, label: '300' },
-      { threshold: 500, label: '500' },
-      { threshold: 700, label: '700' },
-      { threshold: 1_000, label: '1K' },
-      { threshold: 1_500, label: '1.5K' },
+      { threshold: 3, label: '3' },
+      { threshold: 5, label: '5' },
+      { threshold: 7, label: '7' },
+      { threshold: 10, label: '10' },
+      { threshold: 15, label: '15' },
     ],
     getValue: (p) => p.max_win_streak,
   },
@@ -154,12 +161,36 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
     icon: GiChart,
     tiers: [
       { threshold: 1, label: '>0' },
-      { threshold: 500_000 * MICRO, label: '500K' },
-      { threshold: 2_500_000 * MICRO, label: '2.5M' },
-      { threshold: 10_000_000 * MICRO, label: '10M' },
-      { threshold: 50_000_000 * MICRO, label: '50M' },
+      { threshold: 500 * MICRO, label: '500' },
+      { threshold: 2_500 * MICRO, label: '2.5K' },
+      { threshold: 10_000 * MICRO, label: '10K' },
+      { threshold: 50_000 * MICRO, label: '50K' },
     ],
     getValue: (p) => p.net_pnl > 0 ? p.net_pnl : 0,
+  },
+  {
+    id: 'social',
+    icon: GiThreeFriends,
+    tiers: [
+      { threshold: 3, label: '3' },
+      { threshold: 10, label: '10' },
+      { threshold: 25, label: '25' },
+      { threshold: 50, label: '50' },
+      { threshold: 100, label: '100' },
+    ],
+    getValue: (p) => p.unique_opponents,
+  },
+  {
+    id: 'loyal',
+    icon: GiSandsOfTime,
+    tiers: [
+      { threshold: 3, label: '3' },
+      { threshold: 7, label: '7' },
+      { threshold: 30, label: '30' },
+      { threshold: 90, label: '90' },
+      { threshold: 365, label: '365' },
+    ],
+    getValue: (p) => p.active_days,
   },
 ];
 
@@ -228,12 +259,14 @@ function AchievementModal({
   cat,
   tier,
   progressData,
+  claimedSet,
   onClose,
   t,
 }: {
   cat: AchievementCategory;
   tier: number;
   progressData: AchProgressData;
+  claimedSet: Set<string>;
   onClose: () => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
@@ -318,11 +351,14 @@ function AchievementModal({
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          {/* All tier levels */}
+          {/* All tier levels with rewards */}
           <div className="flex justify-between mt-3">
             {cat.tiers.map((tierDef, i) => {
               const tierNum = i + 1;
               const unlocked = tier >= tierNum;
+              const achId = `${cat.id}_${tierNum}`;
+              const claimed = claimedSet.has(achId);
+              const reward = TIER_REWARDS[tierNum] ?? 0;
               return (
                 <div key={i} className="flex flex-col items-center gap-1">
                   <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold ${
@@ -334,6 +370,11 @@ function AchievementModal({
                   </div>
                   <span className={`text-[8px] ${unlocked ? 'text-[var(--color-text)]' : 'text-[var(--color-text-secondary)]'}`}>
                     {tierDef.label}
+                  </span>
+                  <span className={`text-[7px] font-bold ${
+                    claimed ? 'text-[var(--color-success)]' : unlocked ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'
+                  }`}>
+                    {claimed ? '\u2713' : `${reward}`}
                   </span>
                 </div>
               );
@@ -363,6 +404,7 @@ export default function PlayerProfilePage() {
   const [reactingEmoji, setReactingEmoji] = useState<string | null>(null);
   const [selectedAch, setSelectedAch] = useState<string | null>(null);
   const [refStats, setRefStats] = useState<PublicReferralStats | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const isOwnProfile = myAddress?.toLowerCase() === rawAddress?.toLowerCase();
 
@@ -387,6 +429,8 @@ export default function PlayerProfilePage() {
       max_win_streak: p.max_win_streak,
       net_pnl: totalWon - totalWagered,
       total_won: totalWon,
+      unique_opponents: (p as any).unique_opponents ?? 0,
+      active_days: (p as any).active_days ?? 0,
     };
   }, [profile?.achievements]);
 
@@ -404,6 +448,42 @@ export default function PlayerProfilePage() {
   }, [achievementTiers]);
 
   const totalPossible = ACHIEVEMENT_CATEGORIES.length * 5;
+
+  const claimedSet = useMemo(() => {
+    const claimed = (profile?.achievements as any)?.claimed as string[] | undefined;
+    return new Set(claimed ?? []);
+  }, [profile?.achievements]);
+
+  const unclaimedCount = useMemo(() => {
+    if (!achProgressData) return 0;
+    let count = 0;
+    for (const cat of ACHIEVEMENT_CATEGORIES) {
+      const tier = achievementTiers[cat.id] ?? 0;
+      for (let i = 1; i <= tier; i++) {
+        if (!claimedSet.has(`${cat.id}_${i}`)) count++;
+      }
+    }
+    return count;
+  }, [achProgressData, achievementTiers, claimedSet]);
+
+  const handleClaimRewards = useCallback(async () => {
+    if (isClaiming) return;
+    setIsClaiming(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/users/achievements/claim`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Claim failed');
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/users', rawAddress] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+    } catch {
+      // silently fail
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [isClaiming, rawAddress, queryClient]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(rawAddress).catch(() => {});
@@ -650,7 +730,7 @@ export default function PlayerProfilePage() {
             </span>
           }
         >
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {ACHIEVEMENT_CATEGORIES.map((cat) => {
               const tier = achievementTiers[cat.id] ?? 0;
               const Icon = cat.icon;
@@ -690,6 +770,23 @@ export default function PlayerProfilePage() {
               );
             })}
           </div>
+
+          {/* Claim rewards button — only on own profile */}
+          {isOwnProfile && unclaimedCount > 0 && (
+            <button
+              type="button"
+              onClick={handleClaimRewards}
+              disabled={isClaiming}
+              className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-warning)] px-4 py-2.5 text-sm font-bold text-black transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+            >
+              {isClaiming ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Gift size={16} />
+              )}
+              {t('playerProfile.achClaimAll')} ({unclaimedCount})
+            </button>
+          )}
         </CollapsibleSection>
       )}
 
@@ -966,6 +1063,7 @@ export default function PlayerProfilePage() {
           cat={selectedCategory}
           tier={achievementTiers[selectedCategory.id] ?? 0}
           progressData={achProgressData}
+          claimedSet={claimedSet}
           onClose={() => setSelectedAch(null)}
           t={t}
         />

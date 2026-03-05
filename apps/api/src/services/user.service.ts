@@ -702,7 +702,7 @@ export class UserService {
    * Returns earned achievement IDs + extra stats needed for progress tracking.
    */
   async getUserAchievements(userId: string) {
-    // Single query: stats + max bet + best win streak
+    // Single query: stats + max bet + best win streak + unique opponents + active days
     const rows = await this.db.execute(sql`
       with user_bets as (
         select
@@ -711,6 +711,8 @@ export class UserService {
           b.payout_amount::numeric as payout,
           b.winner_user_id,
           b.resolved_time,
+          b.maker_user_id,
+          b.acceptor_user_id,
           case when b.winner_user_id = ${userId} then true else false end as is_win
         from bets b
         where (b.maker_user_id = ${userId} or b.acceptor_user_id = ${userId})
@@ -733,6 +735,19 @@ export class UserService {
           where is_win = true
           group by grp
         ) sub
+      ),
+      opponents as (
+        select count(distinct opponent_id)::int as unique_opponents
+        from (
+          select case when maker_user_id = ${userId} then acceptor_user_id else maker_user_id end as opponent_id
+          from user_bets
+          where acceptor_user_id is not null
+        ) sub
+      ),
+      active as (
+        select count(distinct resolved_time::date)::int as active_days
+        from user_bets
+        where resolved_time is not null
       )
       select
         count(*)::int as total_bets,
@@ -741,7 +756,9 @@ export class UserService {
         coalesce(sum(case when is_win then payout else 0 end), 0)::text as total_won,
         coalesce(max(amount), 0)::text as max_bet,
         coalesce(max(case when is_win then payout else null end), 0)::text as max_win_payout,
-        coalesce((select max_win_streak from streak_lengths), 0)::int as max_win_streak
+        coalesce((select max_win_streak from streak_lengths), 0)::int as max_win_streak,
+        coalesce((select unique_opponents from opponents), 0)::int as unique_opponents,
+        coalesce((select active_days from active), 0)::int as active_days
       from user_bets
     `);
 
@@ -755,41 +772,11 @@ export class UserService {
     const maxBet = Number(r?.max_bet ?? 0);
     const maxWinPayout = Number(r?.max_win_payout ?? 0);
     const maxWinStreak = Number(r?.max_win_streak ?? 0);
-
-    // 1 LAUNCH = 1_000_000 micro
-    const MICRO = 1_000_000;
-
-    const earned: string[] = [];
-
-    // Win milestones
-    if (wins >= 100) earned.push('first_win');
-    if (wins >= 1_000) earned.push('wins_10');
-    if (wins >= 5_000) earned.push('wins_50');
-    if (wins >= 10_000) earned.push('wins_100');
-
-    // Games milestones
-    if (totalBets >= 10_000) earned.push('veteran');
-    if (totalBets >= 50_000) earned.push('legend');
-
-    // Bet size
-    if (maxBet >= 10_000 * MICRO) earned.push('high_roller');
-    if (maxBet >= 50_000 * MICRO) earned.push('whale');
-
-    // Volume
-    if (totalWagered >= 100_000 * MICRO) earned.push('volume_1k');
-    if (totalWagered >= 1_000_000 * MICRO) earned.push('volume_10k');
-    if (totalWagered >= 10_000_000 * MICRO) earned.push('volume_100k');
-
-    // Profitability
-    if (totalWon > totalWagered && totalBets >= 500) earned.push('profitable');
-
-    // Win streaks
-    if (maxWinStreak >= 300) earned.push('streak_3');
-    if (maxWinStreak >= 500) earned.push('streak_5');
-    if (maxWinStreak >= 1_000) earned.push('streak_10');
+    const uniqueOpponents = Number(r?.unique_opponents ?? 0);
+    const activeDays = Number(r?.active_days ?? 0);
 
     return {
-      earned,
+      earned: [], // legacy field, kept for backward compat
       progress: {
         total_bets: totalBets,
         wins,
@@ -798,8 +785,94 @@ export class UserService {
         max_bet: String(maxBet),
         max_win_payout: String(maxWinPayout),
         max_win_streak: maxWinStreak,
+        unique_opponents: uniqueOpponents,
+        active_days: activeDays,
       },
     };
+  }
+  /**
+   * Get all achievement claims for a user.
+   */
+  async getAchievementClaims(userId: string): Promise<string[]> {
+    const rows = await this.db.execute(sql`
+      SELECT achievement_id FROM achievement_claims WHERE user_id = ${userId}
+    `);
+    const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<{ achievement_id: string }>;
+    return rawRows.map((r) => r.achievement_id);
+  }
+
+  /**
+   * Claim COIN rewards for all unclaimed achievements.
+   * Returns total COIN awarded and list of newly claimed achievement IDs.
+   */
+  async claimAchievementRewards(userId: string): Promise<{ claimed: string[]; totalCoin: number }> {
+    // Reward per tier: Bronze=5, Silver=25, Gold=100, Platinum=500, Diamond=2000
+    const TIER_REWARDS = [0, 5, 25, 100, 500, 2000];
+
+    // Achievement thresholds matching frontend
+    const MICRO = 1_000_000;
+    const CATEGORIES = [
+      { id: 'victor', thresholds: [10, 50, 200, 500, 1000], getVal: (p: any) => p.wins },
+      { id: 'warrior', thresholds: [25, 100, 500, 1500, 5000], getVal: (p: any) => p.total_bets },
+      { id: 'high_roller', thresholds: [100*MICRO, 500*MICRO, 1000*MICRO, 5000*MICRO, 10000*MICRO], getVal: (p: any) => p.max_bet },
+      { id: 'volume', thresholds: [1000*MICRO, 10000*MICRO, 50000*MICRO, 200000*MICRO, 1000000*MICRO], getVal: (p: any) => p.total_wagered },
+      { id: 'streak', thresholds: [3, 5, 7, 10, 15], getVal: (p: any) => p.max_win_streak },
+      { id: 'profit', thresholds: [1, 500*MICRO, 2500*MICRO, 10000*MICRO, 50000*MICRO], getVal: (p: any) => p.net_pnl > 0 ? p.net_pnl : 0 },
+      { id: 'social', thresholds: [3, 10, 25, 50, 100], getVal: (p: any) => p.unique_opponents },
+      { id: 'loyal', thresholds: [3, 7, 30, 90, 365], getVal: (p: any) => p.active_days },
+    ];
+
+    // Get current progress
+    const achData = await this.getUserAchievements(userId);
+    const p = achData.progress;
+    const progressData = {
+      ...p,
+      total_wagered: Number(p.total_wagered),
+      total_won: Number(p.total_won),
+      max_bet: Number(p.max_bet),
+      net_pnl: Number(p.total_won) - Number(p.total_wagered),
+    };
+
+    // Get already claimed
+    const alreadyClaimed = new Set(await this.getAchievementClaims(userId));
+
+    // Compute which tiers are earned but unclaimed
+    const toClaim: { achievementId: string; coinAmount: number }[] = [];
+    for (const cat of CATEGORIES) {
+      const val = cat.getVal(progressData);
+      for (let i = 0; i < cat.thresholds.length; i++) {
+        if (val >= cat.thresholds[i]!) {
+          const achId = `${cat.id}_${i + 1}`;
+          if (!alreadyClaimed.has(achId)) {
+            toClaim.push({ achievementId: achId, coinAmount: TIER_REWARDS[i + 1]! });
+          }
+        }
+      }
+    }
+
+    if (toClaim.length === 0) return { claimed: [], totalCoin: 0 };
+
+    // Insert claims and credit vault balance
+    const totalCoin = toClaim.reduce((s, c) => s + c.coinAmount, 0);
+    const totalMicro = BigInt(totalCoin) * BigInt(MICRO);
+
+    for (const claim of toClaim) {
+      await this.db.execute(sql`
+        INSERT INTO achievement_claims (user_id, achievement_id, coin_amount)
+        VALUES (${userId}, ${claim.achievementId}, ${claim.coinAmount})
+        ON CONFLICT (user_id, achievement_id) DO NOTHING
+      `);
+    }
+
+    // Credit COIN to vault balance
+    await this.db.execute(sql`
+      UPDATE vault_balances
+      SET available = (available::numeric + ${totalMicro.toString()})::text
+      WHERE user_id = ${userId}
+    `);
+
+    logger.info({ userId, claimed: toClaim.length, totalCoin }, 'Achievement rewards claimed');
+    return { claimed: toClaim.map((c) => c.achievementId), totalCoin };
   }
 }
 

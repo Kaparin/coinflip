@@ -216,7 +216,7 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
   if (!user) throw Errors.userNotFound();
 
   const db = getDb();
-  const [stats, recentBetsResult, achievements, reactions, vipTier, jackpotWins] = await Promise.all([
+  const [stats, recentBetsResult, achievements, reactions, vipTier, jackpotWins, achievementClaims] = await Promise.all([
     userService.getUserStats(user.id),
     userService.getPlayerRecentBets(user.id, limit, offset),
     userService.getUserAchievements(user.id),
@@ -234,6 +234,7 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       .where(eq(jackpotPools.winnerUserId, user.id))
       .orderBy(sql`${jackpotPools.completedAt} DESC NULLS LAST`)
       .limit(10),
+    userService.getAchievementClaims(user.id),
   ]);
 
   // Fetch Diamond customization if applicable
@@ -262,7 +263,10 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       recent_bets: recentBetsResult.bets,
       recent_bets_total: recentBetsResult.total,
       h2h,
-      achievements,
+      achievements: {
+        ...achievements,
+        claimed: achievementClaims,
+      },
       reactions,
       my_reaction: myReaction,
       jackpot_wins: jackpotWins.map((jw) => ({
@@ -277,4 +281,11 @@ usersRouter.get('/:address', optionalAuthMiddleware, zValidator('query', PlayerP
       } : null,
     },
   });
+});
+
+// POST /api/v1/users/achievements/claim — Claim COIN rewards for earned achievements
+usersRouter.post('/achievements/claim', authMiddleware, async (c) => {
+  const authUser = c.get('user');
+  const result = await userService.claimAchievementRewards(authUser.id);
+  return c.json({ data: result });
 });

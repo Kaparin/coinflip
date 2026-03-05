@@ -142,7 +142,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const raffleSeed = resultsResponse?.data?.raffleSeed ?? null;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-4 overflow-y-auto">
+    <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-6 space-y-4 overflow-y-auto">
       {/* Back link */}
       <Link href="/game/events" className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} />
