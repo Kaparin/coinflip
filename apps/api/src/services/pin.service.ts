@@ -15,7 +15,6 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { Errors } from '../lib/errors.js';
 import { vaultService } from './vault.service.js';
-import { gameDenom } from '../config/env.js';
 
 class PinService {
   /**
@@ -142,10 +141,10 @@ class PinService {
       requiredPrice = PIN_MIN_PRICE;
     }
 
-    // Deduct from user's available balance
-    const deducted = await vaultService.deductBalance(userId, requiredPrice);
+    // Deduct from user's COIN balance (pins are paid in COIN utility token)
+    const deducted = await vaultService.deductCoin(userId, requiredPrice);
     if (!deducted) {
-      throw Errors.insufficientBalance(requiredPrice, '(check your balance)');
+      throw Errors.insufficientBalance(requiredPrice, '(check your COIN balance)');
     }
 
     // Upsert pin slot
@@ -168,11 +167,11 @@ class PinService {
         },
       });
 
-    // Record revenue
+    // Record revenue (pins always in COIN)
     await db.insert(treasuryLedger).values({
       txhash: `pin_${crypto.randomUUID()}`,
       amount: requiredPrice,
-      denom: gameDenom(),
+      denom: 'COIN',
       source: 'bet_pin',
     });
 
@@ -212,8 +211,8 @@ class PinService {
         const refundAmount = ((BigInt(pin.price) * BigInt(PIN_EXPIRE_REFUND_BPS)) / 10000n).toString();
 
         if (BigInt(refundAmount) > 0n) {
-          // Credit refund to bonus balance
-          await vaultService.creditWinner(pin.user_id, refundAmount);
+          // Credit refund to COIN balance (pins are COIN-denominated)
+          await vaultService.creditCoin(pin.user_id, refundAmount);
 
           logger.info(
             { slot: pin.slot, betId: pin.bet_id, userId: pin.user_id, refund: refundAmount },

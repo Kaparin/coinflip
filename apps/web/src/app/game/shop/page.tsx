@@ -1,18 +1,16 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { CheckCircle, ExternalLink, Loader2, Store, AlertTriangle, ArrowRight, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle, ExternalLink, Loader2, Store, AlertTriangle, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useNativeBalance } from '@/hooks/use-wallet-balance';
-import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useWebSocketContext } from '@/contexts/websocket-context';
 import { GameTokenIcon, AxmIcon } from '@/components/ui';
-import { signBankSendSync, signDepositTxBytes } from '@/lib/wallet-signer';
-import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
+import { signBankSendSync } from '@/lib/wallet-signer';
 import { Modal } from '@/components/ui/modal';
-import { EXPLORER_URL, API_URL, TREASURY_ADDRESS, isAxmMode } from '@/lib/constants';
+import { EXPLORER_URL, API_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
@@ -28,8 +26,6 @@ export default function ShopPage() {
   const { isConnected, address, getWallet } = useWalletContext();
   const queryClient = useQueryClient();
   const { data: nativeBalance } = useNativeBalance(address);
-  const { data: grantStatus } = useGrantStatus();
-  const oneClickEnabled = grantStatus?.authz_granted ?? false;
 
   // Load tier config from server
   const { data: shopConfig, isLoading: configLoading } = useQuery({
@@ -86,23 +82,17 @@ export default function ShopPage() {
     reason: string;
   } | null>(null);
 
-  // Post-purchase deposit flow
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [depositStep, setDepositStep] = useState<'signing' | 'broadcasting' | 'confirming' | null>(null);
-  const [depositDone, setDepositDone] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
   const nativeHuman = Number(nativeBalance ?? '0') / 1_000_000;
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   const refreshBalances = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
-    queryClient.invalidateQueries({ queryKey: walletBalanceQueryKey(null) });
+    if (address) queryClient.invalidateQueries({ queryKey: walletBalanceQueryKey(address) });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'purchase-status'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'config'] });
-  }, [queryClient]);
+  }, [queryClient, address]);
 
   // WS listeners for background purchase confirmation
   const { subscribe } = useWebSocketContext();
@@ -110,8 +100,7 @@ export default function ShopPage() {
   useEffect(() => {
     const unsub = subscribe((event) => {
       if (event.type === 'purchase_confirmed') {
-        const data = event.data as { coin_amount?: string; coin_tx_hash?: string };
-        // Auto-trigger deposit after COIN arrives on wallet
+        const data = event.data as { coin_amount?: string };
         setSuccessTx((prev) => {
           if (prev) {
             return { ...prev, coinAmount: Number(data.coin_amount ?? prev.coinAmount) };
@@ -131,55 +120,6 @@ export default function ShopPage() {
     return unsub;
   }, [subscribe, refreshBalances]);
 
-  const handleDeposit = useCallback(async () => {
-    if (!address || !successTx || isDepositing) return;
-    const coinAmount = successTx.coinAmount;
-    if (!coinAmount || coinAmount <= 0) return;
-
-    setIsDepositing(true);
-    setDepositStep('signing');
-    setError(null);
-
-    try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-
-      const { txBytes } = await signDepositTxBytes(wallet, address, coinAmount);
-      setDepositStep('broadcasting');
-
-      const res = await fetch(`${API_URL}/api/v1/vault/deposit/broadcast`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-wallet-address': address,
-          ...getAuthHeaders(),
-        },
-        credentials: 'include',
-        body: JSON.stringify({ tx_bytes: txBytes }),
-      });
-
-      setDepositStep('confirming');
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error?.message || 'Deposit broadcast failed');
-      }
-
-      setDepositDone(true);
-      refreshBalances();
-
-      if (!oneClickEnabled) {
-        setTimeout(() => setShowOnboarding(true), 1500);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(getUserFriendlyError(msg, t, 'generic'));
-      refreshBalances();
-    } finally {
-      setIsDepositing(false);
-      setDepositStep(null);
-    }
-  }, [address, successTx, isDepositing, getWallet, refreshBalances, oneClickEnabled, t]);
-
   const handleBuy = useCallback(async (tier: ChestTier) => {
     if (!address || isBuying) return;
 
@@ -187,7 +127,6 @@ export default function ShopPage() {
 
     setError(null);
     setSuccessTx(null);
-    setDepositDone(false);
     setIsBuying(true);
     setBuyStep('signing');
 
@@ -290,7 +229,7 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Success card — COIN is being sent / was sent */}
+      {/* Success card — COIN credited to balance */}
       {successTx && (
         <div className="rounded-xl border px-4 py-3 space-y-3 border-[var(--color-success)]/30 bg-[var(--color-success)]/10">
           <div className="flex items-center gap-2">
@@ -307,9 +246,6 @@ export default function ShopPage() {
               </p>
             )}
           </div>
-          <p className="text-[10px] text-[var(--color-text-secondary)]">
-            {t('shop.coinSending')}
-          </p>
           <a
             href={`${EXPLORER_URL}/transactions/${successTx.txHash}`}
             target="_blank"
@@ -318,48 +254,13 @@ export default function ShopPage() {
           >
             {t('presale.txHash')} <ExternalLink size={10} />
           </a>
-
-          {/* Auto-deposit buttons */}
-          {!depositDone && (
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleDeposit}
-                disabled={isDepositing}
-                className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-3 text-xs font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] disabled:opacity-50 active:scale-[0.98]"
-              >
-                {isDepositing ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    {depositStep === 'signing' ? t('presale.depositSigning')
-                      : depositStep === 'broadcasting' ? t('presale.depositBroadcasting')
-                      : depositStep === 'confirming' ? t('presale.depositConfirming')
-                      : t('presale.depositing')}
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight size={14} />
-                    {t('presale.depositAndPlay')}
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSuccessTx(null)}
-                disabled={isDepositing}
-                className="flex-1 rounded-xl border border-[var(--color-border)] px-3 py-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-              >
-                {t('presale.depositLater')}
-              </button>
-            </div>
-          )}
-
-          {depositDone && (
-            <div className="flex items-center gap-2 rounded-lg bg-[var(--color-success)]/15 px-3 py-2">
-              <CheckCircle size={14} className="text-[var(--color-success)]" />
-              <p className="text-xs font-bold text-[var(--color-success)]">{t('presale.depositSuccess')}</p>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setSuccessTx(null)}
+            className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
+          >
+            OK
+          </button>
         </div>
       )}
 
@@ -580,7 +481,6 @@ export default function ShopPage() {
         )}
       </Modal>
 
-      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
     </div>
   );
 }

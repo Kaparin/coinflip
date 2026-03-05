@@ -7,6 +7,7 @@ import { adminMiddleware } from '../middleware/admin.js';
 import { getDb } from '../lib/db.js';
 import { shopPurchases, userNotifications } from '@coinflip/db/schema';
 import { treasuryService } from '../services/treasury.service.js';
+import { vaultService } from '../services/vault.service.js';
 import { configService } from '../services/config.service.js';
 import { wsService } from '../services/ws.service.js';
 import { logger } from '../lib/logger.js';
@@ -253,31 +254,20 @@ function resolveShopPurchaseInBackground(
       const result = await pollForTxSimple(txHash, 90_000);
 
       if (result && result.code === 0) {
-        // AXM payment confirmed on-chain — now send real COIN from treasury
+        // AXM payment confirmed on-chain — credit COIN to user's DB balance
         const microCoin = String(Math.floor(tierConfig.coinAmount * 1_000_000));
-
-        let coinTxHash: string | undefined;
-        let bonusTxHash: string | undefined;
+        const totalMicroCoin = isFirstPurchase
+          ? String(Math.floor(tierConfig.coinAmount * 2 * 1_000_000))
+          : microCoin;
 
         try {
-          // Send main COIN amount (always CW20, regardless of GAME_CURRENCY)
-          const coinResult = await treasuryService.sendCoin(address, microCoin);
-          coinTxHash = coinResult.txHash;
-
-          // Send bonus COIN for first purchase
-          if (isFirstPurchase) {
-            const bonusResult = await treasuryService.sendCoin(address, microCoin);
-            bonusTxHash = bonusResult.txHash;
-          }
+          // Credit COIN balance in DB (no on-chain CW20 transfer needed)
+          await vaultService.creditCoin(userId, totalMicroCoin);
 
           // Mark as confirmed
           await db
             .update(shopPurchases)
-            .set({
-              status: 'confirmed',
-              coinTxHash: coinTxHash ?? null,
-              bonusTxHash: bonusTxHash ?? null,
-            })
+            .set({ status: 'confirmed' })
             .where(eq(shopPurchases.id, purchaseId));
 
           const totalCoin = isFirstPurchase ? tierConfig.coinAmount * 2 : tierConfig.coinAmount;
@@ -286,15 +276,12 @@ function resolveShopPurchaseInBackground(
             type: 'purchase_confirmed',
             data: {
               tx_hash: txHash,
-              coin_tx_hash: coinTxHash,
-              bonus_tx_hash: bonusTxHash,
               coin_amount: String(totalCoin),
             },
           });
 
-          logger.info({ purchaseId, txHash, coinTxHash, bonusTxHash }, 'Shop purchase confirmed — COIN sent');
+          logger.info({ purchaseId, txHash, totalMicroCoin, isFirstPurchase }, 'Shop purchase confirmed — COIN credited to DB');
         } catch (err) {
-          // COIN transfer failed — mark purchase as coin_failed
           const reason = err instanceof Error ? err.message : String(err);
 
           await db
@@ -306,16 +293,16 @@ function resolveShopPurchaseInBackground(
             userId,
             type: 'purchase_failed',
             title: 'Purchase failed',
-            message: `Your AXM payment was received but COIN transfer failed. Please contact support.`,
+            message: `Your AXM payment was received but COIN credit failed. Please contact support.`,
             metadata: { tx_hash: txHash, reason },
           });
 
           wsService.sendToAddress(address, {
             type: 'purchase_failed',
-            data: { tx_hash: txHash, reason: 'COIN transfer failed. Contact support.' },
+            data: { tx_hash: txHash, reason: 'COIN credit failed. Contact support.' },
           });
 
-          logger.error({ purchaseId, txHash, err }, 'COIN transfer failed after AXM payment confirmed');
+          logger.error({ purchaseId, txHash, err }, 'COIN credit failed after AXM payment confirmed');
         }
         return;
       }

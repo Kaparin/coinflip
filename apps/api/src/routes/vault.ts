@@ -134,10 +134,11 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  // Fetch chain balance + DB offchain columns + open bet count in parallel
-  const [chainBalance, offchain, dbOpenCount] = await Promise.all([
+  // Fetch chain balance + DB offchain columns + COIN balance + open bet count in parallel
+  const [chainBalance, offchain, coinBalance, dbOpenCount] = await Promise.all([
     getChainVaultBalance(address),
     vaultService.getOffchainBalances(user.id),
+    vaultService.getCoinBalance(user.id),
     betService.getOpenBetCountForUser(user.id),
   ]);
 
@@ -195,6 +196,7 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
       available: available.toString(),
       locked: locked.toString(),
       total: total.toString(),
+      coin_balance: coinBalance,
       pending_bets: pendingBets,
       open_bets_count: openBetsCount,
     },

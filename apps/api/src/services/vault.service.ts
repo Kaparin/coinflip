@@ -285,6 +285,70 @@ export class VaultService {
       'Prize credited to bonus balance',
     );
   }
+  // ─── COIN balance methods (separate utility token) ────────────────
+
+  /**
+   * Get user's COIN (CW20 utility token) balance from DB.
+   */
+  async getCoinBalance(userId: string): Promise<string> {
+    const row = await this.db.query.vaultBalances.findFirst({
+      where: eq(vaultBalances.userId, userId),
+      columns: { coinBalance: true },
+    });
+    return row?.coinBalance ?? '0';
+  }
+
+  /**
+   * Credit COIN to user's balance. Creates row if not exists.
+   * Used by Shop when user buys COIN with AXM.
+   */
+  async creditCoin(userId: string, amount: string) {
+    const result = await this.db
+      .insert(vaultBalances)
+      .values({ userId, coinBalance: amount })
+      .onConflictDoUpdate({
+        target: vaultBalances.userId,
+        set: {
+          coinBalance: sql`${vaultBalances.coinBalance}::numeric + ${amount}::numeric`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    logger.info(
+      { userId, amount, newCoinBalance: result[0]?.coinBalance },
+      'COIN credited to user balance',
+    );
+    return result[0];
+  }
+
+  /**
+   * Atomically deduct COIN from user's balance.
+   * Used for pin purchases and other COIN-denominated features.
+   * Returns the updated row, or null if insufficient COIN balance.
+   */
+  async deductCoin(userId: string, amount: string) {
+    const result = await this.db
+      .update(vaultBalances)
+      .set({
+        coinBalance: sql`${vaultBalances.coinBalance}::numeric - ${amount}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(vaultBalances.userId, userId),
+          sql`${vaultBalances.coinBalance}::numeric >= ${amount}::numeric`,
+        ),
+      )
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ userId, amount }, 'deductCoin: insufficient COIN balance');
+      return null;
+    }
+
+    return result[0];
+  }
 }
 
 export const vaultService = new VaultService();

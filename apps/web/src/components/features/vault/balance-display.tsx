@@ -462,6 +462,8 @@ export function BalanceDisplay() {
   const isOperationInFlight = depositStatus === 'signing' || depositStatus === 'broadcasting' || withdrawMutation.isPending || withdrawStatus === 'signing';
 
   const balance = data?.data;
+  const coinBalanceMicro = BigInt((balance as any)?.coin_balance ?? '0');
+  const coinBalanceHuman = fromMicroLaunch(coinBalanceMicro);
   const rawAvailableMicro = BigInt(balance?.available ?? '0');
   const rawLockedMicro = BigInt(balance?.locked ?? '0');
 
@@ -777,6 +779,17 @@ export function BalanceDisplay() {
                 <p className="text-lg font-bold tabular-nums">{fmtNum(totalHuman)}</p>
               </div>
             </div>
+
+            {/* COIN utility token balance (from Shop, used for pins) */}
+            {isAxmMode() && (
+              <div className="flex items-center justify-between rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-2.5 mb-3">
+                <div className="flex items-center gap-2">
+                  <Image src="/coin-token-logo.png" alt="COIN" width={22} height={22} className="inline-block align-middle object-contain shrink-0" />
+                  <span className="text-[10px] uppercase text-[var(--color-text-secondary)] font-medium">COIN</span>
+                </div>
+                <span className="text-sm font-bold tabular-nums">{fmtNum(coinBalanceHuman)}</span>
+              </div>
+            )}
 
             {/* AXM native balance (gas) — hidden in AXM mode since wallet balance IS AXM */}
             {!isAxmMode() && (
