@@ -364,11 +364,11 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
             case 'balance_updated':
-              // Skip vault balance invalidation during deposit/withdraw grace period.
-              // The optimistic setQueryData has the correct value; a refetch now would
-              // overwrite it with stale data from the server's chain cache.
+              // Skip during grace period — optimistic update is more accurate
               if (!isInBalanceGracePeriod()) {
-                scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
+                pendingInvalidations.current.add('/api/v1/vault/balance');
+                pendingInvalidations.current.add(WALLET_BALANCE_KEY);
+                flushInvalidations();
               }
               break;
             case 'event_started':
@@ -379,14 +379,14 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
             case 'deposit_confirmed':
-              // Async deposit confirmed — clear grace period so refetch isn't blocked
-              clearBalanceGracePeriod();
-              scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
-              break;
             case 'deposit_failed':
-              // Async deposit failed — clear grace period and refetch to revert optimistic update
+            case 'withdraw_confirmed':
+            case 'withdraw_failed':
+              // Critical balance events — clear grace period and refetch immediately (no debounce)
               clearBalanceGracePeriod();
-              scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
+              pendingInvalidations.current.add('/api/v1/vault/balance');
+              pendingInvalidations.current.add(WALLET_BALANCE_KEY);
+              flushInvalidations();
               break;
             case 'jackpot_updated':
             case 'jackpot_won':

@@ -535,7 +535,8 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     const granter = await resolveGasGranter(user.id, address);
 
     try {
-      relayResult = await relayerService.relayWithdraw(address, amount, false, granter);
+      // Use async mode: broadcastTxSync returns tx hash instantly from mempool
+      relayResult = await relayerService.relayWithdraw(address, amount, true, granter);
     } catch (err) {
       // Relay failed — unlock funds
       await vaultService.unlockFunds(user.id, amount).catch(e =>
@@ -544,49 +545,82 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     }
 
     if (!relayResult.success) {
-      // Chain rejected — unlock funds
+      // CheckTx rejected — unlock funds
       await vaultService.unlockFunds(user.id, amount).catch(e =>
         logger.warn({ err: e }, 'Failed to unlock funds after withdraw chain error'));
       logger.error({ relayResult, address, amount }, 'Withdraw relay failed');
       throwRelayError(relayResult);
     }
 
-    // Success — invalidate cache first, then fetch fresh balance from chain
-    invalidateBalanceCache(address);
-    const newChainBalance = await getChainVaultBalance(address);
-    await vaultService.syncBalanceFromChain(
-      user.id,
-      newChainBalance.available,
-      newChainBalance.locked,
-      BigInt(relayResult.height ?? 0),
-    );
-
-    // Notify via WS
-    wsService.sendToAddress(address, {
-      type: 'balance_updated',
-      data: { available: newChainBalance.available, locked: newChainBalance.locked },
-    });
+    const txHash = relayResult.txHash ?? '';
+    logger.info({ txHash, address, amount }, 'Withdraw tx in mempool — returning 202');
   } finally {
     releaseInflight(address);
   }
 
-  // Fire-and-forget: sweep user's offchain_spent to treasury in background
-  vaultService.getOffchainBalances(user.id).then(async ({ offchainSpent }) => {
-    if (BigInt(offchainSpent) <= 0n) return;
+  const txHash = relayResult.txHash ?? '';
+
+  // Background: poll for confirmation, sync balance, notify via WS
+  (async () => {
     try {
-      const { treasurySweepService } = await import('../services/treasury-sweep.service.js');
-      await treasurySweepService.sweepSingleUser(user.id, address, offchainSpent);
+      const result = await pollTxConfirmation(txHash, 60_000);
+      if (!result) {
+        logger.warn({ txHash, address }, 'Withdraw poll timeout (60s)');
+        // Unlock funds since we can't confirm
+        await vaultService.unlockFunds(user.id, amount).catch(() => {});
+        wsService.sendToAddress(address, {
+          type: 'withdraw_failed',
+          data: { tx_hash: txHash, reason: 'Transaction confirmation timed out.' },
+        });
+        return;
+      }
+      if (result.code !== 0) {
+        logger.error({ txHash, address, rawLog: result.rawLog }, 'Withdraw failed on chain');
+        await vaultService.unlockFunds(user.id, amount).catch(() => {});
+        wsService.sendToAddress(address, {
+          type: 'withdraw_failed',
+          data: { tx_hash: txHash, reason: result.rawLog },
+        });
+        return;
+      }
+
+      // Confirmed — sync balance
+      logger.info({ txHash, address, height: result.height }, 'Withdraw confirmed on chain');
+      await new Promise(r => setTimeout(r, 1_500));
+      invalidateBalanceCache(address);
+      const newChainBalance = await getChainVaultBalance(address);
+      await vaultService.syncBalanceFromChain(
+        user.id,
+        newChainBalance.available,
+        newChainBalance.locked,
+        BigInt(result.height),
+      );
+      wsService.sendToAddress(address, {
+        type: 'withdraw_confirmed',
+        data: { tx_hash: txHash, height: result.height, amount },
+      });
+      wsService.sendToAddress(address, {
+        type: 'balance_updated',
+        data: { available: newChainBalance.available, locked: newChainBalance.locked },
+      });
+
+      // Sweep offchain_spent in background
+      const { offchainSpent } = await vaultService.getOffchainBalances(user.id);
+      if (BigInt(offchainSpent) > 0n) {
+        const { treasurySweepService } = await import('../services/treasury-sweep.service.js');
+        await treasurySweepService.sweepSingleUser(user.id, address, offchainSpent);
+      }
     } catch (err) {
-      logger.warn({ err, userId: user.id }, 'Auto-sweep after withdrawal failed (non-critical)');
+      logger.error({ err, txHash, address }, 'Withdraw background poll error');
     }
-  }).catch(() => {});
+  })();
 
   return c.json({
     data: {
-      status: 'confirmed',
+      status: 'pending',
       amount,
-      tx_hash: relayResult.txHash,
-      message: 'Withdrawal confirmed on chain.',
+      tx_hash: txHash,
+      message: 'Withdrawal submitted. You will be notified when confirmed.',
     },
-  });
+  }, 202);
 });

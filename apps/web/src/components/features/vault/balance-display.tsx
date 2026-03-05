@@ -397,20 +397,14 @@ export function BalanceDisplay() {
           };
         });
 
-        // Optimistic update: add to wallet CW20 balance
+        // Optimistic update: add to wallet native balance
         queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
           return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
         });
 
-        // Protect optimistic update from stale WS-triggered refetches
-        setBalanceGracePeriod(8_000);
+        // Short grace period — WS withdraw_confirmed will clear it and trigger refetch
+        setBalanceGracePeriod(4_000);
         queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
-
-        // Refetch after grace period for eventual consistency
-        setTimeout(() => {
-          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
-        }, 8_000);
       },
       onError: (err) => {
         const error = err as { error?: { message?: string; details?: { txHash?: string }; code?: string } };
@@ -643,20 +637,10 @@ export function BalanceDisplay() {
         return (newBal < 0n ? 0n : newBal).toString();
       });
 
-      // Protect optimistic update from stale WS-triggered refetches.
-      // Server's chain cache may briefly hold pre-deposit balance (REST node lag).
-      // For async mode, use a short grace period — the pending state UI protects the user
-      // experience; we don't want to block subsequent withdrawal balance updates.
-      setBalanceGracePeriod(isAsync ? 15_000 : 8_000);
+      // Short grace period to protect optimistic update from stale refetches.
+      // WS deposit_confirmed event will clear it and trigger real refetch.
+      setBalanceGracePeriod(4_000);
       queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
-
-      // Refetch after grace period for eventual consistency
-      if (!isAsync) {
-        setTimeout(() => {
-          queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
-        }, 8_000);
-      }
     } catch (err) {
       // If optimized flow fails, try legacy full client-side deposit as fallback
       try {
