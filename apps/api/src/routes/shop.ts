@@ -260,13 +260,13 @@ function resolveShopPurchaseInBackground(
         let bonusTxHash: string | undefined;
 
         try {
-          // Send main COIN amount
-          const coinResult = await treasuryService.sendPrize(address, microCoin);
+          // Send main COIN amount (always CW20, regardless of GAME_CURRENCY)
+          const coinResult = await treasuryService.sendCoin(address, microCoin);
           coinTxHash = coinResult.txHash;
 
           // Send bonus COIN for first purchase
           if (isFirstPurchase) {
-            const bonusResult = await treasuryService.sendPrize(address, microCoin);
+            const bonusResult = await treasuryService.sendCoin(address, microCoin);
             bonusTxHash = bonusResult.txHash;
           }
 

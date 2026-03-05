@@ -246,6 +246,72 @@ export class TreasuryService {
 
     return { txHash: result.txHash!, amount, withdrawTxHash };
   }
+
+  /**
+   * Send CW20 COIN tokens from treasury wallet to a recipient.
+   * Always uses CW20 transfer regardless of GAME_CURRENCY mode.
+   * Used by Shop (which always deals in COIN tokens).
+   */
+  async sendCoin(
+    recipientAddress: string,
+    amount: string,
+  ): Promise<{ txHash: string; amount: string }> {
+    if (!relayerService.isReady()) {
+      throw Errors.relayerNotReady();
+    }
+    if (!env.LAUNCH_CW20_ADDR) {
+      throw new Error('LAUNCH_CW20_ADDR not configured — cannot send COIN tokens');
+    }
+
+    // Check treasury CW20 wallet balance
+    let walletBalance = 0n;
+    try {
+      const query = btoa(JSON.stringify({ balance: { address: env.TREASURY_ADDRESS } }));
+      const res = await chainRest(
+        `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { data: { balance: string } };
+        walletBalance = BigInt(data.data.balance);
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to query treasury CW20 balance for sendCoin');
+    }
+
+    if (walletBalance < BigInt(amount)) {
+      throw Errors.insufficientBalance(
+        amount,
+        walletBalance.toString(),
+      );
+    }
+
+    // CW20 transfer from treasury to recipient
+    const result = await relayerService.relayCw20Transfer(
+      env.TREASURY_ADDRESS,
+      env.LAUNCH_CW20_ADDR,
+      recipientAddress,
+      amount,
+      'COIN Shop purchase',
+    );
+
+    if (!result.success) {
+      logger.error({ result, recipientAddress, amount }, 'COIN transfer failed');
+      if (result.timeout) {
+        throw Errors.chainTimeout(result.txHash);
+      }
+      throw Errors.chainTxFailed(
+        result.txHash ?? '',
+        result.rawLog ?? result.error,
+      );
+    }
+
+    logger.info(
+      { txHash: result.txHash, recipientAddress, amount },
+      'COIN tokens sent to recipient',
+    );
+
+    return { txHash: result.txHash!, amount };
+  }
 }
 
 export const treasuryService = new TreasuryService();
