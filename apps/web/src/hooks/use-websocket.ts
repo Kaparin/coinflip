@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WS_URL, isAxmMode } from '@/lib/constants';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
-import { isInBalanceGracePeriod } from '@/lib/balance-grace';
+import { isInBalanceGracePeriod, clearBalanceGracePeriod } from '@/lib/balance-grace';
 
 /** Query key prefix for wallet game-token balance (CW20 or native depending on mode) */
 const WALLET_BALANCE_KEY = isAxmMode() ? 'wallet-game-balance' : 'wallet-cw20-balance';
@@ -379,11 +379,13 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
             case 'deposit_confirmed':
-              // Async deposit confirmed — force refetch balance (override grace period)
+              // Async deposit confirmed — clear grace period so refetch isn't blocked
+              clearBalanceGracePeriod();
               scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
               break;
             case 'deposit_failed':
-              // Async deposit failed — refetch to revert optimistic balance update
+              // Async deposit failed — clear grace period and refetch to revert optimistic update
+              clearBalanceGracePeriod();
               scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
               break;
             case 'jackpot_updated':

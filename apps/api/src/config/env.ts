@@ -42,8 +42,8 @@ const envSchema = z.object({
   ENABLE_BACKGROUND_SWEEP: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
   /** Enable chain indexer (event polling). Default: true in prod, false in dev. */
   ENABLE_INDEXER: z.string().default(process.env.NODE_ENV === 'production' ? 'true' : 'false'),
-  /** Enable async deposit flow (return 202 immediately, confirm via WS). Default: false. */
-  DEPOSIT_ASYNC_MODE: z.string().default('false'),
+  /** Enable async deposit flow (return 202 immediately, confirm via WS). Default: true. */
+  DEPOSIT_ASYNC_MODE: z.string().default('true'),
   /** Use CometBFT WebSocket for real-time indexing instead of polling. Default: false. */
   INDEXER_WS_MODE: z.string().default('false'),
 });

@@ -370,9 +370,9 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
       // Background polling — fire-and-forget
       (async () => {
         try {
-          const result = await pollTxConfirmation(txHash, 120_000);
+          const result = await pollTxConfirmation(txHash, 60_000);
           if (!result) {
-            logger.warn({ txHash, address }, 'Async deposit poll timeout (120s) — notifying client');
+            logger.warn({ txHash, address }, 'Async deposit poll timeout (60s) — notifying client');
             wsService.sendToAddress(address, {
               type: 'deposit_failed',
               data: { tx_hash: txHash, reason: 'Transaction confirmation timed out. Please check your balance.' },
@@ -388,6 +388,8 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
             return;
           }
           logger.info({ txHash, address, height: result.height }, 'Async deposit confirmed on chain');
+          // Small delay to let REST node catch up with the new block state
+          await new Promise(r => setTimeout(r, 1_500));
           invalidateBalanceCache(address);
           const chainBalance = await getChainVaultBalance(address);
           await vaultService.syncBalanceFromChain(
