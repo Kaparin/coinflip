@@ -13,7 +13,7 @@ import { ContestLeaderboard } from '@/components/features/events/contest-leaderb
 import { RaffleParticipants } from '@/components/features/events/raffle-participants';
 import { JoinRaffleButton } from '@/components/features/events/join-raffle-button';
 import { getEventTheme } from '@/components/features/events/event-theme';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { useCancelSponsoredRaffle, useUpdateSponsoredRaffle } from '@/hooks/use-sponsored-raffle';
 
 function formatDateRange(startsAt: string, endsAt: string): string {
@@ -40,7 +40,7 @@ function formatDuration(startsAt: string, endsAt: string): string {
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data, isLoading } = useGetEventById(id, {
     query: { staleTime: 30_000, refetchInterval: 60_000 },
   });
@@ -124,7 +124,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const isActive = (event.status === 'active') && !notStartedYet;
   const isEnded = event.status === 'completed' || event.status === 'calculating' || event.status === 'archived';
   const prizes = event.prizes as Array<{ place: number; amount: string; label?: string }>;
-  const eventDescription = event.description ? String(event.description) : null;
+  const localTitle = pickLocalized(locale, event.title, ev?.titleEn as string | undefined, ev?.titleRu as string | undefined);
+  const eventDescription = pickLocalized(locale, event.description ? String(event.description) : null, ev?.descriptionEn as string | undefined, ev?.descriptionRu as string | undefined) || null;
 
   // Extract winners + seed from results
   const resultsResponse = resultsData as unknown as { data?: { winners?: Array<Record<string, unknown>>; raffleSeed?: string } };
@@ -167,7 +168,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 {isContest ? t('events.contest') : t('events.raffle')}
               </span>
             </div>
-            <h1 className="text-lg font-bold">{event.title}</h1>
+            <h1 className="text-lg font-bold">{localTitle}</h1>
           </div>
 
           {/* Status badge */}
@@ -210,7 +211,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center gap-1.5">
             <Trophy size={12} className={theme.iconColor} />
             <span className="font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-            <GameTokenIcon size={32} />
+            <GameTokenIcon size={16} />
           </div>
           <div className="flex items-center gap-1">
             <Users size={12} className={theme.iconColor} />

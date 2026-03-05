@@ -9,6 +9,7 @@ import { wsService } from './ws.service.js';
 import { LEADERBOARD_CACHE_TTL_MS, EMPTY_EVENT_ARCHIVE_GRACE_MS, EVENT_AUTO_APPROVE_GRACE_MS } from '@coinflip/shared/constants';
 import type { ContestMetric } from '@coinflip/shared/types';
 import crypto from 'node:crypto';
+import { translationService } from './translation.service.js';
 
 // ---- Leaderboard cache ----
 
@@ -73,6 +74,10 @@ class EventsService {
 
   async createEvent(params: CreateEventParams) {
     const db = getDb();
+
+    // Auto-translate title + description
+    const i18n = await translationService.translateEvent(params.title, params.description ?? null);
+
     const [event] = await db
       .insert(events)
       .values({
@@ -85,6 +90,10 @@ class EventsService {
         prizes: params.prizes,
         totalPrizePool: params.totalPrizePool,
         createdBy: params.createdBy,
+        titleEn: i18n.titleEn,
+        titleRu: i18n.titleRu,
+        descriptionEn: i18n.descriptionEn,
+        descriptionRu: i18n.descriptionRu,
       })
       .returning();
     return event;
@@ -121,6 +130,17 @@ class EventsService {
     if (params.config !== undefined) updates.config = params.config;
     if (params.prizes !== undefined) updates.prizes = params.prizes;
     if (params.totalPrizePool !== undefined) updates.totalPrizePool = params.totalPrizePool;
+
+    // Re-translate if title or description changed
+    if (params.title !== undefined || params.description !== undefined) {
+      const title = params.title ?? event.title;
+      const description = params.description ?? event.description;
+      const i18n = await translationService.translateEvent(title, description ?? null);
+      updates.titleEn = i18n.titleEn;
+      updates.titleRu = i18n.titleRu;
+      updates.descriptionEn = i18n.descriptionEn;
+      updates.descriptionRu = i18n.descriptionRu;
+    }
 
     const [updated] = await db
       .update(events)
@@ -1164,6 +1184,11 @@ class EventsService {
       isOwner: userId != null && event.userId === userId,
       pricePaid: event.pricePaid ?? null,
       sponsoredStatus: event.sponsoredStatus ?? null,
+      // i18n
+      titleEn: event.titleEn ?? null,
+      titleRu: event.titleRu ?? null,
+      descriptionEn: event.descriptionEn ?? null,
+      descriptionRu: event.descriptionRu ?? null,
     };
   }
 }

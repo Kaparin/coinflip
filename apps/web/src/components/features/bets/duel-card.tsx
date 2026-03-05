@@ -218,7 +218,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
         </div>
         <div className="flex items-center gap-1">
           <span className="text-sm font-bold tabular-nums">{formatLaunch(duel.amount)}</span>
-          <GameTokenIcon size={28} />
+          <GameTokenIcon size={16} />
         </div>
       </div>
 

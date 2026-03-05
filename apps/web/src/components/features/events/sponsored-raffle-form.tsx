@@ -118,7 +118,7 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
               <h2 className="text-sm font-bold">{t('sponsoredRaffle.title')}</h2>
               {config && (
                 <p className="text-[10px] text-[var(--color-text-secondary)] flex items-center gap-1">
-                  {t('sponsoredRaffle.serviceFee')}: {formatLaunch(config.price)} <GameTokenIcon size={24} />
+                  {t('sponsoredRaffle.serviceFee')}: {formatLaunch(config.price)} <GameTokenIcon size={14} />
                 </p>
               )}
             </div>
@@ -192,7 +192,7 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
                   className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 pr-16 text-sm outline-none focus:border-[var(--color-primary)] transition-colors"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  <GameTokenIcon size={28} />
+                  <GameTokenIcon size={16} />
                   <span className="text-[10px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</span>
                 </div>
               </div>
@@ -241,19 +241,19 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--color-text-secondary)]">{t('sponsoredRaffle.serviceFee')}</span>
                 <span className="font-semibold flex items-center gap-1">
-                  {config ? formatLaunch(config.price) : '...'} <GameTokenIcon size={28} />
+                  {config ? formatLaunch(config.price) : '...'} <GameTokenIcon size={16} />
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--color-text-secondary)]">{t('sponsoredRaffle.prizePool')}</span>
                 <span className="font-semibold flex items-center gap-1">
-                  {prizeAmountHuman ? formatLaunch(toMicroLaunch(Number(prizeAmountHuman) || 0)) : '0'} <GameTokenIcon size={28} />
+                  {prizeAmountHuman ? formatLaunch(toMicroLaunch(Number(prizeAmountHuman) || 0)) : '0'} <GameTokenIcon size={16} />
                 </span>
               </div>
               <div className="border-t border-[var(--color-border)] pt-1.5 flex items-center justify-between text-xs">
                 <span className="font-bold">{t('sponsoredRaffle.total')}</span>
                 <span className="font-bold text-[var(--color-warning)] flex items-center gap-1">
-                  {formatLaunch(totalCostMicro.toString())} <GameTokenIcon size={32} />
+                  {formatLaunch(totalCostMicro.toString())} <GameTokenIcon size={16} />
                 </span>
               </div>
             </div>

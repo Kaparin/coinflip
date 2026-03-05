@@ -809,7 +809,7 @@ export default function PlayerProfilePage() {
                     <span className={`text-sm font-bold tabular-nums ${textColor}`}>
                       +{formatLaunch(Number(jw.amount))}
                     </span>
-                    <GameTokenIcon size={32} />
+                    <GameTokenIcon size={16} />
                   </div>
                 </div>
               );
@@ -900,7 +900,7 @@ export default function PlayerProfilePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold tabular-nums">{formatLaunch(Number(bet.amount))}</span>
-                      <GameTokenIcon size={32} />
+                      <GameTokenIcon size={16} />
                     </div>
                     {opponentAddr && (
                       <Link

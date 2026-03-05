@@ -101,7 +101,7 @@ export function EventResults({ eventId }: EventResultsProps) {
               <span className={`font-bold text-[var(--color-success)] ${isFirst ? 'text-base' : 'text-sm'}`}>
                 {formatLaunch(amount)}
               </span>
-              <GameTokenIcon size={isFirst ? 40 : 36} />
+              <GameTokenIcon size={isFirst ? 18 : 16} />
               {txHash && (
                 <CheckCircle size={14} className="text-[var(--color-success)] animate-scale-in" />
               )}

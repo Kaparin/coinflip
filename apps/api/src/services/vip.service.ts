@@ -115,10 +115,10 @@ class VipService {
         );
     }
 
-    // Atomic deduct from COIN balance (VIP is paid in COIN utility token)
-    const deducted = await vaultService.deductCoin(userId, price);
+    // Atomic deduct from AXM game balance (VIP is paid in AXM)
+    const deducted = await vaultService.deductBalance(userId, price);
     if (!deducted) {
-      throw Errors.insufficientBalance(price, '(check your COIN balance)');
+      throw Errors.insufficientBalance(price, '(check your game balance)');
     }
 
     // Calculate expiry
@@ -138,7 +138,7 @@ class VipService {
     await db.insert(treasuryLedger).values({
       txhash: `vip_${crypto.randomUUID()}`,
       amount: price,
-      denom: 'COIN',
+      denom: 'AXM',
       source: 'vip_subscription',
     });
 

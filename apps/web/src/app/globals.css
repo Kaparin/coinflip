@@ -37,6 +37,36 @@ body {
 }
 
 /* ============================
+   CUSTOM SCROLLBAR
+   Thin, dark gold/neon accent
+   ============================ */
+
+/* WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(251,191,36,0.35), rgba(245,158,11,0.2));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(251,191,36,0.55), rgba(245,158,11,0.35));
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251,191,36,0.3) transparent;
+}
+
+/* ============================
    KEYFRAME ANIMATIONS
    ============================ */
 

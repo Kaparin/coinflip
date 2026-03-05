@@ -17,6 +17,7 @@ import { vaultService } from './vault.service.js';
 import { eventsService } from './events.service.js';
 import { wsService } from './ws.service.js';
 import { gameDenom } from '../config/env.js';
+import { translationService } from './translation.service.js';
 
 class SponsoredRaffleService {
   /** Load config from platform_config */
@@ -96,6 +97,9 @@ class SponsoredRaffleService {
       .where(eq(users.id, userId))
       .limit(1);
 
+    // Auto-translate title + description
+    const i18n = await translationService.translateEvent(title, description);
+
     let eventRow: { id: string } | undefined;
     try {
       const [row] = await db
@@ -114,6 +118,10 @@ class SponsoredRaffleService {
           userId,
           sponsoredStatus: 'approved',
           pricePaid: totalCost,
+          titleEn: i18n.titleEn,
+          titleRu: i18n.titleRu,
+          descriptionEn: i18n.descriptionEn,
+          descriptionRu: i18n.descriptionRu,
         })
         .returning({ id: events.id });
       eventRow = row;

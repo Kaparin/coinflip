@@ -92,7 +92,7 @@ export function MobileBalanceBar() {
               <span className="text-lg font-bold tabular-nums text-[var(--color-success)]">
                 {fmtNum(availableHuman)}
               </span>
-              <GameTokenIcon size={36} />
+              <GameTokenIcon size={16} />
             </div>
 
             {/* Secondary info pills */}

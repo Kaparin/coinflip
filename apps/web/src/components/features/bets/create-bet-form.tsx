@@ -306,7 +306,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           <p className="text-lg font-bold">{t('wager.betSubmitted')}</p>
           <div className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
             <span className="font-semibold text-[var(--color-text)]">{parsedAmount.toLocaleString()}</span>
-            <GameTokenIcon size={20} />
+            <GameTokenIcon size={14} />
             <span>{GAME_TOKEN}</span>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] animate-pulse mt-1">
@@ -320,7 +320,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             <p className="text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] font-medium">{t('wager.youreFlipping')}</p>
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black tabular-nums">{parsedAmount.toLocaleString()}</span>
-              <GameTokenIcon size={28} />
+              <GameTokenIcon size={16} />
             </div>
           </div>
 
@@ -402,7 +402,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-12 text-sm font-medium placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                <GameTokenIcon size={22} />
+                <GameTokenIcon size={14} />
               </span>
             </div>
             {parsedAmount > 0 && parsedAmount < 1 && (
@@ -458,7 +458,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
               : !canCreateBet
                 ? t('wager.betLimitReached', { max: MAX_OPEN_BETS_PER_USER })
                 : isValidAmount
-                  ? <span className="flex items-center justify-center gap-1.5">{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <GameTokenIcon size={20} /></span>
+                  ? <span className="flex items-center justify-center gap-1.5">{t('wager.flipFor', { amount: parsedAmount.toLocaleString() })} <GameTokenIcon size={14} /></span>
                   : t('wager.enterAmount')}
           </button>
 

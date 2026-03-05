@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Store, AlertTriangle, Sparkles } from 'lucide-react';
+import { Store, AlertTriangle, Sparkles, Coins } from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -135,136 +135,129 @@ export default function ShopPage() {
     );
   }
 
-  const hasAnyBonusLeft = tiers.some((tier) => !purchasedTiers[tier.tier]);
-
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 space-y-5">
-      {/* Header */}
-      <div className="text-center space-y-1">
+    <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
+      {/* Page Header */}
+      <div className="text-center">
         <div className="flex items-center justify-center gap-2">
-          <Store size={24} className="text-[var(--color-primary)]" />
+          <Store size={22} className="text-[var(--color-primary)]" />
           <h1 className="text-xl font-extrabold">{t('shop.title')}</h1>
         </div>
-        <p className="text-xs text-[var(--color-text-secondary)]">{t('shop.subtitle')}</p>
       </div>
 
-      {/* Vault balance info */}
-      {isConnected && (
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
-          <span className="text-xs text-[var(--color-text-secondary)]">{t('shop.yourBalance')}:</span>
-          <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums text-[var(--color-success)]">
-            {fmtNum(vaultBalanceHuman)} <GameTokenIcon size={18} />
-          </span>
+      {/* ─── COIN Section ─── */}
+      <section className="space-y-4">
+        {/* Section header */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
+            <Coins size={16} className="text-[var(--color-primary)]" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold">{t('shop.sectionCoin')}</h2>
+            <p className="text-[11px] text-[var(--color-text-secondary)]">{t('shop.sectionCoinDesc')}</p>
+          </div>
         </div>
-      )}
 
-      {/* Loading */}
-      {configLoading && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
-        </div>
-      )}
+        {/* Disabled notice */}
+        {!configLoading && !isEnabled && (
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-4 py-3">
+            <AlertTriangle size={16} className="text-[var(--color-warning)] shrink-0" />
+            <p className="text-xs font-medium text-[var(--color-warning)]">{t('shop.disabled')}</p>
+          </div>
+        )}
 
-      {/* Disabled notice */}
-      {!configLoading && !isEnabled && (
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-4 py-3">
-          <AlertTriangle size={16} className="text-[var(--color-warning)] shrink-0" />
-          <p className="text-xs font-medium text-[var(--color-warning)]">{t('shop.disabled')}</p>
-        </div>
-      )}
+        {/* Error */}
+        {error && !selectedTier && (
+          <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3">
+            <p className="text-xs text-[var(--color-danger)]">{error}</p>
+          </div>
+        )}
 
-      {/* Error */}
-      {error && !selectedTier && (
-        <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3">
-          <p className="text-xs text-[var(--color-danger)]">{error}</p>
-        </div>
-      )}
+        {/* Loading */}
+        {configLoading && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
+          </div>
+        )}
 
-      {/* Chest Grid */}
-      {!configLoading && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {tiers.map((tier) => {
-            const isFirstForTier = !purchasedTiers[tier.tier];
-            const bonusAmount = isFirstForTier ? tier.coinAmount : 0;
-            const canAfford = vaultBalanceHuman >= tier.axmPrice;
+        {/* Chest Grid */}
+        {!configLoading && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {tiers.map((tier) => {
+              const isFirstForTier = !purchasedTiers[tier.tier];
+              const bonusAmount = isFirstForTier ? tier.coinAmount : 0;
+              const canAfford = vaultBalanceHuman >= tier.axmPrice;
 
-            return (
-              <button
-                key={tier.tier}
-                type="button"
-                onClick={() => {
-                  if (!isConnected) {
-                    (window as any).__walletContext?.connect?.();
-                    return;
-                  }
-                  setError(null);
-                  setSelectedTier(tier);
-                }}
-                disabled={!isEnabled || isBuying}
-                className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
-              >
-                {/* Per-tier bonus badge */}
-                {isFirstForTier && bonusAmount > 0 && (
-                  <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                    +{fmtNum(bonusAmount)}
+              return (
+                <button
+                  key={tier.tier}
+                  type="button"
+                  onClick={() => {
+                    if (!isConnected) {
+                      (window as any).__walletContext?.connect?.();
+                      return;
+                    }
+                    setError(null);
+                    setSelectedTier(tier);
+                  }}
+                  disabled={!isEnabled || isBuying}
+                  className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
+                >
+                  {/* Per-tier bonus badge */}
+                  {isFirstForTier && bonusAmount > 0 && (
+                    <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                      +{fmtNum(bonusAmount)}
+                    </div>
+                  )}
+                  {tier.label === 'popular' && (
+                    <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                      {t('shop.popular')}
+                    </div>
+                  )}
+                  {tier.label === 'bestValue' && (
+                    <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
+                      {t('shop.bestValue')}
+                    </div>
+                  )}
+
+                  {/* COIN amount — top */}
+                  <div className="flex items-center gap-1 mt-1">
+                    <LaunchTokenIcon size={16} />
+                    <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
+                      {fmtNum(tier.coinAmount)} COIN
+                    </p>
                   </div>
-                )}
-                {tier.label === 'popular' && (
-                  <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                    {t('shop.popular')}
+
+                  {/* Image */}
+                  <div className="relative h-20 w-20 my-2">
+                    <Image
+                      src={tier.image}
+                      alt={t(tier.nameKey)}
+                      fill
+                      className="object-contain drop-shadow-lg"
+                      sizes="80px"
+                    />
                   </div>
-                )}
-                {tier.label === 'bestValue' && (
-                  <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                    {t('shop.bestValue')}
+
+                  {/* Name */}
+                  <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
+
+                  {/* Price — AXM with game token icon */}
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <GameTokenIcon size={14} />
+                    <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
                   </div>
-                )}
 
-                {/* COIN amount — top */}
-                <div className="flex items-center gap-1 mt-1">
-                  <LaunchTokenIcon size={16} />
-                  <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
-                    {fmtNum(tier.coinAmount)} COIN
-                  </p>
-                </div>
-
-                {/* Image */}
-                <div className="relative h-20 w-20 my-2">
-                  <Image
-                    src={tier.image}
-                    alt={t(tier.nameKey)}
-                    fill
-                    className="object-contain drop-shadow-lg"
-                    sizes="80px"
-                  />
-                </div>
-
-                {/* Name */}
-                <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
-
-                {/* Price — AXM with game token icon */}
-                <div className="mt-1 flex items-center gap-1.5">
-                  <GameTokenIcon size={18} />
-                  <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
-                </div>
-
-                {/* Insufficient balance warning */}
-                {isConnected && !canAfford && (
-                  <p className="text-[9px] text-[var(--color-danger)] mt-1">{t('shop.notEnough')}</p>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* First purchase banner */}
-      {hasAnyBonusLeft && isConnected && (
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5 px-4 py-3">
-          <Sparkles size={16} className="text-[var(--color-warning)] shrink-0" />
-          <p className="text-[11px] font-medium text-[var(--color-warning)]">{t('shop.firstPurchaseBanner')}</p>
-        </div>
-      )}
+                  {/* Insufficient balance warning */}
+                  {isConnected && !canAfford && (
+                    <p className="text-[9px] text-[var(--color-danger)] mt-1">{t('shop.notEnough')}</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Purchase Confirmation Modal */}
       <Modal
@@ -360,44 +353,49 @@ export default function ShopPage() {
       <Modal
         open={!!successResult}
         onClose={() => setSuccessResult(null)}
-        title=""
-        showCloseButton={false}
+        title={t('shop.congratulations')}
       >
         {successResult && (
-          <div className="flex flex-col items-center gap-4 py-2">
-            {/* Animated chest */}
-            <div className="relative h-32 w-32 animate-bounce-slow">
-              <Image
-                src={successResult.tier.image}
-                alt={t(successResult.tier.nameKey)}
-                fill
-                className="object-contain drop-shadow-2xl"
-                sizes="128px"
-              />
-              {/* Sparkle effect */}
-              <div className="absolute inset-0 animate-pulse rounded-full bg-[var(--color-primary)]/10 blur-xl" />
+          <div className="flex flex-col items-center gap-5 py-2">
+            {/* Animated chest with glow */}
+            <div className="relative">
+              <div className="absolute -inset-6 rounded-full bg-[var(--color-primary)]/15 blur-2xl animate-pulse" />
+              <div className="relative h-36 w-36 animate-bounce-slow">
+                <Image
+                  src={successResult.tier.image}
+                  alt={t(successResult.tier.nameKey)}
+                  fill
+                  className="object-contain drop-shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+                  sizes="144px"
+                />
+              </div>
             </div>
 
-            {/* Congratulations */}
-            <div className="text-center space-y-1">
-              <h2 className="text-lg font-extrabold text-[var(--color-primary)]">
-                {t('shop.congratulations')}
-              </h2>
-              <p className="text-sm text-[var(--color-text)]">
+            {/* Coin amount */}
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <LaunchTokenIcon size={24} />
+                <span className="text-2xl font-black tabular-nums text-[var(--color-primary)]">
+                  +{fmtNum(successResult.coinAmount + successResult.bonusAmount)} COIN
+                </span>
+              </div>
+              <p className="text-sm text-[var(--color-text-secondary)]">
                 {t('shop.received', { amount: fmtNum(successResult.coinAmount + successResult.bonusAmount) })}
               </p>
               {successResult.bonusAmount > 0 && (
-                <p className="text-xs font-bold text-[var(--color-success)] flex items-center justify-center gap-1">
-                  <Sparkles size={12} />
-                  +{fmtNum(successResult.bonusAmount)} COIN {t('shop.bonusLabel')}
-                </p>
+                <div className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 px-3 py-1">
+                  <Sparkles size={12} className="text-[var(--color-success)]" />
+                  <span className="text-xs font-bold text-[var(--color-success)]">
+                    +{fmtNum(successResult.bonusAmount)} COIN {t('shop.bonusLabel')}
+                  </span>
+                </div>
               )}
             </div>
 
             <button
               type="button"
               onClick={() => setSuccessResult(null)}
-              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
+              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
             >
               {t('shop.continue')}
             </button>

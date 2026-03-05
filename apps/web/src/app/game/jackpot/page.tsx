@@ -7,8 +7,8 @@ import { JackpotHistory } from '@/components/features/jackpot/jackpot-history';
 import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, History, Info } from 'lucide-react';
-import { GiOpenTreasureChest, GiCoins, GiTargeting, GiPresent, GiLightningFrequency } from 'react-icons/gi';
+import { ArrowLeft, History, Info, Coins, Target, Gift, Zap } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 type Tab = 'active' | 'history';
@@ -37,7 +37,7 @@ export default function JackpotPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <GiOpenTreasureChest size={22} className="text-rose-400 drop-shadow-[0_0_6px_rgba(251,113,133,0.5)]" />
+            <Image src="/jackpot.png" alt="Jackpot" width={28} height={28} className="drop-shadow-[0_0_6px_rgba(251,113,133,0.5)]" sizes="28px" />
             {t('jackpot.title')}
           </h1>
           <p className="text-xs text-[var(--color-text-secondary)]">
@@ -66,10 +66,10 @@ export default function JackpotPage() {
             <span className="text-xs font-bold text-rose-400">{t('jackpot.howTitle')}</span>
           </div>
           <div className="space-y-2">
-            <HowItWorksStep icon={GiCoins} text={t('jackpot.howStep1')} />
-            <HowItWorksStep icon={GiTargeting} text={t('jackpot.howStep2')} />
-            <HowItWorksStep icon={GiPresent} text={t('jackpot.howStep3')} />
-            <HowItWorksStep icon={GiLightningFrequency} text={t('jackpot.howStep4')} />
+            <HowItWorksStep icon={Coins} text={t('jackpot.howStep1')} />
+            <HowItWorksStep icon={Target} text={t('jackpot.howStep2')} />
+            <HowItWorksStep icon={Gift} text={t('jackpot.howStep3')} />
+            <HowItWorksStep icon={Zap} text={t('jackpot.howStep4')} />
           </div>
         </div>
       )}
@@ -109,7 +109,7 @@ export default function JackpotPage() {
         <TabButton
           active={activeTab === 'active'}
           onClick={() => setActiveTab('active')}
-          icon={<GiOpenTreasureChest size={14} />}
+          icon={<Image src="/jackpot.png" alt="" width={16} height={16} sizes="16px" />}
           label={t('jackpot.activePools')}
         />
         <TabButton

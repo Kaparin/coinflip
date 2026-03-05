@@ -156,7 +156,7 @@ export function JackpotWinModal({ open, onDismiss, tierName, amount }: JackpotWi
             <span className={`text-3xl font-black tabular-nums ${theme.textColor}`}>
               +{formattedAmount}
             </span>
-            <GameTokenIcon size={60} />
+            <GameTokenIcon size={20} />
           </div>
 
           {/* Dismiss button */}

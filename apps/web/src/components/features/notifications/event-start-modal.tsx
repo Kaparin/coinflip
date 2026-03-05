@@ -157,7 +157,7 @@ export function EventStartModal({
                 </p>
                 <div className="flex items-center justify-center gap-1.5">
                   <span className="text-lg font-bold text-[var(--color-success)]">{formatLaunch(totalPrizePool)}</span>
-                  <GameTokenIcon size={20} />
+                  <GameTokenIcon size={14} />
                 </div>
               </div>
 

@@ -116,7 +116,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
                 </span>
                 <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{metricLabel}</p>
               </div>
-              <GameTokenIcon size={rank === 1 ? 36 : 32} />
+              <GameTokenIcon size={rank === 1 ? 16 : 16} />
             </div>
           </div>
         );

@@ -91,7 +91,7 @@ function LeaderboardRow({
         {sortBy === 'wagered' && (
           <div className="flex items-center gap-1.5 justify-end">
             <span className="text-sm font-bold tabular-nums">{formatLaunch(entry.total_wagered)}</span>
-            <GameTokenIcon size={40} />
+            <GameTokenIcon size={18} />
           </div>
         )}
         {sortBy === 'win_rate' && (

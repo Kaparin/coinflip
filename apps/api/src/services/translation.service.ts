@@ -1,9 +1,12 @@
 /**
- * Translation Service — auto-translate content between en/ru using google-translate-api-x.
+ * Translation Service — auto-translate content between en/ru using DeepL API Free.
+ * Falls back to source text if translation fails or API key is not configured.
  */
 
-import translate from 'google-translate-api-x';
+import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+
+const DEEPL_API_URL = 'https://api-free.deepl.com/v2/translate';
 
 export interface TranslatedContent {
   titleEn: string;
@@ -13,18 +16,41 @@ export interface TranslatedContent {
 }
 
 class TranslationService {
-  /** Translate a single text string */
-  private async translate(text: string, from: string, to: string): Promise<string> {
+  /** Translate a single text string via DeepL */
+  private async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
+    if (!text.trim()) return text;
+    if (!env.DEEPL_API_KEY) {
+      logger.debug('DEEPL_API_KEY not set — skipping translation');
+      return text;
+    }
+
     try {
-      const result = await translate(text, { from, to });
-      return result.text;
+      const res = await fetch(DEEPL_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          auth_key: env.DEEPL_API_KEY,
+          text,
+          source_lang: sourceLang.toUpperCase(),
+          target_lang: targetLang.toUpperCase(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        logger.warn({ status: res.status, errText, sourceLang, targetLang }, 'DeepL API error');
+        return text;
+      }
+
+      const data = (await res.json()) as { translations: Array<{ text: string }> };
+      return data.translations?.[0]?.text ?? text;
     } catch (err) {
-      logger.warn({ err, from, to, textLen: text.length }, 'Translation failed, using source text as fallback');
+      logger.warn({ err, sourceLang, targetLang, textLen: text.length }, 'Translation request failed');
       return text;
     }
   }
 
-  /** Detect if text is Russian (contains Cyrillic characters) */
+  /** Detect if text is primarily Russian (contains Cyrillic characters) */
   private isRussian(text: string): boolean {
     const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length;
     return cyrillicCount > text.length * 0.15;
@@ -33,7 +59,6 @@ class TranslationService {
   /**
    * Translate title + content into both en/ru.
    * Auto-detects source language, translates to the other.
-   * @param contentField — the name of the "body" column (content for news, message for announcements)
    */
   async translateContent(
     title: string,
@@ -45,7 +70,7 @@ class TranslationService {
 
     const [translatedTitle, translatedContent] = await Promise.all([
       this.translate(title, from, to),
-      this.translate(content, from, to),
+      content ? this.translate(content, from, to) : Promise.resolve(content),
     ]);
 
     return {
@@ -69,6 +94,22 @@ class TranslationService {
       titleRu: result.titleRu,
       messageEn: result.contentEn,
       messageRu: result.contentRu,
+    };
+  }
+
+  /**
+   * Translate event title + description into both en/ru.
+   */
+  async translateEvent(
+    title: string,
+    description: string | null,
+  ): Promise<{ titleEn: string; titleRu: string; descriptionEn: string | null; descriptionRu: string | null }> {
+    const result = await this.translateContent(title, description ?? '');
+    return {
+      titleEn: result.titleEn,
+      titleRu: result.titleRu,
+      descriptionEn: description ? result.contentEn : null,
+      descriptionRu: description ? result.contentRu : null,
     };
   }
 }

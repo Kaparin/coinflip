@@ -29,7 +29,7 @@ export function LaunchTokenIcon({ size = 48, className = '' }: LaunchTokenIconPr
  * Game token icon — auto-selects COIN or AXM icon based on GAME_CURRENCY mode.
  * Use this everywhere game amounts are displayed.
  */
-export function GameTokenIcon({ size = 48, className = '' }: LaunchTokenIconProps) {
+export function GameTokenIcon({ size = 16, className = '' }: LaunchTokenIconProps) {
   if (isAxmMode()) {
     return (
       <Image

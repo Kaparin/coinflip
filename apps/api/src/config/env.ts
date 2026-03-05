@@ -46,6 +46,8 @@ const envSchema = z.object({
   DEPOSIT_ASYNC_MODE: z.string().default('true'),
   /** Use CometBFT WebSocket for real-time indexing instead of polling. Default: false. */
   INDEXER_WS_MODE: z.string().default('false'),
+  /** DeepL API key for auto-translation of dynamic content (announcements, news, events). */
+  DEEPL_API_KEY: z.string().default(''),
 });
 
 export const env = envSchema.parse(process.env);

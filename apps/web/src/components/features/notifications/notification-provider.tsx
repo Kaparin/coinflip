@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { usePendingNotifications, useMarkNotificationRead, type Notification } from '@/hooks/use-notifications';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { JackpotWinModal } from './jackpot-win-modal';
 import { AnnouncementModal } from './announcement-modal';
 import { EventStartModal } from './event-start-modal';
@@ -45,18 +45,6 @@ interface QueuedNotification {
   description?: string | null;
   totalPrizePool?: string;
   endsAt?: string;
-}
-
-/** Pick locale-aware text from i18n fields with fallback */
-function pickLocalized(
-  locale: string,
-  original: string | undefined,
-  en?: string,
-  ru?: string,
-): string {
-  if (locale === 'en' && en) return en;
-  if (locale === 'ru' && ru) return ru;
-  return original ?? '';
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {

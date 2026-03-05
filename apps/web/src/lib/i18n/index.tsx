@@ -62,6 +62,18 @@ function getInitialLocale(): Locale {
   return 'en';
 }
 
+/** Pick locale-aware text from i18n fields with fallback to original */
+export function pickLocalized(
+  locale: string,
+  original: string | undefined | null,
+  en?: string | null,
+  ru?: string | null,
+): string {
+  if (locale === 'en' && en) return en;
+  if (locale === 'ru' && ru) return ru;
+  return original ?? '';
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en');
   const [mounted, setMounted] = useState(false);

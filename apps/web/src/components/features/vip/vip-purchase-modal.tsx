@@ -248,7 +248,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
                 <div className="flex-1">
                   <h3 className="font-bold capitalize text-sm">{config.tier}</h3>
                   <p className="text-xs text-white/50">
-                    {formatLaunch(activePrice)} COIN / {period === 'yearly' ? t('vip.year') : t('vip.month')}
+                    {formatLaunch(activePrice)} AXM / {period === 'yearly' ? t('vip.year') : t('vip.month')}
                   </p>
                 </div>
                 {period === 'yearly' && savingsPercent > 0 && (

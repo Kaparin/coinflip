@@ -327,7 +327,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       className="rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 p-3 animate-pulse"
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="flex items-center gap-1.5 text-base font-bold tabular-nums">{formatLaunch(bet.amount)} <GameTokenIcon size={40} /></span>
+        <span className="flex items-center gap-1.5 text-base font-bold tabular-nums">{formatLaunch(bet.amount)} <GameTokenIcon size={18} /></span>
         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold">
           {t('myBets.submitting')}
         </span>
@@ -361,7 +361,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
       >
         <div className="flex items-center justify-between mb-1">
           <span className="flex items-center gap-1.5 text-base font-bold tabular-nums">
-            {formatLaunch(bet.amount)} <GameTokenIcon size={40} />
+            {formatLaunch(bet.amount)} <GameTokenIcon size={18} />
           </span>
           <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
             isRevealed

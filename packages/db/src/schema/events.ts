@@ -24,6 +24,11 @@ export const events = pgTable(
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // i18n columns
+    titleEn: text('title_en'),
+    titleRu: text('title_ru'),
+    descriptionEn: text('description_en'),
+    descriptionRu: text('description_ru'),
   },
   (table) => [
     index('events_status_idx').on(table.status),

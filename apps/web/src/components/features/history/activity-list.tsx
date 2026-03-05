@@ -139,7 +139,7 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
           <span className={`text-sm font-bold tabular-nums ${config.colorClass}`}>
             {config.sign}{formatted}
           </span>
-          <GameTokenIcon size={40} />
+          <GameTokenIcon size={18} />
         </div>
       </div>
     </div>

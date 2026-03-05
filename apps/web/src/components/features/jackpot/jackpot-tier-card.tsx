@@ -97,68 +97,70 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
         <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${style.shimmerColor} to-transparent animate-shimmer pointer-events-none`} />
       )}
 
-      <div className="relative p-4">
-        {/* Header: icon + name + cycle */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            {/* Tier image */}
-            <div className="relative shrink-0">
-              <div className={`absolute -inset-2 rounded-full ${style.iconGlow} blur-lg ${isNearlyFull ? 'animate-pulse-glow' : ''}`} />
-              <Image
-                src={style.image}
-                alt={pool.tierName}
-                width={80}
-                height={80}
-                className="relative drop-shadow-lg"
-                sizes="80px"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className={`text-sm font-bold ${style.accent}`}>
-                  {t(`jackpot.tiers.${pool.tierName}`)}
-                </h3>
-                {requiredVip && vipBadgeStyle ? (
-                  <span
-                    onClick={() => setVipInfoOpen(true)}
-                    className={`inline-flex shrink-0 items-center rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} font-bold leading-none ${vipBadgeStyle.text} cursor-pointer`}
-                    style={{ gap: 2, padding: '2px 6px', fontSize: 9 }}
-                  >
-                    <Crown style={{ width: 8, height: 8, flexShrink: 0 }} />
-                    <span className="capitalize">{requiredVip}</span>
-                  </span>
-                ) : null}
-              </div>
-              <span className="text-[10px] text-[var(--color-text-secondary)]">
-                #{pool.cycle} · {t('jackpot.minGames', { count: pool.minGames })}
-              </span>
-            </div>
-          </div>
-          <span className={`font-bold rounded-full ${style.badge}`} style={{ fontSize: 10, padding: '2px 8px' }}>
-            {pool.status === 'filling'
-              ? `${pool.progress}%`
-              : pool.status === 'drawing'
-                ? t('jackpot.drawing')
-                : t('jackpot.completed')}
-          </span>
+      <div className="relative flex items-center gap-3 p-3">
+        {/* Tier image — left column */}
+        <div className="relative shrink-0 self-center">
+          <div className={`absolute -inset-2 rounded-full ${style.iconGlow} blur-lg ${isNearlyFull ? 'animate-pulse-glow' : ''}`} />
+          <Image
+            src={style.image}
+            alt={pool.tierName}
+            width={64}
+            height={64}
+            className="relative drop-shadow-lg"
+            sizes="64px"
+          />
         </div>
 
-        {/* Progress bar */}
-        <JackpotProgressBar progress={pool.progress} tierName={pool.tierName} />
-
-        {/* Amount display */}
-        <div className="flex items-center justify-between mt-2.5">
-          <div className="flex items-center gap-1">
-            <GameTokenIcon size={12} />
-            <span className={`text-sm font-bold tabular-nums ${style.accent}`}>
-              {currentFormatted}
+        {/* Content — right column */}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Tier name + VIP badge + status */}
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className={`text-sm font-bold truncate ${style.accent}`}>
+                {t(`jackpot.tiers.${pool.tierName}`)}
+              </h3>
+              {requiredVip && vipBadgeStyle ? (
+                <span
+                  onClick={() => setVipInfoOpen(true)}
+                  className={`inline-flex shrink-0 items-center rounded-full border bg-gradient-to-r ${vipBadgeStyle.gradient} font-bold leading-none ${vipBadgeStyle.text} cursor-pointer`}
+                  style={{ gap: 2, padding: '2px 6px', fontSize: 9 }}
+                >
+                  <Crown style={{ width: 8, height: 8, flexShrink: 0 }} />
+                  <span className="capitalize">{requiredVip}</span>
+                </span>
+              ) : null}
+            </div>
+            <span className={`shrink-0 font-bold rounded-full ${style.badge}`} style={{ fontSize: 10, padding: '2px 8px' }}>
+              {pool.status === 'filling'
+                ? `${pool.progress}%`
+                : pool.status === 'drawing'
+                  ? t('jackpot.drawing')
+                  : t('jackpot.completed')}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              / {targetFormatted}
-            </span>
-            <GameTokenIcon size={10} />
+
+          {/* Row 2: Cycle + min games */}
+          <div className="text-[10px] text-[var(--color-text-secondary)] mb-2">
+            #{pool.cycle} · {t('jackpot.minGames', { count: pool.minGames })}
+          </div>
+
+          {/* Row 3: Progress bar */}
+          <JackpotProgressBar progress={pool.progress} tierName={pool.tierName} />
+
+          {/* Row 4: Amount */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-1">
+              <GameTokenIcon size={12} />
+              <span className={`text-sm font-bold tabular-nums ${style.accent}`}>
+                {currentFormatted}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-[var(--color-text-secondary)]">
+                / {targetFormatted}
+              </span>
+              <GameTokenIcon size={10} />
+            </div>
           </div>
         </div>
       </div>

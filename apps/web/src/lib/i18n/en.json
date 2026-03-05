@@ -627,6 +627,8 @@
   "shop": {
     "title": "Shop",
     "subtitle": "Choose a chest and get COIN tokens instantly",
+    "sectionCoin": "COIN Tokens",
+    "sectionCoinDesc": "Buy chests with AXM and receive COIN instantly",
     "buy": "Buy",
     "buying": "Buying...",
     "popular": "Popular",
@@ -980,7 +982,7 @@
       "duration": "30 days subscription",
       "durationYearly": "365 days subscription",
       "charge": "Will be charged",
-      "deductionWarning": "{amount} COIN will be deducted from your game balance immediately.",
+      "deductionWarning": "{amount} AXM will be deducted from your game balance immediately.",
       "noRefundWarning": "Your current {currentTier} VIP subscription will be replaced. Remaining days will NOT be refunded.",
       "activateImmediately": "Subscription activates immediately for 30 days",
       "activateYearly": "Subscription activates immediately for 365 days",

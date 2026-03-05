@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { emitDepositEvent } from '@/lib/deposit-status-events';
+import { JackpotWinnerReveal } from '@/components/features/jackpot/jackpot-winner-reveal';
 import { X } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import type { WsEvent } from '@coinflip/shared/types';
@@ -37,6 +38,12 @@ export default function GamePage() {
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set(['bets']));
   const [showWsBanner, setShowWsBanner] = useState(false);
   const [eventNotification, setEventNotification] = useState<{ message: string; variant: 'success' | 'info' | 'warning' | 'error' } | null>(null);
+  const [jackpotWinner, setJackpotWinner] = useState<{
+    tierName: string;
+    amount: string;
+    winnerAddress: string;
+    winnerNickname: string | null;
+  } | null>(null);
   const queryClient = useQueryClient();
   const { address, isConnected } = useWalletContext();
   const { addToast } = useToast();
@@ -138,14 +145,13 @@ export default function GamePage() {
       addToast('error', t('balance.depositFailedWs', { reason }));
     }
 
-    // Jackpot notifications
+    // Jackpot winner — show rich overlay with tier image
     if (event.type === 'jackpot_won') {
-      const tierName = String(data?.tierName ?? '');
-      const amount = String(data?.amount ?? '0');
-      const winner = String(data?.winnerNickname || data?.winnerAddress || '');
-      setEventNotification({
-        message: t('jackpot.notifications.won', { tier: t(`jackpot.tiers.${tierName}`), winner, amount: formatLaunch(amount) }),
-        variant: 'success',
+      setJackpotWinner({
+        tierName: String(data?.tierName ?? ''),
+        amount: String(data?.amount ?? '0'),
+        winnerAddress: String(data?.winnerAddress ?? ''),
+        winnerNickname: data?.winnerNickname ? String(data.winnerNickname) : null,
       });
     }
   }, [handlePendingWsEvent, handleDuelWsEvent, handleNotificationEvent, addToast, address, t]);
@@ -262,6 +268,17 @@ export default function GamePage() {
         </div>
       </div>
     </div>
+
+      {/* Jackpot winner overlay */}
+      {jackpotWinner && (
+        <JackpotWinnerReveal
+          tierName={jackpotWinner.tierName}
+          amount={jackpotWinner.amount}
+          winnerAddress={jackpotWinner.winnerAddress}
+          winnerNickname={jackpotWinner.winnerNickname}
+          onClose={() => setJackpotWinner(null)}
+        />
+      )}
 
       {/* Event notification banner — fixed bottom, auto-dismiss */}
       {eventNotification && (

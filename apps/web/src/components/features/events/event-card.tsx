@@ -6,7 +6,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { GameTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, pickLocalized } from '@/lib/i18n';
 
 function formatDuration(startsAt: string, endsAt: string): string {
   const ms = new Date(endsAt).getTime() - new Date(startsAt).getTime();
@@ -52,14 +52,20 @@ interface EventCardProps {
     sponsorNickname?: string | null;
     isOwner?: boolean;
     config?: EventConfig;
+    titleEn?: string | null;
+    titleRu?: string | null;
+    descriptionEn?: string | null;
+    descriptionRu?: string | null;
   };
   size?: 'large' | 'medium' | 'compact';
   index?: number;
 }
 
 export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const theme = getEventTheme(event.type);
+  const localTitle = pickLocalized(locale, event.title, event.titleEn, event.titleRu);
+  const localDescription = pickLocalized(locale, event.description, event.descriptionEn, event.descriptionRu);
   const now = new Date();
   const notStartedYet = new Date(event.startsAt) > now;
   const isUpcoming = (event.status === 'draft' || event.status === 'active') && notStartedYet;
@@ -87,11 +93,11 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
       >
         <div className="flex items-center gap-2 min-w-0">
           <TypeIcon size={14} className={theme.iconColor} />
-          <span className="text-sm font-medium truncate">{event.title}</span>
+          <span className="text-sm font-medium truncate">{localTitle}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <GameTokenIcon size={32} />
+          <GameTokenIcon size={16} />
         </div>
       </Link>
     );
@@ -144,7 +150,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
 
           {/* Title */}
           <h3 className={`font-bold truncate ${size === 'large' ? 'text-lg' : 'text-sm'}`}>
-            {event.title}
+            {localTitle}
           </h3>
 
           {/* Contest metric badge */}
@@ -158,9 +164,9 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
           )}
 
           {/* Description */}
-          {size === 'large' && event.description && (
+          {size === 'large' && localDescription && (
             <p className="mt-1 text-xs text-[var(--color-text-secondary)] line-clamp-2">
-              {event.description}
+              {localDescription}
             </p>
           )}
         </div>
@@ -216,7 +222,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         <div className="flex items-center gap-1.5">
           <Trophy size={12} className="text-[var(--color-warning)]" />
           <span className="text-sm font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <GameTokenIcon size={36} />
+          <GameTokenIcon size={16} />
         </div>
       </div>
     </Link>

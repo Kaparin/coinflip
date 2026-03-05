@@ -66,7 +66,7 @@ function WithdrawProgressOverlay({ elapsedSec }: { elapsedSec: number }) {
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-          <GameTokenIcon size={60} />
+          <GameTokenIcon size={24} />
         </div>
         <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
       </div>
@@ -138,7 +138,7 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-          <GameTokenIcon size={60} />
+          <GameTokenIcon size={24} />
         </div>
         <h3 className="text-base font-bold">{t('balance.depositInProgress')}</h3>
       </div>
@@ -741,7 +741,7 @@ export function BalanceDisplay() {
                 )}
               </div>
               <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
-                <GameTokenIcon size={45} />
+                <GameTokenIcon size={18} />
                 {fmtNum(walletBalanceHuman)}
               </p>
               <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{t('balance.depositToPlay')}</p>
@@ -829,7 +829,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={45} />
+                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={18} />
                 </p>
                 <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-[var(--color-primary)] hover:underline mb-4 break-all font-mono block">
@@ -847,7 +847,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositPending')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-primary)]">
-                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={45} />
+                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={18} />
                 </p>
                 <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-[var(--color-primary)] hover:underline mb-2 break-all font-mono block">
@@ -874,7 +874,7 @@ export function BalanceDisplay() {
                 <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 mb-3">
                   <span className="text-xs text-[var(--color-text-secondary)]">{t('balance.walletBalance')}</span>
                   <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums">
-                    {fmtNum(walletBalanceHuman)} <GameTokenIcon size={36} />
+                    {fmtNum(walletBalanceHuman)} <GameTokenIcon size={16} />
                   </span>
                 </div>
 
@@ -955,7 +955,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  −{parseFloat(withdrawAmount || lastWithdrawHumanRef.current).toLocaleString()} <GameTokenIcon size={45} />
+                  −{parseFloat(withdrawAmount || lastWithdrawHumanRef.current).toLocaleString()} <GameTokenIcon size={18} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}

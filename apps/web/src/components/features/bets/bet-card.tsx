@@ -341,7 +341,7 @@ export const BetCard = memo(function BetCard({
           <span className="flex items-center justify-center shrink-0">{tier.icon}</span>
           <div className="flex items-center gap-1.5">
             <span className="text-xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-            <GameTokenIcon size={44} />
+            <GameTokenIcon size={18} />
           </div>
         </div>
 
@@ -379,7 +379,7 @@ export const BetCard = memo(function BetCard({
             <span className="text-[9px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
             <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              <GameTokenIcon size={32} />
+              <GameTokenIcon size={16} />
             </span>
           </div>
         </div>
