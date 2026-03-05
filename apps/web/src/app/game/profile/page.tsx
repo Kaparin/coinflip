@@ -6,7 +6,8 @@ import Image from 'next/image';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetCurrentUser } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID } from '@/lib/constants';
+import { ADMIN_ADDRESS, EXPLORER_URL, COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, ACTIVE_CONTRACT, TELEGRAM_BOT_NAME, TELEGRAM_BOT_ID, isAxmMode } from '@/lib/constants';
+import { walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
 import { useTranslation } from '@/lib/i18n';
 import { useReferral, fetchPlatformStats, fetchReferralConfig, type PlatformStats, type ReferralConfig, type InviteEntry } from '@/hooks/use-referral';
 import { COMMISSION_BPS } from '@coinflip/shared/constants';
@@ -284,30 +285,28 @@ SHA256(${t('profile.randomCodeComment5')}) == ${t('profile.randomCodeComment6')}
           </div>
 
           {/* Contract Addresses */}
-          {(COINFLIP_CONTRACT || LAUNCH_CW20_CONTRACT) && (
+          {ACTIVE_CONTRACT && (
             <div className="pt-2 border-t border-[var(--color-border)]/50">
               <p className="text-[10px] font-bold uppercase text-[var(--color-text-secondary)] mb-2">
                 {t('profile.contractsTitle')}
               </p>
               <div className="space-y-2">
-                {COINFLIP_CONTRACT && (
-                  <a
-                    href={`https://axiomechain.pro/contract/${COINFLIP_CONTRACT}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
-                  >
-                    <Code size={14} className="text-[var(--color-primary)] shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.gameContract')}</p>
-                      <p className="text-[10px] font-mono break-all text-[var(--color-text)] group-hover:text-[var(--color-primary)]">
-                        {COINFLIP_CONTRACT}
-                      </p>
-                    </div>
-                    <ExternalLink size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
-                  </a>
-                )}
-                {LAUNCH_CW20_CONTRACT && (
+                <a
+                  href={`https://axiomechain.pro/contract/${ACTIVE_CONTRACT}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5 group"
+                >
+                  <Code size={14} className="text-[var(--color-primary)] shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('profile.gameContract')}</p>
+                    <p className="text-[10px] font-mono break-all text-[var(--color-text)] group-hover:text-[var(--color-primary)]">
+                      {ACTIVE_CONTRACT}
+                    </p>
+                  </div>
+                  <ExternalLink size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                </a>
+                {!isAxmMode() && LAUNCH_CW20_CONTRACT && (
                   <a
                     href={`https://axiomechain.pro/contract/${LAUNCH_CW20_CONTRACT}`}
                     target="_blank"
@@ -600,7 +599,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
     const result = await claim();
     if (result.ok) {
       addToast('success', t('referral.claimSuccess'));
-      queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+      queryClient.invalidateQueries({ queryKey: walletBalanceQueryKey(null) });
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
       fetchPlatformStats().then(setPlatformStats);
     } else {

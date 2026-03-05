@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { useJackpotHistory } from '@/hooks/use-jackpot';
 import { useTranslation } from '@/lib/i18n';
 import { ChevronDown, Copy, CheckCircle, Trophy } from 'lucide-react';
@@ -146,7 +146,7 @@ function HistoryItem({
           <span className={`text-sm font-bold tabular-nums ${accent}`}>
             {formatLaunch(pool.currentAmount)}
           </span>
-          <LaunchTokenIcon size={12} />
+          <GameTokenIcon size={12} />
           <ChevronDown
             size={14}
             className={`text-[var(--color-text-secondary)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}

@@ -10,7 +10,7 @@ import { getChainVaultBalance, invalidateBalanceCache } from './vault.js';
 import { relayerService } from '../services/relayer.js';
 import { Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import { walletTxRateLimit } from '../middleware/rate-limit.js';
 import { getDb } from '../lib/db.js';
 import { treasuryLedger } from '@coinflip/db/schema';
@@ -343,12 +343,20 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
 
     // Best-effort: re-deposit tokens back to treasury vault via CW20 Send
     try {
-      const reDepositResult = await relayerService.submitExecOnContract(
-        treasuryAddr,
-        cw20Addr,
-        { send: { contract: env.COINFLIP_CONTRACT_ADDR, amount, msg: btoa(JSON.stringify({ deposit: {} })) } },
-        'CoinFlip referral claim refund',
-      );
+      const reDepositResult = isAxmMode()
+        ? await relayerService.submitExecOnContract(
+            treasuryAddr,
+            getActiveContractAddr(),
+            { deposit: {} },
+            'CoinFlip referral claim refund',
+            [{ denom: env.AXM_DENOM, amount }],
+          )
+        : await relayerService.submitExecOnContract(
+            treasuryAddr,
+            cw20Addr,
+            { send: { contract: getActiveContractAddr(), amount, msg: btoa(JSON.stringify({ deposit: {} })) } },
+            'CoinFlip referral claim refund',
+          );
       if (reDepositResult.success) {
         logger.info({ txHash: reDepositResult.txHash, amount, treasuryAddr }, 'Referral claim: tokens re-deposited to treasury vault');
       } else {

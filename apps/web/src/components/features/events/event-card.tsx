@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Trophy, Users, Target, User, Eye, Clock, BarChart3 } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
 import { useTranslation } from '@/lib/i18n';
@@ -91,7 +91,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <LaunchTokenIcon size={32} />
+          <GameTokenIcon size={32} />
         </div>
       </Link>
     );
@@ -216,7 +216,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         <div className="flex items-center gap-1.5">
           <Trophy size={12} className="text-[var(--color-warning)]" />
           <span className="text-sm font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <LaunchTokenIcon size={36} />
+          <GameTokenIcon size={36} />
         </div>
       </div>
     </Link>

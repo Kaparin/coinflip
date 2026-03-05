@@ -10,7 +10,7 @@ import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
 import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications } from '@coinflip/db/schema';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { getCoinFlipStats } from './bets.js';
@@ -185,11 +185,11 @@ adminRouter.get('/users/:userId', async (c) => {
   // Fetch chain balance for comparison (chain is source of truth for UI)
   let chainBalance: { available: string; locked: string } | null = null;
   let chainUserBets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }> = [];
-  if (user.address && env.COINFLIP_CONTRACT_ADDR) {
+  if (user.address && getActiveContractAddr()) {
     try {
       const vbQuery = btoa(JSON.stringify({ vault_balance: { address: user.address } }));
       const vbRes = await chainRest(
-        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${vbQuery}`,
+        `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${vbQuery}`,
       );
       if (vbRes.ok) {
         const vbData = await vbRes.json() as { data: { available: string; locked: string } };
@@ -197,7 +197,7 @@ adminRouter.get('/users/:userId', async (c) => {
       }
       const ubQuery = btoa(JSON.stringify({ user_bets: { address: user.address, limit: 20 } }));
       const ubRes = await chainRest(
-        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${ubQuery}`,
+        `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${ubQuery}`,
       );
       if (ubRes.ok) {
         const ubData = await ubRes.json() as { data: { bets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }> } };
@@ -440,7 +440,7 @@ adminRouter.get('/bets/orphaned', async (c) => {
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await chainRest(
-      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
     );
 
     if (!res.ok) {
@@ -497,7 +497,7 @@ adminRouter.post('/bets/orphaned/import', zValidator('json', ImportOrphanedSchem
     const query = JSON.stringify({ bet: { bet_id: chainBetId } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await chainRest(
-      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
     );
 
     if (!res.ok) {

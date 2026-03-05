@@ -9,7 +9,7 @@ import { useVipConfig, useVipStatus, usePurchaseVip } from '@/hooks/use-vip';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { Modal } from '@/components/ui/modal';
 
 interface VipPurchaseModalProps {
@@ -109,7 +109,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
           <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
             <span className="text-sm text-[var(--color-text-secondary)]">{t('vip.confirm.charge')}</span>
             <span className="flex items-center gap-1.5 text-sm font-bold">
-              {formattedPrice} <LaunchTokenIcon size={16} />
+              {formattedPrice} <GameTokenIcon size={16} />
             </span>
           </div>
 

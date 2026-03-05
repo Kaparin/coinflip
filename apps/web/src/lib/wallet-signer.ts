@@ -18,7 +18,7 @@ import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { SigningStargateClient, GasPrice, calculateFee } from '@cosmjs/stargate';
 import { DEFAULT_GAS_PRICE } from '@coinflip/shared/chain';
-import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TREASURY_ADDRESS } from '@/lib/constants';
+import { COINFLIP_CONTRACT, LAUNCH_CW20_CONTRACT, TREASURY_ADDRESS, ACTIVE_CONTRACT, isAxmMode, AXM_DENOM } from '@/lib/constants';
 import { toMicroLaunch } from '@coinflip/shared/constants';
 import { Registry } from '@cosmjs/proto-signing';
 import { defaultRegistryTypes } from '@cosmjs/stargate';
@@ -105,15 +105,15 @@ export async function getStargateClient(
   });
 }
 
-// ---- Deposit (CW20 Send) — Optimized: sign-only ----
+// ---- Deposit — Optimized: sign-only ----
 
 /**
- * Fixed gas limit for CW20 Send → CoinFlip deposit.
- * CW20 Send with deposit submessage typically uses 250k-400k gas.
- * 500k provides headroom without wasting fees.
- * Eliminates the extra `simulate` RPC call that 'auto' gas requires.
+ * Fixed gas limit for deposit transactions.
+ * CW20 Send: 250k-400k gas → 500k headroom.
+ * Native MsgExecuteContract with funds: ~200k gas → 300k headroom.
  */
-const DEPOSIT_GAS_LIMIT = 500_000;
+const DEPOSIT_GAS_LIMIT_CW20 = 500_000;
+const DEPOSIT_GAS_LIMIT_NATIVE = 300_000;
 
 /** Convert Uint8Array to base64 string (browser-safe). */
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -149,23 +149,42 @@ export async function signDepositTxBytes(
 
   const microAmount = toMicroLaunch(humanAmount);
 
-  const msg = {
-    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-    value: MsgExecuteContract.fromPartial({
-      sender: address,
-      contract: LAUNCH_CW20_CONTRACT,
-      msg: new TextEncoder().encode(JSON.stringify({
-        send: {
-          contract: COINFLIP_CONTRACT,
-          amount: microAmount,
-          msg: btoa(JSON.stringify({ deposit: {} })),
-        },
-      })),
-      funds: [],
-    }),
-  };
+  let msg;
+  let gasLimit: number;
 
-  const fee = calculateFee(DEPOSIT_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+  if (isAxmMode()) {
+    // AXM mode: MsgExecuteContract { deposit: {} } with native funds attached
+    msg = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: MsgExecuteContract.fromPartial({
+        sender: address,
+        contract: ACTIVE_CONTRACT,
+        msg: new TextEncoder().encode(JSON.stringify({ deposit: {} })),
+        funds: [{ denom: AXM_DENOM, amount: microAmount }],
+      }),
+    };
+    gasLimit = DEPOSIT_GAS_LIMIT_NATIVE;
+  } else {
+    // COIN mode: CW20 Send → CoinFlip contract
+    msg = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: MsgExecuteContract.fromPartial({
+        sender: address,
+        contract: LAUNCH_CW20_CONTRACT,
+        msg: new TextEncoder().encode(JSON.stringify({
+          send: {
+            contract: COINFLIP_CONTRACT,
+            amount: microAmount,
+            msg: btoa(JSON.stringify({ deposit: {} })),
+          },
+        })),
+        funds: [],
+      }),
+    };
+    gasLimit = DEPOSIT_GAS_LIMIT_CW20;
+  }
+
+  const fee = calculateFee(gasLimit, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
   let txRaw: TxRaw;
   try {
@@ -192,7 +211,7 @@ export interface DepositResult {
 }
 
 /**
- * Legacy: Deposit LAUNCH tokens with full client-side sign + broadcast.
+ * Legacy: Deposit with full client-side sign + broadcast.
  * Kept as fallback; prefer signDepositTxBytes() + server broadcast.
  */
 export async function signDeposit(
@@ -203,6 +222,21 @@ export async function signDeposit(
   const client = await getCachedCosmWasmClient(wallet);
   const microAmount = toMicroLaunch(humanAmount);
 
+  if (isAxmMode()) {
+    // AXM mode: execute deposit with native funds
+    const fee = calculateFee(DEPOSIT_GAS_LIMIT_NATIVE, GasPrice.fromString(DEFAULT_GAS_PRICE));
+    const result = await client.execute(
+      address,
+      ACTIVE_CONTRACT,
+      { deposit: {} },
+      fee,
+      'CoinFlip deposit',
+      [{ denom: AXM_DENOM, amount: microAmount }],
+    );
+    return { txHash: result.transactionHash, height: result.height };
+  }
+
+  // COIN mode: CW20 Send
   const sendMsg = {
     send: {
       contract: COINFLIP_CONTRACT,
@@ -211,7 +245,7 @@ export async function signDeposit(
     },
   };
 
-  const fee = calculateFee(DEPOSIT_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
+  const fee = calculateFee(DEPOSIT_GAS_LIMIT_CW20, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
   const result = await client.execute(
     address,
@@ -280,24 +314,24 @@ export async function signAuthzGrant(
     filter: { typeUrl: string; value: Uint8Array };
   }> = [];
 
-  // CoinFlip contract: game actions + withdraw
-  if (COINFLIP_CONTRACT) {
+  // CoinFlip contract: game actions + withdraw + deposit (native mode needs deposit for authz)
+  if (ACTIVE_CONTRACT) {
+    const keys = ['create_bet', 'accept_bet', 'accept_and_reveal', 'reveal', 'cancel_bet', 'claim_timeout', 'withdraw'];
+    if (isAxmMode()) keys.push('deposit');
     contractGrants.push({
-      contract: COINFLIP_CONTRACT,
+      contract: ACTIVE_CONTRACT,
       limit: maxCallsLimit,
       filter: {
         typeUrl: '/cosmwasm.wasm.v1.AcceptedMessageKeysFilter',
         value: AcceptedMessageKeysFilter.encode(
-          AcceptedMessageKeysFilter.fromPartial({
-            keys: ['create_bet', 'accept_bet', 'accept_and_reveal', 'reveal', 'cancel_bet', 'claim_timeout', 'withdraw'],
-          }),
+          AcceptedMessageKeysFilter.fromPartial({ keys }),
         ).finish(),
       },
     });
   }
 
-  // LAUNCH CW20 contract: transfer (needed for branch-change fee payment)
-  if (LAUNCH_CW20_CONTRACT) {
+  // LAUNCH CW20 contract: transfer (needed for branch-change fee payment) — COIN mode only
+  if (!isAxmMode() && LAUNCH_CW20_CONTRACT) {
     contractGrants.push({
       contract: LAUNCH_CW20_CONTRACT,
       limit: maxCallsLimit,
@@ -384,7 +418,7 @@ export async function signDirectWithdraw(
 
   const result = await client.execute(
     address,
-    COINFLIP_CONTRACT,
+    ACTIVE_CONTRACT,
     withdrawMsg,
     'auto',
     'CoinFlip withdraw',
@@ -494,7 +528,7 @@ export async function signCoinflipAdminSweep(
 
   const result = await client.execute(
     address,
-    COINFLIP_CONTRACT,
+    ACTIVE_CONTRACT,
     msg,
     'auto',
     'CoinFlip admin sweep orphaned tokens',

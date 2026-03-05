@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import { GiOpenTreasureChest } from 'react-icons/gi';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 
@@ -156,7 +156,7 @@ export function JackpotWinModal({ open, onDismiss, tierName, amount }: JackpotWi
             <span className={`text-3xl font-black tabular-nums ${theme.textColor}`}>
               +{formattedAmount}
             </span>
-            <LaunchTokenIcon size={60} />
+            <GameTokenIcon size={60} />
           </div>
 
           {/* Dismiss button */}

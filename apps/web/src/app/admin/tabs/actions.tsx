@@ -12,7 +12,7 @@ import {
 import type { HealResult } from '@/hooks/use-admin';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { signCoinflipAdminSweep } from '@/lib/wallet-signer';
-import { COINFLIP_CONTRACT } from '@/lib/constants';
+import { ACTIVE_CONTRACT } from '@/lib/constants';
 
 export function ActionsTab() {
   return (
@@ -130,7 +130,7 @@ function ContractSweepAction() {
   return (
     <ActionCard
       title="Сбор осиротевших COIN из контракта"
-      description={`Восстановление COIN токенов, застрявших в контракте CoinFlip и не привязанных к балансам. Контракт: ${COINFLIP_CONTRACT.slice(0, 16)}...`}
+      description={`Восстановление COIN токенов, застрявших в контракте CoinFlip и не привязанных к балансам. Контракт: ${ACTIVE_CONTRACT.slice(0, 16)}...`}
     >
       <button
         type="button"

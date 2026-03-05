@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, memo } from 'react';
 import type { ReactNode } from 'react';
 import { formatLaunch, fromMicroLaunch, COMMISSION_BPS } from '@coinflip/shared/constants';
 import { Crown, Flame, Zap, Coins, Clock, Gem, Sparkles, Pin } from 'lucide-react';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipInfoModal } from '@/components/features/vip/vip-info-modal';
@@ -341,7 +341,7 @@ export const BetCard = memo(function BetCard({
           <span className="flex items-center justify-center shrink-0">{tier.icon}</span>
           <div className="flex items-center gap-1.5">
             <span className="text-xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-            <LaunchTokenIcon size={44} />
+            <GameTokenIcon size={44} />
           </div>
         </div>
 
@@ -379,7 +379,7 @@ export const BetCard = memo(function BetCard({
             <span className="text-[9px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
             <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              <LaunchTokenIcon size={32} />
+              <GameTokenIcon size={32} />
             </span>
           </div>
         </div>

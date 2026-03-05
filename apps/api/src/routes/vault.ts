@@ -9,7 +9,7 @@ import { relayerService } from '../services/relayer.js';
 import { wsService } from '../services/ws.service.js';
 import { AppError, Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import type { AppEnv } from '../types.js';
 import type { RelayResult } from '../services/relayer.js';
 import { getPendingBetCount } from '../lib/pending-counts.js';
@@ -37,7 +37,7 @@ export async function getChainVaultBalance(address: string): Promise<{ available
       try {
         const query = btoa(JSON.stringify({ vault_balance: { address } }));
         const res = await chainRest(
-          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+          `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${query}`,
         );
         if (!res.ok) return { available: '0', locked: '0' };
         const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -201,10 +201,27 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
   });
 });
 
-// POST /api/v1/vault/deposit — Deposit via CW20 Send (returns unsigned payload)
+// POST /api/v1/vault/deposit — Returns unsigned payload for deposit
+// COIN mode: CW20 Send to contract. AXM mode: native MsgExecuteContract + Deposit with funds.
 vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSchema), async (c) => {
   const { amount } = c.req.valid('json');
 
+  if (isAxmMode()) {
+    // AXM mode: execute Deposit {} on native contract with attached native funds
+    const contractAddr = getActiveContractAddr();
+    return c.json({
+      data: {
+        contract: contractAddr,
+        msg: { deposit: {} },
+        funds: [{ denom: env.AXM_DENOM, amount }],
+        amount,
+        mode: 'native',
+        instruction: 'Sign this MsgExecuteContract to deposit AXM tokens.',
+      },
+    });
+  }
+
+  // COIN mode: CW20 Send
   const depositMsg = {
     send: {
       contract: env.COINFLIP_CONTRACT_ADDR,
@@ -218,6 +235,7 @@ vaultRouter.post('/deposit', authMiddleware, zValidator('json', DepositRequestSc
       contract: env.LAUNCH_CW20_ADDR,
       msg: depositMsg,
       amount,
+      mode: 'cw20',
       instruction: 'Sign this CW20 Send transaction via Keplr to deposit COIN tokens.',
     },
   });
@@ -273,10 +291,23 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
 
   const { tx_bytes: txBytesBase64 } = c.req.valid('json');
 
-  // Pre-flight: verify user's CW20 wallet balance before broadcasting.
+  // Pre-flight: verify user's wallet balance before broadcasting.
   // This prevents wasting gas on a tx that will fail due to insufficient balance.
-  if (env.LAUNCH_CW20_ADDR) {
-    try {
+  try {
+    if (isAxmMode()) {
+      // AXM mode: check native bank balance
+      const balRes = await chainRest(
+        `/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=${env.AXM_DENOM}`,
+      );
+      if (balRes.ok) {
+        const balData = await balRes.json() as { balance: { amount: string } };
+        const nativeBalance = BigInt(balData.balance?.amount ?? '0');
+        if (nativeBalance === 0n) {
+          throw Errors.insufficientBalance('deposit amount', '0 (wallet AXM balance is empty)');
+        }
+      }
+    } else if (env.LAUNCH_CW20_ADDR) {
+      // COIN mode: check CW20 balance
       const balQuery = btoa(JSON.stringify({ balance: { address } }));
       const balRes = await chainRest(
         `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${balQuery}`,
@@ -288,12 +319,10 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
           throw Errors.insufficientBalance('deposit amount', '0 (wallet CW20 balance is empty)');
         }
       }
-    } catch (err) {
-      // If it's our own AppError, re-throw it
-      if (err instanceof AppError) throw err;
-      // Otherwise just log and continue — don't block deposit on balance check failure
-      logger.warn({ err, address }, 'CW20 balance pre-check failed, proceeding with broadcast');
     }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.warn({ err, address }, 'Balance pre-check failed, proceeding with broadcast');
   }
 
   // Prevent concurrent deposits for the same user

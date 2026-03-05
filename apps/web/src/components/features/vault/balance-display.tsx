@@ -8,11 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
-import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
+import { GameTokenIcon, AxmIcon } from '@/components/ui';
 import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { signDepositTxBytes, signDeposit } from '@/lib/wallet-signer';
-import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
-import { API_URL, EXPLORER_URL } from '@/lib/constants';
+import { useWalletBalance, useNativeBalance, walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
+import { API_URL, EXPLORER_URL, isAxmMode } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 
 /** Extract tx hash from CosmJS timeout error: "Transaction with ID 7C77... was submitted..." */
@@ -66,7 +66,7 @@ function WithdrawProgressOverlay({ elapsedSec }: { elapsedSec: number }) {
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-          <LaunchTokenIcon size={60} />
+          <GameTokenIcon size={60} />
         </div>
         <h3 className="text-base font-bold">{t('balance.withdrawInProgress')}</h3>
       </div>
@@ -138,7 +138,7 @@ function DepositProgressOverlay({ currentStep, elapsedSec }: { currentStep: Depo
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-[var(--color-primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--color-primary)] animate-spin" />
-          <LaunchTokenIcon size={60} />
+          <GameTokenIcon size={60} />
         </div>
         <h3 className="text-base font-bold">{t('balance.depositInProgress')}</h3>
       </div>
@@ -398,7 +398,7 @@ export function BalanceDisplay() {
         });
 
         // Optimistic update: add to wallet CW20 balance
-        queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+        queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
           return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
         });
 
@@ -409,7 +409,7 @@ export function BalanceDisplay() {
         // Refetch after grace period for eventual consistency
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
         }, 8_000);
       },
       onError: (err) => {
@@ -439,7 +439,7 @@ export function BalanceDisplay() {
               },
             };
           });
-          queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+          queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
             return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
           });
           // Protect optimistic update, refetch after grace period
@@ -447,7 +447,7 @@ export function BalanceDisplay() {
           queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
           setTimeout(() => {
             queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-            queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+            queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
           }, 8_000);
         } else {
           setWithdrawError(getUserFriendlyError(err, t, 'withdraw'));
@@ -474,11 +474,11 @@ export function BalanceDisplay() {
   const lockedHuman = fromMicroLaunch(lockedMicro);
   const totalHuman = fromMicroLaunch(totalMicro);
 
-  // Wallet (CW20) balance - tokens not yet deposited
+  // Wallet game-token balance — CW20 COIN or native AXM depending on mode
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
-  // Native AXM balance (for gas)
+  // Native AXM balance (for gas) — in AXM mode this is also the game token
   const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000;
-  const isLowAxm = nativeBalanceHuman < 0.5;
+  const isLowAxm = isAxmMode() ? false : nativeBalanceHuman < 0.5;
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -524,7 +524,7 @@ export function BalanceDisplay() {
         clearBalanceGracePeriod();
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
         }, 500);
       } else if (event.type === 'failed') {
         setDepositError(event.reason || t('balance.depositFailed'));
@@ -532,7 +532,7 @@ export function BalanceDisplay() {
         // Revert optimistic balance update
         clearBalanceGracePeriod();
         queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-        queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+        queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
       }
     });
     return unsub;
@@ -547,7 +547,7 @@ export function BalanceDisplay() {
       feedback('success');
       clearBalanceGracePeriod();
       queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-      queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+      queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
     }, 90_000);
     return () => clearTimeout(failsafe);
   }, [depositStatus, queryClient]);
@@ -636,7 +636,7 @@ export function BalanceDisplay() {
       });
 
       // Optimistic update: subtract from wallet CW20 balance
-      queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+      queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
         const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
         return (newBal < 0n ? 0n : newBal).toString();
       });
@@ -652,7 +652,7 @@ export function BalanceDisplay() {
       if (!isAsync) {
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
         }, 8_000);
       }
     } catch (err) {
@@ -674,7 +674,7 @@ export function BalanceDisplay() {
           const newTotal = BigInt(old.data.total) + BigInt(depositMicro);
           return { ...old, data: { ...old.data, available: newAvailable.toString(), total: newTotal.toString() } };
         });
-        queryClient.setQueryData(['wallet-cw20-balance', address], (old: any) => {
+        queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
           const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
           return (newBal < 0n ? 0n : newBal).toString();
         });
@@ -682,7 +682,7 @@ export function BalanceDisplay() {
         queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-          queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+          queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
         }, 8_000);
       } catch (fallbackErr) {
         setDepositError(getUserFriendlyError(fallbackErr, t, 'deposit'));
@@ -705,7 +705,7 @@ export function BalanceDisplay() {
     clearBalanceGracePeriod();
     // Force refetch to get accurate balances
     queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
-    queryClient.refetchQueries({ queryKey: ['wallet-cw20-balance'] });
+    queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
   };
 
   const handleWithdraw = () => {
@@ -739,21 +739,23 @@ export function BalanceDisplay() {
           </div>
         ) : (
           <>
-            {/* Wallet balance (CW20 tokens in user's wallet, not deposited) */}
+            {/* Wallet balance (game tokens in user's wallet, not deposited) */}
             <div className="rounded-xl bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 p-3 mb-3">
               <div className="flex items-center justify-between mb-0.5">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">{t('balance.walletBalanceAxiome')}</p>
-                <button
-                  type="button"
-                  onClick={() => setShowCoinGuide(true)}
-                  className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-primary)] opacity-60 hover:opacity-100 transition-opacity"
-                  title={t('balance.coinGuideTitle')}
-                >
-                  <HelpCircle size={14} />
-                </button>
+                {!isAxmMode() && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCoinGuide(true)}
+                    className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-primary)] opacity-60 hover:opacity-100 transition-opacity"
+                    title={t('balance.coinGuideTitle')}
+                  >
+                    <HelpCircle size={14} />
+                  </button>
+                )}
               </div>
               <p className="flex items-center gap-2 text-sm font-bold tabular-nums">
-                <LaunchTokenIcon size={45} />
+                <GameTokenIcon size={45} />
                 {fmtNum(walletBalanceHuman)}
               </p>
               <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{t('balance.depositToPlay')}</p>
@@ -776,17 +778,19 @@ export function BalanceDisplay() {
               </div>
             </div>
 
-            {/* AXM native balance (gas) */}
-            <div className={`flex items-center justify-between rounded-xl p-2.5 mb-3 ${isLowAxm ? 'bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20' : 'bg-[var(--color-bg)]'}`}>
-              <div className="flex items-center gap-2">
-                <AxmIcon size={18} />
-                <span className="text-[10px] uppercase text-[var(--color-text-secondary)]">AXM</span>
+            {/* AXM native balance (gas) — hidden in AXM mode since wallet balance IS AXM */}
+            {!isAxmMode() && (
+              <div className={`flex items-center justify-between rounded-xl p-2.5 mb-3 ${isLowAxm ? 'bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20' : 'bg-[var(--color-bg)]'}`}>
+                <div className="flex items-center gap-2">
+                  <AxmIcon size={18} />
+                  <span className="text-[10px] uppercase text-[var(--color-text-secondary)]">AXM</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>{nativeBalanceHuman.toFixed(2)}</span>
+                  {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`text-sm font-bold tabular-nums ${isLowAxm ? 'text-[var(--color-warning)]' : ''}`}>{nativeBalanceHuman.toFixed(2)}</span>
-                {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
-              </div>
-            </div>
+            )}
 
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeposit(true)} disabled={isOperationInFlight}
@@ -828,7 +832,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={45} />
+                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={45} />
                 </p>
                 <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-[var(--color-primary)] hover:underline mb-4 break-all font-mono block">
@@ -846,7 +850,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.depositPending')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-primary)]">
-                  +{parseFloat(depositAmount).toLocaleString()} <LaunchTokenIcon size={45} />
+                  +{parseFloat(depositAmount).toLocaleString()} <GameTokenIcon size={45} />
                 </p>
                 <a href={`${EXPLORER_URL}/transactions/${depositTxHash}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-[var(--color-primary)] hover:underline mb-2 break-all font-mono block">
@@ -873,7 +877,7 @@ export function BalanceDisplay() {
                 <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 mb-3">
                   <span className="text-xs text-[var(--color-text-secondary)]">{t('balance.walletBalance')}</span>
                   <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums">
-                    {fmtNum(walletBalanceHuman)} <LaunchTokenIcon size={36} />
+                    {fmtNum(walletBalanceHuman)} <GameTokenIcon size={36} />
                   </span>
                 </div>
 
@@ -954,7 +958,7 @@ export function BalanceDisplay() {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{t('balance.withdrawSuccess')}</h3>
                 <p className="flex items-center justify-center gap-1.5 text-sm font-semibold mb-1 text-[var(--color-success)] animate-number-pop">
-                  −{parseFloat(withdrawAmount || lastWithdrawHumanRef.current).toLocaleString()} <LaunchTokenIcon size={45} />
+                  −{parseFloat(withdrawAmount || lastWithdrawHumanRef.current).toLocaleString()} <GameTokenIcon size={45} />
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                   {t('balance.withdrawSentDesc')}

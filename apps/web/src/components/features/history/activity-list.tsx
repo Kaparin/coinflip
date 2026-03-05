@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useActivity, type ActivityItem, type ActivityType } from '@/hooks/use-activity';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { Trophy, Skull, Gift, History } from 'lucide-react';
@@ -139,7 +139,7 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
           <span className={`text-sm font-bold tabular-nums ${config.colorClass}`}>
             {config.sign}{formatted}
           </span>
-          <LaunchTokenIcon size={40} />
+          <GameTokenIcon size={40} />
         </div>
       </div>
     </div>

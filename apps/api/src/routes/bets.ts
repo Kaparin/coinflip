@@ -19,7 +19,7 @@ import { relayerService } from '../services/relayer.js';
 import { formatBetResponse } from '../lib/format.js';
 import { AppError, Errors } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr } from '../config/env.js';
 import { resolveCreateBetInBackground, confirmAcceptAndRevealInBackground, confirmCancelBetInBackground } from '../services/background-tasks.js';
 import { addPendingLock, removePendingLock, invalidateBalanceCache, getChainVaultBalance } from './vault.js';
 import { generateSecret, computeCommitment } from '@coinflip/shared/commitment';
@@ -75,7 +75,7 @@ async function getChainBetState(betId: number): Promise<string | null> {
       try {
         const query = btoa(JSON.stringify({ bet: { bet_id: betId } }));
         const res = await chainRest(
-          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+          `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${query}`,
         );
         if (!res.ok) return null;
         const data = (await res.json()) as { data: { status?: string } };
@@ -101,7 +101,7 @@ async function getChainOpenBetCountForMaker(makerAddress: string): Promise<numbe
         const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
         const encoded = Buffer.from(query).toString('base64');
         const res = await chainRest(
-          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+          `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
         );
         if (!res.ok) return [];
         const data = (await res.json()) as { data: { bets: Array<{ id: number; maker?: string }> } };

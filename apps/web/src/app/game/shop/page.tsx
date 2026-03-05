@@ -8,11 +8,12 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { useNativeBalance } from '@/hooks/use-wallet-balance';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useWebSocketContext } from '@/contexts/websocket-context';
-import { LaunchTokenIcon, AxmIcon } from '@/components/ui';
+import { GameTokenIcon, AxmIcon } from '@/components/ui';
 import { signBankSendSync, signDepositTxBytes } from '@/lib/wallet-signer';
 import { OnboardingModal } from '@/components/features/auth/onboarding-modal';
 import { Modal } from '@/components/ui/modal';
-import { EXPLORER_URL, API_URL, TREASURY_ADDRESS } from '@/lib/constants';
+import { EXPLORER_URL, API_URL, TREASURY_ADDRESS, isAxmMode } from '@/lib/constants';
+import { walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -97,7 +98,7 @@ export default function ShopPage() {
 
   const refreshBalances = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
-    queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+    queryClient.invalidateQueries({ queryKey: walletBalanceQueryKey(null) });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'purchase-status'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'config'] });
@@ -403,7 +404,7 @@ export default function ShopPage() {
 
                 {/* COIN amount — top */}
                 <div className="flex items-center gap-1 mt-1">
-                  <LaunchTokenIcon size={16} />
+                  <GameTokenIcon size={16} />
                   <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
                     {fmtNum(tier.coinAmount)} COIN
                   </p>
@@ -477,7 +478,7 @@ export default function ShopPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-[var(--color-text-secondary)]">{t('shop.confirmReceive')}</span>
                 <span className="flex items-center gap-1 font-bold text-[var(--color-primary)]">
-                  <LaunchTokenIcon size={14} />
+                  <GameTokenIcon size={14} />
                   {fmtNum(selectedTier.coinAmount)} COIN
                 </span>
               </div>

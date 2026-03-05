@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Send } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
+import { UserAvatar, GameTokenIcon } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -191,7 +191,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
         </div>
         <div className="flex items-center gap-1">
           <span className="text-sm font-bold tabular-nums">{formatLaunch(duel.amount)}</span>
-          <LaunchTokenIcon size={28} />
+          <GameTokenIcon size={28} />
         </div>
       </div>
 

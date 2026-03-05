@@ -1,8 +1,10 @@
 'use client';
 
 import Image from 'next/image';
+import { isAxmMode } from '@/lib/constants';
 
 const LAUNCH_TOKEN_LOGO = '/coin-token-logo.png';
+const AXM_LOGO = '/axm.png';
 
 export interface LaunchTokenIconProps {
   /** Size in pixels. Default: 48 */
@@ -21,4 +23,23 @@ export function LaunchTokenIcon({ size = 48, className = '' }: LaunchTokenIconPr
       className={`inline-block align-middle object-contain shrink-0 ${className}`}
     />
   );
+}
+
+/**
+ * Game token icon — auto-selects COIN or AXM icon based on GAME_CURRENCY mode.
+ * Use this everywhere game amounts are displayed.
+ */
+export function GameTokenIcon({ size = 48, className = '' }: LaunchTokenIconProps) {
+  if (isAxmMode()) {
+    return (
+      <Image
+        src={AXM_LOGO}
+        alt="AXM"
+        width={size}
+        height={size}
+        className={`inline-block align-middle object-cover shrink-0 rounded-full ${className}`}
+      />
+    );
+  }
+  return <LaunchTokenIcon size={size} className={className} />;
 }

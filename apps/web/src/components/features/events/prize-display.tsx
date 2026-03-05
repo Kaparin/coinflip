@@ -2,7 +2,7 @@
 
 import { formatLaunch } from '@coinflip/shared/constants';
 import { Trophy, CheckCircle, Crown, Medal } from 'lucide-react';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 
 interface PrizeEntry {
@@ -83,7 +83,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
       <div className="flex items-center gap-1.5 text-xs">
         <Trophy size={12} className="text-[var(--color-warning)]" />
         <span className="font-bold">{formatLaunch(prizes[0]?.amount ?? '0')}</span>
-        <LaunchTokenIcon size={32} />
+        <GameTokenIcon size={32} />
         {prizes.length > 1 && (
           <span className="text-[var(--color-text-secondary)]">+{prizes.length - 1} more</span>
         )}
@@ -156,7 +156,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                       <span className={`font-bold tabular-nums text-emerald-400 ${config.amountSize}`}>
                         {formatLaunch(prize.amount)}
                       </span>
-                      <LaunchTokenIcon size={config.place === 1 ? 36 : 28} />
+                      <GameTokenIcon size={config.place === 1 ? 36 : 28} />
                     </div>
                   </div>
 
@@ -208,7 +208,7 @@ export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedL
                   <span className="text-sm font-bold tabular-nums text-emerald-400">
                     {formatLaunch(prize.amount)}
                   </span>
-                  <LaunchTokenIcon size={28} />
+                  <GameTokenIcon size={28} />
                   {winner?.prizeTxHash && (
                     <CheckCircle size={12} className="text-emerald-400 ml-0.5" />
                   )}

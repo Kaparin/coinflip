@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
-import { LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
@@ -157,11 +157,11 @@ export function Header() {
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-1.5" title={t('header.vaultTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <LaunchTokenIcon size={18} /></span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <GameTokenIcon size={18} /></span>
                   </div>
                   <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <LaunchTokenIcon size={18} /></span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <GameTokenIcon size={18} /></span>
                   </div>
                   <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM">
                     <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={18} /></span>
@@ -468,7 +468,7 @@ export function Header() {
                   }`}
                 >
                   <span className="flex items-center gap-1">
-                    {fmtBal(availableHuman)} <LaunchTokenIcon size={18} />
+                    {fmtBal(availableHuman)} <GameTokenIcon size={18} />
                   </span>
                   <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
                 </button>

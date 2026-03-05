@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { Trophy, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
@@ -80,7 +80,7 @@ export function JackpotWinnerReveal({
               +{formatLaunch(amount)}
             </div>
             <div className="flex items-center justify-end gap-0.5 mt-0.5">
-              <LaunchTokenIcon size={10} />
+              <GameTokenIcon size={10} />
               <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">
                 {t(`jackpot.tiers.${tierName}`)}
               </span>

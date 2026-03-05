@@ -24,8 +24,14 @@ const envSchema = z.object({
   /** Comma-separated fallback REST URLs for chain queries (tried in order after primary) */
   AXIOME_REST_URLS_FALLBACK: z.string().default(''),
   AXIOME_CHAIN_ID: z.string().default('axiome-1'),
+  /** Game currency mode: 'coin' = CW20 COIN token, 'axm' = native AXM */
+  GAME_CURRENCY: z.enum(['coin', 'axm']).default('coin'),
   COINFLIP_CONTRACT_ADDR: z.string().default(''),
+  /** Native-token CoinFlip contract address (used when GAME_CURRENCY=axm) */
+  COINFLIP_NATIVE_CONTRACT_ADDR: z.string().default(''),
   LAUNCH_CW20_ADDR: z.string().default(''),
+  /** Native denom for AXM mode (default: uaxm) */
+  AXM_DENOM: z.string().default('uaxm'),
   RELAYER_MNEMONIC: z.string().default(''),
   RELAYER_ADDRESS: z.string().default(''),
   TREASURY_ADDRESS: z.string().default(''),
@@ -46,6 +52,16 @@ export const env = envSchema.parse(process.env);
 
 export type Env = z.infer<typeof envSchema>;
 
+/** Returns true if game runs on native AXM instead of CW20 COIN */
+export function isAxmMode(): boolean {
+  return env.GAME_CURRENCY === 'axm';
+}
+
+/** Returns the active CoinFlip contract address based on GAME_CURRENCY */
+export function getActiveContractAddr(): string {
+  return isAxmMode() ? env.COINFLIP_NATIVE_CONTRACT_ADDR : env.COINFLIP_CONTRACT_ADDR;
+}
+
 /**
  * Validate that all critical environment variables are set.
  * Called at server startup — crashes the process if any are missing.
@@ -54,13 +70,19 @@ export type Env = z.infer<typeof envSchema>;
 export function validateProductionEnv(): void {
   const isProd = env.NODE_ENV === 'production';
   const required: Array<{ key: keyof typeof env; label: string }> = [
-    { key: 'COINFLIP_CONTRACT_ADDR', label: 'CoinFlip smart contract address' },
-    { key: 'LAUNCH_CW20_ADDR', label: 'COIN CW20 token contract address' },
     { key: 'RELAYER_MNEMONIC', label: 'Relayer wallet mnemonic' },
     { key: 'RELAYER_ADDRESS', label: 'Relayer wallet address' },
     { key: 'TREASURY_ADDRESS', label: 'Treasury wallet address' },
     { key: 'DATABASE_URL', label: 'PostgreSQL connection string' },
   ];
+
+  // Currency-specific requirements
+  if (env.GAME_CURRENCY === 'axm') {
+    required.push({ key: 'COINFLIP_NATIVE_CONTRACT_ADDR', label: 'Native CoinFlip contract address (AXM mode)' });
+  } else {
+    required.push({ key: 'COINFLIP_CONTRACT_ADDR', label: 'CoinFlip smart contract address' });
+    required.push({ key: 'LAUNCH_CW20_ADDR', label: 'COIN CW20 token contract address' });
+  }
 
   const missing: string[] = [];
 

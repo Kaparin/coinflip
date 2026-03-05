@@ -11,7 +11,7 @@ import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
 import { relayerService } from './relayer.js';
 import { formatBetResponse } from '../lib/format.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
@@ -209,7 +209,7 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
             const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
             const encoded = Buffer.from(query).toString('base64');
             const res = await chainRest(
-              `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+              `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
             );
             if (res.ok) {
               const data = await res.json() as {
@@ -710,7 +710,7 @@ async function getChainBetState(betId: number): Promise<ChainBetState | null> {
         const query = JSON.stringify({ bet: { bet_id: betId } });
         const encoded = Buffer.from(query).toString('base64');
         const res = await chainRest(
-          `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+          `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
         );
         if (!res.ok) return null;
         const data = await res.json() as { data: ChainBetState };
@@ -1331,7 +1331,7 @@ async function reconcileOrphanedChainBets(): Promise<void> {
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await chainRest(
-      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
     );
     if (!res.ok) return;
 
@@ -1741,7 +1741,7 @@ export async function runHealSweep(): Promise<HealResult> {
     const query = JSON.stringify({ open_bets: { limit: CHAIN_OPEN_BETS_LIMIT } });
     const encoded = Buffer.from(query).toString('base64');
     const res = await chainRest(
-      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+      `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${encoded}`,
     );
 
     if (res.ok) {

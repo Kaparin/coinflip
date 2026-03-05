@@ -14,7 +14,7 @@
  */
 
 import { StargateClient } from '@cosmjs/stargate';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { wsService } from './ws.service.js';
@@ -47,7 +47,7 @@ export class IndexerService {
   private wsConnected = false;
 
   constructor() {
-    this.contractAddress = env.COINFLIP_CONTRACT_ADDR;
+    this.contractAddress = getActiveContractAddr();
   }
 
   /** Initialize with DB connection and start polling */
@@ -55,7 +55,7 @@ export class IndexerService {
     this.db = db;
 
     if (!this.contractAddress) {
-      logger.warn('COINFLIP_CONTRACT_ADDR not set — indexer disabled');
+      logger.warn('CoinFlip contract address not set — indexer disabled');
       return;
     }
 
@@ -892,7 +892,7 @@ export class IndexerService {
           const chainQuery = JSON.stringify({ bet: { bet_id: Number(betId) } });
           const encoded = Buffer.from(chainQuery).toString('base64');
           const res = await chainRest(
-            `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${encoded}`,
+            `/cosmwasm/wasm/v1/contract/${this.contractAddress}/smart/${encoded}`,
           );
           if (res.ok) {
             const data = (await res.json()) as { data: { acceptor?: string | null } };

@@ -21,10 +21,25 @@ export const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID ?? 'axiome-1';
 /** Axiome Connect protocol prefix */
 export const AXIOME_CONNECT_PREFIX = 'axiomesign://';
 
+/** Game currency mode: 'coin' = CW20 COIN token, 'axm' = native AXM */
+export const GAME_CURRENCY = (process.env.NEXT_PUBLIC_GAME_CURRENCY ?? 'coin') as 'coin' | 'axm';
+
+/** Returns true if game runs on native AXM instead of CW20 COIN */
+export function isAxmMode(): boolean {
+  return GAME_CURRENCY === 'axm';
+}
+
 /** Contract addresses */
 export const COINFLIP_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_CONTRACT ?? '';
+export const COINFLIP_NATIVE_CONTRACT = process.env.NEXT_PUBLIC_COINFLIP_NATIVE_CONTRACT ?? '';
 export const LAUNCH_CW20_CONTRACT = process.env.NEXT_PUBLIC_LAUNCH_CW20 ?? '';
 export const PRESALE_CONTRACT = process.env.NEXT_PUBLIC_PRESALE_CONTRACT ?? '';
+
+/** Active CoinFlip contract address based on GAME_CURRENCY */
+export const ACTIVE_CONTRACT = isAxmMode() ? COINFLIP_NATIVE_CONTRACT : COINFLIP_CONTRACT;
+
+/** Native denom for AXM mode */
+export const AXM_DENOM = process.env.NEXT_PUBLIC_AXM_DENOM ?? 'uaxm';
 
 /** Treasury wallet address (receives AXM for shop purchases) */
 export const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS ?? '';

@@ -20,7 +20,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { relayerService } from './relayer.js';
 import { vaultService } from './vault.service.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import { chainRest } from '../lib/chain-fetch.js';
 
 export interface SweepCandidate {
@@ -55,7 +55,7 @@ async function queryChainVaultBalance(address: string): Promise<{ available: str
   try {
     const query = btoa(JSON.stringify({ vault_balance: { address } }));
     const res = await chainRest(
-      `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+      `/cosmwasm/wasm/v1/contract/${getActiveContractAddr()}/smart/${query}`,
     );
     if (!res.ok) return { available: '0', locked: '0' };
     const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -238,11 +238,21 @@ class TreasurySweepService {
         );
 
         try {
-          await relayerService.submitExecOnContract(
-            address,
-            env.LAUNCH_CW20_ADDR,
-            { send: { contract: env.COINFLIP_CONTRACT_ADDR, amount: sweepAmount.toString(), msg: btoa(JSON.stringify({ deposit: {} })) } },
-          );
+          if (isAxmMode()) {
+            await relayerService.submitExecOnContract(
+              address,
+              getActiveContractAddr(),
+              { deposit: {} },
+              'Sweep re-deposit',
+              [{ denom: env.AXM_DENOM, amount: sweepAmount.toString() }],
+            );
+          } else {
+            await relayerService.submitExecOnContract(
+              address,
+              env.LAUNCH_CW20_ADDR,
+              { send: { contract: getActiveContractAddr(), amount: sweepAmount.toString(), msg: btoa(JSON.stringify({ deposit: {} })) } },
+            );
+          }
           logger.info({ address, amount: sweepAmount.toString() }, 'Re-deposit after failed sweep transfer succeeded');
         } catch (reDepositErr) {
           logger.error({ err: reDepositErr, address, amount: sweepAmount.toString() }, 'Re-deposit after failed sweep transfer also failed');

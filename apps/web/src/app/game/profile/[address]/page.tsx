@@ -6,7 +6,7 @@ import { usePlayerProfile } from '@/hooks/use-player-profile';
 import { useUserAnnouncements } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
-import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
+import { UserAvatar, GameTokenIcon } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -809,7 +809,7 @@ export default function PlayerProfilePage() {
                     <span className={`text-sm font-bold tabular-nums ${textColor}`}>
                       +{formatLaunch(Number(jw.amount))}
                     </span>
-                    <LaunchTokenIcon size={32} />
+                    <GameTokenIcon size={32} />
                   </div>
                 </div>
               );
@@ -900,7 +900,7 @@ export default function PlayerProfilePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold tabular-nums">{formatLaunch(Number(bet.amount))}</span>
-                      <LaunchTokenIcon size={32} />
+                      <GameTokenIcon size={32} />
                     </div>
                     {opponentAddr && (
                       <Link

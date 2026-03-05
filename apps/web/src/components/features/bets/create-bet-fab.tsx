@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { CreateBetForm } from '@/components/features/bets/create-bet-form';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
@@ -99,7 +99,7 @@ export function CreateBetFab({ onBetSubmitted }: CreateBetFabProps) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)]/15">
-                  <LaunchTokenIcon size={40} />
+                  <GameTokenIcon size={40} />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold">{t('wager.newBet')}</h2>

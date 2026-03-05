@@ -8,7 +8,7 @@ import { referralService } from '../services/referral.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr } from '../config/env.js';
 import { chainCached } from '../lib/chain-cache.js';
 import {
   generateChallenge,
@@ -356,7 +356,7 @@ authRouter.get('/grants', authMiddleware, async (c) => {
       authz_expires_at: authzExpiresAt,
       fee_grant_active: feeGrantActive,
       relayer_address: env.RELAYER_ADDRESS,
-      contract_address: env.COINFLIP_CONTRACT_ADDR,
+      contract_address: getActiveContractAddr(),
     },
   });
 });
@@ -373,7 +373,7 @@ authRouter.get('/grant-msg', authMiddleware, async (c) => {
     data: {
       granter: address,
       grantee: env.RELAYER_ADDRESS,
-      contract_address: env.COINFLIP_CONTRACT_ADDR,
+      contract_address: getActiveContractAddr(),
       allowed_messages: [
         'create_bet', 'accept_bet', 'reveal', 'cancel_bet', 'claim_timeout', 'withdraw',
       ],

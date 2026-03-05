@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useGetBetHistory, type Bet } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch, fromMicroLaunch, OPEN_BET_TTL_SECS } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
@@ -157,7 +157,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
         <div className="flex items-center justify-between">
           <span className="text-[var(--color-text-secondary)]">{t('history.betAmount')}</span>
           <span className="font-semibold tabular-nums flex items-center gap-1">
-            {formatLaunch(betAmountMicro)} <LaunchTokenIcon size={30} />
+            {formatLaunch(betAmountMicro)} <GameTokenIcon size={30} />
           </span>
         </div>
 
@@ -174,7 +174,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('history.payout')}</span>
             <span className="font-semibold tabular-nums text-[var(--color-success)] flex items-center gap-1">
-              {formatLaunch(payoutMicro)} <LaunchTokenIcon size={30} />
+              {formatLaunch(payoutMicro)} <GameTokenIcon size={30} />
             </span>
           </div>
         )}
@@ -183,7 +183,7 @@ function ExpandedDetails({ bet, address }: { bet: Bet; address: string }) {
           <div className="flex items-center justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('history.commission')}</span>
             <span className="font-semibold tabular-nums flex items-center gap-1">
-              {formatLaunch(commissionMicro)} <LaunchTokenIcon size={30} />
+              {formatLaunch(commissionMicro)} <GameTokenIcon size={30} />
             </span>
           </div>
         )}
@@ -401,7 +401,7 @@ function BetHistoryDetail() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold tabular-nums">{formatLaunch(betAmountMicro)}</span>
-                      <LaunchTokenIcon size={40} />
+                      <GameTokenIcon size={40} />
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
                         isResolved
                           ? isWinner ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'

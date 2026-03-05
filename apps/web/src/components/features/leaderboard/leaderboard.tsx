@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useLeaderboard, type LeaderboardEntry } from '@/hooks/use-leaderboard';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -91,7 +91,7 @@ function LeaderboardRow({
         {sortBy === 'wagered' && (
           <div className="flex items-center gap-1.5 justify-end">
             <span className="text-sm font-bold tabular-nums">{formatLaunch(entry.total_wagered)}</span>
-            <LaunchTokenIcon size={40} />
+            <GameTokenIcon size={40} />
           </div>
         )}
         {sortBy === 'win_rate' && (

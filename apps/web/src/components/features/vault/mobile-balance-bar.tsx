@@ -9,7 +9,7 @@ import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { BalanceDisplay } from './balance-display';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -92,7 +92,7 @@ export function MobileBalanceBar() {
               <span className="text-lg font-bold tabular-nums text-[var(--color-success)]">
                 {fmtNum(availableHuman)}
               </span>
-              <LaunchTokenIcon size={36} />
+              <GameTokenIcon size={36} />
             </div>
 
             {/* Secondary info pills */}

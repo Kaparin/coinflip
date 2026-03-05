@@ -68,6 +68,12 @@ export const COIN_DECIMALS = 6;
 /** CW20 token denom label */
 export const LAUNCH_TOKEN_LABEL = 'COIN';
 
+/** Native game token denom label (used in AXM mode) */
+export const NATIVE_TOKEN_LABEL = 'AXM';
+
+/** Native game token minimal denom (used in AXM mode) */
+export const NATIVE_GAME_DENOM = 'uaxm';
+
 /** Gas adjustment multiplier for estimation */
 export const GAS_ADJUSTMENT = 1.4;
 

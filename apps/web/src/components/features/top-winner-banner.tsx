@@ -2,7 +2,7 @@
 
 import { useTopWinner } from '@/hooks/use-top-winner';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
@@ -67,7 +67,7 @@ export function TopWinnerBanner() {
                 +{payoutFormatted}
               </div>
               <div className="flex items-center justify-end gap-0.5 mt-0.5">
-                <LaunchTokenIcon size={10} />
+                <GameTokenIcon size={10} />
                 <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">COIN</span>
               </div>
             </div>

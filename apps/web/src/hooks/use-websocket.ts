@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { WS_URL } from '@/lib/constants';
+import { WS_URL, isAxmMode } from '@/lib/constants';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { isInBalanceGracePeriod } from '@/lib/balance-grace';
+
+/** Query key prefix for wallet game-token balance (CW20 or native depending on mode) */
+const WALLET_BALANCE_KEY = isAxmMode() ? 'wallet-game-balance' : 'wallet-cw20-balance';
 import type { WsEvent } from '@coinflip/shared/types';
 
 interface UseWebSocketOptions {
@@ -106,7 +109,7 @@ export function useWebSocket({
       // a server refetch during this window returns data adjusted for server-side
       // pending locks that overlap with frontend deductions → double-subtraction.
       if (
-        (key === '/api/v1/vault/balance' || key === 'wallet-cw20-balance') &&
+        (key === '/api/v1/vault/balance' || key === WALLET_BALANCE_KEY) &&
         (isFrozenRef.current || isInBalanceGracePeriod())
       ) {
         continue;
@@ -162,7 +165,7 @@ export function useWebSocket({
             '/api/v1/bets/mine',
             '/api/v1/bets/history',
             '/api/v1/vault/balance',
-            'wallet-cw20-balance',
+            WALLET_BALANCE_KEY,
           );
         }
         reconnectCountRef.current++;
@@ -351,7 +354,7 @@ export function useWebSocket({
                 '/api/v1/bets/mine',
                 '/api/v1/bets/history',
                 '/api/v1/vault/balance',
-                'wallet-cw20-balance',
+                WALLET_BALANCE_KEY,
                 '/api/v1/users/top-winner',
               );
               break;
@@ -365,7 +368,7 @@ export function useWebSocket({
               // The optimistic setQueryData has the correct value; a refetch now would
               // overwrite it with stale data from the server's chain cache.
               if (!isInBalanceGracePeriod()) {
-                scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+                scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
               }
               break;
             case 'event_started':
@@ -377,11 +380,11 @@ export function useWebSocket({
               break;
             case 'deposit_confirmed':
               // Async deposit confirmed — force refetch balance (override grace period)
-              scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
               break;
             case 'deposit_failed':
               // Async deposit failed — refetch to revert optimistic balance update
-              scheduleInvalidation('/api/v1/vault/balance', 'wallet-cw20-balance');
+              scheduleInvalidation('/api/v1/vault/balance', WALLET_BALANCE_KEY);
               break;
             case 'jackpot_updated':
             case 'jackpot_won':

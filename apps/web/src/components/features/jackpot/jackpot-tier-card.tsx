@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatLaunch, VIP_JACKPOT_TIERS } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { JackpotProgressBar } from './jackpot-progress-bar';
 import { VipInfoModal } from '@/components/features/vip/vip-info-modal';
 import { useTranslation } from '@/lib/i18n';
@@ -164,7 +164,7 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
         {/* Amount display */}
         <div className="flex items-center justify-between mt-2.5">
           <div className="flex items-center gap-1">
-            <LaunchTokenIcon size={12} />
+            <GameTokenIcon size={12} />
             <span className={`text-sm font-bold tabular-nums ${style.accent}`}>
               {currentFormatted}
             </span>
@@ -173,7 +173,7 @@ export function JackpotTierCard({ pool }: JackpotTierCardProps) {
             <span className="text-xs text-[var(--color-text-secondary)]">
               / {targetFormatted}
             </span>
-            <LaunchTokenIcon size={10} />
+            <GameTokenIcon size={10} />
           </div>
         </div>
       </div>

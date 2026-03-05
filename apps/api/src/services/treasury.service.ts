@@ -1,7 +1,7 @@
 import { desc, sql, count } from 'drizzle-orm';
 import { treasuryLedger, bets, users } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { relayerService } from './relayer.js';
@@ -12,8 +12,8 @@ export class TreasuryService {
 
   /**
    * Get treasury balance from chain:
-   *  - vaultBalance: LAUNCH tokens deposited in the contract vault (commissions)
-   *  - walletBalance: CW20 LAUNCH tokens in the treasury wallet (already withdrawn)
+   *  - vaultBalance: tokens deposited in the contract vault (commissions)
+   *  - walletBalance: tokens in the treasury wallet (already withdrawn)
    */
   async getBalance(): Promise<{
     vaultAvailable: string;
@@ -21,6 +21,7 @@ export class TreasuryService {
     walletBalance: string;
   }> {
     const treasuryAddr = env.TREASURY_ADDRESS;
+    const contractAddr = getActiveContractAddr();
 
     // 1) Query contract vault balance for the treasury address
     let vaultAvailable = '0';
@@ -28,7 +29,7 @@ export class TreasuryService {
     try {
       const query = btoa(JSON.stringify({ vault_balance: { address: treasuryAddr } }));
       const res = await chainRest(
-        `/cosmwasm/wasm/v1/contract/${env.COINFLIP_CONTRACT_ADDR}/smart/${query}`,
+        `/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${query}`,
       );
       if (res.ok) {
         const data = (await res.json()) as { data: { available: string; locked: string } };
@@ -39,19 +40,31 @@ export class TreasuryService {
       logger.warn({ err }, 'Failed to query treasury vault balance');
     }
 
-    // 2) Query CW20 wallet balance (tokens already withdrawn to wallet)
+    // 2) Query wallet balance (CW20 or native depending on mode)
     let walletBalance = '0';
     try {
-      const query = btoa(JSON.stringify({ balance: { address: treasuryAddr } }));
-      const res = await chainRest(
-        `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
-      );
-      if (res.ok) {
-        const data = (await res.json()) as { data: { balance: string } };
-        walletBalance = data.data.balance;
+      if (isAxmMode()) {
+        // AXM mode: query native bank balance
+        const res = await chainRest(
+          `/cosmos/bank/v1beta1/balances/${treasuryAddr}/by_denom?denom=${env.AXM_DENOM}`,
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { balance: { amount: string } };
+          walletBalance = data.balance.amount;
+        }
+      } else {
+        // COIN mode: query CW20 balance
+        const query = btoa(JSON.stringify({ balance: { address: treasuryAddr } }));
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${env.LAUNCH_CW20_ADDR}/smart/${query}`,
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { data: { balance: string } };
+          walletBalance = data.data.balance;
+        }
       }
     } catch (err) {
-      logger.warn({ err }, 'Failed to query treasury CW20 wallet balance');
+      logger.warn({ err }, 'Failed to query treasury wallet balance');
     }
 
     return { vaultAvailable, vaultLocked, walletBalance };
@@ -155,14 +168,9 @@ export class TreasuryService {
   }
 
   /**
-   * Send LAUNCH tokens from treasury wallet to a recipient address.
-   * Uses CW20 transfer. If the treasury wallet doesn't have enough,
-   * automatically withdraws from the vault first.
-   *
-   * Flow:
-   *  1. Check treasury CW20 wallet balance
-   *  2. If insufficient, withdraw the deficit from vault to wallet
-   *  3. Execute CW20 transfer from treasury to recipient
+   * Send tokens from treasury wallet to a recipient address.
+   * AXM mode: native MsgSend. COIN mode: CW20 transfer.
+   * If the treasury wallet doesn't have enough, auto-withdraws from vault first.
    */
   async sendPrize(
     recipientAddress: string,
@@ -199,19 +207,29 @@ export class TreasuryService {
       withdrawTxHash = withdrawResult.txHash;
     }
 
-    // Step 2: CW20 transfer from treasury to recipient
-    // Treasury IS relayer, so relayCw20Transfer(treasury, cw20, recipient, amount)
-    // uses MsgExec where grantee == sender, which works as a direct execution.
-    const result = await relayerService.relayCw20Transfer(
-      env.TREASURY_ADDRESS,
-      env.LAUNCH_CW20_ADDR,
-      recipientAddress,
-      amount,
-      'CoinFlip event prize',
-    );
+    // Step 2: Transfer tokens from treasury to recipient
+    let result;
+    if (isAxmMode()) {
+      // AXM mode: direct native MsgSend from treasury (relayer) wallet
+      result = await relayerService.relayNativeSend(
+        recipientAddress,
+        amount,
+        env.AXM_DENOM,
+        'CoinFlip event prize',
+      );
+    } else {
+      // COIN mode: CW20 transfer from treasury to recipient
+      result = await relayerService.relayCw20Transfer(
+        env.TREASURY_ADDRESS,
+        env.LAUNCH_CW20_ADDR,
+        recipientAddress,
+        amount,
+        'CoinFlip event prize',
+      );
+    }
 
     if (!result.success) {
-      logger.error({ result, recipientAddress, amount }, 'Prize CW20 transfer failed');
+      logger.error({ result, recipientAddress, amount }, 'Prize transfer failed');
       if (result.timeout) {
         throw Errors.chainTimeout(result.txHash);
       }

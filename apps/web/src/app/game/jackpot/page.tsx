@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useJackpotActive } from '@/hooks/use-jackpot';
 import { JackpotTierCard } from '@/components/features/jackpot/jackpot-tier-card';
 import { JackpotHistory } from '@/components/features/jackpot/jackpot-history';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { ArrowLeft, History, Info } from 'lucide-react';
@@ -82,7 +82,7 @@ export default function JackpotPage() {
               {t('jackpot.summaryTotal')}
             </div>
             <div className="flex items-center gap-1.5">
-              <LaunchTokenIcon size={16} />
+              <GameTokenIcon size={16} />
               <span className="text-lg font-black tabular-nums text-rose-400">
                 {formatLaunch(totalAmount.toString())}
               </span>

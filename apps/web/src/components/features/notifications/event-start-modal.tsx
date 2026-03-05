@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, Target, X, Clock, Zap, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
@@ -157,7 +157,7 @@ export function EventStartModal({
                 </p>
                 <div className="flex items-center justify-center gap-1.5">
                   <span className="text-lg font-bold text-[var(--color-success)]">{formatLaunch(totalPrizePool)}</span>
-                  <LaunchTokenIcon size={20} />
+                  <GameTokenIcon size={20} />
                 </div>
               </div>
 

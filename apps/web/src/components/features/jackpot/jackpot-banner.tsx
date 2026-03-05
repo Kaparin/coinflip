@@ -2,7 +2,7 @@
 
 import { useJackpotActive } from '@/hooks/use-jackpot';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
@@ -69,7 +69,7 @@ export function JackpotBanner() {
                 {totalFormatted}
               </div>
               <div className="flex items-center justify-end gap-0.5 mt-0.5">
-                <LaunchTokenIcon size={10} />
+                <GameTokenIcon size={10} />
                 <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">
                   {t('jackpot.bannerTotal')}
                 </span>

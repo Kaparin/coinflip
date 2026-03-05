@@ -17,7 +17,7 @@ import {
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { InsufficientBalanceModal } from '@/components/features/vault/insufficient-balance-modal';
 import { Coins } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
@@ -440,7 +440,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <span className="text-base font-bold tabular-nums">{formatLaunch(bet.amount)}</span>
-                    <LaunchTokenIcon size={40} />
+                    <GameTokenIcon size={40} />
                   </div>
                   <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-bold uppercase tracking-wide">
                     {t('bets.sending')}
@@ -533,7 +533,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
               <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] p-3">
                 <span className="text-sm text-[var(--color-text-secondary)]">{t('history.betAmount')}</span>
                 <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
-                  {formatLaunch(acceptTarget.amount)} <LaunchTokenIcon size={40} />
+                  {formatLaunch(acceptTarget.amount)} <GameTokenIcon size={40} />
                 </span>
               </div>
 
@@ -541,7 +541,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
               <div className="flex items-center justify-between rounded-lg bg-emerald-500/5 border border-emerald-500/10 p-3">
                 <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
                 <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-emerald-400">
-                  +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} />
+                  +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })} <GameTokenIcon size={40} />
                 </span>
               </div>
 

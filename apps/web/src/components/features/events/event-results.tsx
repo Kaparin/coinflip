@@ -2,7 +2,7 @@
 
 import { useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -101,7 +101,7 @@ export function EventResults({ eventId }: EventResultsProps) {
               <span className={`font-bold text-[var(--color-success)] ${isFirst ? 'text-base' : 'text-sm'}`}>
                 {formatLaunch(amount)}
               </span>
-              <LaunchTokenIcon size={isFirst ? 40 : 36} />
+              <GameTokenIcon size={isFirst ? 40 : 36} />
               {txHash && (
                 <CheckCircle size={14} className="text-[var(--color-success)] animate-scale-in" />
               )}

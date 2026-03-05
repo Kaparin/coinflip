@@ -22,10 +22,11 @@ import { SigningStargateClient, GasPrice, StdFee, SignerData } from '@cosmjs/sta
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 import { MsgExec } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
+import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx';
 import { toUtf8, fromHex, toBase64 } from '@cosmjs/encoding';
 import { stringToPath } from '@cosmjs/crypto';
 import { AXIOME_PREFIX, AXIOME_HD_PATH, FEE_DENOM, DEFAULT_EXEC_GAS_LIMIT } from '@coinflip/shared/chain';
-import { env } from '../config/env.js';
+import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { SequenceManager } from './sequence-manager.js';
@@ -36,6 +37,7 @@ function createRegistry(): Registry {
   const registry = new Registry();
   registry.register('/cosmos.authz.v1beta1.MsgExec', MsgExec);
   registry.register('/cosmwasm.wasm.v1.MsgExecuteContract', MsgExecuteContract);
+  registry.register('/cosmos.bank.v1beta1.MsgSend', MsgSend);
   return registry;
 }
 
@@ -90,7 +92,7 @@ export class RelayerService {
 
   constructor() {
     this.relayerAddress = env.RELAYER_ADDRESS;
-    this.contractAddress = env.COINFLIP_CONTRACT_ADDR;
+    this.contractAddress = getActiveContractAddr();
     this.treasuryAddress = env.TREASURY_ADDRESS;
     this.chainId = env.AXIOME_CHAIN_ID;
     this.sequenceManager = new SequenceManager(env.AXIOME_RPC_URL, this.relayerAddress);
@@ -106,7 +108,7 @@ export class RelayerService {
     }
 
     if (!this.contractAddress) {
-      logger.warn('COINFLIP_CONTRACT_ADDR not set — relayer service disabled');
+      logger.warn('CoinFlip contract address not set — relayer service disabled');
       return;
     }
 
@@ -199,12 +201,13 @@ export class RelayerService {
     memo = '',
     asyncMode = false,
     granter?: string,
+    funds?: Array<{ denom: string; amount: string }>,
   ): Promise<RelayResult> {
     if (!this.isReady()) {
       return { success: false, error: 'Relayer not initialized' };
     }
 
-    return this._submitExecInner(userAddress, action, memo, asyncMode, undefined, granter);
+    return this._submitExecInner(userAddress, action, memo, asyncMode, undefined, granter, funds);
   }
 
   /** Build the MsgAny + fee for a given user action */
@@ -213,12 +216,13 @@ export class RelayerService {
     action: ContractAction | Record<string, unknown>,
     contractAddr?: string,
     granter?: string,
+    funds?: Array<{ denom: string; amount: string }>,
   ) {
     const innerMsg: MsgExecuteContract = {
       sender: userAddress,
       contract: contractAddr ?? this.contractAddress,
       msg: toUtf8(JSON.stringify(action)),
-      funds: [],
+      funds: funds ?? [],
     };
     const execMsg: MsgExec = {
       grantee: this.relayerAddress,
@@ -279,6 +283,7 @@ export class RelayerService {
     asyncMode = false,
     contractOverride?: string,
     granter?: string,
+    funds?: Array<{ denom: string; amount: string }>,
   ): Promise<RelayResult> {
     const actionKey = Object.keys(action)[0]!;
     const targetContract = contractOverride ?? this.contractAddress;
@@ -287,7 +292,7 @@ export class RelayerService {
       'Submitting MsgExec',
     );
 
-    const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride, granter);
+    const { msgAny, fee } = this.buildTxPayload(userAddress, action, contractOverride, granter, funds);
 
     // Log tx start (before broadcast)
     const startTime = Date.now();
@@ -562,6 +567,8 @@ export class RelayerService {
   private get allowedContracts(): Set<string> {
     const set = new Set<string>();
     if (this.contractAddress) set.add(this.contractAddress);
+    if (env.COINFLIP_CONTRACT_ADDR) set.add(env.COINFLIP_CONTRACT_ADDR);
+    if (env.COINFLIP_NATIVE_CONTRACT_ADDR) set.add(env.COINFLIP_NATIVE_CONTRACT_ADDR);
     if (env.LAUNCH_CW20_ADDR) set.add(env.LAUNCH_CW20_ADDR);
     return set;
   }
@@ -575,6 +582,7 @@ export class RelayerService {
     contractAddress: string,
     action: Record<string, unknown>,
     memo = '',
+    funds?: Array<{ denom: string; amount: string }>,
     granter?: string,
   ): Promise<RelayResult> {
     if (!this.isReady()) {
@@ -587,7 +595,7 @@ export class RelayerService {
       );
       return { success: false, error: 'Contract address not in whitelist' };
     }
-    return this._submitExecInner(userAddress, action, memo, false, contractAddress, granter);
+    return this._submitExecInner(userAddress, action, memo, false, contractAddress, granter, funds);
   }
 
   /**
@@ -607,14 +615,18 @@ export class RelayerService {
       cw20Contract,
       { transfer: { recipient, amount } },
       memo || 'CoinFlip fee transfer',
+      undefined,
       granter,
     );
   }
 
   // ---- Convenience methods for CoinFlip contract actions ----
 
-  async relayDeposit(userAddress: string): Promise<RelayResult> {
-    return this.submitExec(userAddress, { deposit: {} });
+  async relayDeposit(userAddress: string, amount?: string): Promise<RelayResult> {
+    const funds = isAxmMode() && amount
+      ? [{ denom: env.AXM_DENOM, amount }]
+      : undefined;
+    return this.submitExec(userAddress, { deposit: {} }, '', false, undefined, funds);
   }
 
   async relayWithdraw(userAddress: string, amount: string, asyncMode = false, granter?: string): Promise<RelayResult> {
@@ -679,6 +691,103 @@ export class RelayerService {
 
   async relayClaimTimeout(userAddress: string, betId: number, asyncMode = false, granter?: string): Promise<RelayResult> {
     return this.submitExec(userAddress, { claim_timeout: { bet_id: betId } }, '', asyncMode, granter);
+  }
+
+  /**
+   * Send native tokens directly from the relayer/treasury wallet.
+   * Uses the same broadcast queue and sequence management as MsgExec transactions.
+   * Only works because relayer == treasury.
+   */
+  async relayNativeSend(
+    recipientAddress: string,
+    amount: string,
+    denom: string,
+    memo = '',
+  ): Promise<RelayResult> {
+    if (!this.isReady()) {
+      return { success: false, error: 'Relayer not initialized' };
+    }
+
+    const msgAny = {
+      typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+      value: {
+        fromAddress: this.relayerAddress,
+        toAddress: recipientAddress,
+        amount: [{ denom, amount }],
+      },
+    };
+
+    const fee: StdFee = {
+      amount: [{ denom: FEE_DENOM, amount: '5000' }],
+      gas: '200000',
+    };
+
+    const startTime = Date.now();
+    const logId = await relayerTxLogService.logStart({
+      userAddress: this.relayerAddress,
+      contractAddress: '',
+      action: 'native_send',
+      actionPayload: { to: recipientAddress, amount, denom },
+      memo: memo || undefined,
+    });
+
+    const release = await this.acquireBroadcastLock();
+    try {
+      const { accountNumber, sequence } = await this.sequenceManager.getAndIncrement();
+      const signerData: SignerData = { accountNumber, sequence, chainId: this.chainId };
+
+      const txRaw = await this.client!.sign(
+        this.relayerAddress,
+        [msgAny],
+        fee,
+        memo,
+        signerData,
+      );
+      const txBytes = TxRaw.encode(txRaw).finish();
+      const txHashHex = await this.client!.broadcastTxSync(txBytes);
+      const txHash = typeof txHashHex === 'string'
+        ? txHashHex
+        : Buffer.from(txHashHex).toString('hex').toUpperCase();
+
+      logger.info({ txHash, to: recipientAddress, amount, denom }, 'Native send tx in mempool');
+
+      // Poll for confirmation (simplified — 15s max)
+      const maxPollMs = 15_000;
+      const pollStartTime = Date.now();
+      while (Date.now() - pollStartTime < maxPollMs) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`).catch(() => null);
+        if (res?.ok) {
+          const txData = (await res.json()) as { tx_response?: { code: number; height?: string } };
+          if (txData.tx_response) {
+            if (txData.tx_response.code === 0) {
+              await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: 0 });
+              return { success: true, txHash, code: 0, height: Number(txData.tx_response.height ?? 0) };
+            }
+            await relayerTxLogService.logComplete(logId, { txHash, success: false, code: txData.tx_response.code, durationMs: Date.now() - startTime, attempt: 0 });
+            return { success: false, txHash, code: txData.tx_response.code, error: `Tx failed with code ${txData.tx_response.code}` };
+          }
+        }
+      }
+
+      await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: 0 });
+      return { success: true, txHash, code: 0, timeout: true };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.error({ err, to: recipientAddress, amount }, 'Native send failed');
+
+      // Handle sequence mismatch
+      if (errorMsg.includes('account sequence mismatch') || errorMsg.includes('incorrect account sequence')) {
+        const expected = parseExpectedSequence(errorMsg);
+        if (expected !== null) await this.sequenceManager.forceSet(expected);
+        else await this.sequenceManager.handleSequenceMismatch();
+      }
+
+      await relayerTxLogService.logComplete(logId, { rawLog: errorMsg, success: false, durationMs: Date.now() - startTime, attempt: 0 });
+      return { success: false, error: errorMsg };
+    } finally {
+      release();
+    }
   }
 
   /** Get relayer account balance (for monitoring) */

@@ -3,7 +3,7 @@
 import { useGetEventLeaderboard } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -116,7 +116,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
                 </span>
                 <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{metricLabel}</p>
               </div>
-              <LaunchTokenIcon size={rank === 1 ? 36 : 32} />
+              <GameTokenIcon size={rank === 1 ? 36 : 32} />
             </div>
           </div>
         );

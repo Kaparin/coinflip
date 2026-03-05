@@ -1,7 +1,7 @@
 'use client';
 
 import { Modal } from '@/components/ui/modal';
-import { LaunchTokenIcon } from '@/components/ui';
+import { GameTokenIcon } from '@/components/ui';
 import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
 import { useTranslation } from '@/lib/i18n';
 import { fromMicroLaunch, formatLaunch } from '@coinflip/shared/constants';
@@ -41,7 +41,7 @@ export function InsufficientBalanceModal({
         <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] p-3">
           <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.insufficientRequired')}</span>
           <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
-            {formatLaunch(requiredAmount)} <LaunchTokenIcon size={40} />
+            {formatLaunch(requiredAmount)} <GameTokenIcon size={40} />
           </span>
         </div>
 
@@ -49,7 +49,7 @@ export function InsufficientBalanceModal({
         <div className="flex items-center justify-between rounded-lg bg-[var(--color-bg)] p-3">
           <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.insufficientAvailable')}</span>
           <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-[var(--color-text)]">
-            {formatLaunch(availableAmount)} <LaunchTokenIcon size={40} />
+            {formatLaunch(availableAmount)} <GameTokenIcon size={40} />
           </span>
         </div>
 
@@ -57,7 +57,7 @@ export function InsufficientBalanceModal({
         <div className="flex items-center justify-between rounded-lg bg-red-500/5 border border-red-500/10 p-3">
           <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.insufficientShortfall')}</span>
           <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums text-red-400">
-            {fromMicroLaunch(Number(shortfall > 0n ? shortfall : 0n)).toLocaleString('en-US', { maximumFractionDigits: 2 })} <LaunchTokenIcon size={40} />
+            {fromMicroLaunch(Number(shortfall > 0n ? shortfall : 0n)).toLocaleString('en-US', { maximumFractionDigits: 2 })} <GameTokenIcon size={40} />
           </span>
         </div>
 
