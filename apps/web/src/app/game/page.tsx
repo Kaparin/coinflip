@@ -218,7 +218,7 @@ export default function GamePage() {
       <JackpotBanner />
 
       <div id="create-bet-form" className="hidden md:block">
-        <CreateBetForm onBetSubmitted={addPending} />
+        <CreateBetForm onBetSubmitted={(bet) => { addPending(bet); handleTabChange('mybets'); }} />
       </div>
 
       {/* Tabs — all always mounted, hidden via CSS to preserve state & scroll */}
@@ -306,7 +306,7 @@ export default function GamePage() {
         </div>
       )}
 
-      <CreateBetFab onBetSubmitted={addPending} />
+      <CreateBetFab onBetSubmitted={(bet) => { addPending(bet); handleTabChange('mybets'); }} />
     </PullToRefresh>
   );
 }
