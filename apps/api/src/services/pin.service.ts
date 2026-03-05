@@ -15,6 +15,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { Errors } from '../lib/errors.js';
 import { vaultService } from './vault.service.js';
+import { gameDenom } from '../config/env.js';
 
 class PinService {
   /**
@@ -171,7 +172,7 @@ class PinService {
     await db.insert(treasuryLedger).values({
       txhash: `pin_${crypto.randomUUID()}`,
       amount: requiredPrice,
-      denom: 'COIN',
+      denom: gameDenom(),
       source: 'bet_pin',
     });
 

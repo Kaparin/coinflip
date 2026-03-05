@@ -16,6 +16,7 @@ import { configService } from './config.service.js';
 import { vaultService } from './vault.service.js';
 import { eventsService } from './events.service.js';
 import { wsService } from './ws.service.js';
+import { gameDenom } from '../config/env.js';
 
 class SponsoredRaffleService {
   /** Load config from platform_config */
@@ -127,7 +128,7 @@ class SponsoredRaffleService {
     await db.insert(treasuryLedger).values({
       txhash: `raffle_${eventRow!.id}`,
       amount: config.price,
-      denom: 'COIN',
+      denom: gameDenom(),
       source: 'sponsored_raffle',
     });
 
@@ -201,7 +202,7 @@ class SponsoredRaffleService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_raffle_${eventId}`,
         amount: event.pricePaid,
-        denom: 'COIN',
+        denom: gameDenom(),
         source: 'sponsored_raffle_refund',
       });
 
@@ -251,7 +252,7 @@ class SponsoredRaffleService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_raffle_${eventId}`,
         amount: event.pricePaid,
-        denom: 'COIN',
+        denom: gameDenom(),
         source: 'sponsored_raffle_refund',
       });
 

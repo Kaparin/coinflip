@@ -16,6 +16,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { Errors } from '../lib/errors.js';
 import { vaultService } from './vault.service.js';
+import { gameDenom } from '../config/env.js';
 
 /** Simple LRU-ish cache for active VIP tier lookups (60s TTL) */
 const vipCache = new Map<string, { tier: VipTier; expiresAt: string; cachedAt: number }>();
@@ -138,7 +139,7 @@ class VipService {
     await db.insert(treasuryLedger).values({
       txhash: `vip_${crypto.randomUUID()}`,
       amount: price,
-      denom: 'COIN',
+      denom: gameDenom(),
       source: 'vip_subscription',
     });
 

@@ -62,6 +62,11 @@ export function getActiveContractAddr(): string {
   return isAxmMode() ? env.COINFLIP_NATIVE_CONTRACT_ADDR : env.COINFLIP_CONTRACT_ADDR;
 }
 
+/** Returns the game token denom label ('AXM' or 'COIN') for ledger/display */
+export function gameDenom(): string {
+  return isAxmMode() ? 'AXM' : 'COIN';
+}
+
 /**
  * Validate that all critical environment variables are set.
  * Called at server startup — crashes the process if any are missing.

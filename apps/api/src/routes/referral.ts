@@ -277,7 +277,7 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
   const treasuryAddr = env.TREASURY_ADDRESS;
   const cw20Addr = env.LAUNCH_CW20_ADDR;
 
-  if (!treasuryAddr || !cw20Addr) {
+  if (!treasuryAddr || (!isAxmMode() && !cw20Addr)) {
     await referralService.rollbackClaim(userId, amount);
     logger.error({ userId, amount }, 'Referral claim: TREASURY_ADDRESS or LAUNCH_CW20_ADDR not configured');
     return c.json({
@@ -307,7 +307,7 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
     logger.warn({ err, treasuryAddr }, 'Referral claim: failed to pre-check treasury balance — proceeding anyway');
   }
 
-  // Step 2b: Treasury withdraws CW20 from coinflip contract vault
+  // Step 2b: Treasury withdraws tokens from coinflip contract vault
   const withdrawResult = await relayerService.relayWithdraw(treasuryAddr, amount);
   if (!withdrawResult.success) {
     // Withdraw failed — rollback DB claim
@@ -324,14 +324,26 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
 
   logger.info({ txHash: withdrawResult.txHash, amount, treasuryAddr }, 'Referral claim: treasury withdraw confirmed');
 
-  // Step 2b: Transfer CW20 from treasury wallet → user wallet
-  const transferResult = await relayerService.relayCw20Transfer(
-    treasuryAddr,
-    cw20Addr,
-    address,
-    amount,
-    'CoinFlip referral reward',
-  );
+  // Step 2c: Transfer tokens from treasury wallet → user wallet
+  let transferResult;
+  if (isAxmMode()) {
+    // AXM mode: native MsgSend from treasury (relayer) wallet to user
+    transferResult = await relayerService.relayNativeSend(
+      address,
+      amount,
+      env.AXM_DENOM,
+      'CoinFlip referral reward',
+    );
+  } else {
+    // COIN mode: CW20 transfer from treasury wallet to user
+    transferResult = await relayerService.relayCw20Transfer(
+      treasuryAddr,
+      cw20Addr,
+      address,
+      amount,
+      'CoinFlip referral reward',
+    );
+  }
 
   if (!transferResult.success) {
     // Transfer failed — tokens are in treasury wallet but user didn't receive.

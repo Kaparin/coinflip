@@ -12,6 +12,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
 import { configService } from './config.service.js';
+import { gameDenom } from '../config/env.js';
 import { vaultService } from './vault.service.js';
 import { wsService } from './ws.service.js';
 import { translationService } from './translation.service.js';
@@ -99,7 +100,7 @@ class AnnouncementService {
     await db.insert(treasuryLedger).values({
       txhash: `announcement_${ann!.id}`,
       amount: config.price,
-      denom: 'COIN',
+      denom: gameDenom(),
       source: 'sponsored_announcement',
     });
 
@@ -166,7 +167,7 @@ class AnnouncementService {
       await db.insert(treasuryLedger).values({
         txhash: `refund_announcement_${announcementId}`,
         amount: ann.pricePaid,
-        denom: 'COIN',
+        denom: gameDenom(),
         source: 'sponsored_announcement_refund',
       });
 

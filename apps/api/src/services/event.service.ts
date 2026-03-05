@@ -1,6 +1,7 @@
 import { eq, desc } from 'drizzle-orm';
 import { txEvents, treasuryLedger } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
+import { gameDenom } from '../config/env.js';
 
 export class EventService {
   private db = getDb();
@@ -34,7 +35,7 @@ export class EventService {
       .values({
         txhash: params.txhash,
         amount: params.amount,
-        denom: 'COIN',
+        denom: gameDenom(),
         source: params.source,
       })
       .returning();
