@@ -5,8 +5,8 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { GameTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ChevronRight } from 'lucide-react';
-import { GiOpenTreasureChest } from 'react-icons/gi';
 
 /**
  * Jackpot banner shown on the main game page.
@@ -38,12 +38,17 @@ export function JackpotBanner() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-rose-400/[0.04] to-transparent animate-shimmer pointer-events-none" />
 
         <div className="relative flex items-center gap-3 px-3.5 py-2.5">
-          {/* Treasure chest icon with glow */}
+          {/* Jackpot icon */}
           <div className="relative shrink-0">
-            <div className="absolute -inset-1.5 rounded-full bg-rose-400/10 blur-md" />
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-rose-400/20 to-violet-600/10 border border-rose-500/25">
-              <GiOpenTreasureChest size={18} className="text-rose-400 drop-shadow-[0_0_6px_rgba(251,113,133,0.5)]" />
-            </div>
+            <div className="absolute -inset-2 rounded-full bg-rose-400/10 blur-lg" />
+            <Image
+              src="/jackpot.png"
+              alt="Jackpot"
+              width={80}
+              height={80}
+              className="relative drop-shadow-[0_0_8px_rgba(251,113,133,0.4)]"
+              unoptimized
+            />
           </div>
 
           {/* Content */}
