@@ -439,10 +439,41 @@ export async function signDirectWithdraw(
  */
 const BANK_SEND_GAS_LIMIT = 150_000;
 
+// ---- Stargate Client Cache + Sequence Tracker ----
+// Reuse client across rapid-fire shop purchases to avoid connection overhead.
+// Track sequence locally so consecutive txs don't collide while in mempool.
+
+let _cachedStargateClient: SigningStargateClient | null = null;
+let _cachedStargateAddr: string | null = null;
+let _lastKnownSequence: number | null = null;
+
+async function getCachedStargateClient(
+  wallet: DirectSecp256k1HdWallet,
+): Promise<SigningStargateClient> {
+  const accounts = await wallet.getAccounts();
+  const addr = accounts[0]!.address;
+
+  if (_cachedStargateClient && _cachedStargateAddr === addr) {
+    return _cachedStargateClient;
+  }
+
+  if (_cachedStargateClient) {
+    try { _cachedStargateClient.disconnect(); } catch { /* ignore */ }
+  }
+
+  _cachedStargateClient = await getStargateClient(wallet);
+  _cachedStargateAddr = addr;
+  _lastKnownSequence = null;
+  return _cachedStargateClient;
+}
+
 /**
  * Sign a bank.MsgSend(AXM → treasury) and broadcast via broadcast_tx_sync.
  * Returns txHash as soon as the tx enters the mempool (~100ms after sign).
  * Does NOT wait for block inclusion — caller handles confirmation separately.
+ *
+ * Tracks account sequence locally to support rapid consecutive purchases
+ * while previous txs are still in the mempool.
  *
  * @param wallet - CosmJS wallet instance
  * @param address - Sender's axm1... address
@@ -458,7 +489,15 @@ export async function signBankSendSync(
 ): Promise<{ txHash: string }> {
   onStep?.('signing');
 
-  const client = await getStargateClient(wallet);
+  let client: SigningStargateClient;
+  try {
+    client = await getCachedStargateClient(wallet);
+  } catch {
+    _cachedStargateClient = null;
+    _cachedStargateAddr = null;
+    _lastKnownSequence = null;
+    client = await getCachedStargateClient(wallet);
+  }
 
   const msg = {
     typeUrl: '/cosmos.bank.v1beta1.MsgSend',
@@ -471,14 +510,27 @@ export async function signBankSendSync(
 
   const fee = calculateFee(BANK_SEND_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
+  // Use locally tracked sequence if available, otherwise fetch from chain
+  let signerData: { accountNumber: number; sequence: number; chainId: string } | undefined;
+  if (_lastKnownSequence !== null) {
+    const { accountNumber } = await client.getSequence(address);
+    const chainId = await client.getChainId();
+    signerData = { accountNumber, sequence: _lastKnownSequence, chainId };
+  }
+
   let txRaw: TxRaw;
   try {
-    txRaw = await client.sign(address, [msg], fee, 'COIN Shop purchase');
+    txRaw = signerData
+      ? await client.sign(address, [msg], fee, 'COIN Shop purchase', signerData)
+      : await client.sign(address, [msg], fee, 'COIN Shop purchase');
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : '';
     if (errMsg.includes('WebSocket') || errMsg.includes('socket') || errMsg.includes('connect')) {
-      const freshClient = await getStargateClient(wallet);
-      txRaw = await freshClient.sign(address, [msg], fee, 'COIN Shop purchase');
+      _cachedStargateClient = null;
+      _cachedStargateAddr = null;
+      _lastKnownSequence = null;
+      client = await getCachedStargateClient(wallet);
+      txRaw = await client.sign(address, [msg], fee, 'COIN Shop purchase');
     } else {
       throw err;
     }
@@ -506,7 +558,47 @@ export async function signBankSendSync(
   }
 
   if (data.result.code !== 0) {
+    // On sequence mismatch, parse expected sequence and retry once
+    const seqMatch = (data.result.log || '').match(/expected (\d+), got (\d+)/);
+    if (seqMatch) {
+      const expectedSeq = parseInt(seqMatch[1]!, 10);
+      const { accountNumber } = await client.getSequence(address);
+      const chainId = await client.getChainId();
+      const retryRaw = await client.sign(
+        address, [msg], fee, 'COIN Shop purchase',
+        { accountNumber, sequence: expectedSeq, chainId },
+      );
+      const retryBytes = TxRaw.encode(retryRaw).finish();
+      const retryHex = Array.from(retryBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const retryRes = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${retryHex}`);
+      if (retryRes.ok) {
+        const retryData = await retryRes.json() as {
+          result?: { hash?: string; code?: number; log?: string };
+        };
+        if (retryData.result?.hash && retryData.result.code === 0) {
+          _lastKnownSequence = expectedSeq + 1;
+          return { txHash: retryData.result.hash };
+        }
+        if (retryData.result?.code !== 0) {
+          throw new Error(retryData.result?.log || `Transaction rejected (code ${retryData.result?.code})`);
+        }
+      }
+    }
     throw new Error(data.result.log || `Transaction rejected by mempool (code ${data.result.code})`);
+  }
+
+  // Success — advance local sequence tracker
+  if (signerData) {
+    _lastKnownSequence = signerData.sequence + 1;
+  } else {
+    // First successful tx: fetch current sequence and set next
+    try {
+      const { sequence } = await client.getSequence(address);
+      // Chain may still show old sequence; the tx we just sent used `sequence`, so next is +1
+      _lastKnownSequence = sequence + 1;
+    } catch {
+      _lastKnownSequence = null;
+    }
   }
 
   return { txHash: data.result.hash };
