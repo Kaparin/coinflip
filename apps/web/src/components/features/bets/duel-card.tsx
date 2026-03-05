@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Send } from 'lucide-react';
+import { Send, Smile } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { UserAvatar, GameTokenIcon } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
@@ -67,6 +67,13 @@ function PlayerSide({
   );
 }
 
+const CHAT_EMOJIS = [
+  '😀', '😂', '🤣', '😎', '🤑', '🥳', '😤', '😱',
+  '🔥', '💎', '🎯', '👑', '💪', '🤝', '⚡', '🍀',
+  '👍', '👎', '🎉', '🏆', '💰', '💸', '❤️', '💔',
+  '🤔', '😏', '🙏', '✌️', '🫡', '🤞', '👀', '💀',
+];
+
 const CONFETTI_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
 
 /** Deterministic pseudo-random based on seed — avoids hydration mismatch from Math.random() */
@@ -117,6 +124,8 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [msgInput, setMsgInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
+  const emojiRef = useRef<HTMLDivElement>(null);
 
   const isParticipant = myAddress &&
     (myAddress.toLowerCase() === duel.maker.toLowerCase() ||
@@ -143,6 +152,24 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [duel.messages]);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    if (!showEmojis) return;
+    const handleClick = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmojis(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showEmojis]);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    setMsgInput((prev) => (prev + emoji).slice(0, 100));
+    setShowEmojis(false);
+    inputRef.current?.focus();
+  }, []);
 
   const handleSend = useCallback(async () => {
     const text = msgInput.trim();
@@ -324,17 +351,26 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
       {/* Input (participants only) */}
       {isParticipant && duel.phase !== 'fade-out' && (
-        <div className="flex gap-1.5">
-          <input
-            ref={inputRef}
-            type="text"
-            value={msgInput}
-            onChange={(e) => setMsgInput(e.target.value.slice(0, 100))}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={t('duel.messagePlaceholder')}
-            disabled={sending}
-            className="flex-1 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-2.5 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:border-[var(--color-primary)]/50 disabled:opacity-50"
-          />
+        <div className="flex gap-1.5 relative">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={msgInput}
+              onChange={(e) => setMsgInput(e.target.value.slice(0, 100))}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder={t('duel.messagePlaceholder')}
+              disabled={sending}
+              className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] pl-2.5 pr-8 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:border-[var(--color-primary)]/50 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowEmojis((v) => !v)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+            >
+              <Smile size={14} />
+            </button>
+          </div>
           <button
             type="button"
             onClick={handleSend}
@@ -343,6 +379,24 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
           >
             <Send size={14} />
           </button>
+          {/* Emoji picker popup */}
+          {showEmojis && (
+            <div
+              ref={emojiRef}
+              className="absolute bottom-full right-0 mb-1 p-2 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] shadow-lg z-30 w-[220px] grid grid-cols-8 gap-0.5"
+            >
+              {CHAT_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => insertEmoji(emoji)}
+                  className="text-base leading-none p-1 rounded hover:bg-[var(--color-primary)]/10 transition-colors text-center"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

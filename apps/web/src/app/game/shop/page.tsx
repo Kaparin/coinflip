@@ -1,31 +1,35 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { CheckCircle, ExternalLink, Loader2, Store, AlertTriangle, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Store, AlertTriangle, Sparkles } from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { useNativeBalance } from '@/hooks/use-wallet-balance';
-import { useWebSocketContext } from '@/contexts/websocket-context';
-import { GameTokenIcon, AxmIcon } from '@/components/ui';
-import { signBankSendSync } from '@/lib/wallet-signer';
+import { useGetVaultBalance } from '@coinflip/api-client';
+import { GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
 import { Modal } from '@/components/ui/modal';
-import { EXPLORER_URL, API_URL, TREASURY_ADDRESS } from '@/lib/constants';
-import { walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
+import { API_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { fromMicroLaunch } from '@coinflip/shared/constants';
+import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { CHEST_TIERS, mergeTierConfig, type ChestTier } from './chest-config';
 import Image from 'next/image';
 
-type BuyStep = 'signing' | 'broadcasting';
-
 export default function ShopPage() {
   const { t } = useTranslation();
-  const { isConnected, address, getWallet } = useWalletContext();
+  const { isConnected, address } = useWalletContext();
   const queryClient = useQueryClient();
-  const { data: nativeBalance } = useNativeBalance(address);
+  const { pendingDeduction } = usePendingBalance();
+
+  // Vault balance (AXM)
+  const { data: balanceData } = useGetVaultBalance({
+    query: { enabled: isConnected },
+  });
+  const rawAvailable = BigInt(balanceData?.data?.available ?? '0');
+  const adjusted = rawAvailable - pendingDeduction;
+  const vaultBalanceHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
 
   // Load tier config from server
   const { data: shopConfig, isLoading: configLoading } = useQuery({
@@ -46,7 +50,7 @@ export default function ShopPage() {
     [shopConfig?.tiers],
   );
 
-  // Shop purchase status
+  // Per-tier purchase status
   const { data: purchaseStatus } = useQuery({
     queryKey: ['shop', 'purchase-status'],
     queryFn: async () => {
@@ -54,139 +58,74 @@ export default function ShopPage() {
         headers: { ...getAuthHeaders() },
         credentials: 'include',
       });
-      if (!res.ok) return { hasFirstPurchase: false, totalPurchases: 0 };
+      if (!res.ok) return { purchasedTiers: {} as Record<number, number>, totalPurchases: 0 };
       const json = await res.json();
-      return json.data as { hasFirstPurchase: boolean; totalPurchases: number };
+      return json.data as { purchasedTiers: Record<number, number>; totalPurchases: number };
     },
     enabled: isConnected,
     staleTime: 30_000,
   });
 
-  const hasFirstPurchase = purchaseStatus?.hasFirstPurchase ?? false;
+  const purchasedTiers = purchaseStatus?.purchasedTiers ?? {};
 
-  // Confirmation modal state
+  // Modal states
   const [selectedTier, setSelectedTier] = useState<ChestTier | null>(null);
-
   const [isBuying, setIsBuying] = useState(false);
-  const [buyStep, setBuyStep] = useState<BuyStep | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successTx, setSuccessTx] = useState<{
-    txHash: string;
+  const [successResult, setSuccessResult] = useState<{
+    tier: ChestTier;
     coinAmount: number;
     bonusAmount: number;
   } | null>(null);
 
-  // Purchase failure modal (from WS event)
-  const [purchaseFailure, setPurchaseFailure] = useState<{
-    txHash: string;
-    reason: string;
-  } | null>(null);
-
-  const nativeHuman = Number(nativeBalance ?? '0') / 1_000_000;
-
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   const refreshBalances = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['wallet-native-balance'] });
-    if (address) queryClient.invalidateQueries({ queryKey: walletBalanceQueryKey(address) });
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
     queryClient.invalidateQueries({ queryKey: ['shop', 'purchase-status'] });
-    queryClient.invalidateQueries({ queryKey: ['shop', 'config'] });
-  }, [queryClient, address]);
-
-  // WS listeners for background purchase confirmation
-  const { subscribe } = useWebSocketContext();
-
-  useEffect(() => {
-    const unsub = subscribe((event) => {
-      if (event.type === 'purchase_confirmed') {
-        const data = event.data as { coin_amount?: string };
-        setSuccessTx((prev) => {
-          if (prev) {
-            return { ...prev, coinAmount: Number(data.coin_amount ?? prev.coinAmount) };
-          }
-          return prev;
-        });
-        refreshBalances();
-      } else if (event.type === 'purchase_failed') {
-        const data = event.data as { tx_hash?: string; reason?: string };
-        setPurchaseFailure({
-          txHash: data.tx_hash ?? '',
-          reason: data.reason ?? '',
-        });
-        refreshBalances();
-      }
-    });
-    return unsub;
-  }, [subscribe, refreshBalances]);
+    queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
+  }, [queryClient]);
 
   const handleBuy = useCallback(async (tier: ChestTier) => {
     if (!address || isBuying) return;
 
-    const microAxm = Math.floor(tier.axmPrice * 1_000_000);
-
     setError(null);
-    setSuccessTx(null);
     setIsBuying(true);
-    setBuyStep('signing');
 
     try {
-      const wallet = await getWallet();
-      if (!wallet) throw new Error('Wallet not available');
-
-      // Sign bank.MsgSend(AXM → treasury) + broadcast_tx_sync
-      const { txHash } = await signBankSendSync(
-        wallet, address, String(microAxm),
-        (step) => setBuyStep(step),
-      );
-
-      // Tell server about the purchase — server verifies tx + sends real COIN
-      let isFirstPurchase = false;
-      try {
-        const res = await fetch(`${API_URL}/api/v1/shop/instant-buy`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(),
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            tx_hash: txHash,
-            chest_tier: tier.tier,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          isFirstPurchase = data.data?.is_first_purchase ?? false;
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || 'Server rejected purchase');
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message === 'Server rejected purchase') throw err;
-        // Non-critical — tx is already in mempool
-      }
-
-      const bonusAmount = isFirstPurchase ? tier.coinAmount : 0;
-
-      setSuccessTx({
-        txHash,
-        coinAmount: tier.coinAmount + bonusAmount,
-        bonusAmount,
+      const res = await fetch(`${API_URL}/api/v1/shop/buy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ chest_tier: tier.tier }),
       });
 
-      // Close confirmation modal on success
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const code = errData?.error?.code;
+        if (code === 'INSUFFICIENT_BALANCE') {
+          throw new Error(t('shop.insufficientBalance'));
+        }
+        throw new Error(errData?.error?.message || 'Purchase failed');
+      }
+
+      const data = await res.json();
+      const coinAmount = data.data?.coin_amount ?? tier.coinAmount;
+      const bonusAmount = data.data?.bonus_amount ?? 0;
+
       setSelectedTier(null);
+      setSuccessResult({ tier, coinAmount, bonusAmount });
       refreshBalances();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setError(getUserFriendlyError(msg, t, 'generic'));
-      refreshBalances();
+      setError(msg);
     } finally {
       setIsBuying(false);
-      setBuyStep(null);
     }
-  }, [address, isBuying, getWallet, refreshBalances, t]);
+  }, [address, isBuying, refreshBalances, t]);
 
   if (!TREASURY_ADDRESS) {
     return (
@@ -195,6 +134,8 @@ export default function ShopPage() {
       </div>
     );
   }
+
+  const hasAnyBonusLeft = tiers.some((tier) => !purchasedTiers[tier.tier]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 space-y-5">
@@ -206,6 +147,16 @@ export default function ShopPage() {
         </div>
         <p className="text-xs text-[var(--color-text-secondary)]">{t('shop.subtitle')}</p>
       </div>
+
+      {/* Vault balance info */}
+      {isConnected && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
+          <span className="text-xs text-[var(--color-text-secondary)]">{t('shop.yourBalance')}:</span>
+          <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums text-[var(--color-success)]">
+            {fmtNum(vaultBalanceHuman)} <GameTokenIcon size={18} />
+          </span>
+        </div>
+      )}
 
       {/* Loading */}
       {configLoading && (
@@ -223,44 +174,9 @@ export default function ShopPage() {
       )}
 
       {/* Error */}
-      {error && (
+      {error && !selectedTier && (
         <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3">
           <p className="text-xs text-[var(--color-danger)]">{error}</p>
-        </div>
-      )}
-
-      {/* Success card — COIN credited to balance */}
-      {successTx && (
-        <div className="rounded-xl border px-4 py-3 space-y-3 border-[var(--color-success)]/30 bg-[var(--color-success)]/10">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={16} className="text-[var(--color-success)]" />
-            <p className="text-xs font-bold text-[var(--color-success)]">
-              {t('shop.instantSuccess')}
-            </p>
-          </div>
-          <div className="text-[10px] text-[var(--color-text-secondary)] space-y-0.5">
-            <p>{t('shop.received', { amount: fmtNum(successTx.coinAmount) })}</p>
-            {successTx.bonusAmount > 0 && (
-              <p className="text-[var(--color-success)] font-bold">
-                +{fmtNum(successTx.bonusAmount)} COIN {t('shop.bonusLabel')}
-              </p>
-            )}
-          </div>
-          <a
-            href={`${EXPLORER_URL}/transactions/${successTx.txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-primary)] hover:underline"
-          >
-            {t('presale.txHash')} <ExternalLink size={10} />
-          </a>
-          <button
-            type="button"
-            onClick={() => setSuccessTx(null)}
-            className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-          >
-            OK
-          </button>
         </div>
       )}
 
@@ -268,8 +184,9 @@ export default function ShopPage() {
       {!configLoading && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {tiers.map((tier) => {
-            const bonusAmount = !hasFirstPurchase ? tier.coinAmount : 0;
-            const canAfford = nativeHuman >= tier.axmPrice;
+            const isFirstForTier = !purchasedTiers[tier.tier];
+            const bonusAmount = isFirstForTier ? tier.coinAmount : 0;
+            const canAfford = vaultBalanceHuman >= tier.axmPrice;
 
             return (
               <button
@@ -283,11 +200,11 @@ export default function ShopPage() {
                   setError(null);
                   setSelectedTier(tier);
                 }}
-                disabled={!isEnabled || isBuying || (isConnected && !canAfford)}
+                disabled={!isEnabled || isBuying}
                 className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
               >
-                {/* Bonus badge */}
-                {!hasFirstPurchase && bonusAmount > 0 && (
+                {/* Per-tier bonus badge */}
+                {isFirstForTier && bonusAmount > 0 && (
                   <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
                     +{fmtNum(bonusAmount)}
                   </div>
@@ -305,7 +222,7 @@ export default function ShopPage() {
 
                 {/* COIN amount — top */}
                 <div className="flex items-center gap-1 mt-1">
-                  <GameTokenIcon size={16} />
+                  <LaunchTokenIcon size={16} />
                   <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
                     {fmtNum(tier.coinAmount)} COIN
                   </p>
@@ -325,11 +242,16 @@ export default function ShopPage() {
                 {/* Name */}
                 <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
 
-                {/* Price — large with AXM icon */}
+                {/* Price — AXM with game token icon */}
                 <div className="mt-1 flex items-center gap-1.5">
-                  <AxmIcon size={18} />
+                  <GameTokenIcon size={18} />
                   <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
                 </div>
+
+                {/* Insufficient balance warning */}
+                {isConnected && !canAfford && (
+                  <p className="text-[9px] text-[var(--color-danger)] mt-1">{t('shop.notEnough')}</p>
+                )}
               </button>
             );
           })}
@@ -337,7 +259,7 @@ export default function ShopPage() {
       )}
 
       {/* First purchase banner */}
-      {!hasFirstPurchase && isConnected && (
+      {hasAnyBonusLeft && isConnected && (
         <div className="flex items-center gap-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5 px-4 py-3">
           <Sparkles size={16} className="text-[var(--color-warning)] shrink-0" />
           <p className="text-[11px] font-medium text-[var(--color-warning)]">{t('shop.firstPurchaseBanner')}</p>
@@ -346,7 +268,7 @@ export default function ShopPage() {
 
       {/* Purchase Confirmation Modal */}
       <Modal
-        open={!!selectedTier}
+        open={!!selectedTier && !successResult}
         onClose={() => !isBuying && setSelectedTier(null)}
         title={t('shop.confirmTitle')}
         showCloseButton={!isBuying}
@@ -372,18 +294,18 @@ export default function ShopPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-[var(--color-text-secondary)]">{t('shop.confirmPrice')}</span>
                 <span className="flex items-center gap-1 font-bold">
-                  <AxmIcon size={14} />
+                  <GameTokenIcon size={14} />
                   {selectedTier.axmPrice} AXM
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-[var(--color-text-secondary)]">{t('shop.confirmReceive')}</span>
                 <span className="flex items-center gap-1 font-bold text-[var(--color-primary)]">
-                  <GameTokenIcon size={14} />
+                  <LaunchTokenIcon size={14} />
                   {fmtNum(selectedTier.coinAmount)} COIN
                 </span>
               </div>
-              {!hasFirstPurchase && (
+              {!purchasedTiers[selectedTier.tier] && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[var(--color-text-secondary)]">{t('shop.confirmBonus')}</span>
                   <span className="flex items-center gap-1 font-bold text-[var(--color-success)]">
@@ -394,16 +316,10 @@ export default function ShopPage() {
               )}
             </div>
 
-            {/* Info about crediting */}
-            <div className="flex items-start gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
-              <ShieldCheck size={16} className="text-[var(--color-primary)] shrink-0 mt-0.5" />
-              <div className="text-[11px] text-[var(--color-text-secondary)] space-y-1">
-                <p>{t('shop.confirmInfo')}</p>
-                {!hasFirstPurchase && (
-                  <p className="text-[var(--color-success)] font-medium">{t('shop.confirmBonusInfo')}</p>
-                )}
-              </div>
-            </div>
+            {/* Info */}
+            <p className="text-[11px] text-[var(--color-text-secondary)] text-center">
+              {t('shop.confirmInfo')}
+            </p>
 
             {/* Error in modal */}
             {error && (
@@ -421,12 +337,7 @@ export default function ShopPage() {
                 className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] disabled:opacity-70 active:scale-[0.98]"
               >
                 {isBuying ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    {buyStep === 'signing' ? t('presale.stepSigning')
-                      : buyStep === 'broadcasting' ? t('presale.stepBroadcasting')
-                      : t('presale.buying')}
-                  </>
+                  <span className="animate-pulse">{t('shop.buying')}</span>
                 ) : (
                   t('shop.confirmBuy', { price: `${selectedTier.axmPrice} AXM` })
                 )}
@@ -445,42 +356,54 @@ export default function ShopPage() {
         )}
       </Modal>
 
-      {/* Purchase Failed Modal (from WS background confirmation) */}
+      {/* Success Modal — animated chest + congratulations */}
       <Modal
-        open={!!purchaseFailure}
-        onClose={() => setPurchaseFailure(null)}
-        title={t('shop.purchaseFailedTitle')}
+        open={!!successResult}
+        onClose={() => setSuccessResult(null)}
+        title=""
+        showCloseButton={false}
       >
-        {purchaseFailure && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <XCircle size={20} className="text-[var(--color-danger)]" />
-              <p className="text-sm font-bold text-[var(--color-danger)]">{t('shop.purchaseFailedTitle')}</p>
+        {successResult && (
+          <div className="flex flex-col items-center gap-4 py-2">
+            {/* Animated chest */}
+            <div className="relative h-32 w-32 animate-bounce-slow">
+              <Image
+                src={successResult.tier.image}
+                alt={t(successResult.tier.nameKey)}
+                fill
+                className="object-contain drop-shadow-2xl"
+                sizes="128px"
+              />
+              {/* Sparkle effect */}
+              <div className="absolute inset-0 animate-pulse rounded-full bg-[var(--color-primary)]/10 blur-xl" />
             </div>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              {t('shop.purchaseFailedDetail')}
-            </p>
-            {purchaseFailure.txHash && (
-              <a
-                href={`${EXPLORER_URL}/transactions/${purchaseFailure.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-primary)] hover:underline"
-              >
-                {t('presale.txHash')} <ExternalLink size={10} />
-              </a>
-            )}
+
+            {/* Congratulations */}
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-extrabold text-[var(--color-primary)]">
+                {t('shop.congratulations')}
+              </h2>
+              <p className="text-sm text-[var(--color-text)]">
+                {t('shop.received', { amount: fmtNum(successResult.coinAmount + successResult.bonusAmount) })}
+              </p>
+              {successResult.bonusAmount > 0 && (
+                <p className="text-xs font-bold text-[var(--color-success)] flex items-center justify-center gap-1">
+                  <Sparkles size={12} />
+                  +{fmtNum(successResult.bonusAmount)} COIN {t('shop.bonusLabel')}
+                </p>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={() => setPurchaseFailure(null)}
+              onClick={() => setSuccessResult(null)}
               className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
             >
-              {t('shop.purchaseFailedOk')}
+              {t('shop.continue')}
             </button>
           </div>
         )}
       </Modal>
-
     </div>
   );
 }

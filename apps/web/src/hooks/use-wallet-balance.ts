@@ -69,6 +69,20 @@ export function useNativeBalance(address?: string | null) {
   });
 }
 
+/**
+ * Hook to get the CW20 COIN token balance regardless of GAME_CURRENCY mode.
+ * Useful for displaying COIN balance in the header/shop when game currency is AXM.
+ */
+export function useCoinBalance(address?: string | null) {
+  return useQuery({
+    queryKey: ['wallet-cw20-balance', address],
+    queryFn: () => fetchCw20Balance(address!),
+    enabled: !!address && !!LAUNCH_CW20_CONTRACT,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+}
+
 /** Returns the React Query key used by useWalletBalance for cache manipulation */
 export function walletBalanceQueryKey(address?: string | null): unknown[] {
   return isAxmMode()

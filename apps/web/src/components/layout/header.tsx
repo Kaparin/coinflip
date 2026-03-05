@@ -4,11 +4,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
-import { GameTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
+import { GameTokenIcon, LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
-import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
+import { useWalletBalance, useNativeBalance, useCoinBalance } from '@/hooks/use-wallet-balance';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
 import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
@@ -39,6 +39,7 @@ export function Header() {
   const activeEventCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
   const { data: nativeBalanceRaw } = useNativeBalance(wallet.address);
+  const { data: coinBalanceRaw } = useCoinBalance(wallet.address);
   const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
   const isDiamond = vipStatus?.active && vipStatus.tier === 'diamond';
@@ -97,6 +98,7 @@ export function Header() {
   const availableHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000; // uaxm → AXM
+  const coinBalanceHuman = fromMicroLaunch(coinBalanceRaw ?? '0');
   const isLowAxm = !vipStatus?.active && nativeBalanceHuman < 0.5;
 
   const isAdmin =
@@ -159,9 +161,9 @@ export function Header() {
                     <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
                     <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <GameTokenIcon size={18} /></span>
                   </div>
-                  <div className="flex items-center gap-1.5" title={t('header.walletTitle')}>
-                    <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.wallet')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(walletBalanceHuman)} <GameTokenIcon size={18} /></span>
+                  <div className="flex items-center gap-1.5" title="COIN">
+                    <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
+                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(coinBalanceHuman)} <LaunchTokenIcon size={18} /></span>
                   </div>
                   <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM">
                     <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={18} /></span>

@@ -111,6 +111,11 @@ body {
   100% { transform: scale(1); }
 }
 
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
 @keyframes confetti-fall {
   0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
   100% { opacity: 0; transform: translateY(120px) rotate(720deg); }
@@ -152,6 +157,7 @@ body {
 .animate-number-pop    { animation: numberPop 0.3s ease-out; }
 .animate-slide-in      { animation: slideIn 0.2s ease-out; }
 .animate-slide-out     { animation: slideOut 0.2s ease-out forwards; }
+.animate-bounce-slow   { animation: bounceSlow 1.5s ease-in-out infinite; }
 
 /* Stagger delay utilities for list animations */
 .stagger-1 { animation-delay: 0.03s; animation-fill-mode: both; }

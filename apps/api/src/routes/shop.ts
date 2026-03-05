@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { eq, count, sum, countDistinct, desc } from 'drizzle-orm';
+import { eq, and, count, sum, countDistinct, desc } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth.js';
 import { adminMiddleware } from '../middleware/admin.js';
 import { getDb } from '../lib/db.js';
@@ -46,15 +46,25 @@ shopRouter.get('/purchase-status', authMiddleware, async (c) => {
   const user = c.get('user');
   const db = getDb();
 
-  const [result] = await db
-    .select({ total: count() })
+  // Return per-tier purchase counts for per-item first-purchase bonus
+  const tierCounts = await db
+    .select({ tier: shopPurchases.chestTier, total: count() })
     .from(shopPurchases)
-    .where(eq(shopPurchases.userId, user.id));
+    .where(eq(shopPurchases.userId, user.id))
+    .groupBy(shopPurchases.chestTier);
+
+  const purchasedTiers = tierCounts.reduce<Record<number, number>>((acc, row) => {
+    acc[row.tier] = row.total;
+    return acc;
+  }, {});
+
+  const totalPurchases = tierCounts.reduce((sum, row) => sum + row.total, 0);
 
   return c.json({
     data: {
-      hasFirstPurchase: (result?.total ?? 0) > 0,
-      totalPurchases: result?.total ?? 0,
+      hasFirstPurchase: totalPurchases > 0,
+      totalPurchases,
+      purchasedTiers,
     },
   });
 });
@@ -170,6 +180,114 @@ shopRouter.post(
     }
 
     return c.json({ data: { ok: true } });
+  },
+);
+
+// ---- POST /buy — instant vault-based purchase (no blockchain tx) ----
+
+const BuySchema = z.object({
+  chest_tier: z.number().int().min(1).max(6),
+});
+
+shopRouter.post(
+  '/buy',
+  authMiddleware,
+  zValidator('json', BuySchema),
+  async (c) => {
+    const user = c.get('user');
+    const address = c.get('address');
+    const body = c.req.valid('json');
+    const db = getDb();
+
+    // Check shop is enabled
+    const enabled = await isShopEnabled();
+    if (!enabled) {
+      return c.json({ error: { code: 'SHOP_DISABLED', message: 'Shop is currently disabled' } }, 400);
+    }
+
+    // Load tier config
+    const tiers = await getShopTiers();
+    const tierConfig = tiers.find(t => t.tier === body.chest_tier);
+    if (!tierConfig) {
+      return c.json({ error: { code: 'INVALID_TIER', message: 'Invalid chest tier' } }, 400);
+    }
+
+    const microAxm = String(Math.floor(tierConfig.axmPrice * 1_000_000));
+
+    // Deduct AXM from vault balance
+    const deducted = await vaultService.deductBalance(user.id, microAxm);
+    if (!deducted) {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient game balance' } }, 400);
+    }
+
+    // Check per-tier first purchase bonus
+    const [tierCount] = await db
+      .select({ total: count() })
+      .from(shopPurchases)
+      .where(
+        and(
+          eq(shopPurchases.userId, user.id),
+          eq(shopPurchases.chestTier, body.chest_tier),
+        ),
+      );
+
+    const isFirstTierPurchase = (tierCount?.total ?? 0) === 0;
+    const microCoin = String(Math.floor(tierConfig.coinAmount * 1_000_000));
+    const totalMicroCoin = isFirstTierPurchase
+      ? String(Math.floor(tierConfig.coinAmount * 2 * 1_000_000))
+      : microCoin;
+    const bonusMicroCoin = isFirstTierPurchase ? microCoin : '0';
+
+    // Credit COIN to user balance
+    await vaultService.creditCoin(user.id, totalMicroCoin);
+
+    // Record purchase (use synthetic ID instead of tx hash)
+    const syntheticTxHash = `vault-${crypto.randomUUID()}`;
+    await db
+      .insert(shopPurchases)
+      .values({
+        userId: user.id,
+        address,
+        chestTier: body.chest_tier,
+        axmAmount: microAxm,
+        coinAmount: microCoin,
+        bonusCredited: bonusMicroCoin,
+        txHash: syntheticTxHash,
+        status: 'confirmed',
+      });
+
+    const coinAmount = tierConfig.coinAmount;
+    const bonusAmount = isFirstTierPurchase ? tierConfig.coinAmount : 0;
+    const totalCoin = coinAmount + bonusAmount;
+
+    // Notify via WS
+    wsService.sendToAddress(address, {
+      type: 'purchase_confirmed',
+      data: {
+        tx_hash: syntheticTxHash,
+        coin_amount: String(totalCoin),
+      },
+    });
+
+    // Also send balance_updated
+    wsService.sendToAddress(address, {
+      type: 'balance_updated',
+      data: { address },
+    });
+
+    logger.info(
+      { userId: user.id, tier: body.chest_tier, axm: tierConfig.axmPrice, coin: totalCoin, bonus: bonusAmount },
+      'Shop vault purchase completed',
+    );
+
+    return c.json({
+      data: {
+        coin_amount: coinAmount,
+        bonus_amount: bonusAmount,
+        total_coin: totalCoin,
+        is_first_tier_purchase: isFirstTierPurchase,
+      },
+    });
   },
 );
 

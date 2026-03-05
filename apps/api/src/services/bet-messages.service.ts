@@ -3,23 +3,12 @@ import { betMessages, bets, users } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { AppError } from '../lib/errors.js';
 
-/** In-memory rate limiter: userId → last message timestamp */
-const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_MS = 3_000;
-
 class BetMessagesService {
   private db = getDb();
 
   /** Send a message in a bet's duel chat */
   async sendMessage(params: { betId: bigint; userId: string; message: string }) {
     const { betId, userId, message } = params;
-
-    // Rate limit: 1 message per 3 seconds per user
-    const now = Date.now();
-    const lastSent = rateLimitMap.get(userId) ?? 0;
-    if (now - lastSent < RATE_LIMIT_MS) {
-      throw new AppError('RATE_LIMITED', 'Wait a few seconds before sending another message', 429);
-    }
 
     // Verify bet exists and is in an active duel state
     const [bet] = await this.db
@@ -57,9 +46,6 @@ class BetMessagesService {
         message: trimmed,
       })
       .returning();
-
-    // Update rate limit
-    rateLimitMap.set(userId, now);
 
     return row!;
   }
