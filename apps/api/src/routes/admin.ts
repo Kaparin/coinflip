@@ -237,6 +237,7 @@ adminRouter.get('/users/:userId', async (c) => {
       vault: {
         available: balance?.available ?? '0',
         locked: balance?.locked ?? '0',
+        coinBalance: balance?.coinBalance ?? '0',
       },
       chainVault: chainBalance ? { available: chainBalance.available, locked: chainBalance.locked } : null,
       chainUserBets: chainUserBets.map(b => ({ id: b.id, status: b.status, amount: b.amount, maker: b.maker, acceptor: b.acceptor })),
@@ -249,6 +250,36 @@ adminRouter.get('/users/:userId', async (c) => {
       })),
     },
   });
+});
+
+// POST /api/v1/admin/users/:userId/coin — Credit or debit COIN balance
+const CoinAdjustSchema = z.object({
+  amount: z.string().min(1),
+  action: z.enum(['credit', 'debit']),
+  reason: z.string().optional(),
+});
+
+adminRouter.post('/users/:userId/coin', zValidator('json', CoinAdjustSchema), async (c) => {
+  const userId = c.req.param('userId');
+  const { amount, action, reason } = c.req.valid('json');
+  const db = getDb();
+
+  const [user] = await db.select({ id: users.id, address: users.address }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return c.json({ error: { code: 'NOT_FOUND', message: 'User not found' } }, 404);
+
+  if (action === 'credit') {
+    await vaultService.creditCoin(userId, amount);
+  } else {
+    const result = await vaultService.deductCoin(userId, amount);
+    if (!result) {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
+    }
+  }
+
+  const newBalance = await vaultService.getCoinBalance(userId);
+  logger.info({ userId, action, amount, reason, newBalance }, 'Admin: COIN balance adjusted');
+
+  return c.json({ data: { coinBalance: newBalance } });
 });
 
 // ═══════════════════════════════════════════

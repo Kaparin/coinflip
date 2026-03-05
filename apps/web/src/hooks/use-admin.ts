@@ -192,7 +192,7 @@ export interface DiagnosticsData {
 
 export interface UserDetail {
   user: { id: string; address: string; nickname: string | null; createdAt: string | null };
-  vault: { available: string; locked: string };
+  vault: { available: string; locked: string; coinBalance: string };
   chainVault: { available: string; locked: string } | null;
   chainUserBets: Array<{ id: number; status: string; amount: string; maker: string; acceptor: string | null }>;
   bets: Array<{
@@ -302,6 +302,23 @@ export function useAdminUserDetail(userId: string | null) {
     queryFn: () => adminFetch<UserDetail>(`/api/v1/admin/users/${userId}`, address!),
     enabled: isConnected && !!address && !!userId,
     staleTime: 5_000,
+  });
+}
+
+export function useAdminAdjustCoin() {
+  const { address } = useWalletContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, amount, action, reason }: { userId: string; amount: string; action: 'credit' | 'debit'; reason?: string }) => {
+      return adminFetch<{ coinBalance: string }>(`/api/v1/admin/users/${userId}/coin`, address!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, action, reason }),
+      });
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin', 'user', vars.userId] });
+    },
   });
 }
 

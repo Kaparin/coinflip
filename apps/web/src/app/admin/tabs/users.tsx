@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { formatLaunch } from '@coinflip/shared/constants';
-import { useAdminUsers, useAdminUserDetail } from '@/hooks/use-admin';
+import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
+import { useAdminUsers, useAdminUserDetail, useAdminAdjustCoin } from '@/hooks/use-admin';
 import {
   StatCard,
   shortAddr,
@@ -152,6 +152,9 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
         )}
       </div>
 
+      {/* COIN Balance Management */}
+      <CoinBalanceSection userId={userId} coinBalance={detail.vault.coinBalance} />
+
       {/* Chain user bets — bets on chain where user is maker or acceptor */}
       {detail.chainUserBets?.length > 0 && (
         <div className="space-y-2">
@@ -227,6 +230,78 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
             </tbody>
           </table>
         </TableWrapper>
+      </div>
+    </div>
+  );
+}
+
+function CoinBalanceSection({ userId, coinBalance }: { userId: string; coinBalance: string }) {
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const adjustCoin = useAdminAdjustCoin();
+
+  const handleAdjust = (action: 'credit' | 'debit') => {
+    const num = parseFloat(amount);
+    if (!num || num <= 0) return;
+    const micro = toMicroLaunch(num);
+    adjustCoin.mutate({ userId, amount: micro, action, reason: reason || undefined }, {
+      onSuccess: () => { setAmount(''); setReason(''); },
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">COIN баланс</p>
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <StatCard label="COIN баланс" value={formatLaunch(coinBalance)} />
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Сумма (COIN)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="100"
+              min={0}
+              step={1}
+              className="w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-sm tabular-nums focus:border-[var(--color-primary)] focus:outline-none"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Причина</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Тест / награда / ..."
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => handleAdjust('credit')}
+            disabled={adjustCoin.isPending || !amount}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold disabled:opacity-50 transition-colors"
+          >
+            + Начислить
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAdjust('debit')}
+            disabled={adjustCoin.isPending || !amount}
+            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 transition-colors"
+          >
+            − Списать
+          </button>
+        </div>
+        {adjustCoin.isError && (
+          <p className="text-[11px] text-red-400">{(adjustCoin.error as Error).message}</p>
+        )}
+        {adjustCoin.isSuccess && (
+          <p className="text-[11px] text-emerald-400">Баланс обновлён: {formatLaunch((adjustCoin.data as { coinBalance: string }).coinBalance)} COIN</p>
+        )}
       </div>
     </div>
   );
