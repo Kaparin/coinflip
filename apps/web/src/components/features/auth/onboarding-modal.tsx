@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useTranslation } from '@/lib/i18n';
@@ -29,6 +30,7 @@ const AUTH_STEPS: AuthStep[] = ['fetching', 'signing', 'broadcasting', 'confirmi
 export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalProps) {
   const { t } = useTranslation();
   const { address, getWallet } = useWalletContext();
+  const queryClient = useQueryClient();
   const { data: grantStatus, refetch } = useGrantStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,9 @@ export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalP
       }
 
       setStep('done');
-      void refetch();
+      // Invalidate + await refetch so all consumers (bet-list, create-form) see authz_granted=true
+      await queryClient.invalidateQueries({ queryKey: ['/api/v1/auth/grants'] });
+      await refetch();
       onSuccess?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to sign grant';
@@ -116,7 +120,7 @@ export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalP
     } finally {
       setIsSubmitting(false);
     }
-  }, [address, getWallet, refetch]);
+  }, [address, getWallet, queryClient, refetch]);
 
   if (!isOpen) return null;
 
