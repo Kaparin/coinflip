@@ -17,6 +17,7 @@ import {
   PieChart,
   Newspaper,
   Store,
+  Coins,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 import { DashboardTab } from './tabs/dashboard';
@@ -33,8 +34,9 @@ import { ConfigTab } from './tabs/config';
 import { CommissionTab } from './tabs/commission';
 import { NewsTab } from './tabs/news';
 import { ShopTab } from './tabs/shop';
+import { StakingTab } from './tabs/staking';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'news' | 'shop';
+type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'staking' | 'news' | 'shop';
 
 const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд' },
@@ -44,6 +46,7 @@ const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
   { id: 'jackpot', icon: Gem, label: 'Джекпот' },
   { id: 'vip', icon: Crown, label: 'VIP' },
   { id: 'commission', icon: PieChart, label: 'Комиссия' },
+  { id: 'staking', icon: Coins, label: 'Стейкинг' },
   { id: 'transactions', icon: ArrowLeftRight, label: 'Транзакции' },
   { id: 'announcements', icon: Megaphone, label: 'Анонсы' },
   { id: 'news', icon: Newspaper, label: 'Новости' },
@@ -103,6 +106,7 @@ export default function AdminPage() {
       {activeTab === 'announcements' && <AnnouncementsTab />}
       {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'commission' && <CommissionTab />}
+      {activeTab === 'staking' && <StakingTab />}
       {activeTab === 'news' && <NewsTab />}
       {activeTab === 'shop' && <ShopTab />}
     </div>

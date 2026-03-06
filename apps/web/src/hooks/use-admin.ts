@@ -1186,3 +1186,49 @@ export function useAdminRejectSponsoredRaffle() {
     },
   });
 }
+
+// ─── Staking Distribution ────────────────────────────────────────
+
+export interface StakingStats {
+  totalAccumulated: string;
+  totalEntries: number;
+  pendingAmount: string;
+  pendingEntries: number;
+  flushedAmount: string;
+  flushedEntries: number;
+}
+
+export function useAdminStakingStats() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'staking', 'stats', address],
+    queryFn: () => adminFetch<StakingStats>('/api/v1/admin/staking/stats', address!),
+    enabled: isConnected && !!address,
+    staleTime: 10_000,
+  });
+}
+
+export function useAdminStakingPending() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'staking', 'pending', address],
+    queryFn: () => adminFetch<string>('/api/v1/admin/staking/pending', address!),
+    enabled: isConnected && !!address,
+    staleTime: 5_000,
+  });
+}
+
+export function useAdminStakingFlush() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      adminFetch<{ txHash: string; amount: string }>('/api/v1/admin/staking/flush', address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'staking'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'economy'] });
+    },
+  });
+}
