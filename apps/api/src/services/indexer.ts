@@ -336,6 +336,7 @@ export class IndexerService {
       'coinflip.accept_bet': 'bet_accepted',
       'coinflip.bet_revealed': 'bet_revealed',
       'coinflip.reveal': 'bet_revealed',
+      'coinflip.accept_and_reveal': 'bet_revealed', // Native contract: atomic accept+reveal in one tx
       'coinflip.commission_paid': 'bet_revealed', // Contract emits duplicate "action" attr — commission_paid overwrites bet_revealed
       'coinflip.bet_timeout_claimed': 'bet_timeout_claimed',
       'coinflip.claim_timeout': 'bet_timeout_claimed',
@@ -355,11 +356,13 @@ export class IndexerService {
     }
 
     // Record commission in treasury_ledger
+    // Native contract: commission is in accept_and_reveal event
+    // CW20 contract: separate commission_paid event
     if (
       event.type === 'coinflip.commission_paid' ||
-      event.attributes.action === 'commission_paid'
+      event.attributes.action === 'commission_paid' ||
+      (event.type === 'coinflip.accept_and_reveal' && event.attributes.commission)
     ) {
-      // Contract emits "commission" attribute, not "amount"
       const amount = event.attributes.commission ?? event.attributes.amount;
       if (amount && BigInt(amount) > 0n) {
         try {
@@ -458,11 +461,13 @@ export class IndexerService {
 
         case 'coinflip.reveal':
         case 'coinflip.bet_revealed':
+        case 'coinflip.accept_and_reveal': // Native contract: atomic accept+reveal in one tx
         case 'coinflip.commission_paid': { // Contract emits duplicate "action" attr — commission_paid overwrites bet_revealed
           // Contract emits "commission"/"payout", indexer historically used "commission_amount"/"payout_amount"
           const commissionAmount = event.attributes.commission_amount ?? event.attributes.commission ?? null;
           const payoutAmount = event.attributes.payout_amount ?? event.attributes.payout ?? null;
           const winnerAddress = event.attributes.winner ?? null;
+          const isAcceptAndReveal = event.type === 'coinflip.accept_and_reveal';
 
           let winnerUserId: string | null = null;
           if (winnerAddress) {
@@ -476,12 +481,30 @@ export class IndexerService {
             }
           }
 
+          // For accept_and_reveal: resolve acceptor userId from event
+          let acceptorUserId: string | null = null;
+          if (isAcceptAndReveal && event.attributes.acceptor) {
+            const acceptorUser = await this.db
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.address, event.attributes.acceptor))
+              .limit(1);
+            if (acceptorUser.length > 0) {
+              acceptorUserId = acceptorUser[0]!.id;
+            }
+          }
+
           // Fetch bet BEFORE update to get maker/acceptor info for vault unlock
           const betBeforeReveal = await this.db
             .select({ makerUserId: bets.makerUserId, acceptorUserId: bets.acceptorUserId, amount: bets.amount, status: bets.status })
             .from(bets)
             .where(eq(bets.betId, BigInt(betId)))
             .limit(1);
+
+          // accept_and_reveal can transition from open/accepting; regular reveal from accepted/accepting
+          const allowedStatuses = isAcceptAndReveal
+            ? ['open', 'accepted', 'accepting']
+            : ['accepted', 'accepting'];
 
           await this.db
             .update(bets)
@@ -493,17 +516,20 @@ export class IndexerService {
               ...(commissionAmount ? { commissionAmount } : {}),
               ...(payoutAmount ? { payoutAmount } : {}),
               ...(winnerUserId ? { winnerUserId } : {}),
+              ...(acceptorUserId ? { acceptorUserId } : {}),
+              ...(isAcceptAndReveal && event.attributes.guess ? { acceptorGuess: event.attributes.guess } : {}),
+              ...(isAcceptAndReveal ? { acceptedTime: new Date(), txhashAccept: event.txHash } : {}),
             })
             .where(and(
               eq(bets.betId, BigInt(betId)),
-              inArray(bets.status, ['accepted', 'accepting']),
+              inArray(bets.status, allowedStatuses),
             ));
 
           // Forfeit locked funds for both players (do NOT restore to available).
           // Funds were consumed on-chain: loser's stake is gone, winner received payout.
           if (betBeforeReveal.length > 0) {
             const prev = betBeforeReveal[0]!;
-            if (['accepted', 'accepting'].includes(prev.status)) {
+            if (['open', 'accepted', 'accepting'].includes(prev.status)) {
               await vaultService.forfeitLocked(prev.makerUserId, prev.amount).catch(err =>
                 logger.warn({ err, betId }, 'bet_revealed: forfeitLocked maker failed'));
               if (prev.acceptorUserId) {

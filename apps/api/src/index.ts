@@ -7,6 +7,7 @@ import { relayerService } from './services/relayer.js';
 import { indexerService } from './services/indexer.js';
 import { startBackgroundSweep, stopBackgroundSweep } from './services/background-tasks.js';
 import { jackpotService } from './services/jackpot.service.js';
+import { stakingService } from './services/staking.service.js';
 import { treasurySweepService } from './services/treasury-sweep.service.js';
 import { getDb } from './lib/db.js';
 
@@ -39,6 +40,13 @@ async function initServices() {
     logger.warn({ err }, 'Jackpot pool initialization failed');
   }
 
+  // Backfill staking contributions for resolved bets that were missed
+  try {
+    await stakingService.backfillContributions();
+  } catch (err) {
+    logger.warn({ err }, 'Staking backfill on startup failed');
+  }
+
   const enableIndexer = env.ENABLE_INDEXER === 'true';
   const enableSweep = env.ENABLE_BACKGROUND_SWEEP === 'true';
 
@@ -63,11 +71,14 @@ async function initServices() {
     logger.info('Background sweep disabled (ENABLE_BACKGROUND_SWEEP != "true"). Set ENABLE_BACKGROUND_SWEEP=true to enable.');
   }
 
-  // Periodic jackpot backfill every 60 seconds — catches any contributions
+  // Periodic backfill every 60 seconds — catches any contributions
   // missed due to transient errors or restarts during event processing
   setInterval(() => {
     jackpotService.backfillContributions().catch((err) => {
       logger.warn({ err }, 'Periodic jackpot backfill failed');
+    });
+    stakingService.backfillContributions().catch((err) => {
+      logger.warn({ err }, 'Periodic staking backfill failed');
     });
   }, 60_000);
 

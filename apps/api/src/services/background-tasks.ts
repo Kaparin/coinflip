@@ -21,6 +21,8 @@ import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 import { jackpotService } from './jackpot.service.js';
+import { stakingService } from './staking.service.js';
+import { partnerService } from './partner.service.js';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -922,6 +924,15 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
           referralService.distributeRewards(betId, totalPot, currentBet.makerUserId, acceptorId)
             .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — referral reward distribution failed`));
         }
+
+        // Post-resolution: staking, jackpot, partner (idempotent via unique constraints)
+        const totalPot = BigInt(currentBet.amount) * 2n;
+        stakingService.recordContribution(betId, totalPot)
+          .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — staking contribution failed`));
+        jackpotService.processBetContribution(betId, totalPot)
+          .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — jackpot contribution failed`));
+        partnerService.processBetCommission(betId, totalPot)
+          .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — partner commission failed`));
       }
     }
 

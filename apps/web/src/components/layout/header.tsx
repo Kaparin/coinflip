@@ -253,9 +253,9 @@ export function Header() {
                   <button
                     type="button"
                     onClick={() => setStakingOpen(true)}
-                    className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
                   >
-                    <Image src="/launch-token-logo2.png" alt="LAUNCH" width={22} height={22} className="rounded-full" />
+                    <Image src="/launch-token-logo2.png" alt="LAUNCH" width={32} height={32} className="rounded-full" />
                     <span>{t('staking.stake')}</span>
                   </button>
 
@@ -525,7 +525,7 @@ export function Header() {
               onClick={() => { setStakingOpen(true); setBalanceOpen(false); }}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-xs font-bold text-violet-400 transition-colors hover:bg-violet-500/20 active:scale-[0.98]"
             >
-              <Image src="/launch-token-logo2.png" alt="LAUNCH" width={18} height={18} className="rounded-full" />
+              <Image src="/launch-token-logo2.png" alt="LAUNCH" width={26} height={26} className="rounded-full" />
               {t('staking.title')}
             </button>
           </div>

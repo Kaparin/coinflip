@@ -144,6 +144,39 @@ class StakingService {
 
     return { txHash: result.txHash!, amount: pendingTotal };
   }
+
+  /**
+   * Backfill staking contributions for all resolved bets missing from staking_ledger.
+   * Called once on server startup for resilience.
+   */
+  async backfillContributions(): Promise<void> {
+    const db = getDb();
+
+    try {
+      const missingBets = await db.execute(sql`
+        SELECT b.bet_id, b.amount
+        FROM bets b
+        WHERE b.status IN ('revealed', 'timeout_claimed')
+          AND NOT EXISTS (
+            SELECT 1 FROM staking_ledger sl WHERE sl.bet_id = b.bet_id
+          )
+        ORDER BY b.bet_id ASC
+      `) as unknown as Array<{ bet_id: string; amount: string }>;
+
+      if (missingBets.length === 0) return;
+
+      logger.info({ count: missingBets.length }, 'Staking backfill: processing missing contributions');
+
+      for (const bet of missingBets) {
+        const totalPot = BigInt(bet.amount) * 2n;
+        await this.recordContribution(BigInt(bet.bet_id), totalPot);
+      }
+
+      logger.info({ count: missingBets.length }, 'Staking backfill complete');
+    } catch (err) {
+      logger.error({ err }, 'Staking backfill failed');
+    }
+  }
 }
 
 export const stakingService = new StakingService();

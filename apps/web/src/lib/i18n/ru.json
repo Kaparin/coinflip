@@ -1238,8 +1238,9 @@
   "staking": {
     "title": "Стейкинг LAUNCH",
     "subtitle": "Зарабатывай AXM за стейкинг",
-    "totalStaked": "Всего застейкано LAUNCH",
-    "distributed": "Распределено AXM",
+    "totalStaked": "Всего застейкано",
+    "distributed": "Распределено",
+    "stakers": "Стейкеров",
     "yourPosition": "Твоя позиция",
     "staked": "Застейкано",
     "rewards": "Награды",
@@ -1248,6 +1249,8 @@
     "stake": "Стейк",
     "unstake": "Анстейк",
     "claim": "Забрать",
+    "claimRewards": "Забрать награды",
+    "pendingRewards": "Доступные награды",
     "amountToStake": "Сумма для стейка",
     "amountToUnstake": "Сумма для анстейка",
     "stakeLaunch": "Застейкать LAUNCH",
@@ -1255,9 +1258,14 @@
     "signing": "Подписание...",
     "revenueSource": "Heads or Tails",
     "perPot": "от банка",
+    "revenueDesc": "Доход от комиссий игры",
+    "futureProjects": "Будущие проекты",
     "contractUnavailable": "Контракт стейкинга временно недоступен",
     "retry": "Попробовать снова",
     "txSubmitted": "отправлено, подтверждается...",
-    "confirming": "подтверждается..."
+    "confirming": "подтверждается...",
+    "noRewards": "Нет доступных наград",
+    "availableToStake": "Доступно",
+    "stakedAmount": "Застейкано"
   }
 }

@@ -9,7 +9,7 @@ import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
-import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, eventParticipants, events as eventsTable, stakingLedger } from '@coinflip/db/schema';
+import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, jackpotContributions, eventParticipants, events as eventsTable, stakingLedger } from '@coinflip/db/schema';
 import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
@@ -769,6 +769,12 @@ adminRouter.get('/economy/overview', async (c) => {
       count: sql<number>`count(*)::int`,
     }).from(jackpotPools).where(sql`status = 'completed' AND winner_user_id IS NOT NULL`);
 
+    // Jackpot contributions (1% of each pot accumulated)
+    const [jackpotContribStats] = await db.select({
+      totalContributed: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      betsCount: sql<number>`count(distinct bet_id)::int`,
+    }).from(jackpotContributions);
+
     // Partner payouts
     const [partnerStats] = await db.select({
       totalPaid: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
@@ -848,12 +854,16 @@ adminRouter.get('/economy/overview', async (c) => {
       data: {
         // AXM P&L
         axm: {
-          commissionEarned: commStats!.totalEarned,
-          commissionEntries: commStats!.entries,
+          // Treasury sweep total (AXM withdrawn from contract to admin wallet)
+          treasurySwept: commStats!.totalEarned,
+          treasurySweptEntries: commStats!.entries,
+          // Per-category breakdown (from actual ledger tables)
           referralPaid: refStats!.totalPaid,
           referralCount: refStats!.count,
           jackpotPaid: jackpotStats!.totalPaid,
-          jackpotCount: jackpotStats!.count,
+          jackpotPaidCount: jackpotStats!.count,
+          jackpotContributed: jackpotContribStats!.totalContributed,
+          jackpotContribBets: jackpotContribStats!.betsCount,
           partnerPaid: partnerStats!.totalPaid,
           partnerCount: partnerStats!.count,
           stakingAccrued: stakingStats!.totalAccrued,
@@ -862,15 +872,15 @@ adminRouter.get('/economy/overview', async (c) => {
           stakingCount: stakingStats!.count,
           eventPrizes: eventStats!.totalPrizes,
           eventWinners: eventStats!.winnersCount,
-          // Net = commission earned - referrals - jackpots - partners - staking
-          // (events paid from treasury wallet, not commission)
-          netTreasury: (
-            BigInt(commStats!.totalEarned)
-            - BigInt(refStats!.totalPaid)
-            - BigInt(jackpotStats!.totalPaid)
-            - BigInt(partnerStats!.totalPaid)
-            - BigInt(stakingStats!.totalAccrued)
-          ).toString(),
+          // Team share = total 10% commission - referrals - jackpot contributions - staking - partners
+          teamShare: (() => {
+            const totalComm = BigInt(betTotals!.totalCommission);
+            const spent = BigInt(refStats!.totalPaid)
+              + BigInt(jackpotContribStats!.totalContributed)
+              + BigInt(stakingStats!.totalAccrued)
+              + BigInt(partnerStats!.totalPaid);
+            return (totalComm - spent).toString();
+          })(),
         },
         // COIN Economy
         coin: {

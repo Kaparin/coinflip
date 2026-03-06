@@ -1238,8 +1238,9 @@
   "staking": {
     "title": "LAUNCH Staking",
     "subtitle": "Earn AXM by staking LAUNCH",
-    "totalStaked": "Total Staked LAUNCH",
-    "distributed": "Distributed AXM",
+    "totalStaked": "Total Staked",
+    "distributed": "Distributed",
+    "stakers": "Stakers",
     "yourPosition": "Your Position",
     "staked": "Staked",
     "rewards": "Rewards",
@@ -1248,6 +1249,8 @@
     "stake": "Stake",
     "unstake": "Unstake",
     "claim": "Claim",
+    "claimRewards": "Claim Rewards",
+    "pendingRewards": "Pending Rewards",
     "amountToStake": "Amount to stake",
     "amountToUnstake": "Amount to unstake",
     "stakeLaunch": "Stake LAUNCH",
@@ -1255,9 +1258,14 @@
     "signing": "Signing...",
     "revenueSource": "Heads or Tails",
     "perPot": "per pot",
+    "revenueDesc": "Revenue from game commissions",
+    "futureProjects": "Future Projects",
     "contractUnavailable": "Staking contract is temporarily unavailable",
     "retry": "Try again",
     "txSubmitted": "submitted, confirming...",
-    "confirming": "confirming..."
+    "confirming": "confirming...",
+    "noRewards": "No pending rewards",
+    "availableToStake": "Available",
+    "stakedAmount": "Staked"
   }
 }

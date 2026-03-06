@@ -70,36 +70,36 @@ export function DashboardTab() {
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            label="Комиссия заработана"
-            value={eco ? fmt(eco.axm.commissionEarned) : '...'}
-            sub={eco ? `${eco.axm.commissionEntries} записей` : ''}
+            label="Комиссия 10%"
+            value={eco ? fmt(eco.betting.totalCommission) : '...'}
+            sub={eco ? `${eco.betting.resolvedBets} ставок` : ''}
           />
           <StatCard
-            label="Рефералам выплачено"
+            label="Рефералам"
             value={eco ? fmt(eco.axm.referralPaid) : '...'}
             sub={eco ? `${eco.axm.referralCount} выплат` : ''}
           />
           <StatCard
-            label="Джекпоты выплачены"
-            value={eco ? fmt(eco.axm.jackpotPaid) : '...'}
-            sub={eco ? `${eco.axm.jackpotCount} розыгр.` : ''}
+            label="Джекпот (накоплен)"
+            value={eco ? fmt(eco.axm.jackpotContributed ?? '0') : '...'}
+            sub={eco ? `выплачено: ${fmt(eco.axm.jackpotPaid)}` : ''}
           />
           <StatCard
-            label="Партнёрам выплачено"
-            value={eco ? fmt(eco.axm.partnerPaid) : '...'}
-            sub={eco ? `${eco.axm.partnerCount} выплат` : ''}
+            label="Стейкинг LAUNCH"
+            value={eco ? fmt(eco.axm.stakingAccrued ?? '0') : '...'}
+            sub={eco ? `pending: ${fmt(eco.axm.stakingPending ?? '0')}` : ''}
           />
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard
-            label="Призы ивентов"
-            value={eco ? fmt(eco.axm.eventPrizes) : '...'}
-            sub={eco ? `${eco.axm.eventWinners} победит.` : ''}
+            label="Доля команды"
+            value={eco ? fmt(eco.axm.teamShare ?? '0') : '...'}
+            sub="10% − рефералы − джекпот − стейкинг − партнёры"
           />
           <StatCard
-            label="Чистая прибыль платформы"
-            value={eco ? fmt(eco.axm.netTreasury) : '...'}
-            sub="комиссия − рефералы − джекпоты − партнёры"
+            label="Treasury swept"
+            value={eco ? fmt(eco.axm.treasurySwept ?? '0') : '...'}
+            sub={eco ? `${eco.axm.treasurySweptEntries ?? 0} операций` : ''}
           />
           <StatCard
             label="Комиссия за 24ч / 7д"

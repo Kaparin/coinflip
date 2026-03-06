@@ -83,96 +83,120 @@ export function CommissionTab() {
 
   return (
     <div className="space-y-6">
-      {/* ═══ Financial P&L ═══ */}
+      {/* ═══ Commission 10% Breakdown ═══ */}
       {eco && (
         <div className="space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <TrendingUp size={16} className="text-emerald-400" />
-            Финансовый отчёт (AXM)
+            Комиссия 10% — разбивка
           </h3>
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-4">
-            {/* Income */}
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1">
-                <TrendingUp size={12} /> Доходы
-              </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <StatCard
-                  label="Комиссия со ставок"
-                  value={formatLaunch(eco.axm.commissionEarned)}
-                  sub={`${eco.axm.commissionEntries} записей`}
-                />
-                <StatCard
-                  label="Магазин COIN (AXM)"
-                  value={formatLaunch(eco.coin.shopAxmRevenue)}
-                  sub={`${eco.coin.shopPurchases} покупок`}
-                />
-                <StatCard
-                  label="Объём ставок"
-                  value={formatLaunch(eco.betting.totalVolume)}
-                  sub={`${eco.betting.totalBets} ставок / ${eco.betting.uniquePlayers} игроков`}
-                />
-              </div>
-            </div>
+            {/* Total 10% */}
+            {(() => {
+              const totalComm = BigInt(eco.betting.totalCommission);
+              const referrals = BigInt(eco.axm.referralPaid);
+              const jackpot = BigInt(eco.axm.jackpotContributed ?? '0');
+              const staking = BigInt(eco.axm.stakingAccrued ?? '0');
+              const partners = BigInt(eco.axm.partnerPaid);
+              const team = BigInt(eco.axm.teamShare ?? '0');
 
-            {/* Expenses */}
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-red-400 mb-2 flex items-center gap-1">
-                <TrendingDown size={12} /> Расходы из комиссии
-              </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                <StatCard
-                  label="Рефералы"
-                  value={formatLaunch(eco.axm.referralPaid)}
-                  sub={`${eco.axm.referralCount} выплат`}
-                />
-                <StatCard
-                  label="Джекпоты"
-                  value={formatLaunch(eco.axm.jackpotPaid)}
-                  sub={`${eco.axm.jackpotCount} выплат`}
-                />
-                <StatCard
-                  label="Стейкинг LAUNCH"
-                  value={formatLaunch(eco.axm.stakingAccrued ?? '0')}
-                  sub={`${eco.axm.stakingCount ?? 0} записей`}
-                  warn={BigInt(eco.axm.stakingPending ?? '0') > 0n}
-                />
-                <StatCard
-                  label="Партнёры"
-                  value={formatLaunch(eco.axm.partnerPaid)}
-                  sub={`${eco.axm.partnerCount} выплат`}
-                />
-                <StatCard
-                  label="Призы ивентов"
-                  value={formatLaunch(eco.axm.eventPrizes)}
-                  sub={`${eco.axm.eventWinners} победителей`}
-                />
-              </div>
-            </div>
+              const pct = (v: bigint) => totalComm > 0n ? Number((v * 10000n) / totalComm) / 100 : 0;
 
-            {/* Net */}
-            <div className="border-t border-[var(--color-border)] pt-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className={`rounded-xl border p-4 ${BigInt(eco.axm.netTreasury) >= 0n ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Чистая прибыль платформы</p>
-                  <p className={`text-2xl font-bold ${BigInt(eco.axm.netTreasury) >= 0n ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {formatLaunch(eco.axm.netTreasury)} AXM
-                  </p>
-                  <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-                    комиссия - рефералы - джекпоты - стейкинг - партнёры
-                  </p>
-                </div>
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">COIN в обращении</p>
-                  <p className="text-2xl font-bold text-amber-400">
-                    {formatLaunch(eco.coin.totalCirculating)} COIN
-                  </p>
-                  <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-                    у {eco.coin.holdersCount} юзеров (виртуальные, к листингу)
-                  </p>
-                </div>
-              </div>
-            </div>
+              const segments = [
+                { label: 'Рефералы', value: referrals, color: 'bg-blue-500', textColor: 'text-blue-400' },
+                { label: 'Джекпот', value: jackpot, color: 'bg-purple-500', textColor: 'text-purple-400' },
+                { label: 'Стейкинг', value: staking, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                { label: 'Партнёры', value: partners, color: 'bg-teal-500', textColor: 'text-teal-400' },
+                { label: 'Казна (команда)', value: team, color: 'bg-amber-500', textColor: 'text-amber-400' },
+              ];
+
+              return (
+                <>
+                  {/* Big total card */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">Общая комиссия 10%</p>
+                      <p className="text-3xl font-bold">{formatLaunch(eco.betting.totalCommission)} <span className="text-base text-[var(--color-text-secondary)]">AXM</span></p>
+                      <p className="text-[11px] text-[var(--color-text-secondary)]">из {eco.betting.resolvedBets} разыгранных ставок • объём {formatLaunch(eco.betting.totalVolume)} AXM</p>
+                    </div>
+                  </div>
+
+                  {/* Visual bar */}
+                  <div className="flex h-8 overflow-hidden rounded-full border border-[var(--color-border)]">
+                    {segments.map((s) => {
+                      const p = pct(s.value);
+                      if (p <= 0) return null;
+                      return (
+                        <div
+                          key={s.label}
+                          className={`${s.color} flex items-center justify-center text-[9px] font-bold text-white transition-all`}
+                          style={{ width: `${Math.max(p, 3)}%` }}
+                          title={`${s.label}: ${formatLaunch(s.value.toString())} AXM (${p.toFixed(1)}%)`}
+                        >
+                          {p >= 8 ? `${s.label} ${p.toFixed(0)}%` : p >= 4 ? `${p.toFixed(0)}%` : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Per-category cards */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    {segments.map((s) => (
+                      <div key={s.label} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`h-2 w-2 rounded-full ${s.color}`} />
+                          <p className="text-[10px] text-[var(--color-text-secondary)]">{s.label}</p>
+                        </div>
+                        <p className={`text-sm font-bold ${s.textColor}`}>{formatLaunch(s.value.toString())}</p>
+                        <p className="text-[10px] text-[var(--color-text-secondary)]">{pct(s.value).toFixed(1)}% от комиссии</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Details row */}
+                  <div className="border-t border-[var(--color-border)] pt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <StatCard label="Рефералов выплачено" value={`${eco.axm.referralCount}`} sub={`${formatLaunch(eco.axm.referralPaid)} AXM`} />
+                    <StatCard
+                      label="Джекпот накоплен"
+                      value={formatLaunch(eco.axm.jackpotContributed ?? '0')}
+                      sub={`${eco.axm.jackpotContribBets ?? 0} ставок • ${eco.axm.jackpotPaidCount ?? 0} выплат`}
+                    />
+                    <StatCard
+                      label="Стейкинг (pending)"
+                      value={formatLaunch(eco.axm.stakingPending ?? '0')}
+                      sub={`отправлено: ${formatLaunch(eco.axm.stakingFlushed ?? '0')}`}
+                      warn={BigInt(eco.axm.stakingPending ?? '0') > 0n}
+                    />
+                    <StatCard
+                      label="Призы ивентов"
+                      value={formatLaunch(eco.axm.eventPrizes)}
+                      sub={`${eco.axm.eventWinners} победителей (из казны)`}
+                    />
+                  </div>
+
+                  {/* Bottom summary */}
+                  <div className="border-t border-[var(--color-border)] pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className={`rounded-xl border p-4 ${team >= 0n ? 'border-amber-500/30 bg-amber-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Доля команды</p>
+                      <p className={`text-xl font-bold ${team >= 0n ? 'text-amber-400' : 'text-red-400'}`}>
+                        {formatLaunch(team.toString())} AXM
+                      </p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)]">{pct(team).toFixed(1)}% от комиссии</p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Treasury swept</p>
+                      <p className="text-xl font-bold">{formatLaunch(eco.axm.treasurySwept ?? '0')} AXM</p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)]">{eco.axm.treasurySweptEntries ?? 0} операций вывода</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">COIN в обращении</p>
+                      <p className="text-xl font-bold text-amber-400">{formatLaunch(eco.coin.totalCirculating)} COIN</p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)]">у {eco.coin.holdersCount} юзеров</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

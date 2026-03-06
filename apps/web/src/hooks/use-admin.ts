@@ -216,12 +216,14 @@ export interface UserDetail {
 
 export interface EconomyOverview {
   axm: {
-    commissionEarned: string;
-    commissionEntries: number;
+    treasurySwept: string;
+    treasurySweptEntries: number;
     referralPaid: string;
     referralCount: number;
     jackpotPaid: string;
-    jackpotCount: number;
+    jackpotPaidCount: number;
+    jackpotContributed: string;
+    jackpotContribBets: number;
     partnerPaid: string;
     partnerCount: number;
     stakingAccrued: string;
@@ -230,7 +232,7 @@ export interface EconomyOverview {
     stakingCount: number;
     eventPrizes: string;
     eventWinners: number;
-    netTreasury: string;
+    teamShare: string;
   };
   coin: {
     totalCirculating: string;
