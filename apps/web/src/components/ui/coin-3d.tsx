@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useTexture, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -37,70 +37,117 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-// ─── Avatar texture generation ───────────────────────────────
-const AVATAR_PALETTE = ['#6366f1', '#8b5cf6', '#a855f7', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+// ─── Boring-avatars "beam" reproduction ──────────────────────
+// Exact same algorithm as boring-avatars beam variant
+const AVATAR_PALETTE = ['#6366f1', '#8b5cf6', '#a855f7', '#06b6d4', '#10b981'];
+const BEAM_SIZE = 36;
 const avatarTextureCache = new Map<string, THREE.CanvasTexture>();
 
-function hashAddress(address: string): number {
-  let h = 0;
-  for (let i = 0; i < address.length; i++) {
-    h = ((h << 5) - h + address.charCodeAt(i)) | 0;
+function boringHash(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
   }
-  return Math.abs(h);
+  return Math.abs(hash);
 }
 
-function generateAvatarTexture(address: string): THREE.CanvasTexture {
+function getDigit(num: number, pos: number): number {
+  return Math.floor(num / Math.pow(10, pos)) % 10;
+}
+
+function getBoolean(num: number, pos: number): boolean {
+  return !(getDigit(num, pos) % 2);
+}
+
+function getUnit(num: number, range: number, index?: number): number {
+  const value = num % range;
+  return index !== undefined && getDigit(num, index) % 2 === 0 ? -value : value;
+}
+
+function getContrast(hexColor: string): string {
+  const hex = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#000000' : '#FFFFFF';
+}
+
+/** Generate beam avatar SVG string — identical to boring-avatars */
+function generateBeamSvg(address: string, size: number): string {
+  const num = boringHash(address);
+  const c = BEAM_SIZE;
+  const pLen = AVATAR_PALETTE.length;
+
+  const wrapperColor = AVATAR_PALETTE[num % pLen]!;
+  const faceColor = getContrast(wrapperColor);
+  const backgroundColor = AVATAR_PALETTE[(num + 13) % pLen]!;
+
+  const tx0 = getUnit(num, 10, 1);
+  const wrapperTranslateX = tx0 < 5 ? tx0 + c / 9 : tx0;
+  const ty0 = getUnit(num, 10, 2);
+  const wrapperTranslateY = ty0 < 5 ? ty0 + c / 9 : ty0;
+  const wrapperRotate = getUnit(num, 360);
+  const wrapperScale = 1 + getUnit(num, c / 12) / 10;
+  const isCircle = getBoolean(num, 1);
+  const isMouthOpen = getBoolean(num, 2);
+  const eyeSpread = getUnit(num, 5);
+  const mouthSpread = getUnit(num, 3);
+  const faceRotate = getUnit(num, 10, 3);
+  const faceTranslateX = wrapperTranslateX > c / 6 ? wrapperTranslateX / 2 : getUnit(num, 8, 1);
+  const faceTranslateY = wrapperTranslateY > c / 6 ? wrapperTranslateY / 2 : getUnit(num, 7, 2);
+
+  const wrapperRx = isCircle ? c : c / 6;
+  const wrapperTransform = `translate(${wrapperTranslateX} ${wrapperTranslateY}) rotate(${wrapperRotate} ${c / 2} ${c / 2}) scale(${wrapperScale})`;
+  const faceTransform = `translate(${faceTranslateX} ${faceTranslateY}) rotate(${faceRotate} ${c / 2} ${c / 2})`;
+
+  const mouth = isMouthOpen
+    ? `<path d="M15 ${19 + mouthSpread}c2 1 4 1 6 0" stroke="${faceColor}" fill="none" stroke-linecap="round"/>`
+    : `<path d="M13,${19 + mouthSpread} a1,0.75 0 0,0 10,0" fill="${faceColor}"/>`;
+
+  // Use a hash-based mask ID to avoid collisions
+  const maskId = `bm${num}`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${c} ${c}" width="${size}" height="${size}">
+<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${c}" height="${c}">
+<rect width="${c}" height="${c}" rx="${c * 2}" fill="#FFFFFF"/>
+</mask>
+<g mask="url(#${maskId})">
+<rect width="${c}" height="${c}" fill="${backgroundColor}"/>
+<rect x="0" y="0" width="${c}" height="${c}" fill="${wrapperColor}" rx="${wrapperRx}" transform="${wrapperTransform}"/>
+<g transform="${faceTransform}">
+${mouth}
+<rect x="${14 - eyeSpread}" y="14" width="1.5" height="2" rx="1" fill="${faceColor}"/>
+<rect x="${20 + eyeSpread}" y="14" width="1.5" height="2" rx="1" fill="${faceColor}"/>
+</g>
+</g>
+</svg>`;
+}
+
+/** Load boring-avatars beam SVG as a Three.js CanvasTexture (async) */
+function loadAvatarTexture(address: string): Promise<THREE.CanvasTexture> {
   const cached = avatarTextureCache.get(address);
-  if (cached) return cached;
+  if (cached) return Promise.resolve(cached);
 
-  const SIZE = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = SIZE;
-  canvas.height = SIZE;
-  const ctx = canvas.getContext('2d')!;
-  const h = hashAddress(address);
+  return new Promise((resolve) => {
+    const svg = generateBeamSvg(address, 512);
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 
-  // Circular clip
-  ctx.beginPath();
-  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
-  ctx.clip();
+    const img = new Image(512, 512);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, 512, 512);
 
-  // Gradient background
-  const grad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
-  grad.addColorStop(0, AVATAR_PALETTE[h % AVATAR_PALETTE.length]!);
-  grad.addColorStop(1, AVATAR_PALETTE[(h >> 4) % AVATAR_PALETTE.length]!);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, SIZE, SIZE);
-
-  // Beam-like colored circles
-  for (let i = 0; i < 4; i++) {
-    const seed = Math.abs(h * (i + 2) + i * 17);
-    const color = AVATAR_PALETTE[seed % AVATAR_PALETTE.length]!;
-    const cx = SIZE * 0.15 + (seed * 7 % (SIZE * 0.7));
-    const cy = SIZE * 0.15 + (seed * 11 % (SIZE * 0.7));
-    const r = SIZE * 0.12 + (seed * 3 % (SIZE * 0.22));
-
-    ctx.globalAlpha = 0.45 + (seed * 5 % 35) / 100;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.globalAlpha = 1;
-
-  // White border ring
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 10;
-  ctx.beginPath();
-  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 5, 0, Math.PI * 2);
-  ctx.stroke();
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  avatarTextureCache.set(address, texture);
-  return texture;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      avatarTextureCache.set(address, texture);
+      resolve(texture);
+    };
+    img.src = dataUrl;
+  });
 }
 
 // ─── Coin mesh with animation ────────────────────────────────
@@ -145,13 +192,22 @@ function CoinMesh({
     }
   }, [frontTex, backTex]);
 
-  // Generate avatar textures (memoized per address)
-  const avatarTextures = useMemo(() => {
-    if (!makerAddress || !acceptorAddress) return null;
-    return {
-      maker: generateAvatarTexture(makerAddress),
-      acceptor: generateAvatarTexture(acceptorAddress),
-    };
+  // Load avatar textures async (boring-avatars beam → SVG → canvas → texture)
+  const [avatarTextures, setAvatarTextures] = useState<{
+    maker: THREE.CanvasTexture;
+    acceptor: THREE.CanvasTexture;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!makerAddress || !acceptorAddress) return;
+    let cancelled = false;
+    Promise.all([
+      loadAvatarTexture(makerAddress),
+      loadAvatarTexture(acceptorAddress),
+    ]).then(([maker, acceptor]) => {
+      if (!cancelled) setAvatarTextures({ maker, acceptor });
+    });
+    return () => { cancelled = true; };
   }, [makerAddress, acceptorAddress]);
 
   // Materials: [edge, top-cap, bottom-cap]
@@ -190,21 +246,23 @@ function CoinMesh({
 
   const materials = useMemo(() => [edgeMat, topMat, bottomMat], [edgeMat, topMat, bottomMat]);
 
-  // Swap textures when state changes: idle→logo, flipping/landed→avatars
+  // Swap textures: idle → logo, flipping/landed → avatars
   useEffect(() => {
-    if (!avatarTextures) return;
-
     if (state === 'flipping' || state === 'landed') {
-      // Top cap = maker avatar, bottom cap = acceptor avatar
-      // heads (maker wins) → top cap up, tails (acceptor wins) → bottom cap up
-      topMat.map = avatarTextures.maker;
-      bottomMat.map = avatarTextures.acceptor;
+      if (avatarTextures) {
+        // Top cap = maker, bottom cap = acceptor
+        // heads (maker wins) → top stays up; tails (acceptor wins) → bottom up
+        topMat.map = avatarTextures.maker;
+        bottomMat.map = avatarTextures.acceptor;
+        topMat.needsUpdate = true;
+        bottomMat.needsUpdate = true;
+      }
     } else {
       topMat.map = frontTex;
       bottomMat.map = backTex;
+      topMat.needsUpdate = true;
+      bottomMat.needsUpdate = true;
     }
-    topMat.needsUpdate = true;
-    bottomMat.needsUpdate = true;
   }, [state, avatarTextures, topMat, bottomMat, frontTex, backTex]);
 
   // Reset on flip start
@@ -228,14 +286,10 @@ function CoinMesh({
       const elapsed = performance.now() / 1000 - flipStart.current;
       const t = Math.min(elapsed / flipDuration, 1);
 
-      // Vertical arc (only if verticalMotion enabled — disabled when CSS handles it)
-      if (verticalMotion) {
-        mesh.position.y = maxHeight * 4 * t * (1 - t);
-      } else {
-        mesh.position.y = 0;
-      }
+      // Vertical arc (disabled when CSS handles toss motion)
+      mesh.position.y = verticalMotion ? maxHeight * 4 * t * (1 - t) : 0;
 
-      // X-axis rotation: fast spin decelerating to correct face
+      // X-axis rotation with deceleration
       const eased = easeOutCubic(t);
       const finalAngle =
         result === 'heads'
