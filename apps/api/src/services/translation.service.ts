@@ -73,11 +73,24 @@ class TranslationService {
       content ? this.translate(content, from, to) : Promise.resolve(content),
     ]);
 
+    // If translation returned the same text (API key missing or failed),
+    // use empty string for the target language so pickLocalized falls back to original.
+    const titleDiff = translatedTitle !== title;
+    const contentDiff = translatedContent !== content;
+
+    if (isRu) {
+      return {
+        titleEn: titleDiff ? translatedTitle : '',
+        titleRu: title,
+        contentEn: contentDiff ? translatedContent : '',
+        contentRu: content,
+      };
+    }
     return {
-      titleEn: isRu ? translatedTitle : title,
-      titleRu: isRu ? title : translatedTitle,
-      contentEn: isRu ? translatedContent : content,
-      contentRu: isRu ? content : translatedContent,
+      titleEn: title,
+      titleRu: titleDiff ? translatedTitle : '',
+      contentEn: content,
+      contentRu: contentDiff ? translatedContent : '',
     };
   }
 
