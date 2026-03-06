@@ -73,6 +73,13 @@ pub enum ExecuteMsg {
     /// Pending admin: accept ownership (step 2 of 2-step transfer)
     AcceptAdmin {},
 
+    /// Admin: withdraw from a user's vault directly to admin wallet.
+    /// Used by sweep service to collect offchain-spent tokens (VIP, pins, etc.).
+    AdminWithdrawUser {
+        user: String,
+        amount: Uint128,
+    },
+
     /// Admin: sweep orphaned native tokens (contract balance minus all vault balances)
     AdminSweep {
         /// Optional recipient. Defaults to admin.

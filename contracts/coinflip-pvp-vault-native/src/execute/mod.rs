@@ -1,6 +1,7 @@
 pub mod accept_and_reveal;
 pub mod accept_bet;
 pub mod admin_sweep;
+pub mod admin_withdraw_user;
 pub mod cancel_bet;
 pub mod claim_timeout;
 pub mod create_bet;

@@ -104,6 +104,9 @@ pub fn execute(
         ),
         ExecuteMsg::TransferAdmin { new_admin } => execute_transfer_admin(deps, info, new_admin),
         ExecuteMsg::AcceptAdmin {} => execute_accept_admin(deps, info),
+        ExecuteMsg::AdminWithdrawUser { user, amount } => {
+            crate::execute::admin_withdraw_user::execute_admin_withdraw_user(deps, env, info, user, amount)
+        }
         ExecuteMsg::AdminSweep { recipient } => {
             crate::execute::admin_sweep::execute_admin_sweep(deps, env, info, recipient)
         }

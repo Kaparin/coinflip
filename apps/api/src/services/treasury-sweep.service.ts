@@ -3,29 +3,16 @@
  *
  * Off-chain purchases (VIP, pins, announcements, raffles) deduct from user balance
  * via offchain_spent in DB, but the actual tokens remain in the contract vault.
- * This service sweeps those tokens to the treasury wallet.
+ * This service sweeps those tokens to the admin wallet using the contract's
+ * admin_withdraw_user function.
  *
- * COIN mode flow per user:
+ * Flow per user:
  *   1. Query chain vault balance
  *   2. sweepAmount = min(offchain_spent, chain_available)
- *   3. relayWithdraw(user, sweepAmount) → tokens from vault to user's CW20 wallet
- *   4. relayCw20Transfer(user, cw20, treasury, sweepAmount) → tokens to treasury
- *   5. On success: creditAvailable(userId, sweepAmount) to decrement offchain_spent
- *   6. On transfer failure: attempt re-deposit back into vault
- *
- * AXM mode flow per user:
- *   1. Query chain vault balance
- *   2. sweepAmount = min(offchain_spent, chain_available)
- *   3. relayWithdraw(user, sweepAmount) → native AXM from vault to user's bank account
- *   4. relayNativeSend cannot be used (no bank authz grant from user to relayer)
- *   → Instead: withdraw to treasury directly by calling relayWithdraw on treasury address
- *     after the user's vault has been debited. This requires a two-step approach:
- *     a) The offchain_spent represents tokens owed to treasury.
- *     b) We withdraw from the user's vault → tokens go to user's wallet (native uaxm).
- *     c) We cannot transfer from user's wallet without bank authz.
- *     → Simplified: just credit the DB (decrement offchain_spent) and log it.
- *       The tokens remain in the user's vault and will be collected when they withdraw.
- *       At withdraw time, vault.ts already triggers sweepSingleUser().
+ *   3. relayContractExecute({ admin_withdraw_user: { user, amount } })
+ *      → contract sends native AXM from user's vault directly to admin wallet
+ *   4. On success: creditAvailable(userId, sweepAmount) to decrement offchain_spent
+ *   5. Record in treasury_ledger
  */
 
 import { gt, eq, sql } from 'drizzle-orm';
@@ -34,7 +21,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { relayerService } from './relayer.js';
 import { vaultService } from './vault.service.js';
-import { env, getActiveContractAddr, isAxmMode, gameDenom } from '../config/env.js';
+import { env, getActiveContractAddr, gameDenom } from '../config/env.js';
 import { chainRest } from '../lib/chain-fetch.js';
 
 export interface SweepCandidate {
@@ -52,8 +39,7 @@ export interface SweepResult {
   amount: string;
   status: 'success' | 'failed' | 'skipped';
   error?: string;
-  withdrawTxHash?: string;
-  transferTxHash?: string;
+  txHash?: string;
 }
 
 export interface SweepSummary {
@@ -81,10 +67,59 @@ async function queryChainVaultBalance(address: string): Promise<{ available: str
 
 class TreasurySweepService {
   private sweepInProgress = false;
+  private autoSweepInterval: ReturnType<typeof setInterval> | null = null;
 
   /** Check if a sweep is currently running */
   isRunning(): boolean {
     return this.sweepInProgress;
+  }
+
+  /**
+   * Start automatic sweep cron — runs every intervalMs.
+   * Default: every 10 minutes.
+   */
+  startAutoSweep(intervalMs = 10 * 60 * 1000): void {
+    if (this.autoSweepInterval) return;
+
+    logger.info({ intervalMs }, 'Starting auto-sweep cron');
+    this.autoSweepInterval = setInterval(async () => {
+      try {
+        if (this.sweepInProgress) {
+          logger.debug('Auto-sweep skipped: already in progress');
+          return;
+        }
+        if (!relayerService.isReady()) {
+          logger.debug('Auto-sweep skipped: relayer not ready');
+          return;
+        }
+
+        // Check if there are any candidates
+        const db = getDb();
+        const [count] = await db
+          .select({ cnt: sql<number>`count(*)::int` })
+          .from(vaultBalances)
+          .where(gt(sql`${vaultBalances.offchainSpent}::numeric`, sql`0`));
+
+        if (!count?.cnt) return;
+
+        logger.info({ candidates: count.cnt }, 'Auto-sweep: found debts, starting sweep');
+        const summary = await this.executeSweep(20);
+        logger.info(
+          { succeeded: summary.succeeded, failed: summary.failed, totalSwept: summary.totalSwept },
+          'Auto-sweep completed',
+        );
+      } catch (err) {
+        logger.warn({ err }, 'Auto-sweep cron failed');
+      }
+    }, intervalMs);
+  }
+
+  /** Stop automatic sweep */
+  stopAutoSweep(): void {
+    if (this.autoSweepInterval) {
+      clearInterval(this.autoSweepInterval);
+      this.autoSweepInterval = null;
+    }
   }
 
   /**
@@ -198,8 +233,8 @@ class TreasurySweepService {
   }
 
   /**
-   * Sweep a single user's offchain_spent to treasury.
-   * Safe to call independently (e.g., after user withdrawal).
+   * Sweep a single user's offchain_spent to admin wallet.
+   * Uses the contract's admin_withdraw_user function.
    */
   async sweepSingleUser(userId: string, address: string, offchainSpent: string): Promise<SweepResult> {
     const result: SweepResult = { userId, address, amount: '0', status: 'skipped' };
@@ -226,82 +261,34 @@ class TreasurySweepService {
         return result;
       }
 
-      if (isAxmMode()) {
-        // AXM mode: withdraw from user's vault → native uaxm goes to user's bank account.
-        // Then transfer native tokens from user to treasury via relayNativeSend is NOT possible
-        // (no bank.MsgSend authz grant). Instead, withdraw directly and the tokens
-        // go to the user's bank account. We can't transfer them further, so we use
-        // a different strategy: withdraw to the user, then just credit the DB.
-        // The net effect: user's vault balance decreases, user's bank balance increases,
-        // offchain_spent is zeroed. Treasury gets compensated via commission on bets.
-        //
-        // A more robust approach would be to add admin_withdraw_user to the contract,
-        // but for now this works because:
-        // 1. offchain_spent is small relative to total volume
-        // 2. The tokens were already "spent" (VIP, pins, etc.) — this just reconciles DB
+      // Use admin_withdraw_user — sends AXM from user's vault directly to admin wallet
+      const txResult = await relayerService.relayContractExecute(
+        getActiveContractAddr(),
+        {
+          admin_withdraw_user: {
+            user: address,
+            amount: sweepAmount.toString(),
+          },
+        },
+        [],
+        `Sweep offchain debt: ${address}`,
+      );
 
-        const withdrawResult = await relayerService.relayWithdraw(address, sweepAmount.toString());
-        if (!withdrawResult.success) {
-          result.status = 'failed';
-          result.error = `Withdraw failed: ${withdrawResult.rawLog ?? withdrawResult.error}`;
-          return result;
-        }
-        result.withdrawTxHash = withdrawResult.txHash;
-        // No separate transfer step in AXM mode
-        result.transferTxHash = withdrawResult.txHash;
-      } else {
-        // COIN mode: two-step withdraw + CW20 transfer
-
-        // Step 1: Withdraw from vault to user's CW20 wallet
-        const withdrawResult = await relayerService.relayWithdraw(address, sweepAmount.toString());
-        if (!withdrawResult.success) {
-          result.status = 'failed';
-          result.error = `Withdraw failed: ${withdrawResult.rawLog ?? withdrawResult.error}`;
-          return result;
-        }
-        result.withdrawTxHash = withdrawResult.txHash;
-
-        // Step 2: Transfer CW20 from user's wallet to treasury
-        const transferResult = await relayerService.relayCw20Transfer(
-          address,
-          env.LAUNCH_CW20_ADDR,
-          env.TREASURY_ADDRESS,
-          sweepAmount.toString(),
-          'Treasury sweep',
-        );
-
-        if (!transferResult.success) {
-          // Transfer failed — try to re-deposit tokens back to vault
-          logger.warn(
-            { address, amount: sweepAmount.toString(), error: transferResult.rawLog },
-            'Sweep CW20 transfer failed, attempting re-deposit',
-          );
-
-          try {
-            await relayerService.submitExecOnContract(
-              address,
-              env.LAUNCH_CW20_ADDR,
-              { send: { contract: getActiveContractAddr(), amount: sweepAmount.toString(), msg: btoa(JSON.stringify({ deposit: {} })) } },
-            );
-            logger.info({ address, amount: sweepAmount.toString() }, 'Re-deposit after failed sweep transfer succeeded');
-          } catch (reDepositErr) {
-            logger.error({ err: reDepositErr, address, amount: sweepAmount.toString() }, 'Re-deposit after failed sweep transfer also failed');
-          }
-
-          result.status = 'failed';
-          result.error = `CW20 transfer failed: ${transferResult.rawLog ?? transferResult.error}`;
-          return result;
-        }
-        result.transferTxHash = transferResult.txHash;
+      if (!txResult.success) {
+        result.status = 'failed';
+        result.error = `admin_withdraw_user failed: ${txResult.rawLog ?? txResult.error}`;
+        return result;
       }
 
-      // Step 3: Decrement offchain_spent in DB (tokens have been collected)
+      result.txHash = txResult.txHash;
+
+      // Decrement offchain_spent in DB (tokens have been collected)
       await vaultService.creditAvailable(userId, sweepAmount.toString());
 
-      // Step 4: Record in treasury ledger
+      // Record in treasury ledger
       const db = getDb();
       await db.insert(treasuryLedger).values({
-        txhash: result.transferTxHash ?? `sweep_${userId}_${Date.now()}`,
+        txhash: txResult.txHash ?? `sweep_${userId}_${Date.now()}`,
         amount: sweepAmount.toString(),
         denom: gameDenom(),
         source: 'treasury_sweep',
@@ -309,7 +296,7 @@ class TreasurySweepService {
 
       result.status = 'success';
       logger.info(
-        { userId, address, amount: sweepAmount.toString(), withdrawTx: result.withdrawTxHash, transferTx: result.transferTxHash },
+        { userId, address, amount: sweepAmount.toString(), txHash: result.txHash },
         'Single user sweep completed',
       );
     } catch (err) {

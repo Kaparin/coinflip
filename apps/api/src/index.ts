@@ -7,6 +7,7 @@ import { relayerService } from './services/relayer.js';
 import { indexerService } from './services/indexer.js';
 import { startBackgroundSweep, stopBackgroundSweep } from './services/background-tasks.js';
 import { jackpotService } from './services/jackpot.service.js';
+import { treasurySweepService } from './services/treasury-sweep.service.js';
 import { getDb } from './lib/db.js';
 
 // ─── Startup validation ──────────────────────────────────────────
@@ -69,6 +70,9 @@ async function initServices() {
       logger.warn({ err }, 'Periodic jackpot backfill failed');
     });
   }, 60_000);
+
+  // Auto-sweep offchain debts (VIP, pins, etc.) every 10 minutes
+  treasurySweepService.startAutoSweep(10 * 60 * 1000);
 }
 
 const server = serve({
