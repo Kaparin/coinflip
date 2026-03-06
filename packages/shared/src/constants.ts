@@ -116,6 +116,10 @@ export const EMPTY_EVENT_ARCHIVE_GRACE_MS = 5 * 60 * 1000;
 /** Grace period before auto-approving calculating events with results (10 minutes) */
 export const EVENT_AUTO_APPROVE_GRACE_MS = 10 * 60 * 1000;
 
+// ---- Staking ----
+/** LAUNCH staking contribution from each pot in basis points (200 = 2%) */
+export const STAKING_BPS = 200;
+
 // ---- Jackpot ----
 /** Total jackpot contribution from each pot in basis points (100 = 1%) */
 export const JACKPOT_TOTAL_BPS = 100;

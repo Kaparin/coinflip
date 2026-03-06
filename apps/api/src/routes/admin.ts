@@ -9,7 +9,7 @@ import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
-import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, eventParticipants, events as eventsTable } from '@coinflip/db/schema';
+import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, eventParticipants, events as eventsTable, stakingLedger } from '@coinflip/db/schema';
 import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
@@ -23,6 +23,7 @@ import { newsService } from '../services/news.service.js';
 import { announcementService } from '../services/announcement.service.js';
 import { translationService } from '../services/translation.service.js';
 import { treasurySweepService } from '../services/treasury-sweep.service.js';
+import { stakingService } from '../services/staking.service.js';
 import type { AppEnv } from '../types.js';
 import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 
@@ -774,6 +775,14 @@ adminRouter.get('/economy/overview', async (c) => {
       count: sql<number>`count(*)::int`,
     }).from(partnerLedger);
 
+    // Staking rewards (LAUNCH stakers)
+    const [stakingStats] = await db.select({
+      totalAccrued: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      totalFlushed: sql<string>`coalesce(sum(case when status = 'flushed' then amount::numeric else 0 end), 0)::text`,
+      pending: sql<string>`coalesce(sum(case when status = 'pending' then amount::numeric else 0 end), 0)::text`,
+      count: sql<number>`count(*)::int`,
+    }).from(stakingLedger);
+
     // Event prizes distributed (AXM)
     const [eventStats] = await db.select({
       totalPrizes: sql<string>`coalesce(sum(ep.prize_amount::numeric), 0)::text`,
@@ -847,15 +856,20 @@ adminRouter.get('/economy/overview', async (c) => {
           jackpotCount: jackpotStats!.count,
           partnerPaid: partnerStats!.totalPaid,
           partnerCount: partnerStats!.count,
+          stakingAccrued: stakingStats!.totalAccrued,
+          stakingFlushed: stakingStats!.totalFlushed,
+          stakingPending: stakingStats!.pending,
+          stakingCount: stakingStats!.count,
           eventPrizes: eventStats!.totalPrizes,
           eventWinners: eventStats!.winnersCount,
-          // Net = commission earned - referrals - jackpots - partners
+          // Net = commission earned - referrals - jackpots - partners - staking
           // (events paid from treasury wallet, not commission)
           netTreasury: (
             BigInt(commStats!.totalEarned)
             - BigInt(refStats!.totalPaid)
             - BigInt(jackpotStats!.totalPaid)
             - BigInt(partnerStats!.totalPaid)
+            - BigInt(stakingStats!.totalAccrued)
           ).toString(),
         },
         // COIN Economy
@@ -1454,4 +1468,27 @@ adminRouter.post(
 // GET /admin/treasury/sweep/status — check if sweep is running
 adminRouter.get('/treasury/sweep/status', async (c) => {
   return c.json({ data: { running: treasurySweepService.isRunning() } });
+});
+
+// ═══════════════════════════════════════════
+// Staking (LAUNCH staker rewards)
+// ═══════════════════════════════════════════
+
+adminRouter.get('/staking/stats', async (c) => {
+  const stats = await stakingService.getStats();
+  return c.json({ data: stats });
+});
+
+adminRouter.get('/staking/pending', async (c) => {
+  const pendingTotal = await stakingService.getPendingTotal();
+  return c.json({ data: { pendingTotal } });
+});
+
+adminRouter.post('/staking/flush', async (c) => {
+  const result = await stakingService.flushToContract();
+  if (!result) {
+    return c.json({ data: { status: 'nothing_to_flush' } });
+  }
+  logger.info({ txHash: result.txHash, amount: result.amount, admin: c.get('address') }, 'admin: staking flush executed');
+  return c.json({ data: { status: 'flushed', ...result } });
 });

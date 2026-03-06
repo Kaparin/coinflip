@@ -790,6 +790,102 @@ export class RelayerService {
     }
   }
 
+  /**
+   * Execute a contract directly from the relayer/treasury wallet (not via authz).
+   * Used for staking distribute() and other treasury-initiated contract calls.
+   */
+  async relayContractExecute(
+    contractAddress: string,
+    msg: Record<string, unknown>,
+    funds: Array<{ denom: string; amount: string }> = [],
+    memo = '',
+  ): Promise<RelayResult> {
+    if (!this.isReady()) {
+      return { success: false, error: 'Relayer not initialized' };
+    }
+
+    const msgAny = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: MsgExecuteContract.fromPartial({
+        sender: this.relayerAddress,
+        contract: contractAddress,
+        msg: toUtf8(JSON.stringify(msg)),
+        funds,
+      }),
+    };
+
+    const fee: StdFee = {
+      amount: [{ denom: FEE_DENOM, amount: '12500' }],
+      gas: '300000',
+    };
+
+    const startTime = Date.now();
+    const logId = await relayerTxLogService.logStart({
+      userAddress: this.relayerAddress,
+      contractAddress,
+      action: 'contract_execute',
+      actionPayload: { msg, funds },
+      memo: memo || undefined,
+    });
+
+    const release = await this.acquireBroadcastLock();
+    try {
+      const { accountNumber, sequence } = await this.sequenceManager.getAndIncrement();
+      const signerData: SignerData = { accountNumber, sequence, chainId: this.chainId };
+
+      const txRaw = await this.client!.sign(
+        this.relayerAddress,
+        [msgAny],
+        fee,
+        memo,
+        signerData,
+      );
+      const txBytes = TxRaw.encode(txRaw).finish();
+      const txHashHex = await this.client!.broadcastTxSync(txBytes);
+      const txHash = typeof txHashHex === 'string'
+        ? txHashHex
+        : Buffer.from(txHashHex).toString('hex').toUpperCase();
+
+      logger.info({ txHash, contractAddress, msg: Object.keys(msg)[0], funds }, 'Contract execute tx in mempool');
+
+      // Poll for confirmation
+      const maxPollMs = 15_000;
+      const pollStartTime = Date.now();
+      while (Date.now() - pollStartTime < maxPollMs) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await chainRest(`/cosmos/tx/v1beta1/txs/${txHash}`).catch(() => null);
+        if (res?.ok) {
+          const txData = (await res.json()) as { tx_response?: { code: number; height?: string; raw_log?: string } };
+          if (txData.tx_response) {
+            if (txData.tx_response.code === 0) {
+              await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: 0 });
+              return { success: true, txHash, code: 0, height: Number(txData.tx_response.height ?? 0) };
+            }
+            await relayerTxLogService.logComplete(logId, { txHash, success: false, code: txData.tx_response.code, rawLog: txData.tx_response.raw_log, durationMs: Date.now() - startTime, attempt: 0 });
+            return { success: false, txHash, code: txData.tx_response.code, rawLog: txData.tx_response.raw_log, error: `Tx failed with code ${txData.tx_response.code}` };
+          }
+        }
+      }
+
+      await relayerTxLogService.logComplete(logId, { txHash, success: true, code: 0, durationMs: Date.now() - startTime, attempt: 0 });
+      return { success: true, txHash, code: 0, timeout: true };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.error({ err, contractAddress, msg: Object.keys(msg)[0] }, 'Contract execute failed');
+
+      if (errorMsg.includes('account sequence mismatch') || errorMsg.includes('incorrect account sequence')) {
+        const expected = parseExpectedSequence(errorMsg);
+        if (expected !== null) await this.sequenceManager.forceSet(expected);
+        else await this.sequenceManager.handleSequenceMismatch();
+      }
+
+      await relayerTxLogService.logComplete(logId, { rawLog: errorMsg, success: false, durationMs: Date.now() - startTime, attempt: 0 });
+      return { success: false, error: errorMsg };
+    } finally {
+      release();
+    }
+  }
+
   /** Get relayer account balance (for monitoring) */
   async getRelayerBalance(): Promise<string> {
     if (!this.client) return '0';

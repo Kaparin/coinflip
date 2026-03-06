@@ -23,6 +23,7 @@ import { referralService } from './referral.service.js';
 import { vaultService } from './vault.service.js';
 import { jackpotService } from './jackpot.service.js';
 import { partnerService } from './partner.service.js';
+import { stakingService } from './staking.service.js';
 import { ChainWebSocketClient, rpcUrlToWsUrl } from '../lib/chain-ws.js';
 import type { CometBFTTxEvent } from '../lib/chain-ws.js';
 import type { Database } from '@coinflip/db';
@@ -520,6 +521,8 @@ export class IndexerService {
             .catch(err => logger.error({ err, betId }, 'bet_revealed: jackpot contribution failed'));
           await this.processPartnerCommission(BigInt(betId))
             .catch(err => logger.error({ err, betId }, 'bet_revealed: partner commission failed'));
+          await this.processStakingContribution(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'bet_revealed: staking contribution failed'));
 
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
@@ -618,6 +621,8 @@ export class IndexerService {
             .catch(err => logger.error({ err, betId }, 'timeout_claimed: jackpot contribution failed'));
           await this.processPartnerCommission(BigInt(betId))
             .catch(err => logger.error({ err, betId }, 'timeout_claimed: partner commission failed'));
+          await this.processStakingContribution(BigInt(betId))
+            .catch(err => logger.error({ err, betId }, 'timeout_claimed: staking contribution failed'));
 
           break;
         }
@@ -841,6 +846,8 @@ export class IndexerService {
               .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: jackpot failed'));
             await this.processPartnerCommission(bet.betId)
               .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: partner failed'));
+            await this.processStakingContribution(bet.betId)
+              .catch(err => logger.warn({ err, betId: bet.betId.toString() }, 'fullSync: staking failed'));
           }
 
           synced++;
@@ -978,6 +985,32 @@ export class IndexerService {
       await partnerService.processBetCommission(betId, totalPot);
     } catch (err) {
       logger.warn({ err, betId: betId.toString() }, 'Indexer: partner commission failed');
+    }
+  }
+
+  /**
+   * Process staking contribution for a resolved bet.
+   * Idempotent — stakingLedger has unique constraint on bet_id.
+   */
+  private async processStakingContribution(betId: bigint): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      const { bets } = await import('@coinflip/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const [bet] = await this.db
+        .select({ amount: bets.amount })
+        .from(bets)
+        .where(eq(bets.betId, betId))
+        .limit(1);
+
+      if (!bet) return;
+
+      const totalPot = BigInt(bet.amount) * 2n;
+      await stakingService.recordContribution(betId, totalPot);
+    } catch (err) {
+      logger.warn({ err, betId: betId.toString() }, 'Indexer: staking contribution failed');
     }
   }
 

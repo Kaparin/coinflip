@@ -48,6 +48,8 @@ const envSchema = z.object({
   INDEXER_WS_MODE: z.string().default('false'),
   /** DeepL API key for auto-translation of dynamic content (announcements, news, events). */
   DEEPL_API_KEY: z.string().default(''),
+  /** LAUNCH staking contract address for distribute() calls */
+  STAKING_CONTRACT_ADDR: z.string().default(''),
 });
 
 export const env = envSchema.parse(process.env);
