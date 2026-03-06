@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { WS_URL, isAxmMode } from '@/lib/constants';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { isInBalanceGracePeriod, clearBalanceGracePeriod } from '@/lib/balance-grace';
+import { emitDepositEvent } from '@/lib/deposit-status-events';
 
 /** Query key prefix for wallet game-token balance (CW20 or native depending on mode) */
 const WALLET_BALANCE_KEY = isAxmMode() ? 'wallet-game-balance' : 'wallet-cw20-balance';
@@ -379,7 +380,24 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/events/active', '/api/v1/events/completed', '/api/v1/events');
               break;
             case 'deposit_confirmed':
+              // Emit deposit event BEFORE cache invalidation so BalanceDisplay transitions immediately
+              emitDepositEvent({ type: 'confirmed', txHash: String(parsed.data?.tx_hash ?? '') });
+              clearBalanceGracePeriod();
+              pendingInvalidations.current.add('/api/v1/vault/balance');
+              pendingInvalidations.current.add(WALLET_BALANCE_KEY);
+              flushInvalidations();
+              break;
             case 'deposit_failed':
+              emitDepositEvent({
+                type: 'failed',
+                txHash: String(parsed.data?.tx_hash ?? ''),
+                reason: String(parsed.data?.reason ?? ''),
+              });
+              clearBalanceGracePeriod();
+              pendingInvalidations.current.add('/api/v1/vault/balance');
+              pendingInvalidations.current.add(WALLET_BALANCE_KEY);
+              flushInvalidations();
+              break;
             case 'withdraw_confirmed':
             case 'withdraw_failed':
               // Critical balance events — clear grace period and refetch immediately (no debounce)

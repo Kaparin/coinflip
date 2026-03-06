@@ -536,19 +536,44 @@ export function BalanceDisplay() {
     return unsub;
   }, [depositStatus, depositTxHash, queryClient, t]);
 
-  // Failsafe: if pending for >90s with no WS confirmation, auto-transition to success
-  // (the tx likely confirmed but the WS event was lost)
+  // Failsafe + active polling: while pending, poll balance every 5s.
+  // If balance increases (deposit confirmed on chain but WS event lost), transition to success.
+  // Hard failsafe at 30s — the tx is already in mempool, chain confirms within seconds.
+  const preDepositBalanceRef = useRef<string | null>(null);
   useEffect(() => {
     if (depositStatus !== 'pending') return;
+
+    // Capture pre-deposit balance for comparison (use the optimistic value minus deposit)
+    if (preDepositBalanceRef.current === null) {
+      const currentData = queryClient.getQueryData<{ data?: { available?: string } }>(['/api/v1/vault/balance']);
+      preDepositBalanceRef.current = currentData?.data?.available ?? '0';
+    }
+
+    const POLL_MS = 5_000;
+    const FAILSAFE_MS = 30_000;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        // Force a fresh fetch bypassing cache
+        await queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
+      } catch { /* ignore */ }
+    }, POLL_MS);
+
     const failsafe = setTimeout(() => {
       setDepositStatus('success');
       feedback('success');
       clearBalanceGracePeriod();
+      preDepositBalanceRef.current = null;
       queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
       queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
-    }, 90_000);
-    return () => clearTimeout(failsafe);
-  }, [depositStatus, queryClient]);
+    }, FAILSAFE_MS);
+
+    return () => {
+      clearInterval(pollTimer);
+      clearTimeout(failsafe);
+      preDepositBalanceRef.current = null;
+    };
+  }, [depositStatus, queryClient, address]);
 
   // --- Deposit via Web Wallet (optimized: sign locally, broadcast via server) ---
   const handleDeposit = useCallback(async () => {

@@ -22,7 +22,6 @@ import { useActiveDuels } from '@/hooks/use-active-duels';
 import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
-import { emitDepositEvent } from '@/lib/deposit-status-events';
 import { JackpotWinnerReveal } from '@/components/features/jackpot/jackpot-winner-reveal';
 import { X } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -134,14 +133,12 @@ export default function GamePage() {
       setEventNotification({ message: t('events.notifications.canceled', { title }), variant: 'error' });
     }
 
-    // Deposit notifications (async mode)
+    // Deposit notifications (async mode) — emitDepositEvent now handled globally in use-websocket.ts
     if (event.type === 'deposit_confirmed') {
-      emitDepositEvent({ type: 'confirmed', txHash: String(data?.tx_hash ?? '') });
       addToast('success', t('balance.depositConfirmedWs'));
     }
     if (event.type === 'deposit_failed') {
       const reason = String(data?.reason ?? '');
-      emitDepositEvent({ type: 'failed', txHash: String(data?.tx_hash ?? ''), reason });
       addToast('error', t('balance.depositFailedWs', { reason }));
     }
 
