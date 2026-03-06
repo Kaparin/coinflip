@@ -173,19 +173,22 @@ function UserCard({
   user,
   t,
   onTransfer,
+  menuOpen,
+  onToggleMenu,
 }: {
   user: SocialUser;
   t: (k: string, v?: Record<string, string | number>) => string;
   onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   return (
     <div ref={cardRef} className="relative">
       <button
         type="button"
-        onClick={() => setMenuOpen(!menuOpen)}
+        onClick={onToggleMenu}
         className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface-hover)] text-left"
       >
         <div className="relative shrink-0">
@@ -211,7 +214,7 @@ function UserCard({
         <UserActionMenu
           user={user}
           anchorRef={cardRef}
-          onClose={() => setMenuOpen(false)}
+          onClose={onToggleMenu}
           onTransfer={(currency) => onTransfer(user, currency)}
           t={t}
         />
@@ -227,6 +230,7 @@ function UsersPanel({ onTransfer }: { onTransfer: (user: SocialUser, currency: '
   const { isConnected } = useWalletContext();
   const [subTab, setSubTab] = useState<UsersSubTab>('online');
   const [search, setSearch] = useState('');
+  const [openMenuAddr, setOpenMenuAddr] = useState<string | null>(null);
 
   const { users: onlineUsers, loading: onlineLoading } = useOnlineUsers(subTab === 'online');
   const { users: favUsers, loading: favLoading } = useFavorites(subTab === 'favorites' && isConnected);
@@ -286,7 +290,14 @@ function UsersPanel({ onTransfer }: { onTransfer: (user: SocialUser, currency: '
         ) : (
           <>
             {currentUsers.map((user) => (
-              <UserCard key={user.address} user={user} t={t} onTransfer={onTransfer} />
+              <UserCard
+                key={user.address}
+                user={user}
+                t={t}
+                onTransfer={onTransfer}
+                menuOpen={openMenuAddr === user.address}
+                onToggleMenu={() => setOpenMenuAddr(openMenuAddr === user.address ? null : user.address)}
+              />
             ))}
             {subTab === 'all' && nextCursor && (
               <button

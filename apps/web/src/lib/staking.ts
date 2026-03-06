@@ -57,15 +57,17 @@ export interface UserStakingInfo {
 
 // ---- Queries ----
 
-const REST_URL =
-  process.env.NEXT_PUBLIC_AXIOME_REST ||
-  'https://api-chain.axiomechain.org';
+// Use Next.js proxy to avoid CORS issues (direct chain REST blocks browser requests)
+function getRestUrl(): string {
+  if (typeof window !== 'undefined') return '/chain-rest';
+  return process.env.NEXT_PUBLIC_AXIOME_REST || 'https://api-chain.axiomechain.org';
+}
 
 async function queryContract<T>(query: Record<string, unknown>): Promise<T> {
   if (!STAKING_CONTRACT) throw new Error('Staking contract not configured');
   const encoded = btoa(JSON.stringify(query));
   const res = await fetch(
-    `${REST_URL}/cosmwasm/wasm/v1/contract/${STAKING_CONTRACT}/smart/${encoded}`,
+    `${getRestUrl()}/cosmwasm/wasm/v1/contract/${STAKING_CONTRACT}/smart/${encoded}`,
   );
   if (!res.ok) throw new Error(`Contract query failed: ${res.status}`);
   const json = await res.json();
@@ -78,7 +80,7 @@ async function queryContract<T>(query: Record<string, unknown>): Promise<T> {
 async function queryCw20Balance(address: string): Promise<string> {
   const encoded = btoa(JSON.stringify({ balance: { address } }));
   const res = await fetch(
-    `${REST_URL}/cosmwasm/wasm/v1/contract/${LAUNCH_CW20}/smart/${encoded}`,
+    `${getRestUrl()}/cosmwasm/wasm/v1/contract/${LAUNCH_CW20}/smart/${encoded}`,
   );
   if (!res.ok) return '0';
   const json = await res.json();
