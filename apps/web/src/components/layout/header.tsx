@@ -145,7 +145,7 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 lg:px-6">
+        <div className="flex h-14 items-center justify-between px-4 lg:px-6">
           <Link href="/game" className="flex items-center gap-2.5 group">
             <span className="text-lg font-extrabold tracking-tight">
               Heads or <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Tails</span>
