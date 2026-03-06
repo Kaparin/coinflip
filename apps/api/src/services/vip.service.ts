@@ -1,7 +1,7 @@
 /**
  * VIP Service — manages VIP subscriptions, boost limits, and tier lookups.
  *
- * Subscription purchase deducts from user's available balance (not bonus)
+ * Subscription purchase deducts from user's COIN balance
  * and records revenue in treasury_ledger.
  */
 
@@ -115,10 +115,10 @@ class VipService {
         );
     }
 
-    // Atomic deduct from AXM game balance (VIP is paid in AXM)
-    const deducted = await vaultService.deductBalance(userId, price);
+    // Atomic deduct from COIN balance (VIP is paid in COIN)
+    const deducted = await vaultService.deductCoin(userId, price);
     if (!deducted) {
-      throw Errors.insufficientBalance(price, '(check your game balance)');
+      throw Errors.insufficientBalance(price, '(check your COIN balance)');
     }
 
     // Calculate expiry
@@ -138,7 +138,7 @@ class VipService {
     await db.insert(treasuryLedger).values({
       txhash: `vip_${crypto.randomUUID()}`,
       amount: price,
-      denom: 'AXM',
+      denom: 'COIN',
       source: 'vip_subscription',
     });
 

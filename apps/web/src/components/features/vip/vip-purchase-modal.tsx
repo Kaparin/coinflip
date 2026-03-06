@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { FaCrown, FaStar } from 'react-icons/fa';
 import { GiCutDiamond } from 'react-icons/gi';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Check, Zap, Shield, Trophy } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useVipConfig, useVipStatus, usePurchaseVip } from '@/hooks/use-vip';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
-import { GameTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon } from '@/components/ui';
 import { Modal } from '@/components/ui/modal';
 
 interface VipPurchaseModalProps {
@@ -20,21 +20,33 @@ interface VipPurchaseModalProps {
 const tierMeta: Record<string, {
   icon: React.ComponentType<{ className?: string; size?: number }>;
   gradient: string;
+  bgGradient: string;
+  borderColor: string;
+  glowColor: string;
   perks: string[];
 }> = {
   silver: {
     icon: FaStar,
     gradient: 'from-gray-400 to-gray-300',
+    bgGradient: 'from-gray-500/10 to-gray-400/5',
+    borderColor: 'border-gray-400/30',
+    glowColor: 'shadow-gray-400/20',
     perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boosts10', 'vip.perks.largeJackpot'],
   },
   gold: {
     icon: FaCrown,
     gradient: 'from-yellow-500 to-amber-400',
+    bgGradient: 'from-yellow-500/10 to-amber-400/5',
+    borderColor: 'border-yellow-500/30',
+    glowColor: 'shadow-yellow-500/20',
     perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot'],
   },
   diamond: {
     icon: GiCutDiamond,
     gradient: 'from-purple-500 via-pink-500 to-red-500',
+    bgGradient: 'from-purple-500/10 via-pink-500/5 to-red-500/5',
+    borderColor: 'border-purple-500/30',
+    glowColor: 'shadow-purple-500/20',
     perks: ['vip.perks.badge', 'vip.perks.frame', 'vip.perks.customization', 'vip.perks.boostsUnlimited', 'vip.perks.largeJackpot', 'vip.perks.megaJackpot', 'vip.perks.superMegaJackpot'],
   },
 };
@@ -51,7 +63,6 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
   const { data: status } = useVipStatus();
   const purchaseMut = usePurchaseVip();
   const { addToast } = useToast();
-  const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [confirmInfo, setConfirmInfo] = useState<ConfirmInfo | null>(null);
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
@@ -63,7 +74,6 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
 
   const handleConfirm = async () => {
     if (!confirmInfo) return;
-    setSelectedTier(confirmInfo.tier);
     try {
       await purchaseMut.mutateAsync({ tier: confirmInfo.tier, period: confirmInfo.period });
       addToast('success', t('vip.purchaseSuccess'));
@@ -71,8 +81,6 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
       onClose();
     } catch (err) {
       addToast('error', getUserFriendlyError(err, t, 'generic'));
-    } finally {
-      setSelectedTier(null);
     }
   };
 
@@ -90,15 +98,15 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
     const formattedPrice = formatLaunch(confirmInfo.price);
 
     return (
-      <Modal open onClose={handleClose} title={t('vip.confirm.title')}>
+      <Modal open onClose={handleClose} title={t('vip.confirm.title')} showCloseButton={!isLoading}>
         <div className="space-y-4">
-          {/* Tier being purchased */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
-            <div className={`p-2.5 rounded-lg bg-gradient-to-r ${meta?.gradient ?? 'from-gray-400 to-gray-300'}`}>
-              <Icon size={22} className="text-white" />
+          {/* Tier header */}
+          <div className={`flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r ${meta?.bgGradient ?? 'from-gray-500/10 to-gray-400/5'} border ${meta?.borderColor ?? 'border-gray-400/30'}`}>
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${meta?.gradient ?? 'from-gray-400 to-gray-300'} shadow-lg ${meta?.glowColor ?? ''}`}>
+              <Icon size={24} className="text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold capitalize">{confirmInfo.tier} VIP</h3>
+              <h3 className="font-bold capitalize text-base">{confirmInfo.tier} VIP</h3>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {confirmInfo.period === 'yearly' ? t('vip.confirm.durationYearly') : t('vip.confirm.duration')}
               </p>
@@ -108,14 +116,13 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
           {/* Price */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
             <span className="text-sm text-[var(--color-text-secondary)]">{t('vip.confirm.charge')}</span>
-            <span className="flex items-center gap-1.5 text-sm font-bold">
-              {formattedPrice} <GameTokenIcon size={16} />
+            <span className="flex items-center gap-1.5 text-sm font-bold text-[var(--color-primary)]">
+              {formattedPrice} <LaunchTokenIcon size={16} /> COIN
             </span>
           </div>
 
           {/* Warnings */}
           <div className="space-y-2">
-            {/* Funds deduction warning */}
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <AlertTriangle size={16} className="shrink-0 text-amber-400 mt-0.5" />
               <p className="text-xs text-amber-200/90 leading-relaxed">
@@ -123,7 +130,6 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               </p>
             </div>
 
-            {/* Non-refundable warning if upgrading */}
             {isUpgrade && (
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle size={16} className="shrink-0 text-rose-400 mt-0.5" />
@@ -133,19 +139,18 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               </div>
             )}
 
-            {/* General info */}
             <div className="p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)]">
               <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
                 <li className="flex items-start gap-2">
-                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  <span className="mt-0.5">•</span>
                   {confirmInfo.period === 'yearly' ? t('vip.confirm.activateYearly') : t('vip.confirm.activateImmediately')}
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  <span className="mt-0.5">•</span>
                   {t('vip.confirm.noAutoRenew')}
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[var(--color-text-secondary)] mt-0.5">•</span>
+                  <span className="mt-0.5">•</span>
                   {t('vip.confirm.nonRefundable')}
                 </li>
               </ul>
@@ -158,7 +163,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               type="button"
               onClick={() => setConfirmInfo(null)}
               disabled={isLoading}
-              className="flex-1 py-2.5 rounded-xl border border-[var(--color-border)] text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98] disabled:opacity-50"
+              className="flex-1 py-3 rounded-xl border border-[var(--color-border)] text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.98] disabled:opacity-50"
             >
               {t('common.cancel')}
             </button>
@@ -166,7 +171,7 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
               type="button"
               onClick={handleConfirm}
               disabled={isLoading}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-70 bg-gradient-to-r ${meta?.gradient ?? 'from-gray-400 to-gray-300'} hover:opacity-90`}
+              className={`flex-[2] py-3 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-70 bg-gradient-to-r ${meta?.gradient ?? 'from-gray-400 to-gray-300'} hover:opacity-90 shadow-lg ${meta?.glowColor ?? ''}`}
             >
               {isLoading ? (
                 <span className="animate-pulse">{t('vip.purchasing')}</span>
@@ -183,17 +188,17 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
   // Tier selection screen
   return (
     <Modal open onClose={handleClose} title={t('vip.title')}>
-      <div className="space-y-3">
-        {/* Monthly / Yearly toggle */}
+      <div className="space-y-4">
+        {/* Period toggle */}
         <div className="flex justify-center">
-          <div className="inline-flex rounded-xl bg-white/5 p-1 border border-white/10">
+          <div className="inline-flex rounded-xl bg-[var(--color-bg)] p-1 border border-[var(--color-border)]">
             <button
               type="button"
               onClick={() => setPeriod('monthly')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-5 py-2 rounded-lg text-xs font-semibold transition-all ${
                 period === 'monthly'
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/50 hover:text-white/70'
+                  ? 'bg-[var(--color-primary)] text-white shadow-md'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
               }`}
             >
               {t('vip.monthly')}
@@ -201,28 +206,33 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
             <button
               type="button"
               onClick={() => setPeriod('yearly')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                 period === 'yearly'
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/50 hover:text-white/70'
+                  ? 'bg-[var(--color-primary)] text-white shadow-md'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
               }`}
             >
               {t('vip.yearly')}
-              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+              <span className="px-1.5 py-0.5 rounded-md bg-[var(--color-success)]/20 text-[var(--color-success)] text-[10px] font-bold">
                 {t('vip.save', { percent: '15' })}
               </span>
             </button>
           </div>
         </div>
 
+        {/* Current status */}
         {status?.active && (
-          <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-sm">
-            {t('vip.currentTier')}: <span className="font-bold capitalize">{status.tier}</span>
-            {' '}&middot;{' '}
-            {t('vip.expiresAt')}: {status.expiresAt ? new Date(status.expiresAt).toLocaleDateString() : '—'}
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 text-sm">
+            <Shield size={14} className="text-[var(--color-primary)] shrink-0" />
+            <span>
+              {t('vip.currentTier')}: <span className="font-bold capitalize">{status.tier}</span>
+              {' · '}
+              {t('vip.expiresAt')}: {status.expiresAt ? new Date(status.expiresAt).toLocaleDateString() : '—'}
+            </span>
           </div>
         )}
 
+        {/* Tier cards */}
         {activeTiers.map((config) => {
           const meta = tierMeta[config.tier];
           if (!meta) return null;
@@ -237,53 +247,75 @@ export function VipPurchaseModal({ open, onClose }: VipPurchaseModalProps) {
           return (
             <div
               key={config.tier}
-              className={`relative rounded-xl border border-white/10 p-3 sm:p-4 transition-all hover:border-white/20 ${
-                isCurrentOrLower ? 'opacity-50' : ''
+              className={`relative rounded-2xl border overflow-hidden transition-all ${
+                isCurrentOrLower
+                  ? 'opacity-50 border-[var(--color-border)]'
+                  : `${meta.borderColor} hover:shadow-lg ${meta.glowColor}`
               }`}
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`p-2 rounded-lg bg-gradient-to-r ${meta.gradient}`}>
-                  <Icon size={18} className="text-white" />
+              {/* Gradient top accent */}
+              <div className={`h-1 w-full bg-gradient-to-r ${meta.gradient}`} />
+
+              <div className="p-4">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${meta.gradient} shadow-lg ${meta.glowColor}`}>
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold capitalize text-base">{config.tier}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <LaunchTokenIcon size={13} />
+                      <span className="text-sm font-semibold text-[var(--color-primary)]">
+                        {formatLaunch(activePrice)} COIN
+                      </span>
+                      <span className="text-xs text-[var(--color-text-secondary)]">
+                        / {period === 'yearly' ? t('vip.year') : t('vip.month')}
+                      </span>
+                    </div>
+                  </div>
+                  {period === 'yearly' && savingsPercent > 0 && (
+                    <span className="px-2 py-1 rounded-lg bg-[var(--color-success)]/15 text-[var(--color-success)] text-[10px] font-bold shrink-0 border border-[var(--color-success)]/20">
+                      -{savingsPercent}%
+                    </span>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold capitalize text-sm">{config.tier}</h3>
-                  <p className="text-xs text-white/50">
-                    {formatLaunch(activePrice)} AXM / {period === 'yearly' ? t('vip.year') : t('vip.month')}
-                  </p>
-                </div>
-                {period === 'yearly' && savingsPercent > 0 && (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold shrink-0">
-                    {t('vip.save', { percent: String(savingsPercent) })}
-                  </span>
-                )}
+
+                {/* Perks */}
+                <ul className="space-y-1.5 mb-4">
+                  {meta.perks.map((perkKey) => (
+                    <li key={perkKey} className="text-xs text-[var(--color-text-secondary)] flex items-center gap-2">
+                      <Check size={12} className="text-[var(--color-success)] shrink-0" />
+                      {t(perkKey)}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Buy button */}
+                <button
+                  onClick={() => setConfirmInfo({ tier: config.tier, price: activePrice, period })}
+                  disabled={isCurrentOrLower || purchaseMut.isPending}
+                  className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
+                    isCurrentOrLower
+                      ? 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] cursor-not-allowed'
+                      : `bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 shadow-lg ${meta.glowColor}`
+                  }`}
+                >
+                  {isCurrentOrLower ? (
+                    currentTierLevel === (tierOrder[config.tier] ?? 0) ? t('vip.currentPlan') : t('vip.included')
+                  ) : status?.active ? (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Zap size={14} />
+                      {t('vip.upgrade')}
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Trophy size={14} />
+                      {t('vip.subscribe')}
+                    </span>
+                  )}
+                </button>
               </div>
-
-              <ul className="space-y-0.5 mb-3">
-                {meta.perks.map((perkKey) => (
-                  <li key={perkKey} className="text-xs text-white/70 flex items-center gap-2">
-                    <span className="text-green-400 text-[10px]">&#10003;</span>
-                    {t(perkKey)}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                onClick={() => setConfirmInfo({ tier: config.tier, price: activePrice, period })}
-                disabled={isCurrentOrLower || purchaseMut.isPending}
-                className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
-                  isCurrentOrLower
-                    ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                    : `bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 active:scale-[0.98]`
-                }`}
-              >
-                {isCurrentOrLower ? (
-                  currentTierLevel === (tierOrder[config.tier] ?? 0) ? t('vip.currentPlan') : t('vip.included')
-                ) : status?.active ? (
-                  t('vip.upgrade')
-                ) : (
-                  t('vip.subscribe')
-                )}
-              </button>
             </div>
           );
         })}

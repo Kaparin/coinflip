@@ -90,6 +90,7 @@ export function usePurchaseVip() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['/api/v1/vip/status'] });
       qc.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
+      qc.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
     },
   });
 }

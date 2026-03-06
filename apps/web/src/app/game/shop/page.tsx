@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Store, AlertTriangle, Sparkles, Coins } from 'lucide-react';
+import { Store, AlertTriangle, Coins } from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -50,23 +50,6 @@ export default function ShopPage() {
     [shopConfig?.tiers],
   );
 
-  // Per-tier purchase status
-  const { data: purchaseStatus } = useQuery({
-    queryKey: ['shop', 'purchase-status'],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/v1/shop/purchase-status`, {
-        headers: { ...getAuthHeaders() },
-        credentials: 'include',
-      });
-      if (!res.ok) return { purchasedTiers: {} as Record<number, number>, totalPurchases: 0 };
-      const json = await res.json();
-      return json.data as { purchasedTiers: Record<number, number>; totalPurchases: number };
-    },
-    enabled: isConnected,
-    staleTime: 30_000,
-  });
-
-  const purchasedTiers = purchaseStatus?.purchasedTiers ?? {};
 
   // Modal states
   const [selectedTier, setSelectedTier] = useState<ChestTier | null>(null);
@@ -75,14 +58,12 @@ export default function ShopPage() {
   const [successResult, setSuccessResult] = useState<{
     tier: ChestTier;
     coinAmount: number;
-    bonusAmount: number;
   } | null>(null);
 
   const fmtNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   const refreshBalances = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
-    queryClient.invalidateQueries({ queryKey: ['shop', 'purchase-status'] });
     queryClient.invalidateQueries({ queryKey: ['wallet-cw20-balance'] });
   }, [queryClient]);
 
@@ -114,11 +95,11 @@ export default function ShopPage() {
 
       const data = await res.json();
       const coinAmount = data.data?.coin_amount ?? tier.coinAmount;
-      const bonusAmount = data.data?.bonus_amount ?? 0;
 
       setSelectedTier(null);
-      setSuccessResult({ tier, coinAmount, bonusAmount });
       refreshBalances();
+      // Delay success modal so confirmation modal's history cleanup finishes first
+      setTimeout(() => setSuccessResult({ tier, coinAmount }), 300);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
@@ -184,8 +165,6 @@ export default function ShopPage() {
         {!configLoading && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {tiers.map((tier) => {
-              const isFirstForTier = !purchasedTiers[tier.tier];
-              const bonusAmount = isFirstForTier ? tier.coinAmount : 0;
               const canAfford = vaultBalanceHuman >= tier.axmPrice;
 
               return (
@@ -203,12 +182,6 @@ export default function ShopPage() {
                   disabled={!isEnabled || isBuying}
                   className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 pb-2 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
                 >
-                  {/* Per-tier bonus badge */}
-                  {isFirstForTier && bonusAmount > 0 && (
-                    <div className="absolute -top-2 -right-2 z-10 rounded-lg bg-[var(--color-success)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
-                      +{fmtNum(bonusAmount)}
-                    </div>
-                  )}
                   {tier.label === 'popular' && (
                     <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
                       {t('shop.popular')}
@@ -221,13 +194,13 @@ export default function ShopPage() {
                   )}
 
                   {/* Image */}
-                  <div className="relative h-20 w-20 mt-1 mb-1">
+                  <div className="relative h-28 w-28 mt-1 mb-1">
                     <Image
                       src={tier.image}
                       alt={t(tier.nameKey)}
                       fill
                       className="object-contain drop-shadow-lg"
-                      sizes="80px"
+                      sizes="112px"
                     />
                   </div>
 
@@ -242,13 +215,10 @@ export default function ShopPage() {
                     </span>
                   </div>
 
-                  {/* Separator */}
-                  <div className="w-full border-t border-[var(--color-border)]/50 mt-2 mb-1.5" />
-
-                  {/* Price — what you PAY */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Price button */}
+                  <div className="w-full mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] py-2 px-3">
                     <GameTokenIcon size={13} />
-                    <span className="text-xs font-bold text-[var(--color-text-secondary)]">{tier.axmPrice} AXM</span>
+                    <span className="text-xs font-bold text-white">{tier.axmPrice} AXM</span>
                   </div>
 
                   {/* Insufficient balance warning */}
@@ -301,15 +271,6 @@ export default function ShopPage() {
                   {fmtNum(selectedTier.coinAmount)} COIN
                 </span>
               </div>
-              {!purchasedTiers[selectedTier.tier] && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[var(--color-text-secondary)]">{t('shop.confirmBonus')}</span>
-                  <span className="flex items-center gap-1 font-bold text-[var(--color-success)]">
-                    <Sparkles size={14} />
-                    +{fmtNum(selectedTier.coinAmount)} COIN
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Info */}
@@ -379,20 +340,12 @@ export default function ShopPage() {
               <div className="flex items-center justify-center gap-2">
                 <LaunchTokenIcon size={24} />
                 <span className="text-2xl font-black tabular-nums text-[var(--color-primary)]">
-                  +{fmtNum(successResult.coinAmount + successResult.bonusAmount)} COIN
+                  +{fmtNum(successResult.coinAmount)} COIN
                 </span>
               </div>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('shop.received', { amount: fmtNum(successResult.coinAmount + successResult.bonusAmount) })}
+                {t('shop.received', { amount: fmtNum(successResult.coinAmount) })}
               </p>
-              {successResult.bonusAmount > 0 && (
-                <div className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 px-3 py-1">
-                  <Sparkles size={12} className="text-[var(--color-success)]" />
-                  <span className="text-xs font-bold text-[var(--color-success)]">
-                    +{fmtNum(successResult.bonusAmount)} COIN {t('shop.bonusLabel')}
-                  </span>
-                </div>
-              )}
             </div>
 
             <button
