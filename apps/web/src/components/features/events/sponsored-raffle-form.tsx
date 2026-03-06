@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, X, Send, Loader2, CheckCircle } from 'lucide-react';
-import { GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
+import { LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { useSponsoredRaffleConfig, useSubmitSponsoredRaffle } from '@/hooks/use-sponsored-raffle';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { GAME_TOKEN } from '@/lib/constants';
 
 /** Duration preset options in hours */
 const DURATION_PRESETS = [
@@ -118,7 +117,7 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
               <h2 className="text-sm font-bold">{t('sponsoredRaffle.title')}</h2>
               {config && (
                 <p className="text-[10px] text-[var(--color-text-secondary)] flex items-center gap-1">
-                  {t('sponsoredRaffle.serviceFee')}: {formatLaunch(config.price)} <GameTokenIcon size={14} />
+                  {t('sponsoredRaffle.serviceFee')}: {formatLaunch(config.price)} <LaunchTokenIcon size={14} />
                 </p>
               )}
             </div>
@@ -192,8 +191,8 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
                   className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 pr-16 text-sm outline-none focus:border-[var(--color-primary)] transition-colors"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  <GameTokenIcon size={16} />
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</span>
+                  <LaunchTokenIcon size={16} />
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
                 </div>
               </div>
             </div>
@@ -241,19 +240,19 @@ export function SponsoredRaffleForm({ open, onClose }: SponsoredRaffleFormProps)
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--color-text-secondary)]">{t('sponsoredRaffle.serviceFee')}</span>
                 <span className="font-semibold flex items-center gap-1">
-                  {config ? formatLaunch(config.price) : '...'} <GameTokenIcon size={16} />
+                  {config ? formatLaunch(config.price) : '...'} <LaunchTokenIcon size={16} />
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--color-text-secondary)]">{t('sponsoredRaffle.prizePool')}</span>
                 <span className="font-semibold flex items-center gap-1">
-                  {prizeAmountHuman ? formatLaunch(toMicroLaunch(Number(prizeAmountHuman) || 0)) : '0'} <GameTokenIcon size={16} />
+                  {prizeAmountHuman ? formatLaunch(toMicroLaunch(Number(prizeAmountHuman) || 0)) : '0'} <LaunchTokenIcon size={16} />
                 </span>
               </div>
               <div className="border-t border-[var(--color-border)] pt-1.5 flex items-center justify-between text-xs">
                 <span className="font-bold">{t('sponsoredRaffle.total')}</span>
                 <span className="font-bold text-[var(--color-warning)] flex items-center gap-1">
-                  {formatLaunch(totalCostMicro.toString())} <GameTokenIcon size={16} />
+                  {formatLaunch(totalCostMicro.toString())} <LaunchTokenIcon size={16} />
                 </span>
               </div>
             </div>

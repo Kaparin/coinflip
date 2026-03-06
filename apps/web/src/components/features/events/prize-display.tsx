@@ -2,7 +2,7 @@
 
 import { formatLaunch } from '@coinflip/shared/constants';
 import { Trophy, CheckCircle, Crown, Medal } from 'lucide-react';
-import { AxmTokenIcon, GameTokenIcon, UserAvatar } from '@/components/ui';
+import { AxmTokenIcon, LaunchTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 
 interface PrizeEntry {
@@ -80,7 +80,7 @@ const PODIUM = [
 ] as const;
 
 export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedLabel, isSponsored }: PrizeDisplayProps) {
-  const TokenIcon = isSponsored ? GameTokenIcon : AxmTokenIcon;
+  const TokenIcon = isSponsored ? LaunchTokenIcon : AxmTokenIcon;
 
   if (compact) {
     return (

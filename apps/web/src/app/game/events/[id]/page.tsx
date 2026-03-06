@@ -2,10 +2,11 @@
 
 import { use, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2, BarChart3, Info } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2, BarChart3, Info, Megaphone } from 'lucide-react';
 import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { AxmTokenIcon, GameTokenIcon } from '@/components/ui';
+import { AxmTokenIcon, LaunchTokenIcon } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EventTimer } from '@/components/features/events/event-timer';
 import { PrizeDisplay } from '@/components/features/events/prize-display';
@@ -151,108 +152,146 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       </Link>
 
       {/* Header card */}
-      <div className={`relative overflow-hidden rounded-xl border border-[var(--color-border)] p-4 space-y-3 ${
-        isActive || isUpcoming ? `${theme.bgGradient} ${theme.borderGlow}` : 'bg-[var(--color-surface)]'
+      <div className={`relative overflow-hidden rounded-2xl border border-[var(--color-border)] ${
+        isActive || isUpcoming ? `${theme.borderGlow}` : ''
       }`}>
-        {/* Decorative icon */}
-        <TypeIcon
-          size={100}
-          className={`absolute -top-3 -right-3 opacity-[0.04] ${theme.iconColor}`}
-          strokeWidth={1}
-        />
+        {/* Gradient background */}
+        {isContest ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/60 via-[var(--color-surface)] to-violet-950/40" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-950/60 via-[var(--color-surface)] to-yellow-950/40" />
+        )}
+        <div className={`absolute top-0 right-0 w-72 h-72 rounded-full blur-[100px] -translate-y-1/3 translate-x-1/4 ${
+          isContest ? 'bg-indigo-500/8' : 'bg-amber-500/8'
+        }`} />
 
-        <div className="relative flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TypeIcon size={14} className={theme.iconColor} />
-              <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${theme.badgeBg}`}>
-                {isContest ? t('events.contest') : t('events.raffle')}
-              </span>
-            </div>
-            <h1 className="text-lg font-bold">{localTitle}</h1>
+        <div className="relative flex items-stretch gap-0">
+          {/* Image section */}
+          <div className="relative shrink-0 w-28 sm:w-36 self-center p-3">
+            <Image
+              src={isContest ? '/solo-tournament.png' : '/raffles-axm.png'}
+              alt={isContest ? 'Contest' : 'Raffle'}
+              width={144}
+              height={144}
+              className={`w-full h-auto object-contain ${
+                isContest
+                  ? 'drop-shadow-[0_0_20px_rgba(99,102,241,0.35)]'
+                  : 'drop-shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+              }`}
+              sizes="144px"
+            />
           </div>
 
-          {/* Status badge */}
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
-            isActive ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' :
-            isUpcoming ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]' :
-            event.status === 'completed' ? `${theme.badgeBg}` :
-            event.status === 'calculating' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
-            'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
-          }`}>
-            {isUpcoming ? t('events.upcoming') : t(`events.status.${event.status}`)}
-          </span>
-        </div>
-
-        {eventDescription && (
-          <p className="relative text-xs text-[var(--color-text-secondary)]">{eventDescription}</p>
-        )}
-
-        {/* Sponsor badge */}
-        {(() => {
-          const ev = event as unknown as Record<string, unknown>;
-          const addr = ev.sponsorAddress ? String(ev.sponsorAddress) : null;
-          if (!addr) return null;
-          const nick = ev.sponsorNickname ? String(ev.sponsorNickname) : null;
-          return (
-            <div className="relative flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
-              <User size={12} />
-              <span className="font-medium">
-                {t('sponsoredRaffle.sponsoredBy')}{' '}
-                <span className="font-bold">
-                  {nick || `${addr.slice(0, 10)}...`}
+          {/* Content section */}
+          <div className="flex-1 min-w-0 p-4 pl-1 space-y-2.5">
+            {/* Top row: badges + status */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${theme.badgeBg} border ${isContest ? 'border-indigo-500/20' : 'border-amber-500/20'}`}>
+                  <TypeIcon size={10} />
+                  {isContest ? t('events.contest') : t('events.raffle')}
                 </span>
-            </span>
-          </div>
-          );
-        })()}
+                {isSponsored && (
+                  <span className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-violet-500/15 text-violet-400 border border-violet-500/20">
+                    <Megaphone size={10} />
+                    {t('events.sponsored')}
+                  </span>
+                )}
+                {isActive && (
+                  <span className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live
+                  </span>
+                )}
+              </div>
 
-        {/* Stats row */}
-        <div className="relative flex flex-wrap items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-          <div className="flex items-center gap-1.5">
-            <Trophy size={12} className={theme.iconColor} />
-            <span className="font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-            {isSponsored ? <GameTokenIcon size={16} /> : <AxmTokenIcon size={16} />}
-          </div>
-          <div className="flex items-center gap-1">
-            <Users size={12} className={theme.iconColor} />
-            <span>{event.participantCount} {t('events.participants')}</span>
-          </div>
-          {isUpcoming && (
-            <>
-              <div className="flex items-center gap-1">
-                <Clock size={12} className={theme.iconColor} />
-                <span className="text-[var(--color-text-secondary)]">{t('events.startsIn')}</span>
-                <EventTimer targetDate={event.startsAt} compact eventType={event.type} />
+              {/* Status badge */}
+              {!isActive && (
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                  isUpcoming ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)]' :
+                  event.status === 'completed' ? `${theme.badgeBg}` :
+                  event.status === 'calculating' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
+                  'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
+                }`}>
+                  {isUpcoming ? t('events.upcoming') : t(`events.status.${event.status}`)}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 className="text-lg font-bold">{localTitle}</h1>
+
+            {/* Description */}
+            {eventDescription && (
+              <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2">{eventDescription}</p>
+            )}
+
+            {/* Sponsor line */}
+            {(() => {
+              const ev2 = event as unknown as Record<string, unknown>;
+              const addr = ev2.sponsorAddress ? String(ev2.sponsorAddress) : null;
+              if (!addr) return null;
+              const nick = ev2.sponsorNickname ? String(ev2.sponsorNickname) : null;
+              return (
+                <div className="flex items-center gap-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 px-3 py-1.5 text-xs text-violet-300">
+                  <Megaphone size={12} className="text-violet-400 shrink-0" />
+                  <span className="font-medium">
+                    {t('sponsoredRaffle.sponsoredBy')}{' '}
+                    <span className="font-bold text-violet-400">
+                      {nick || `${addr.slice(0, 10)}...`}
+                    </span>
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Stats row */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
+              <div className="flex items-center gap-1.5">
+                <Trophy size={12} className={theme.iconColor} />
+                <span className="font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
+                {isSponsored ? <LaunchTokenIcon size={16} /> : <AxmTokenIcon size={16} />}
               </div>
               <div className="flex items-center gap-1">
-                <Calendar size={12} className="text-[var(--color-text-secondary)]" />
-                <span>{t('events.duration')}: {formatDuration(event.startsAt, event.endsAt)}</span>
+                <Users size={12} />
+                <span>{event.participantCount} {t('events.participants')}</span>
               </div>
-            </>
-          )}
-          {isActive && (
-            <div className="flex items-center gap-1">
-              <Clock size={12} className={theme.iconColor} />
-              <span className="text-[var(--color-text-secondary)]">{t('events.endsIn')}</span>
-              <EventTimer targetDate={event.endsAt} compact eventType={event.type} />
+              {isUpcoming && (
+                <>
+                  <div className="flex items-center gap-1">
+                    <Clock size={12} className={theme.iconColor} />
+                    <EventTimer targetDate={event.startsAt} compact eventType={event.type} />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar size={12} />
+                    <span>{formatDuration(event.startsAt, event.endsAt)}</span>
+                  </div>
+                </>
+              )}
+              {isActive && (
+                <div className="flex items-center gap-1">
+                  <Clock size={12} className={theme.iconColor} />
+                  <span>{t('events.endsIn')}</span>
+                  <EventTimer targetDate={event.endsAt} compact eventType={event.type} />
+                </div>
+              )}
+              {isEnded && (
+                <div className="flex items-center gap-1">
+                  <Calendar size={12} />
+                  <span>{formatDateRange(event.startsAt, event.endsAt)}</span>
+                </div>
+              )}
             </div>
-          )}
-          {isEnded && (
-            <div className="flex items-center gap-1">
-              <Calendar size={12} />
-              <span>{formatDateRange(event.startsAt, event.endsAt)}</span>
-            </div>
-          )}
+
+            {/* Participation badge */}
+            {isEnded && event.hasJoined && (
+              <div className="flex items-center gap-1.5 rounded-lg bg-[var(--color-success)]/10 px-3 py-1.5 text-xs font-bold text-[var(--color-success)]">
+                <CheckCircle size={14} />
+                {t('events.youParticipated')}
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* Participation badge for ended events */}
-        {isEnded && event.hasJoined && (
-          <div className="relative flex items-center gap-1.5 rounded-lg bg-[var(--color-success)]/10 px-3 py-1.5 text-xs font-bold text-[var(--color-success)]">
-            <CheckCircle size={14} />
-            {t('events.youParticipated')}
-          </div>
-        )}
       </div>
 
       {/* Event rules — context-specific based on config */}
