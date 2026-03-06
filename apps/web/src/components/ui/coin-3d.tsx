@@ -10,9 +10,9 @@ const RADIUS = 1;
 const THICKNESS = 0.12;
 const SEGMENTS = 64;
 
-const FLIP_DURATION = 2.8;     // seconds
+const FLIP_DURATION = 2.5;     // seconds (fits in 3s avatar-merge window)
 const MAX_HEIGHT = 3.2;        // peak of the arc
-const TOTAL_SPINS = 8;         // full rotations during flip
+const TOTAL_SPINS = 7;         // full rotations during flip
 const IDLE_SPIN_SPEED = 0.8;   // radians/sec for idle rotation
 
 // ─── Types ───────────────────────────────────────────────────
