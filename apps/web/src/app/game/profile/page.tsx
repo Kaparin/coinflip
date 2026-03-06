@@ -762,6 +762,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                       <span className="font-bold">{fmt(winnerPayout)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({fmt(100 - COMMISSION_BPS / 100)}%)</span></span>
                     </div>
                     <div className="h-px bg-[var(--color-border)]" />
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-violet-400/70">{t('referral.exampleYourChain')}</p>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-violet-400">{t('referral.exampleL1')}</span>
                       <span className="font-bold text-violet-400">{fmt(exL1)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l1Bps)})</span></span>
@@ -779,6 +780,9 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                       <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
                       <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} {GAME_TOKEN} <span className="font-normal">({bpsToPercent(COMMISSION_BPS - totalRefBps)})</span></span>
                     </div>
+                    <p className="text-[9px] text-[var(--color-text-secondary)]/60 mt-1 leading-relaxed">
+                      {t('referral.examplePlatformNote', { pct: bpsToPercent(totalRefBps) })}
+                    </p>
                   </div>
                 );
               })()}
