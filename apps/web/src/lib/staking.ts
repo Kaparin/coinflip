@@ -8,6 +8,7 @@
 import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { GasPrice, calculateFee } from '@cosmjs/stargate';
+import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 import { DEFAULT_GAS_PRICE } from '@coinflip/shared/chain';
 
 // ---- Constants ----
@@ -122,6 +123,9 @@ export async function fetchUserStaking(address: string): Promise<UserStakingInfo
 }
 
 // ---- Transactions ----
+//
+// All staking transactions use sign() + broadcast_tx_sync for instant response.
+// Does NOT wait for block inclusion — avoids 60s timeout through Vercel proxy.
 
 const STAKING_GAS_LIMIT = 500_000;
 
@@ -135,9 +139,29 @@ function getRpcUrl(): string {
 async function getClient(wallet: DirectSecp256k1HdWallet): Promise<SigningCosmWasmClient> {
   return SigningCosmWasmClient.connectWithSigner(getRpcUrl(), wallet, {
     gasPrice: GasPrice.fromString(DEFAULT_GAS_PRICE),
-    broadcastTimeoutMs: 60_000,
-    broadcastPollIntervalMs: 2_000,
   });
+}
+
+/** Sign + broadcast_tx_sync — returns txHash as soon as mempool accepts */
+async function broadcastSync(txRaw: TxRaw): Promise<string> {
+  const txBytes = TxRaw.encode(txRaw).finish();
+  const rpcUrl = getRpcUrl();
+  const hexTx = Array.from(txBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const res = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${hexTx}`);
+
+  if (!res.ok) throw new Error(`Staking broadcast failed: HTTP ${res.status}`);
+
+  const data = await res.json() as {
+    result?: { hash?: string; code?: number; log?: string };
+  };
+
+  if (!data.result?.hash) throw new Error('Staking broadcast: no hash in response');
+
+  if (data.result.code !== 0) {
+    throw new Error(data.result.log || `Staking tx rejected: code ${data.result.code}`);
+  }
+
+  return data.result.hash;
 }
 
 /** Stake LAUNCH tokens (CW20 Send → staking contract) */
@@ -150,22 +174,26 @@ export async function signStake(
   const microAmount = Math.floor(humanAmount * 10 ** LAUNCH_DECIMALS).toString();
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
-  const result = await client.execute(
-    address,
-    LAUNCH_CW20,
-    {
-      send: {
-        contract: STAKING_CONTRACT,
-        amount: microAmount,
-        msg: btoa(JSON.stringify({ stake: {} })),
-      },
+  const msg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: address,
+      contract: LAUNCH_CW20,
+      msg: new TextEncoder().encode(JSON.stringify({
+        send: {
+          contract: STAKING_CONTRACT,
+          amount: microAmount,
+          msg: btoa(JSON.stringify({ stake: {} })),
+        },
+      })),
+      funds: [],
     },
-    fee,
-    'Stake LAUNCH',
-  );
+  };
 
+  const txRaw = await client.sign(address, [msg], fee, 'Stake LAUNCH');
   client.disconnect();
-  return { txHash: result.transactionHash };
+  const txHash = await broadcastSync(txRaw);
+  return { txHash };
 }
 
 /** Unstake LAUNCH tokens */
@@ -178,16 +206,20 @@ export async function signUnstake(
   const microAmount = Math.floor(humanAmount * 10 ** LAUNCH_DECIMALS).toString();
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
-  const result = await client.execute(
-    address,
-    STAKING_CONTRACT,
-    { unstake: { amount: microAmount } },
-    fee,
-    'Unstake LAUNCH',
-  );
+  const msg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: address,
+      contract: STAKING_CONTRACT,
+      msg: new TextEncoder().encode(JSON.stringify({ unstake: { amount: microAmount } })),
+      funds: [],
+    },
+  };
 
+  const txRaw = await client.sign(address, [msg], fee, 'Unstake LAUNCH');
   client.disconnect();
-  return { txHash: result.transactionHash };
+  const txHash = await broadcastSync(txRaw);
+  return { txHash };
 }
 
 /** Claim AXM rewards */
@@ -198,16 +230,20 @@ export async function signClaim(
   const client = await getClient(wallet);
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
-  const result = await client.execute(
-    address,
-    STAKING_CONTRACT,
-    { claim: {} },
-    fee,
-    'Claim staking rewards',
-  );
+  const msg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: address,
+      contract: STAKING_CONTRACT,
+      msg: new TextEncoder().encode(JSON.stringify({ claim: {} })),
+      funds: [],
+    },
+  };
 
+  const txRaw = await client.sign(address, [msg], fee, 'Claim staking rewards');
   client.disconnect();
-  return { txHash: result.transactionHash };
+  const txHash = await broadcastSync(txRaw);
+  return { txHash };
 }
 
 // ---- Helpers ----
