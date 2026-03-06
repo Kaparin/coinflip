@@ -74,13 +74,40 @@ export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalP
       await new Promise((r) => setTimeout(r, 300));
       setAuthStep('broadcasting');
 
+      // broadcast_tx_sync — returns txHash instantly without waiting for block inclusion
       await signAuthzGrant(wallet, address, grantParams.grantee);
 
       setAuthStep('confirming');
-      await new Promise((r) => setTimeout(r, 800));
+
+      // Poll grant status until chain confirms the grant (typically 1-2 blocks, ~6-10s)
+      const maxPollMs = 30_000;
+      const pollInterval = 2_000;
+      const pollStart = Date.now();
+      let confirmed = false;
+      while (Date.now() - pollStart < maxPollMs) {
+        await new Promise((r) => setTimeout(r, pollInterval));
+        try {
+          const grantRes = await fetch(`${API_URL}/api/v1/auth/grants`, {
+            headers: { 'x-wallet-address': address, ...getAuthHeaders() },
+            credentials: 'include',
+          });
+          if (grantRes.ok) {
+            const grantData = await grantRes.json();
+            if (grantData.data?.authz_granted) {
+              confirmed = true;
+              break;
+            }
+          }
+        } catch { /* retry */ }
+      }
+
+      if (!confirmed) {
+        // Tx was broadcast but grant not yet visible — still mark as done,
+        // it will appear on next page load
+      }
 
       setStep('done');
-      setTimeout(() => void refetch(), 3000);
+      void refetch();
       onSuccess?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to sign grant';

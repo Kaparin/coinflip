@@ -370,15 +370,12 @@ export async function signAuthzGrant(
 
   const fee = calculateFee(AUTHZ_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
+  // Sign the tx locally
+  let txRaw: TxRaw;
   try {
-    const result = await client.signAndBroadcast(address, [msgGrant], fee, 'CoinFlip game activation');
-    if (result.code !== 0) {
-      throw new Error(`Authz grant failed: ${result.rawLog}`);
-    }
-    return { txHash: result.transactionHash, height: result.height };
+    txRaw = await client.sign(address, [msgGrant], fee, 'CoinFlip game activation');
   } catch (err) {
     // Handle sequence mismatch — common for new accounts right after deposit.
-    // Parse the expected sequence from the error and retry with explicit SignerData.
     const errMsg = err instanceof Error ? err.message : String(err);
     const seqMatch = errMsg.match(/expected (\d+), got (\d+)/);
     if (!seqMatch) throw err;
@@ -387,18 +384,63 @@ export async function signAuthzGrant(
     const { accountNumber } = await client.getSequence(address);
     const chainId = await client.getChainId();
 
-    const txRaw = await client.sign(
+    txRaw = await client.sign(
       address, [msgGrant], fee, 'CoinFlip game activation',
       { accountNumber, sequence: expectedSeq, chainId },
     );
-    const txBytes = TxRaw.encode(txRaw).finish();
-    const result = await client.broadcastTx(txBytes);
-
-    if (result.code !== 0) {
-      throw new Error(`Authz grant failed: ${result.rawLog}`);
-    }
-    return { txHash: result.transactionHash, height: result.height };
   }
+
+  // Broadcast via broadcast_tx_sync — returns as soon as tx enters mempool (~100ms).
+  // Does NOT wait for block inclusion (avoids 60s timeout through Vercel proxy).
+  const txBytes = TxRaw.encode(txRaw).finish();
+  const rpcUrl = getRpcUrl();
+  const hexTx = Array.from(txBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const res = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${hexTx}`);
+
+  if (!res.ok) {
+    throw new Error(`Authz broadcast failed: HTTP ${res.status}`);
+  }
+
+  const data = await res.json() as {
+    result?: { hash?: string; code?: number; log?: string };
+  };
+
+  if (!data.result?.hash) {
+    throw new Error('Authz broadcast: no hash in response');
+  }
+
+  if (data.result.code !== 0) {
+    // On sequence mismatch from mempool, retry once with corrected sequence
+    const seqMatch = (data.result.log || '').match(/expected (\d+), got (\d+)/);
+    if (seqMatch) {
+      const expectedSeq = parseInt(seqMatch[1]!, 10);
+      const { accountNumber } = await client.getSequence(address);
+      const chainId = await client.getChainId();
+      const retryRaw = await client.sign(
+        address, [msgGrant], fee, 'CoinFlip game activation',
+        { accountNumber, sequence: expectedSeq, chainId },
+      );
+      const retryBytes = TxRaw.encode(retryRaw).finish();
+      const retryHex = Array.from(retryBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const retryRes = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${retryHex}`);
+      if (retryRes.ok) {
+        const retryData = await retryRes.json() as {
+          result?: { hash?: string; code?: number; log?: string };
+        };
+        if (retryData.result?.hash && retryData.result.code === 0) {
+          client.disconnect();
+          return { txHash: retryData.result.hash, height: 0 };
+        }
+        if (retryData.result?.code !== 0) {
+          throw new Error(retryData.result?.log || `Authz grant rejected (code ${retryData.result?.code})`);
+        }
+      }
+    }
+    throw new Error(data.result.log || `Authz grant rejected by mempool (code ${data.result.code})`);
+  }
+
+  client.disconnect();
+  return { txHash: data.result.hash, height: 0 };
 }
 
 // ---- Withdraw (direct, for treasury/advanced users) ----
