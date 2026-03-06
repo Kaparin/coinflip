@@ -129,6 +129,22 @@ const TYPE_CONFIG: Record<ActivityType, {
   },
 };
 
+/** Determine if the activity item is denominated in COIN (LaunchTokenIcon) vs AXM (GameTokenIcon) */
+function isCoinType(item: ActivityItem): boolean {
+  switch (item.type) {
+    case 'shop_purchase':
+    case 'vip_purchase':
+    case 'achievement_claim':
+    case 'branch_change':
+      return true;
+    case 'transfer_sent':
+    case 'transfer_received':
+      return (item.metadata?.currency as string) === 'coin';
+    default:
+      return false;
+  }
+}
+
 function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?: Record<string, string | number>) => string }) {
   const config = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.bet_win;
   const meta = item.metadata;
@@ -252,7 +268,7 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
           <span className={`text-sm font-bold tabular-nums ${config.colorClass}`}>
             {config.sign}{formatted}
           </span>
-          {item.type === 'achievement_claim' ? <LaunchTokenIcon size={18} /> : <GameTokenIcon size={18} />}
+          {isCoinType(item) ? <LaunchTokenIcon size={18} /> : <GameTokenIcon size={18} />}
         </div>
       </div>
     </div>
