@@ -170,22 +170,13 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
             </ActionButton>
           )}
           {pool && pool.status === 'filling' && (
-            <>
-              <ActionButton
-                onClick={() => forceDraw.mutate(pool.id)}
-                variant="danger"
-                disabled={forceDraw.isPending}
-              >
-                Розыгрыш
-              </ActionButton>
-              <ActionButton
-                onClick={() => resetPool.mutate(pool.id)}
-                variant="danger"
-                disabled={resetPool.isPending}
-              >
-                Сброс
-              </ActionButton>
-            </>
+            <ActionButton
+              onClick={() => forceDraw.mutate(pool.id)}
+              variant="danger"
+              disabled={forceDraw.isPending}
+            >
+              Розыгрыш
+            </ActionButton>
           )}
           {pool && pool.status === 'drawing' && (
             <ActionButton
@@ -194,6 +185,15 @@ function TierRow({ tier }: { tier: AdminJackpotTier }) {
               disabled={forceDraw.isPending}
             >
               Повтор
+            </ActionButton>
+          )}
+          {pool && pool.status !== 'completed' && (
+            <ActionButton
+              onClick={() => resetPool.mutate(pool.id)}
+              variant="danger"
+              disabled={resetPool.isPending}
+            >
+              Сброс
             </ActionButton>
           )}
         </div>

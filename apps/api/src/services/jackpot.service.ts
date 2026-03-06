@@ -184,7 +184,13 @@ class JackpotService {
       }
 
       if (eligible.length === 0) {
-        logger.warn({ poolId, minGames: pool.minGames, vipFilter: requiredVipTier ?? 'none' }, 'Jackpot draw: no eligible users, staying in drawing state');
+        // Revert to filling — no point staying stuck in drawing with no candidates
+        await db
+          .update(jackpotPools)
+          .set({ status: 'filling' })
+          .where(eq(jackpotPools.id, poolId));
+
+        logger.warn({ poolId, minGames: pool.minGames, vipFilter: requiredVipTier ?? 'none' }, 'Jackpot draw: no eligible users — reverted to filling');
         return;
       }
 
@@ -736,11 +742,11 @@ class JackpotService {
       .limit(1);
 
     if (!pool) return { success: false, message: 'Pool not found' };
-    if (pool.status !== 'filling') return { success: false, message: 'Can only reset filling pools' };
+    if (pool.status === 'completed') return { success: false, message: 'Cannot reset completed pools' };
 
     await db
       .update(jackpotPools)
-      .set({ currentAmount: '0' })
+      .set({ currentAmount: '0', status: 'filling' })
       .where(eq(jackpotPools.id, poolId));
 
     logger.info({ poolId }, 'Admin: jackpot pool reset to 0');
