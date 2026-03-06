@@ -112,6 +112,9 @@
     "depositFailed": "Ошибка пополнения",
     "insufficientWalletBalance": "Недостаточно токенов: нужно {{need}} COIN, на кошельке {{have}}",
     "checkTxExplorer": "Проверить транзакцию",
+    "depositSubmitted": "Пополнение {amount} отправлено — подтверждается",
+    "withdrawSubmitted": "Вывод {amount} отправлен — средства в пути",
+    "withdrawProcessing": "Вывод обрабатывается — баланс обновится",
     "play": "Игра:",
     "bets": "Ставки:",
     "yourBalance": "Ваш баланс",
@@ -1253,6 +1256,8 @@
     "revenueSource": "Heads or Tails",
     "perPot": "от банка",
     "contractUnavailable": "Контракт стейкинга временно недоступен",
-    "retry": "Попробовать снова"
+    "retry": "Попробовать снова",
+    "txSubmitted": "отправлено, подтверждается...",
+    "confirming": "подтверждается..."
   }
 }

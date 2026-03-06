@@ -112,6 +112,9 @@
     "depositFailed": "Deposit failed",
     "insufficientWalletBalance": "Insufficient wallet balance: need {{need}} COIN, have {{have}}",
     "checkTxExplorer": "Check transaction",
+    "depositSubmitted": "Deposit {amount} submitted — confirming on chain",
+    "withdrawSubmitted": "Withdrawal {amount} submitted — funds on the way",
+    "withdrawProcessing": "Withdrawal processing — balance will update shortly",
     "play": "Play:",
     "bets": "Bets:",
     "yourBalance": "Your balance",
@@ -1253,6 +1256,8 @@
     "revenueSource": "Heads or Tails",
     "perPot": "per pot",
     "contractUnavailable": "Staking contract is temporarily unavailable",
-    "retry": "Try again"
+    "retry": "Try again",
+    "txSubmitted": "submitted, confirming...",
+    "confirming": "confirming..."
   }
 }

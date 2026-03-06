@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2, ArrowDown, ArrowUp, Gift, RefreshCw, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Loader2, ArrowDown, ArrowUp, Gift, RefreshCw, ExternalLink, Clock } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { EXPLORER_URL } from '@/lib/constants';
+import { useToast } from '@/components/ui/toast';
 import {
   fetchStakingStats,
   fetchUserStaking,
@@ -19,7 +20,14 @@ import {
 import { useTranslation } from '@/lib/i18n';
 
 type TabMode = 'stake' | 'unstake';
-type TxStatus = 'idle' | 'signing' | 'success' | 'error';
+type TxStatus = 'idle' | 'signing' | 'error';
+
+interface PendingTx {
+  type: 'stake' | 'unstake' | 'claim';
+  amount?: number;
+  txHash: string;
+  ts: number;
+}
 
 interface StakingSheetProps {
   open: boolean;
@@ -28,6 +36,7 @@ interface StakingSheetProps {
 
 export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const { t } = useTranslation();
+  const { addToast } = useToast();
   const { address, isConnected, getWallet } = useWalletContext();
   const [stats, setStats] = useState<StakingStats | null>(null);
   const [user, setUser] = useState<UserStakingInfo | null>(null);
@@ -35,7 +44,9 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
   const [txStatus, setTxStatus] = useState<TxStatus>('idle');
-  const [txMessage, setTxMessage] = useState('');
+  const [txError, setTxError] = useState('');
+  const [pendingTxs, setPendingTxs] = useState<PendingTx[]>([]);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = useCallback(async () => {
     try {
@@ -59,6 +70,38 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     refresh();
   }, [open, isConnected, refresh]);
 
+  // Clean up pending txs older than 30s and schedule background refreshes
+  useEffect(() => {
+    if (pendingTxs.length === 0) return;
+    // Refresh data every 5s while there are pending txs
+    const interval = setInterval(() => {
+      refresh();
+      // Remove stale pending txs (> 30s)
+      setPendingTxs(prev => prev.filter(tx => Date.now() - tx.ts < 30_000));
+    }, 5_000);
+    return () => clearInterval(interval);
+  }, [pendingTxs.length, refresh]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+  }, []);
+
+  const handleSuccess = (type: PendingTx['type'], txHash: string, amt?: number) => {
+    setPendingTxs(prev => [...prev, { type, amount: amt, txHash, ts: Date.now() }]);
+    setAmount('');
+    setTxStatus('idle');
+
+    const label = type === 'stake' ? t('staking.stake') : type === 'unstake' ? t('staking.unstake') : t('staking.claim');
+    addToast('success', `${label} — ${t('staking.txSubmitted')}`);
+
+    // Auto-close modal after brief delay so user can continue
+    setTimeout(onClose, 800);
+
+    // Schedule background refresh
+    refreshTimerRef.current = setTimeout(refresh, 4_000);
+  };
+
   const handleStake = async () => {
     const wallet = getWallet();
     if (!wallet || !address || !amount) return;
@@ -66,16 +109,13 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     if (num <= 0 || (user && num > user.launchBalance)) return;
 
     setTxStatus('signing');
-    setTxMessage('');
+    setTxError('');
     try {
       const result = await signStake(wallet, address, num);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
-      setAmount('');
-      setTimeout(refresh, 3000);
+      handleSuccess('stake', result.txHash, num);
     } catch (err) {
       setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
@@ -86,16 +126,13 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     if (num <= 0 || (user && num > user.staked)) return;
 
     setTxStatus('signing');
-    setTxMessage('');
+    setTxError('');
     try {
       const result = await signUnstake(wallet, address, num);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
-      setAmount('');
-      setTimeout(refresh, 3000);
+      handleSuccess('unstake', result.txHash, num);
     } catch (err) {
       setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
@@ -104,15 +141,13 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     if (!wallet || !address) return;
 
     setTxStatus('signing');
-    setTxMessage('');
+    setTxError('');
     try {
       const result = await signClaim(wallet, address);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
-      setTimeout(refresh, 3000);
+      handleSuccess('claim', result.txHash);
     } catch (err) {
       setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
@@ -147,6 +182,31 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Pending Transactions */}
+          {pendingTxs.length > 0 && (
+            <div className="space-y-2">
+              {pendingTxs.map((tx) => (
+                <div key={tx.txHash} className="flex items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+                  <Loader2 size={14} className="animate-spin text-violet-400 shrink-0" />
+                  <span className="text-[11px] text-violet-300 flex-1 truncate">
+                    {tx.type === 'stake' && `${t('staking.stake')} ${tx.amount} LAUNCH`}
+                    {tx.type === 'unstake' && `${t('staking.unstake')} ${tx.amount} LAUNCH`}
+                    {tx.type === 'claim' && t('staking.claim')}
+                    {' — '}{t('staking.confirming')}
+                  </span>
+                  <a
+                    href={`${EXPLORER_URL}/tx/${tx.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-violet-400/50 hover:text-violet-400 shrink-0"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Global Stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-3 text-center">
@@ -212,7 +272,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
             <div className="flex">
               <button
                 type="button"
-                onClick={() => { setActiveTab('stake'); setAmount(''); setTxStatus('idle'); setTxMessage(''); }}
+                onClick={() => { setActiveTab('stake'); setAmount(''); setTxStatus('idle'); setTxError(''); }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
                   activeTab === 'stake'
                     ? 'text-violet-400 border-violet-400 bg-violet-500/5'
@@ -224,7 +284,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveTab('unstake'); setAmount(''); setTxStatus('idle'); setTxMessage(''); }}
+                onClick={() => { setActiveTab('unstake'); setAmount(''); setTxStatus('idle'); setTxError(''); }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
                   activeTab === 'unstake'
                     ? 'text-rose-400 border-rose-400 bg-rose-500/5'
@@ -290,15 +350,10 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                 )}
               </button>
 
-              {/* TX Result */}
-              {txStatus === 'success' && txMessage && (
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-400">
-                  {txMessage}
-                </div>
-              )}
-              {txStatus === 'error' && txMessage && (
+              {/* Error */}
+              {txStatus === 'error' && txError && (
                 <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-400">
-                  {txMessage}
+                  {txError}
                 </div>
               )}
             </div>

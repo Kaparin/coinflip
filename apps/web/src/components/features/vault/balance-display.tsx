@@ -27,6 +27,7 @@ import { setBalanceGracePeriod, clearBalanceGracePeriod, isInBalanceGracePeriod 
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
+import { useToast } from '@/components/ui/toast';
 import { onDepositEvent } from '@/lib/deposit-status-events';
 import { feedback } from '@/lib/feedback';
 import { TransferModal } from '@/components/features/social/transfer-modal';
@@ -317,6 +318,7 @@ function CoinGuideModal({ open, onClose }: { open: boolean; onClose: () => void 
 
 export function BalanceDisplay() {
   const { t, locale } = useTranslation();
+  const { addToast } = useToast();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
   const { pendingDeduction } = usePendingBalance();
   const { data, isLoading } = useGetVaultBalance({
@@ -381,7 +383,6 @@ export function BalanceDisplay() {
       },
       onSuccess: () => {
         const microAmount = lastWithdrawMicroRef.current;
-        setWithdrawStatus('success');
         feedback('success');
 
         // Optimistic update: immediately reflect the balance change in UI
@@ -407,6 +408,14 @@ export function BalanceDisplay() {
         // Short grace period — WS withdraw_confirmed will clear it and trigger refetch
         setBalanceGracePeriod(4_000);
         queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
+
+        // Auto-close + toast
+        addToast('success', t('balance.withdrawSubmitted', { amount: lastWithdrawHumanRef.current }));
+        setShowWithdraw(false);
+        setWithdrawAmount('');
+        setWithdrawStatus('idle');
+        setWithdrawError('');
+        setWithdrawErrorTxHash(null);
       },
       onError: (err) => {
         const error = err as { error?: { message?: string; details?: { txHash?: string }; code?: string } };
@@ -418,9 +427,7 @@ export function BalanceDisplay() {
         const isNetworkErr = err instanceof TypeError;
 
         if (isTimeout || isNetworkErr) {
-          // Don't show as "failed" — show optimistic success with a note
-          setWithdrawStatus('timeout');
-          // Apply optimistic updates anyway — balance will correct on next refetch
+          // Apply optimistic updates — balance will correct on next refetch
           const microAmount = lastWithdrawMicroRef.current;
           queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
             if (!old?.data) return old;
@@ -445,6 +452,14 @@ export function BalanceDisplay() {
             queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
             queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
           }, 8_000);
+
+          // Auto-close + info toast
+          addToast('info', t('balance.withdrawProcessing'));
+          setShowWithdraw(false);
+          setWithdrawAmount('');
+          setWithdrawStatus('idle');
+          setWithdrawError('');
+          setWithdrawErrorTxHash(null);
         } else {
           setWithdrawError(getUserFriendlyError(err, t, 'withdraw'));
           setWithdrawErrorTxHash(txHash);
@@ -639,9 +654,6 @@ export function BalanceDisplay() {
       const result = broadcastData.data;
       setDepositTxHash(result.tx_hash);
 
-      const isAsync = broadcastRes.status === 202 || result.status === 'pending';
-      setDepositStatus(isAsync ? 'pending' : 'success');
-
       // Optimistic update: immediately reflect deposit in balances
       const depositMicro = toMicroLaunch(parsedHuman);
       queryClient.setQueryData(['/api/v1/vault/balance'], (old: any) => {
@@ -668,16 +680,16 @@ export function BalanceDisplay() {
       // WS deposit_confirmed event will clear it and trigger real refetch.
       setBalanceGracePeriod(4_000);
       queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
+
+      // Auto-close modal + toast — user can continue immediately
+      addToast('success', t('balance.depositSubmitted', { amount: parseFloat(depositAmount).toLocaleString() }));
+      resetDeposit();
     } catch (err) {
       // If optimized flow fails, try legacy full client-side deposit as fallback
       try {
         setDepositStep('broadcasting');
         setDepositStatus('broadcasting');
         const result = await signDeposit(wallet, address, parsedHuman);
-        setDepositStep('confirming');
-        setDepositTxHash(result.txHash);
-        setDepositStatus('success');
-        feedback('success');
 
         // Optimistic update (same as above)
         const depositMicro = toMicroLaunch(parsedHuman);
@@ -697,6 +709,10 @@ export function BalanceDisplay() {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
           queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
         }, 8_000);
+
+        // Auto-close modal + toast
+        addToast('success', t('balance.depositSubmitted', { amount: parseFloat(depositAmount).toLocaleString() }));
+        resetDeposit();
       } catch (fallbackErr) {
         setDepositError(getUserFriendlyError(fallbackErr, t, 'deposit'));
         setDepositErrorTxHash(extractTxHashFromError(fallbackErr));
