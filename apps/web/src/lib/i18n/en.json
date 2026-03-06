@@ -2,7 +2,7 @@
   "errors": {
     "actionInProgress": "Previous action is still processing. Wait a few seconds.",
     "insufficientBalance": "Insufficient game balance. Deposit more funds.",
-    "belowMinBet": "Minimum bet is 1 COIN.",
+    "belowMinBet": "Minimum bet is 0.1 COIN.",
     "tooManyOpenBets": "Open bets limit reached. Wait for some to finish or cancel some.",
     "dailyLimitExceeded": "Daily limit exceeded. Try again tomorrow.",
     "betNotFound": "Bet not found. Refresh the list.",
@@ -150,6 +150,7 @@
     "wagerInputLabel": "Wager (COIN)",
     "customAmount": "Custom amount...",
     "minAmount": "Minimum: 1 COIN",
+    "minAmountValue": "Minimum: {amount} COIN",
     "insufficientBalance": "Insufficient balance (available: {amount} COIN)",
     "openBetsCount": "Open bets: {count}/{max}",
     "limitReached": "Limit reached",

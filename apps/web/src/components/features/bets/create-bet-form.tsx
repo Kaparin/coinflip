@@ -21,6 +21,7 @@ import {
   COMMISSION_BPS,
   MAX_OPEN_BETS_PER_USER,
   MAX_BATCH_SIZE,
+  MIN_BET_AMOUNT,
   toMicroLaunch,
   fromMicroLaunch,
 } from '@coinflip/shared/constants';
@@ -160,7 +161,8 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   });
 
   const parsedAmount = parseFloat(amount) || 0;
-  const isValidAmount = parsedAmount >= 1 && parsedAmount <= availableHuman && canCreateBet;
+  const minBetHuman = fromMicroLaunch(Number(MIN_BET_AMOUNT));
+  const isValidAmount = parsedAmount >= minBetHuman && parsedAmount <= availableHuman && canCreateBet;
   const winPayout = parsedAmount * 2 * (1 - COMMISSION_BPS / 10000);
 
   const handleConfirm = useCallback(() => {
@@ -222,10 +224,10 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
 
   const isValidBatchFixed = batchMode === 'fixed'
     && parsedBatchCount >= 2 && parsedBatchCount <= maxBatchCount
-    && parsedAmount >= 1 && canCreateBet && batchFixedTotal <= availableHuman;
+    && parsedAmount >= minBetHuman && canCreateBet && batchFixedTotal <= availableHuman;
   const isValidBatchRandom = batchMode === 'random'
     && parsedBatchCount >= 2 && parsedBatchCount <= maxBatchCount
-    && parsedBatchMin >= 1 && parsedBatchMax >= parsedBatchMin
+    && parsedBatchMin >= minBetHuman && parsedBatchMax >= parsedBatchMin
     && batchRandomMaxTotal <= availableHuman && canCreateBet;
   const isValidBatch = batchMode === 'fixed' ? isValidBatchFixed : isValidBatchRandom;
 
@@ -397,6 +399,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   const parts = val.split('.');
                   if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                  if (parts.length === 2 && parts[1].length > 6) val = parts[0] + '.' + parts[1].slice(0, 6);
                   setAmount(val);
                 }}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-12 text-sm font-medium placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
@@ -405,8 +408,8 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                 <GameTokenIcon size={14} />
               </span>
             </div>
-            {parsedAmount > 0 && parsedAmount < 1 && (
-              <p className="mt-1.5 text-[10px] text-[var(--color-warning)]">{t('wager.minAmount')}</p>
+            {parsedAmount > 0 && parsedAmount < minBetHuman && (
+              <p className="mt-1.5 text-[10px] text-[var(--color-warning)]">{t('wager.minAmountValue', { amount: minBetHuman })}</p>
             )}
             {parsedAmount > availableHuman && (
               <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">

@@ -2,7 +2,7 @@
   "errors": {
     "actionInProgress": "Предыдущее действие ещё обрабатывается. Подождите несколько секунд.",
     "insufficientBalance": "Недостаточно средств на игровом балансе. Пополните счёт.",
-    "belowMinBet": "Минимальная ставка — 1 COIN.",
+    "belowMinBet": "Минимальная ставка — 0.1 COIN.",
     "tooManyOpenBets": "Достигнут лимит открытых ставок. Дождитесь завершения или отмените часть.",
     "dailyLimitExceeded": "Превышен дневной лимит. Попробуйте завтра.",
     "betNotFound": "Ставка не найдена. Обновите список.",
@@ -150,6 +150,7 @@
     "wagerInputLabel": "Ставка (COIN)",
     "customAmount": "Своя сумма...",
     "minAmount": "Минимум: 1 COIN",
+    "minAmountValue": "Минимум: {amount} COIN",
     "insufficientBalance": "Недостаточно средств (доступно: {amount} COIN)",
     "openBetsCount": "Открытых ставок: {count}/{max}",
     "limitReached": "Лимит достигнут",
