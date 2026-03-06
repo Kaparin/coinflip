@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus, Coins } from 'lucide-react';
+import Image from 'next/image';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
 import { GameTokenIcon, LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -252,10 +253,10 @@ export function Header() {
                   <button
                     type="button"
                     onClick={() => setStakingOpen(true)}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-violet-500/10 transition-colors"
                     title={t('staking.title')}
                   >
-                    <Coins size={16} />
+                    <Image src="/launch-token-logo2.png" alt="LAUNCH" width={18} height={18} className="rounded-full" />
                   </button>
 
                   {refCode && (
@@ -524,7 +525,7 @@ export function Header() {
               onClick={() => { setStakingOpen(true); setBalanceOpen(false); }}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-xs font-bold text-violet-400 transition-colors hover:bg-violet-500/20 active:scale-[0.98]"
             >
-              <Coins size={16} />
+              <Image src="/launch-token-logo2.png" alt="LAUNCH" width={18} height={18} className="rounded-full" />
               {t('staking.title')}
             </button>
           </div>
