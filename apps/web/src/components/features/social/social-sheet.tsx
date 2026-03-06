@@ -674,14 +674,22 @@ function ChatTab() {
     return cost;
   }, [prices, style, effect]);
 
+  const prevLoadingRef = useRef(true);
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const justLoaded = prevLoadingRef.current && !loading;
+    prevLoadingRef.current = loading;
+    // Always scroll to bottom on initial load; only auto-scroll if near bottom for new messages
+    if (justLoaded) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    } else {
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+      if (isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-  }, [messages.length, messagesEndRef]);
+  }, [messages.length, loading, messagesEndRef]);
 
   const startCooldown = useCallback((ms: number) => {
     const seconds = Math.ceil(ms / 1000);
