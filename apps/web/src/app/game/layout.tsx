@@ -3,6 +3,7 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { MaintenanceBanner } from '@/components/layout/maintenance-banner';
 import { DepositTriggerProvider } from '@/contexts/deposit-trigger-context';
 import { WebSocketProvider } from '@/contexts/websocket-context';
+import { SocialFab } from '@/components/features/social/social-fab';
 
 export default function GameLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
           <Header />
           <main className="flex-1">{children}</main>
           <BottomNav />
+          <SocialFab />
         </div>
       </DepositTriggerProvider>
     </WebSocketProvider>

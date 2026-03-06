@@ -1161,5 +1161,25 @@
     "noMessages": "Пока нет сообщений",
     "messagePlaceholder": "Сообщение...",
     "vs": "vs"
+  },
+  "social": {
+    "online": "Онлайн",
+    "favorites": "Избранные",
+    "allUsers": "Все",
+    "chat": "Чат",
+    "users": "Игроки",
+    "searchPlaceholder": "Поиск по нику или адресу...",
+    "noUsersOnline": "Нет пользователей онлайн",
+    "noFavorites": "Избранных пока нет",
+    "noUsersFound": "Пользователи не найдены",
+    "totalBets": "{count} игр",
+    "addFavorite": "В избранное",
+    "removeFavorite": "Убрать из избранного",
+    "chatDailyReset": "История чата обновляется ежедневно в 00:00 UTC",
+    "chatEmpty": "Сегодня ещё нет сообщений. Будьте первым!",
+    "chatPlaceholder": "Написать сообщение...",
+    "chatCooldown": "Подождите {seconds}с...",
+    "loadMore": "Загрузить ещё",
+    "onlineCount": "{count} онлайн"
   }
 }

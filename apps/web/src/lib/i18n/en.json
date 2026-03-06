@@ -1161,5 +1161,25 @@
     "noMessages": "No messages yet",
     "messagePlaceholder": "Message...",
     "vs": "vs"
+  },
+  "social": {
+    "online": "Online",
+    "favorites": "Favorites",
+    "allUsers": "All",
+    "chat": "Chat",
+    "users": "Users",
+    "searchPlaceholder": "Search by nickname or address...",
+    "noUsersOnline": "No users online",
+    "noFavorites": "No favorites yet",
+    "noUsersFound": "No users found",
+    "totalBets": "{count} games",
+    "addFavorite": "Add to Favorites",
+    "removeFavorite": "Remove from Favorites",
+    "chatDailyReset": "Chat history resets daily at 00:00 UTC",
+    "chatEmpty": "No messages yet today. Be the first!",
+    "chatPlaceholder": "Write a message...",
+    "chatCooldown": "Wait {seconds}s...",
+    "loadMore": "Load more",
+    "onlineCount": "{count} online"
   }
 }

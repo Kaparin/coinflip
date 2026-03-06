@@ -78,7 +78,9 @@ export type WsEventType =
   | 'bet_message'
   | 'announcement'
   | 'purchase_confirmed'
-  | 'purchase_failed';
+  | 'purchase_failed'
+  | 'chat_message'
+  | 'online_count';
 
 export type WsEvent = {
   type: WsEventType;

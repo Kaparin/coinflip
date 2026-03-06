@@ -23,6 +23,7 @@ class WsService {
       set.add(id);
     }
     logger.info({ clientId: id, address, total: this.clients.size }, 'WS client connected');
+    this.emitOnlineCount();
     return id;
   }
 
@@ -37,6 +38,7 @@ class WsService {
     }
     this.clients.delete(id);
     logger.info({ clientId: id, total: this.clients.size }, 'WS client disconnected');
+    this.emitOnlineCount();
   }
 
   /** Broadcast to all connected clients */
@@ -157,6 +159,26 @@ class WsService {
   /** Emit duel chat message */
   emitBetMessage(data: Record<string, unknown>) {
     this.broadcast({ type: 'bet_message', data });
+  }
+
+  /** Get all online wallet addresses */
+  getOnlineAddresses(): string[] {
+    return [...this.addressIndex.keys()];
+  }
+
+  /** Check if address is online */
+  isOnline(address: string): boolean {
+    return this.addressIndex.has(address);
+  }
+
+  /** Emit chat message to all */
+  emitChatMessage(data: Record<string, unknown>) {
+    this.broadcast({ type: 'chat_message', data });
+  }
+
+  /** Emit online count update */
+  emitOnlineCount() {
+    this.broadcast({ type: 'online_count', data: { count: this.addressIndex.size } });
   }
 
   getClientCount(): number {

@@ -11,7 +11,8 @@ import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-fram
 import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
-import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone, Users, Gift } from 'lucide-react';
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronLeft, ChevronRight, X, Loader2, Megaphone, Users, Gift, Star, StarOff } from 'lucide-react';
+import { useFavoriteStatus } from '@/hooks/use-social';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
@@ -408,6 +409,10 @@ export default function PlayerProfilePage() {
 
   const isOwnProfile = myAddress?.toLowerCase() === rawAddress?.toLowerCase();
 
+  const { isFavorite, toggle: toggleFavorite, loading: favLoading } = useFavoriteStatus(
+    !isOwnProfile && myAddress ? rawAddress : undefined,
+  );
+
   // Fetch public referral stats
   useEffect(() => {
     if (rawAddress) {
@@ -625,6 +630,23 @@ export default function PlayerProfilePage() {
             </svg>
             {t('playerProfile.sendMessage')}
           </a>
+        )}
+
+        {/* Add to favorites */}
+        {!isOwnProfile && myAddress && (
+          <button
+            type="button"
+            onClick={toggleFavorite}
+            disabled={favLoading}
+            className={`flex items-center justify-center gap-2 mt-3 w-full rounded-xl px-4 py-2.5 text-sm font-bold transition-colors active:scale-[0.98] disabled:opacity-50 ${
+              isFavorite
+                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20'
+                : 'bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            {isFavorite ? <StarOff size={16} /> : <Star size={16} />}
+            {isFavorite ? t('social.removeFavorite') : t('social.addFavorite')}
+          </button>
         )}
 
         {/* Reactions inline */}

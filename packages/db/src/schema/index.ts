@@ -19,3 +19,5 @@ export { newsPosts } from './news-posts';
 export { betMessages } from './bet-messages';
 export { shopPurchases } from './shop-purchases';
 export { achievementClaims } from './achievement-claims';
+export { userFavorites } from './user-favorites';
+export { globalChatMessages } from './global-chat';

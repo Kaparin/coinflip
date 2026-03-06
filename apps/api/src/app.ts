@@ -17,6 +17,7 @@ import { newsRouter } from './routes/news.js';
 import { announcementsRouter } from './routes/announcements.js';
 import { betMessagesRouter } from './routes/bet-messages.js';
 import { shopRouter } from './routes/shop.js';
+import { socialRouter } from './routes/social.js';
 import { adminEventsRouter } from './routes/admin-events.js';
 import { adminTransactionsRouter } from './routes/admin-transactions.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -145,6 +146,7 @@ app.route('/api/v1/vip', vipRouter);
 app.route('/api/v1/news', newsRouter);
 app.route('/api/v1/announcements', announcementsRouter);
 app.route('/api/v1/shop', shopRouter);
+app.route('/api/v1/social', socialRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

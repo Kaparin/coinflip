@@ -394,7 +394,9 @@ export function useWebSocket({
               scheduleInvalidation('/api/v1/jackpot/active', '/api/v1/jackpot/history');
               break;
             case 'bet_message':
-              // No cache invalidation needed — handled by duel store via onEvent callback
+            case 'chat_message':
+            case 'online_count':
+              // No cache invalidation needed — handled by subscribers via onEvent callback
               break;
           }
 
