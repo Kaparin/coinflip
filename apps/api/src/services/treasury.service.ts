@@ -180,18 +180,18 @@ export class TreasuryService {
       throw Errors.relayerNotReady();
     }
 
-    // Check treasury native AXM balance
+    // Check relayer native AXM balance (prizes are sent from relayer wallet)
     let walletBalance = '0';
     try {
       const res = await chainRest(
-        `/cosmos/bank/v1beta1/balances/${env.TREASURY_ADDRESS}/by_denom?denom=${env.AXM_DENOM}`,
+        `/cosmos/bank/v1beta1/balances/${env.RELAYER_ADDRESS}/by_denom?denom=${env.AXM_DENOM}`,
       );
       if (res.ok) {
         const data = (await res.json()) as { balance: { amount: string } };
         walletBalance = data.balance.amount;
       }
     } catch (err) {
-      logger.warn({ err }, 'Failed to query treasury native AXM balance for prize');
+      logger.warn({ err }, 'Failed to query relayer native AXM balance for prize');
     }
 
     if (BigInt(walletBalance) < BigInt(amount)) {

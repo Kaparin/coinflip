@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import Image from 'next/image';
-import { Trophy } from 'lucide-react';
+import { Trophy, Wallet } from 'lucide-react';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
@@ -167,11 +167,19 @@ export function EventWinModal({ open, onDismiss, eventTitle, rank, prizeAmount }
           </p>
 
           {/* Prize amount */}
-          <div className="flex items-center justify-center gap-2 mb-6">
+          <div className="flex items-center justify-center gap-2 mb-3">
             <span className={`text-3xl font-black tabular-nums ${theme.textColor}`}>
               +{formattedAmount}
             </span>
             <GameTokenIcon size={20} />
+          </div>
+
+          {/* Wallet hint */}
+          <div className="flex items-center justify-center gap-1.5 mb-5 rounded-lg bg-[var(--color-bg)] px-3 py-2">
+            <Wallet size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+            <p className="text-[11px] text-[var(--color-text-secondary)]">
+              {t('events.winModal.walletHint')}
+            </p>
           </div>
 
           {/* Dismiss button */}
