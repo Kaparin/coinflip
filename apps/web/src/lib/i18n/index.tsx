@@ -23,12 +23,20 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string | un
 
 /** In AXM mode, replace "COIN" token references with "AXM" in translated strings */
 const _axmMode = isAxmMode();
-/** Shop sells COIN tokens for AXM — never replace COIN with AXM in these keys */
-const SHOP_COIN_KEYS = new Set(['shop.sectionCoin', 'shop.sectionCoinDesc', 'shop.subtitle']);
+/** These keys reference COIN as a specific token, not the game currency — never rename */
+const COIN_LITERAL_KEYS = new Set([
+  'shop.sectionCoin', 'shop.sectionCoinDesc', 'shop.subtitle',
+  'social.sendCoin', 'social.transferTitle', 'social.sourceCoin',
+  'social.transferSuccess', 'social.transferSuccessDesc', 'social.transferReceived',
+  'social.transferReceivedWithMsg',
+]);
+/** Key prefixes where COIN always means the COIN token, not game currency */
+const COIN_LITERAL_PREFIXES = ['shop.', 'social.send', 'social.transfer', 'social.source'];
 
 function postProcess(str: string, key?: string): string {
   if (!_axmMode) return str;
-  if (key && SHOP_COIN_KEYS.has(key)) return str; // Shop: always COIN tokens for AXM
+  if (key && COIN_LITERAL_KEYS.has(key)) return str;
+  if (key && COIN_LITERAL_PREFIXES.some(p => key.startsWith(p))) return str;
   return str.replace(/\bCOIN\b/g, 'AXM');
 }
 

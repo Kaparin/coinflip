@@ -3,6 +3,7 @@
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -71,20 +72,29 @@ function UserActionMenu({
   );
   const menuRef = useRef<HTMLDivElement>(null);
   const isSelf = address === user.address;
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
 
-  // Calculate fixed position from anchor element
-  useEffect(() => {
+  // Calculate fixed position from anchor element — useLayoutEffect for sync before paint
+  useLayoutEffect(() => {
     if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    const menuWidth = 192; // w-48 = 12rem = 192px
-    let top = rect.bottom + 4;
-    let left = rect.right - menuWidth;
-    // Ensure menu stays within viewport
-    if (top + 200 > window.innerHeight) top = rect.top - 200;
-    if (left < 8) left = 8;
-    setPos({ top, left });
-  }, [anchorRef]);
+    const update = () => {
+      const rect = anchorRef.current!.getBoundingClientRect();
+      const menuWidth = 192; // w-48 = 12rem = 192px
+      let top = rect.bottom + 4;
+      let left = rect.right - menuWidth;
+      // Flip upward if menu would go below viewport
+      if (top + 220 > window.innerHeight) top = rect.top - 220;
+      if (left < 8) left = 8;
+      setPos({ top, left });
+    };
+    update();
+    // Close on scroll (sidebar scroll moves the card away from menu)
+    const scrollParent = anchorRef.current.closest('[class*="overflow-y"]');
+    if (scrollParent) {
+      scrollParent.addEventListener('scroll', onClose, { passive: true });
+      return () => scrollParent.removeEventListener('scroll', onClose);
+    }
+  }, [anchorRef, onClose]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -100,8 +110,6 @@ function UserActionMenu({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose, anchorRef]);
-
-  if (!pos) return null;
 
   return (
     <div
