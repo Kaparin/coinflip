@@ -36,7 +36,7 @@ export function GameStatsSection() {
       const isWinner = bet.winner?.toLowerCase() === address?.toLowerCase();
       if (isWinner) {
         wins++;
-        totalWonMicro += Number(bet.payout_amount ?? 0);
+        totalWonMicro += Number(bet.payout_amount ?? 0) - Number(bet.amount ?? 0);
       } else {
         losses++;
         totalLostMicro += Number(bet.amount ?? 0);
