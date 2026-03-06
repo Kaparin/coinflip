@@ -214,16 +214,18 @@ export default function GamePage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24 md:pb-6">
+    <div className="max-w-2xl lg:max-w-none mx-auto px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
       <TgWelcomeBanner />
-      <div className="hidden md:block">
+
+      {/* Desktop: balance + create form constrained, banners full width */}
+      <div className="hidden md:block max-w-2xl">
         <BalanceDisplay />
       </div>
 
       <TopWinnerBanner />
       <JackpotBanner />
 
-      <div id="create-bet-form" className="hidden md:block">
+      <div id="create-bet-form" className="hidden md:block max-w-2xl">
         <CreateBetForm onBetSubmitted={(bet) => { addPending(bet); handleTabChange('mybets'); }} />
       </div>
 

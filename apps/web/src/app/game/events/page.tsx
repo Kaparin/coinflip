@@ -13,7 +13,7 @@ export default function EventsPage() {
   const [raffleFormOpen, setRaffleFormOpen] = useState(false);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 space-y-4 pb-24 md:pb-6">
+    <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-6 space-y-4 pb-24 md:pb-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">

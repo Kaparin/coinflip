@@ -26,7 +26,7 @@ export default function JackpotPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-4 space-y-4 pb-24 md:pb-6">
+    <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
@@ -76,7 +76,7 @@ export default function JackpotPage() {
 
       {/* Summary Stats */}
       {pools && pools.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
             <div className="text-[9px] uppercase tracking-wider text-[var(--color-text-secondary)] font-bold mb-1">
               {t('jackpot.summaryTotal')}

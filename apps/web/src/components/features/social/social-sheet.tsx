@@ -8,12 +8,12 @@ import {
   useMemo,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Send, Loader2, Sparkles, Pin, Gift, CheckCircle, XCircle } from 'lucide-react';
+import { X, Search, Send, Loader2, Sparkles, Pin, Gift, CheckCircle, XCircle, Heart, User } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { UserAvatar } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon, GameTokenIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -23,9 +23,11 @@ import {
   useAllUsers,
   useChat,
   useChatPrices,
+  useFavoriteStatus,
   type SocialUser,
   type ChatMessage,
 } from '@/hooks/use-social';
+import { TransferModal } from './transfer-modal';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -57,39 +59,155 @@ function containsLinks(text: string): boolean {
   return LINK_RE.test(text);
 }
 
+// ─── User Action Menu (mobile) ────────────────────────────
+
+function UserActionMenu({
+  user,
+  onClose,
+  onTransfer,
+  onNavigate,
+  t,
+}: {
+  user: SocialUser;
+  onClose: () => void;
+  onTransfer: (currency: 'coin' | 'axm') => void;
+  onNavigate: () => void;
+  t: (k: string) => string;
+}) {
+  const { isConnected, address } = useWalletContext();
+  const { isFavorite, toggle: toggleFav, loading: favLoading } = useFavoriteStatus(
+    isConnected ? user.address : undefined,
+  );
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isSelf = address === user.address;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    // Delay to avoid immediate close
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handler);
+    }, 10);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-2 top-full mt-1 z-30 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+    >
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { onTransfer('coin'); onClose(); }}
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-amber-400"
+        >
+          <LaunchTokenIcon size={16} />
+          {t('social.sendCoin')}
+        </button>
+      )}
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { onTransfer('axm'); onClose(); }}
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-indigo-400"
+        >
+          <GameTokenIcon size={16} />
+          {t('social.sendAxm')}
+        </button>
+      )}
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { toggleFav(); }}
+          disabled={favLoading}
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+        >
+          <Heart size={14} className={isFavorite ? 'fill-pink-500 text-pink-500' : 'text-[var(--color-text-secondary)]'} />
+          {isFavorite ? t('social.removeFavorite') : t('social.addFavorite')}
+        </button>
+      )}
+      <Link
+        href={`/game/profile/${user.address}`}
+        onClick={() => { onClose(); onNavigate(); }}
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+      >
+        <User size={14} className="text-[var(--color-text-secondary)]" />
+        {t('social.viewProfile')}
+      </Link>
+    </div>
+  );
+}
+
 // ─── User Card ────────────────────────────────────────────
 
-function UserCard({ user, t, onNavigate }: { user: SocialUser; t: (k: string, v?: Record<string, string | number>) => string; onNavigate: () => void }) {
+function UserCard({
+  user,
+  t,
+  onTransfer,
+  onNavigate,
+}: {
+  user: SocialUser;
+  t: (k: string, v?: Record<string, string | number>) => string;
+  onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+  onNavigate: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <Link
-      href={`/game/profile/${user.address}`}
-      onClick={onNavigate}
-      className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.99]"
-    >
-      <div className="relative shrink-0">
-        <UserAvatar address={user.address} size={36} />
-        {user.is_online && (
-          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-success)]" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className={`text-sm font-semibold truncate ${getVipNameClass(user.vip_tier, user.vip_customization?.nameGradient)}`}>
-            {user.nickname || shortAddr(user.address)}
-          </span>
-          <VipBadge tier={user.vip_tier} badgeIcon={user.vip_customization?.badgeIcon} />
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.99] text-left"
+      >
+        <div className="relative shrink-0">
+          <UserAvatar address={user.address} size={36} />
+          {user.is_online && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-success)]" />
+          )}
         </div>
-        <span className="text-[10px] text-[var(--color-text-secondary)]">
-          {t('social.totalBets', { count: user.total_bets })}
-        </span>
-      </div>
-    </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className={`text-sm font-semibold truncate ${getVipNameClass(user.vip_tier, user.vip_customization?.nameGradient)}`}>
+              {user.nickname || shortAddr(user.address)}
+            </span>
+            <VipBadge tier={user.vip_tier} badgeIcon={user.vip_customization?.badgeIcon} />
+          </div>
+          <span className="text-[10px] text-[var(--color-text-secondary)]">
+            {t('social.totalBets', { count: user.total_bets })}
+          </span>
+        </div>
+      </button>
+
+      {menuOpen && (
+        <UserActionMenu
+          user={user}
+          onClose={() => setMenuOpen(false)}
+          onTransfer={(currency) => { onTransfer(user, currency); }}
+          onNavigate={onNavigate}
+          t={t}
+        />
+      )}
+    </div>
   );
 }
 
 // ─── Users Tab ────────────────────────────────────────────
 
-function UsersTab({ onNavigate }: { onNavigate: () => void }) {
+function UsersTab({
+  onNavigate,
+  onTransfer,
+}: {
+  onNavigate: () => void;
+  onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+}) {
   const { t } = useTranslation();
   const { isConnected } = useWalletContext();
   const [subTab, setSubTab] = useState<UsersSubTab>('online');
@@ -153,7 +271,13 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
         ) : (
           <>
             {currentUsers.map((user) => (
-              <UserCard key={user.address} user={user} t={t} onNavigate={onNavigate} />
+              <UserCard
+                key={user.address}
+                user={user}
+                t={t}
+                onTransfer={onTransfer}
+                onNavigate={onNavigate}
+              />
             ))}
             {subTab === 'all' && nextCursor && (
               <button
@@ -233,7 +357,6 @@ function CoinDropBubble({
         ? 'border-[var(--color-border)] bg-[var(--color-bg)] opacity-60'
         : 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-lg shadow-amber-500/10'
     }`}>
-      {/* Sender info */}
       <div className="flex items-center gap-2 mb-2">
         <Link href={`/game/profile/${msg.address}`} className="shrink-0">
           <UserAvatar address={msg.address} size={24} />
@@ -243,8 +366,6 @@ function CoinDropBubble({
         </Link>
         <span className="text-[9px] text-[var(--color-text-secondary)] ml-auto">{formatTime(msg.createdAt)}</span>
       </div>
-
-      {/* Coin drop card */}
       <div className="flex items-center gap-3">
         <div className={`relative shrink-0 ${isClaimed ? 'grayscale' : ''}`}>
           <Image
@@ -256,23 +377,17 @@ function CoinDropBubble({
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-black text-amber-400">
-            {formatLaunch(drop.amount)} COIN
-          </div>
+          <div className="text-lg font-black text-amber-400">{formatLaunch(drop.amount)} COIN</div>
           {msg.message && msg.message !== `${formatLaunch(drop.amount)} COIN` && (
             <p className="text-xs text-[var(--color-text-secondary)] truncate">{msg.message}</p>
           )}
           {isClaimed && (
-            <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
-              {drop.claimedByNickname || shortAddr(drop.claimedBy!)}
-            </p>
+            <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{drop.claimedByNickname || shortAddr(drop.claimedBy!)}</p>
           )}
         </div>
         <div className="shrink-0">
           {isClaimed ? (
-            <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
-              <CheckCircle size={14} />
-            </div>
+            <CheckCircle size={14} className="text-[var(--color-text-secondary)]" />
           ) : canClaim ? (
             <button
               type="button"
@@ -320,7 +435,6 @@ function ChatBubble({ msg, onEffect }: { msg: ChatMessage; onEffect?: (effect: C
           <span className="text-[7px] font-black tracking-wider text-black uppercase">SUPER CHAT</span>
         </div>
       )}
-
       <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
         <UserAvatar address={msg.address} size={isPinned ? 28 : 24} />
       </Link>
@@ -375,7 +489,6 @@ function PremiumSelector({
 
   return (
     <div className="space-y-2 px-1 py-2 animate-in slide-in-from-bottom-2 duration-200">
-      {/* Message styles */}
       <div className="flex gap-1.5">
         {styleOptions.map(({ key, label, price, gradient }) => {
           const active = style === key;
@@ -397,7 +510,6 @@ function PremiumSelector({
             </button>
           );
         })}
-        {/* Coin Drop button */}
         <button
           type="button"
           onClick={() => { setShowDrop(!showDrop); setStyle(null); setEffect(null); }}
@@ -411,8 +523,6 @@ function PremiumSelector({
           <span className="text-[9px]">COIN Drop</span>
         </button>
       </div>
-
-      {/* Effects — only show when style selected, not for drop */}
       {!showDrop && (style === 'highlighted' || style === 'pinned') && (
         <div className="flex gap-1.5">
           {effectOptions.map(({ key, emoji }) => {
@@ -458,7 +568,6 @@ function CoinDropInput({
 
   return (
     <div className="space-y-2 px-1 pb-1 animate-in slide-in-from-bottom-2 duration-200">
-      {/* Amount presets */}
       <div className="flex gap-1.5">
         {presets.map((v) => (
           <button
@@ -483,8 +592,6 @@ function CoinDropInput({
           className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-xs text-center focus:outline-none focus:border-emerald-500"
         />
       </div>
-
-      {/* Message + Send */}
       <div className="flex gap-1.5">
         <input
           type="text"
@@ -553,13 +660,11 @@ function ChatTab() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Pinned messages (super chat) — show latest at the top
   const pinnedMessages = useMemo(
     () => messages.filter((m) => m.style === 'pinned').slice(-3),
     [messages],
   );
 
-  // Calculate total cost
   const totalCost = useMemo(() => {
     if (!prices) return 0;
     let cost = 0;
@@ -569,7 +674,6 @@ function ChatTab() {
     return cost;
   }, [prices, style, effect]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -688,17 +792,12 @@ function ChatTab() {
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
-      {/* Toast notification */}
       {toast && (
         <ClaimToast message={toast.message} type={toast.type} onDone={() => setToast(null)} />
       )}
-
-      {/* Effect animation overlay */}
       {activeEffect && (
         <EffectOverlay effect={activeEffect} onDone={() => setActiveEffect(null)} />
       )}
-
-      {/* Pinned super-chat messages at top */}
       {pinnedMessages.length > 0 && (
         <div className="shrink-0 border-b border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent px-3 py-2 space-y-1">
           {pinnedMessages.map((msg) => (
@@ -713,15 +812,12 @@ function ChatTab() {
           ))}
         </div>
       )}
-
-      {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain px-3 min-h-0">
         <div className="text-center py-2">
           <span className="text-[9px] text-[var(--color-text-secondary)] bg-[var(--color-bg)] rounded-full px-2.5 py-0.5">
             {t('social.chatDailyReset')}
           </span>
         </div>
-
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={20} className="animate-spin text-[var(--color-text-secondary)]" />
@@ -732,13 +828,7 @@ function ChatTab() {
           <div className="space-y-1.5">
             {messages.map((msg) =>
               msg.style === 'coin_drop' ? (
-                <CoinDropBubble
-                  key={msg.id}
-                  msg={msg}
-                  onClaim={handleClaim}
-                  claiming={claimingId}
-                  currentAddress={currentAddress ?? null}
-                />
+                <CoinDropBubble key={msg.id} msg={msg} onClaim={handleClaim} claiming={claimingId} currentAddress={currentAddress ?? null} />
               ) : (
                 <ChatBubble key={msg.id} msg={msg} onEffect={handleEffect} />
               ),
@@ -747,22 +837,13 @@ function ChatTab() {
         )}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Input area */}
       <div className="shrink-0 border-t border-[var(--color-border)] px-3 py-2">
         {!isConnected ? (
           <p className="text-center text-xs text-[var(--color-text-secondary)] py-1">{t('errors.unauthorized')}</p>
         ) : (
           <div>
-            {/* Error messages */}
-            {linkError && (
-              <p className="text-[10px] text-red-400 mb-1">{t('social.noLinks')}</p>
-            )}
-            {balanceError && (
-              <p className="text-[10px] text-red-400 mb-1">{t('social.insufficientBalance')}</p>
-            )}
-
-            {/* Premium selector */}
+            {linkError && <p className="text-[10px] text-red-400 mb-1">{t('social.noLinks')}</p>}
+            {balanceError && <p className="text-[10px] text-red-400 mb-1">{t('social.insufficientBalance')}</p>}
             {showPremium && (
               <PremiumSelector
                 style={style}
@@ -775,17 +856,9 @@ function ChatTab() {
                 t={t}
               />
             )}
-
-            {/* Coin drop input */}
             {showPremium && showDrop && (
-              <CoinDropInput
-                onSend={handleCoinDrop}
-                sending={sending}
-                cooldown={cooldown}
-              />
+              <CoinDropInput onSend={handleCoinDrop} sending={sending} cooldown={cooldown} />
             )}
-
-            {/* Regular input row — hide when drop mode active */}
             {!(showPremium && showDrop) && (
               <div className="flex items-center gap-1.5">
                 <button
@@ -799,7 +872,6 @@ function ChatTab() {
                 >
                   <Sparkles size={16} />
                 </button>
-
                 <input
                   type="text"
                   value={cooldown > 0 ? '' : input}
@@ -811,7 +883,6 @@ function ChatTab() {
                     linkError || balanceError ? 'border-red-400' : 'border-[var(--color-border)]'
                   }`}
                 />
-
                 <button
                   type="button"
                   onClick={handleSend}
@@ -852,6 +923,17 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+
+  // Transfer modal state
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferRecipient, setTransferRecipient] = useState<SocialUser | null>(null);
+  const [transferCurrency, setTransferCurrency] = useState<'coin' | 'axm'>('coin');
+
+  const handleTransfer = useCallback((user: SocialUser, currency: 'coin' | 'axm') => {
+    setTransferRecipient(user);
+    setTransferCurrency(currency);
+    setTransferOpen(true);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -899,59 +981,69 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
   ];
 
   return createPortal(
-    <div
-      ref={overlayRef}
-      role="dialog"
-      aria-modal="true"
-      onClick={handleOverlayClick}
-      className={`fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
-        visible ? 'opacity-100' : 'opacity-0'
-      }`}
-    >
+    <>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className={`w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl flex flex-col transition-all duration-300 ${
-          visible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+        ref={overlayRef}
+        role="dialog"
+        aria-modal="true"
+        onClick={handleOverlayClick}
+        className={`fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
+          visible ? 'opacity-100' : 'opacity-0'
         }`}
-        style={{ height: '75vh', maxHeight: '75vh' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] shrink-0">
-          <div className="flex gap-1">
-            {mainTabs.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMainTab(key)}
-                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
-                  mainTab === key
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl flex flex-col transition-all duration-300 ${
+            visible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+          }`}
+          style={{ height: '75vh', maxHeight: '75vh' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] shrink-0">
+            <div className="flex gap-1">
+              {mainTabs.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMainTab(key)}
+                  className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
+                    mainTab === key
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onCloseRef.current()}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onCloseRef.current()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0">
-          {mainTab === 'users' ? (
-            <UsersTab onNavigate={() => onCloseRef.current()} />
-          ) : (
-            <ChatTab />
-          )}
+          {/* Content */}
+          <div className="flex-1 min-h-0">
+            {mainTab === 'users' ? (
+              <UsersTab onNavigate={() => onCloseRef.current()} onTransfer={handleTransfer} />
+            ) : (
+              <ChatTab />
+            )}
+          </div>
         </div>
       </div>
-    </div>,
+
+      {/* Transfer Modal — rendered in portal alongside sheet */}
+      <TransferModal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        initialRecipient={transferRecipient}
+        initialCurrency={transferCurrency}
+      />
+    </>,
     document.body,
   );
 }

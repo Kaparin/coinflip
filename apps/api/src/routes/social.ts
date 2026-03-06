@@ -314,12 +314,13 @@ const TRANSFER_FEE_BPS = 500; // 5% fee
 const TransferSchema = z.object({
   recipientAddress: z.string().min(1),
   amount: z.number().min(1).max(1000000),
+  currency: z.enum(['coin', 'axm']).default('coin'),
   message: z.string().max(200).optional(),
 });
 
 socialRouter.post('/transfer', authMiddleware, zValidator('json', TransferSchema), async (c) => {
   const user = c.get('user');
-  const { recipientAddress, amount, message } = c.req.valid('json');
+  const { recipientAddress, amount, currency, message } = c.req.valid('json');
 
   // Find recipient
   const recipient = await userService.getUserByAddress(recipientAddress);
@@ -334,20 +335,28 @@ socialRouter.post('/transfer', authMiddleware, zValidator('json', TransferSchema
   const fee = String(Math.floor(amount * 1_000_000 * TRANSFER_FEE_BPS / 10000));
   const totalDeduct = String(BigInt(microAmount) + BigInt(fee));
 
-  // Deduct total (amount + fee) from sender
-  const deducted = await vaultService.deductCoin(user.id, totalDeduct);
-  if (!deducted) {
-    return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
+  if (currency === 'coin') {
+    // COIN: virtual currency (coin_balance)
+    const deducted = await vaultService.deductCoin(user.id, totalDeduct);
+    if (!deducted) {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
+    }
+    await vaultService.creditCoin(recipient.id, microAmount);
+  } else {
+    // AXM: deduct from vault available (offchainSpent), credit to recipient (bonus)
+    try {
+      await vaultService.deductBalance(user.id, totalDeduct);
+    } catch {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient AXM balance' } }, 400);
+    }
+    await vaultService.creditWinner(recipient.id, microAmount);
   }
-
-  // Credit amount to recipient (fee is burned/kept by platform)
-  await vaultService.creditCoin(recipient.id, microAmount);
 
   // Record transfer
   const db = getDb();
   await db.execute(sql`
-    INSERT INTO coin_transfers (sender_id, recipient_id, amount, fee, message)
-    VALUES (${user.id}, ${recipient.id}, ${microAmount}, ${fee}, ${message ?? null})
+    INSERT INTO coin_transfers (sender_id, recipient_id, amount, fee, message, currency)
+    VALUES (${user.id}, ${recipient.id}, ${microAmount}, ${fee}, ${message ?? null}, ${currency})
   `);
 
   // Get sender info for notification
@@ -365,17 +374,19 @@ socialRouter.post('/transfer', authMiddleware, zValidator('json', TransferSchema
       fromNickname: sender.nickname ? String(sender.nickname) : null,
       amount: microAmount,
       fee,
+      currency,
       message: message ?? null,
     },
   });
 
-  logger.info({ senderId: user.id, recipientId: recipient.id, amount: microAmount, fee }, 'COIN transfer completed');
+  logger.info({ senderId: user.id, recipientId: recipient.id, amount: microAmount, fee, currency }, `${currency.toUpperCase()} transfer completed`);
 
   return c.json({
     data: {
       success: true,
       amount: microAmount,
       fee,
+      currency,
       recipientAddress,
     },
   });
@@ -389,6 +400,7 @@ socialRouter.get('/transfers', authMiddleware, async (c) => {
   const rows = await db.execute(sql`
     SELECT t.id::text, t.amount::text, t.fee::text, t.message, t.created_at,
       t.sender_id::text, t.recipient_id::text,
+      coalesce(t.currency, 'coin') as currency,
       su.address as sender_address, su.profile_nickname as sender_nickname,
       ru.address as recipient_address, ru.profile_nickname as recipient_nickname
     FROM coin_transfers t
@@ -405,6 +417,7 @@ socialRouter.get('/transfers', authMiddleware, async (c) => {
     type: String(r.sender_id) === user.id ? 'sent' : 'received',
     amount: String(r.amount),
     fee: String(r.fee),
+    currency: String(r.currency) as 'coin' | 'axm',
     message: r.message ? String(r.message) : null,
     counterparty: {
       address: String(r.sender_id) === user.id ? String(r.recipient_address) : String(r.sender_address),

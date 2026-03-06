@@ -136,7 +136,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 space-y-6 pb-24 md:pb-6">
+    <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-6 space-y-6 pb-24 md:pb-6">
       {/* Page Header */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-2">
@@ -175,14 +175,14 @@ export default function ShopPage() {
 
         {/* Loading */}
         {configLoading && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
           </div>
         )}
 
         {/* Chest Grid */}
         {!configLoading && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {tiers.map((tier) => {
               const isFirstForTier = !purchasedTiers[tier.tier];
               const bonusAmount = isFirstForTier ? tier.coinAmount : 0;

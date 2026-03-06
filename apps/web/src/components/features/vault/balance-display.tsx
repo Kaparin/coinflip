@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { CheckCircle, Loader2, Shield, HelpCircle, Copy, Check, X } from 'lucide-react';
+import { CheckCircle, Loader2, Shield, HelpCircle, Copy, Check, X, ArrowRightLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useGetVaultBalance, useWithdrawFromVault } from '@coinflip/api-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,6 +29,7 @@ import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { onDepositEvent } from '@/lib/deposit-status-events';
 import { feedback } from '@/lib/feedback';
+import { TransferModal } from '@/components/features/social/transfer-modal';
 
 /** Deposit presets in human-readable LAUNCH */
 const DEPOSIT_PRESETS = [100, 500, 1000];
@@ -332,6 +333,7 @@ export function BalanceDisplay() {
   const queryClient = useQueryClient();
 
   const [showDeposit, setShowDeposit] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const { subscribe } = useDepositTrigger();
   useEffect(() => subscribe(() => setShowDeposit(true)), [subscribe]);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -808,6 +810,11 @@ export function BalanceDisplay() {
                   </span>
                 ) : t('common.withdraw')}
               </button>
+              <button type="button" onClick={() => setShowTransfer(true)}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] btn-press"
+                title={t('social.transfer')}>
+                <ArrowRightLeft size={14} />
+              </button>
             </div>
           </>
         )}
@@ -1052,6 +1059,9 @@ export function BalanceDisplay() {
 
       {/* ===== COIN Guide Modal (CW20 mode only) ===== */}
       {!isAxmMode() && <CoinGuideModal open={showCoinGuide} onClose={() => setShowCoinGuide(false)} />}
+
+      {/* ===== Transfer Modal ===== */}
+      <TransferModal open={showTransfer} onClose={() => setShowTransfer(false)} />
     </>
   );
 }

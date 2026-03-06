@@ -53,12 +53,22 @@ export interface CoinTransfer {
   type: 'sent' | 'received';
   amount: string;
   fee: string;
+  currency: 'coin' | 'axm';
   message: string | null;
   counterparty: {
     address: string;
     nickname: string | null;
   };
   createdAt: string;
+}
+
+export interface TransferNotification {
+  fromAddress: string;
+  fromNickname: string | null;
+  amount: string;
+  fee: string;
+  currency: 'coin' | 'axm';
+  message: string | null;
 }
 
 // ─── Online Count ─────────────────────────────────────────
@@ -356,12 +366,13 @@ export function useFavoriteStatus(address: string | undefined) {
 
 // ─── P2P Transfer ─────────────────────────────────────────
 
-export function useTransferCoin() {
+export function useTransfer() {
   const [loading, setLoading] = useState(false);
 
   const transfer = useCallback(async (
     recipientAddress: string,
     amount: number,
+    currency: 'coin' | 'axm' = 'coin',
     message?: string,
   ): Promise<{ success: boolean; error?: string; fee?: string }> => {
     setLoading(true);
@@ -370,7 +381,7 @@ export function useTransferCoin() {
         method: 'POST',
         credentials: 'include',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientAddress, amount, message }),
+        body: JSON.stringify({ recipientAddress, amount, currency, message }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

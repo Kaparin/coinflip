@@ -145,7 +145,7 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        <div className="mx-auto flex h-14 items-center justify-between px-4 lg:px-6">
           <Link href="/game" className="flex items-center gap-2.5 group">
             <span className="text-lg font-extrabold tracking-tight">
               Heads or <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Tails</span>
@@ -153,55 +153,36 @@ export function Header() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-1 md:flex">
             {wallet.address && (
               <>
-                {/* Balance display */}
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex items-center gap-1.5" title={t('header.vaultTitle')}>
-                    <span className="text-[10px] text-[var(--color-text-secondary)]">{t('header.vault')}</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums text-[var(--color-success)]">{fmtBal(availableHuman)} <GameTokenIcon size={18} /></span>
-                  </div>
-                  <div className="flex items-center gap-1.5" title="COIN">
-                    <span className="text-[10px] text-[var(--color-text-secondary)]">COIN</span>
-                    <span className="flex items-center gap-1.5 font-bold tabular-nums">{fmtBal(coinBalanceHuman)} <LaunchTokenIcon size={18} /></span>
-                  </div>
-                  <div className={`flex items-center gap-1 ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM">
-                    <span className="flex items-center gap-1 text-[10px] tabular-nums font-medium">{nativeBalanceHuman.toFixed(2)} <AxmIcon size={18} /></span>
-                    {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="h-6 w-px bg-[var(--color-border)]" />
-
                 {/* Desktop page links */}
-                <nav className="flex items-center gap-1">
+                <nav className="flex items-center gap-0.5">
                   <Link href="/game"
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                       pathname === '/game'
                         ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                     }`}>
-                    <Puzzle size={14} />
+                    <Puzzle size={16} />
                     {t('nav.play')}
                   </Link>
                   <Link href="/game/profile"
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                       pathname?.startsWith('/game/profile')
                         ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                     }`}>
-                    <User size={14} />
+                    <User size={16} />
                     {t('nav.profile')}
                   </Link>
                   <Link href="/game/events"
-                    className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                       pathname?.startsWith('/game/events')
                         ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                     }`}>
-                    <Trophy size={14} />
+                    <Trophy size={16} />
                     {t('nav.events')}
                     {activeEventCount > 0 && (
                       <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-warning)] px-1 text-[9px] font-bold text-white">
@@ -211,63 +192,81 @@ export function Header() {
                   </Link>
                   {TREASURY_ADDRESS && (
                     <Link href="/game/shop"
-                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                         pathname?.startsWith('/game/shop')
                           ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                           : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                       }`}>
-                      <Store size={14} />
+                      <Store size={16} />
                       {t('nav.shop')}
                     </Link>
                   )}
                   <Link href="/game/news"
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                       pathname?.startsWith('/game/news')
                         ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                     }`}>
-                    <Newspaper size={14} />
+                    <Newspaper size={16} />
                     {t('nav.news')}
                   </Link>
+                </nav>
+              </>
+            )}
+
+            {/* Right side: balance pill + VIP + Invite + Admin + Wallet */}
+            <div className="flex items-center gap-2 ml-auto">
+              {wallet.address && (
+                <>
+                  {/* Compact balance pill */}
+                  <div className="flex items-center gap-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs">
+                    <span className="flex items-center gap-1 font-bold tabular-nums text-[var(--color-success)]" title={t('header.vaultTitle')}>
+                      {fmtBal(availableHuman)} <GameTokenIcon size={16} />
+                    </span>
+                    <span className="h-3.5 w-px bg-[var(--color-border)]" />
+                    <span className="flex items-center gap-1 font-bold tabular-nums" title="COIN">
+                      {fmtBal(coinBalanceHuman)} <LaunchTokenIcon size={16} />
+                    </span>
+                    <span className="h-3.5 w-px bg-[var(--color-border)]" />
+                    <span className={`flex items-center gap-1 tabular-nums font-medium ${isLowAxm ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`} title="AXM">
+                      {nativeBalanceHuman.toFixed(2)} <AxmIcon size={16} />
+                      {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
+                    </span>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => setVipModalOpen(true)}
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
                       vipStatus?.active
                         ? 'bg-amber-500/10 text-amber-400'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
                     }`}
                   >
-                    <Crown size={14} />
-                    {vipStatus?.active ? (
-                      <span className="capitalize">{vipStatus.tier}</span>
-                    ) : (
-                      t('nav.vip')
-                    )}
+                    <Crown size={16} />
+                    {vipStatus?.active && <span className="capitalize">{vipStatus.tier}</span>}
                   </button>
+
                   {refCode && (
                     <button
                       type="button"
                       onClick={handleCopyReferralLink}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
                       title={t('referral.copyLink')}
                     >
-                      <UserPlus size={14} />
-                      {t('nav.invite')}
+                      <UserPlus size={16} />
                     </button>
                   )}
-                </nav>
+                </>
+              )}
 
-              </>
-            )}
-
-            {isAdmin && (
-              <Link href="/admin"
-                className="flex items-center gap-1.5 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-3 py-1.5 text-xs font-bold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/20">
-                <ShieldCheck size={14} />
-                {t('common.admin')}
-              </Link>
-            )}
+              {isAdmin && (
+                <Link href="/admin"
+                  className="flex items-center gap-1.5 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-3 py-1.5 text-xs font-bold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/20">
+                  <ShieldCheck size={14} />
+                </Link>
+              )}
+            </div>
 
             {wallet.address ? (
               <div className="relative" ref={dropdownRef}>

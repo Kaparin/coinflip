@@ -258,7 +258,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
       </div>
     );
@@ -421,7 +421,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 <span className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
                 {t('myBets.submittingCount', { count: myPending.length })}
               </h3>
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 {myPending.map(renderPendingCard)}
               </div>
             </div>
@@ -471,7 +471,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
                 </div>
               )}
 
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 {myOpenBets.map((bet) => {
                   const betId = String(bet.id);
                   const isBoosted = !!(bet as any).is_boosted || !!(bet as any).boosted_at;
@@ -512,7 +512,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
             <span className="h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse" />
             {t('myBets.inProgress', { count: inPlayCount })}
           </h3>
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
             {myAccepting.map((bet) => renderBetCard(bet))}
             {myInProgress.map((bet) => renderBetCard(bet))}
           </div>
@@ -525,7 +525,7 @@ export function MyBets({ pendingBets = [] }: MyBetsProps) {
           <h3 className="text-xs font-bold uppercase text-[var(--color-text-secondary)] mb-2">
             {t('myBets.recentResults', { count: resultsCount })}
           </h3>
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
             {visibleResolved.map(renderResolvedCard)}
           </div>
         </div>

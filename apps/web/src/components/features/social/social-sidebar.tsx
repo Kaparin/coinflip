@@ -7,12 +7,12 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { Search, Send, Loader2, Sparkles, Pin, Gift, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Send, Loader2, Sparkles, Pin, Gift, CheckCircle, XCircle, Heart, User, ArrowRightLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { UserAvatar } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon, GameTokenIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -23,9 +23,11 @@ import {
   useOnlineCount,
   useChat,
   useChatPrices,
+  useFavoriteStatus,
   type SocialUser,
   type ChatMessage,
 } from '@/hooks/use-social';
+import { TransferModal } from './transfer-modal';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -48,38 +50,154 @@ function formatTime(iso: string): string {
 
 const LINK_RE = /https?:\/\/\S+|www\.\S+|\S+\.(com|net|org|io|co|me|xyz|ru|info|biz|gg|ly|link|click|top|app|site|online|store|shop)\b|t\.me\/\S+|discord\.(gg|com)\/\S+/i;
 
+// ─── User Action Menu ─────────────────────────────────────
+
+function UserActionMenu({
+  user,
+  anchorRef,
+  onClose,
+  onTransfer,
+  t,
+}: {
+  user: SocialUser;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  onTransfer: (currency: 'coin' | 'axm') => void;
+  t: (k: string) => string;
+}) {
+  const { isConnected, address } = useWalletContext();
+  const { isFavorite, toggle: toggleFav, loading: favLoading } = useFavoriteStatus(
+    isConnected ? user.address : undefined,
+  );
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isSelf = address === user.address;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose, anchorRef]);
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+    >
+      {/* Send COIN */}
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { onTransfer('coin'); onClose(); }}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-amber-400"
+        >
+          <LaunchTokenIcon size={16} />
+          {t('social.sendCoin')}
+        </button>
+      )}
+
+      {/* Send AXM */}
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { onTransfer('axm'); onClose(); }}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-indigo-400"
+        >
+          <GameTokenIcon size={16} />
+          {t('social.sendAxm')}
+        </button>
+      )}
+
+      {/* Favorite */}
+      {isConnected && !isSelf && (
+        <button
+          type="button"
+          onClick={() => { toggleFav(); }}
+          disabled={favLoading}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+        >
+          <Heart size={14} className={isFavorite ? 'fill-pink-500 text-pink-500' : 'text-[var(--color-text-secondary)]'} />
+          {isFavorite ? t('social.removeFavorite') : t('social.addFavorite')}
+        </button>
+      )}
+
+      {/* View Profile */}
+      <Link
+        href={`/game/profile/${user.address}`}
+        onClick={onClose}
+        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+      >
+        <User size={14} className="text-[var(--color-text-secondary)]" />
+        {t('social.viewProfile')}
+      </Link>
+    </div>
+  );
+}
+
 // ─── User Card ────────────────────────────────────────────
 
-function UserCard({ user, t }: { user: SocialUser; t: (k: string, v?: Record<string, string | number>) => string }) {
+function UserCard({
+  user,
+  t,
+  onTransfer,
+}: {
+  user: SocialUser;
+  t: (k: string, v?: Record<string, string | number>) => string;
+  onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
   return (
-    <Link
-      href={`/game/profile/${user.address}`}
-      className="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface-hover)]"
-    >
-      <div className="relative shrink-0">
-        <UserAvatar address={user.address} size={30} />
-        {user.is_online && (
-          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-success)]" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
-          <span className={`text-xs font-semibold truncate ${getVipNameClass(user.vip_tier, user.vip_customization?.nameGradient)}`}>
-            {user.nickname || shortAddr(user.address)}
-          </span>
-          <VipBadge tier={user.vip_tier} badgeIcon={user.vip_customization?.badgeIcon} />
+    <div ref={cardRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface-hover)] text-left"
+      >
+        <div className="relative shrink-0">
+          <UserAvatar address={user.address} size={30} />
+          {user.is_online && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-success)]" />
+          )}
         </div>
-        <span className="text-[9px] text-[var(--color-text-secondary)]">
-          {t('social.totalBets', { count: user.total_bets })}
-        </span>
-      </div>
-    </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            <span className={`text-xs font-semibold truncate ${getVipNameClass(user.vip_tier, user.vip_customization?.nameGradient)}`}>
+              {user.nickname || shortAddr(user.address)}
+            </span>
+            <VipBadge tier={user.vip_tier} badgeIcon={user.vip_customization?.badgeIcon} />
+          </div>
+          <span className="text-[9px] text-[var(--color-text-secondary)]">
+            {t('social.totalBets', { count: user.total_bets })}
+          </span>
+        </div>
+      </button>
+
+      {menuOpen && (
+        <UserActionMenu
+          user={user}
+          anchorRef={cardRef}
+          onClose={() => setMenuOpen(false)}
+          onTransfer={(currency) => onTransfer(user, currency)}
+          t={t}
+        />
+      )}
+    </div>
   );
 }
 
 // ─── Users Panel ──────────────────────────────────────────
 
-function UsersPanel() {
+function UsersPanel({ onTransfer }: { onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void }) {
   const { t } = useTranslation();
   const { isConnected } = useWalletContext();
   const [subTab, setSubTab] = useState<UsersSubTab>('online');
@@ -143,7 +261,7 @@ function UsersPanel() {
         ) : (
           <>
             {currentUsers.map((user) => (
-              <UserCard key={user.address} user={user} t={t} />
+              <UserCard key={user.address} user={user} t={t} onTransfer={onTransfer} />
             ))}
             {subTab === 'all' && nextCursor && (
               <button
@@ -551,35 +669,56 @@ export function SocialSidebar() {
   const [tab, setTab] = useState<MainTab>('chat');
   const onlineCount = useOnlineCount();
 
+  // Transfer modal state
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferRecipient, setTransferRecipient] = useState<SocialUser | null>(null);
+  const [transferCurrency, setTransferCurrency] = useState<'coin' | 'axm'>('coin');
+
+  const handleTransfer = useCallback((user: SocialUser, currency: 'coin' | 'axm') => {
+    setTransferRecipient(user);
+    setTransferCurrency(currency);
+    setTransferOpen(true);
+  }, []);
+
   const tabs: { key: MainTab; label: string }[] = [
     { key: 'chat', label: t('social.chat') },
     { key: 'users', label: `${t('social.users')}${onlineCount > 0 ? ` (${onlineCount})` : ''}` },
   ];
 
   return (
-    <aside className="hidden lg:flex flex-col w-80 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)] h-full min-h-0">
-      {/* Tabs */}
-      <div className="flex gap-1 px-2 py-2 border-b border-[var(--color-border)] shrink-0">
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${
-              tab === key
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <>
+      <aside className="hidden lg:flex flex-col w-80 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)] min-h-0 overflow-hidden">
+        {/* Tabs */}
+        <div className="flex gap-1 px-2 py-2 border-b border-[var(--color-border)] shrink-0">
+          {tabs.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${
+                tab === key
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 min-h-0">
-        {tab === 'users' ? <UsersPanel /> : <ChatPanel />}
-      </div>
-    </aside>
+        {/* Content */}
+        <div className="flex-1 min-h-0">
+          {tab === 'users' ? <UsersPanel onTransfer={handleTransfer} /> : <ChatPanel />}
+        </div>
+      </aside>
+
+      {/* Transfer Modal */}
+      <TransferModal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        initialRecipient={transferRecipient}
+        initialCurrency={transferCurrency}
+      />
+    </>
   );
 }
