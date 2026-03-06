@@ -940,6 +940,7 @@
     "withdrawal": "Withdrawn from vault",
     "eventPrize": "Prize #{rank} — {title}",
     "achievementClaim": "Achievement: {achievement}",
+    "branchChange": "Branch changed → {referrer}",
     "loadMore": "Load more",
     "noActivity": "No activity yet"
   },

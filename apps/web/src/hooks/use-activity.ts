@@ -4,7 +4,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { API_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 
-export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received' | 'deposit' | 'withdrawal' | 'event_prize' | 'achievement_claim';
+export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received' | 'deposit' | 'withdrawal' | 'event_prize' | 'achievement_claim' | 'branch_change';
 
 export interface ActivityItem {
   id: string;

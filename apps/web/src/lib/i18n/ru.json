@@ -940,6 +940,7 @@
     "withdrawal": "Вывод из хранилища",
     "eventPrize": "Приз #{rank} — {title}",
     "achievementClaim": "Ачивка: {achievement}",
+    "branchChange": "Смена ветки → {referrer}",
     "loadMore": "Загрузить ещё",
     "noActivity": "Пока нет активности"
   },

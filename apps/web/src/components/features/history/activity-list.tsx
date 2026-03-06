@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, Award, Medal } from 'lucide-react';
+import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, Award, Medal, Users } from 'lucide-react';
 import { GiOpenTreasureChest } from 'react-icons/gi';
 import Link from 'next/link';
 
@@ -120,6 +120,13 @@ const TYPE_CONFIG: Record<ActivityType, {
     borderClass: 'border-indigo-400/20',
     sign: '+',
   },
+  branch_change: {
+    icon: Users,
+    colorClass: 'text-amber-400',
+    bgClass: 'bg-amber-400/15',
+    borderClass: 'border-amber-400/20',
+    sign: '-',
+  },
 };
 
 function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?: Record<string, string | number>) => string }) {
@@ -187,6 +194,11 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
     case 'achievement_claim': {
       const achId = meta.achievementId as string;
       description = t('activity.achievementClaim', { achievement: t(`achievements.${achId}.name`) || achId });
+      break;
+    }
+    case 'branch_change': {
+      const newRef = (meta.newReferrerNickname as string) || truncAddr((meta.newReferrerAddress as string) ?? '');
+      description = t('activity.branchChange', { referrer: newRef });
       break;
     }
     default:

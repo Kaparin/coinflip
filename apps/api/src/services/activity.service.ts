@@ -9,7 +9,7 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
-export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received' | 'deposit' | 'withdrawal' | 'event_prize' | 'achievement_claim';
+export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received' | 'deposit' | 'withdrawal' | 'event_prize' | 'achievement_claim' | 'branch_change';
 
 export interface ActivityItem {
   id: string;
@@ -33,7 +33,7 @@ class ActivityService {
     // Build type filter
     const allowedTypes = options.types?.length
       ? options.types
-      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase', 'transfer_sent', 'transfer_received', 'deposit', 'withdrawal', 'event_prize', 'achievement_claim'];
+      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase', 'transfer_sent', 'transfer_received', 'deposit', 'withdrawal', 'event_prize', 'achievement_claim', 'branch_change'];
 
     const unionParts: ReturnType<typeof sql>[] = [];
 
@@ -292,6 +292,24 @@ class ActivityService {
           ) AS metadata
         FROM achievement_claims ac
         WHERE ac.user_id = ${userId}
+      `);
+    }
+
+    // Branch changes (referral tree switch)
+    if (allowedTypes.includes('branch_change')) {
+      unionParts.push(sql`
+        SELECT
+          'branch_change_' || tl.id AS id,
+          'branch_change' AS type,
+          tl.amount::text AS amount,
+          tl.created_at AS ts,
+          jsonb_build_object(
+            'newReferrerAddress', (SELECT u2.address FROM referrals r2 INNER JOIN users u2 ON u2.id = r2.referrer_user_id WHERE r2.user_id = ${userId} LIMIT 1),
+            'newReferrerNickname', (SELECT u2.profile_nickname FROM referrals r2 INNER JOIN users u2 ON u2.id = r2.referrer_user_id WHERE r2.user_id = ${userId} LIMIT 1)
+          ) AS metadata
+        FROM treasury_ledger tl
+        WHERE tl.source = 'branch_change_fee'
+          AND tl.txhash LIKE 'branch_change:' || ${userId} || ':%'
       `);
     }
 
