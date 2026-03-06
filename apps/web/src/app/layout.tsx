@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { AnimatedBackground } from '@/components/layout/animated-background';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000';
 const TITLE = 'Heads or Tails — PvP on Axiome';
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
+        <AnimatedBackground />
         <Providers>{children}</Providers>
       </body>
     </html>

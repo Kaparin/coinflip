@@ -16,6 +16,10 @@ html * {
   max-height: 1000000px;
 }
 
+html {
+  background: #08090d;
+}
+
 :root {
   --color-bg: #0a0a0a;
   --color-surface: #141414;
@@ -31,7 +35,7 @@ html * {
 }
 
 body {
-  background: var(--color-bg);
+  background: transparent;
   color: var(--color-text);
   font-family: system-ui, -apple-system, sans-serif;
 }
@@ -175,6 +179,42 @@ body {
   50%  { transform: scale(1.15); }
   100% { transform: scale(1); }
 }
+
+/* ============================
+   ANIMATED BACKGROUND ORBS
+   GPU-accelerated via transform only
+   ============================ */
+
+@keyframes bgOrb1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%      { transform: translate(40px, 30px) scale(1.05); }
+  50%      { transform: translate(20px, -20px) scale(0.95); }
+  75%      { transform: translate(-30px, 15px) scale(1.02); }
+}
+
+@keyframes bgOrb2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30%      { transform: translate(-35px, -25px) scale(1.08); }
+  60%      { transform: translate(25px, 20px) scale(0.93); }
+  80%      { transform: translate(-15px, -10px) scale(1.03); }
+}
+
+@keyframes bgOrb3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.05; }
+  40%      { transform: translate(-20px, 30px) scale(1.1); opacity: 0.07; }
+  70%      { transform: translate(15px, -15px) scale(0.9); opacity: 0.04; }
+}
+
+@keyframes bgOrb4 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.04; }
+  35%      { transform: translate(30px, -20px) scale(1.06); opacity: 0.06; }
+  65%      { transform: translate(-25px, 25px) scale(0.94); opacity: 0.03; }
+}
+
+.animate-bg-orb-1 { animation: bgOrb1 25s ease-in-out infinite; }
+.animate-bg-orb-2 { animation: bgOrb2 20s ease-in-out infinite; }
+.animate-bg-orb-3 { animation: bgOrb3 22s ease-in-out infinite; }
+.animate-bg-orb-4 { animation: bgOrb4 28s ease-in-out infinite; }
 
 /* ============================
    ANIMATION UTILITY CLASSES
