@@ -300,19 +300,39 @@ authRouter.get('/grants', authMiddleware, async (c) => {
   let feeGrantActive = false;
 
   // Query chain for authz grants: granter=user, grantee=relayer
+  // IMPORTANT: Must verify the grant covers the ACTIVE contract, not just any contract.
+  // After switching from CW20→AXM mode, old grants point to the wrong contract.
   try {
+    const activeContract = getActiveContractAddr();
     const authzResult = await chainCached(
-      'grants:' + address,
+      'grants:' + address + ':' + activeContract,
       async () => {
         const grantsRes = await chainRest(`/cosmos/authz/v1beta1/grants?granter=${address}&grantee=${env.RELAYER_ADDRESS}&msg_type_url=/cosmwasm.wasm.v1.MsgExecuteContract`);
         if (!grantsRes.ok) return { authzGranted: false, authzExpiresAt: null };
         const grantsData = (await grantsRes.json()) as {
-          grants?: Array<{ expiration?: string; authorization?: { type_url: string } }>;
+          grants?: Array<{
+            expiration?: string;
+            authorization?: {
+              '@type'?: string;
+              grants?: Array<{ contract?: string }>;
+            };
+          }>;
         };
         const grants = grantsData.grants ?? [];
+        // Check if any grant covers the active contract address
+        let coversActiveContract = false;
+        let expiresAt: string | null = null;
+        for (const grant of grants) {
+          expiresAt = grant.expiration ?? expiresAt;
+          const innerGrants = grant.authorization?.grants ?? [];
+          if (innerGrants.some(g => g.contract === activeContract)) {
+            coversActiveContract = true;
+            break;
+          }
+        }
         return {
-          authzGranted: grants.length > 0,
-          authzExpiresAt: grants[0]?.expiration ?? null,
+          authzGranted: coversActiveContract,
+          authzExpiresAt: expiresAt,
         };
       },
       300_000,
