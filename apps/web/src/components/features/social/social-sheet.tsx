@@ -167,7 +167,7 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
 
 function ChatTab() {
   const { t } = useTranslation();
-  const { address, isConnected } = useWalletContext();
+  const { isConnected } = useWalletContext();
   const { messages, loading, sendMessage, messagesEndRef } = useChat(true);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -253,7 +253,7 @@ function ChatTab() {
         ) : (
           <div className="space-y-1">
             {messages.map((msg) => (
-              <ChatBubble key={msg.id} msg={msg} isMe={msg.address === address} />
+              <ChatBubble key={msg.id} msg={msg} />
             ))}
           </div>
         )}
@@ -294,34 +294,23 @@ function ChatTab() {
   );
 }
 
-function ChatBubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
+function ChatBubble({ msg }: { msg: ChatMessage }) {
   return (
-    <div className={`flex gap-2 py-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+    <div className="flex items-start gap-2 py-1">
       <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
-        <UserAvatar address={msg.address} size={28} />
+        <UserAvatar address={msg.address} size={24} />
       </Link>
-      <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <Link
-            href={`/game/profile/${msg.address}`}
-            className={`text-[10px] font-semibold hover:underline ${
-              getVipNameClass(msg.vipTier, null)
-            }`}
-          >
-            {msg.nickname || shortAddr(msg.address)}
-          </Link>
-          {msg.vipTier && <VipBadge tier={msg.vipTier} />}
-          <span className="text-[9px] text-[var(--color-text-secondary)]">{formatTime(msg.createdAt)}</span>
-        </div>
-        <div
-          className={`rounded-xl px-3 py-1.5 text-xs break-words ${
-            isMe
-              ? 'bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/20'
-              : 'bg-[var(--color-bg)] border border-[var(--color-border)]'
-          }`}
+      <div className="min-w-0 flex-1 text-xs leading-relaxed">
+        <Link
+          href={`/game/profile/${msg.address}`}
+          className={`font-semibold hover:underline ${getVipNameClass(msg.vipTier, null)}`}
         >
-          {msg.message}
-        </div>
+          {msg.nickname || shortAddr(msg.address)}
+        </Link>
+        {msg.vipTier && <>{' '}<VipBadge tier={msg.vipTier} /></>}
+        <span className="text-[9px] text-[var(--color-text-secondary)] ml-1">{formatTime(msg.createdAt)}</span>
+        <span className="text-[var(--color-text-secondary)] mx-1">·</span>
+        <span className="break-words">{msg.message}</span>
       </div>
     </div>
   );
