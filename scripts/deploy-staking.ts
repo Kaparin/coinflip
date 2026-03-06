@@ -23,9 +23,8 @@ dotenv.config({ path: resolve(import.meta.dirname!, "../.env") });
 
 const RPC_URL = process.env.AXIOME_RPC_URL!;
 const MNEMONIC = process.env.RELAYER_MNEMONIC!;
-const LAUNCH_CW20 =
-  process.env.LAUNCH_CW20_ADDR ||
-  "axm1zvjnc08uy0zz43m0nlh9f5aetpa3amn6a034yqvmsgvzshk9clds375xx9";
+/** LAUNCH token (NOT the game COIN token in LAUNCH_CW20_ADDR) */
+const LAUNCH_CW20 = "axm1zvjnc08uy0zz43m0nlh9f5aetpa3amn6a034yqvmsgvzshk9clds375xx9";
 
 const WASM_PATH = resolve(
   import.meta.dirname!,
@@ -43,7 +42,6 @@ async function main() {
   for (const [name, val] of Object.entries({
     AXIOME_RPC_URL: RPC_URL,
     RELAYER_MNEMONIC: MNEMONIC,
-    LAUNCH_CW20_ADDR: LAUNCH_CW20,
   })) {
     if (!val) throw new Error(`Missing env variable: ${name}`);
   }
