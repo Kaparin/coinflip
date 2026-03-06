@@ -166,20 +166,21 @@ export function useActiveDuels() {
           // Set winner immediately (needed for avatar-merge stop angle) + resolving phase
           setDuel(betId, { ...duel, phase: 'resolving', winner: winner ?? null });
 
-          // resolving(0) → avatar-merge(+800ms) → winner-reveal(+3800ms) → fade-out(+13800ms) → remove
+          // resolving(0) → avatar-merge(+800ms) → winner-reveal(+9000ms) → fade-out(+19000ms) → remove
+          // The 3D coin flip animation is 8s, so avatar-merge→winner-reveal needs ~8.2s
           const t1 = setTimeout(() => updatePhase(betId, 'avatar-merge'), 800);
           timersRef.current.set(`${betId}-merge`, t1);
 
           const t2 = setTimeout(() => {
             if (winner) revealWinner(betId, winner);
-          }, 3800);
+          }, 9000);
           timersRef.current.set(`${betId}-reveal`, t2);
 
           const t3 = setTimeout(() => {
             updatePhase(betId, 'fade-out');
             const t4 = setTimeout(() => removeDuel(betId), REMOVE_DELAY);
             timersRef.current.set(`${betId}-remove`, t4);
-          }, 13800);
+          }, 19000);
           timersRef.current.set(`${betId}-fadeout`, t3);
         }
         break;

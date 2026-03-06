@@ -206,7 +206,9 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
   return (
     <div
-      className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 overflow-hidden ${
+      className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 ${
+        isMergingPhase ? 'overflow-visible' : 'overflow-hidden'
+      } ${
         isFading ? 'animate-duel-fade-out' : `animate-fade-up ${isWinnerReveal ? 'animate-duel-border-glow-winner' : 'animate-duel-border-glow'}`
       }`}
     >
@@ -421,13 +423,21 @@ function Coin3DScene({
 
   return (
     <div className="flex flex-col items-center">
-      <div className={isWinnerReveal ? 'animate-duel-coin-winner-glow' : ''}>
+      {/* CSS handles vertical toss motion + scale; Three.js handles rotation only */}
+      <div className={`transition-transform ${
+        isMergingPhase ? 'animate-duel-3d-coin-toss' : ''
+      } ${isWinnerReveal ? 'animate-duel-coin-winner-glow' : ''}`}>
         <Coin3D
           state={coinState}
           result={coinResult}
           size={isWinnerReveal ? 100 : 88}
           spinSpeed={1.5}
           cameraPosition={[0, 3, 4.2]}
+          flipDuration={8}
+          totalSpins={12}
+          verticalMotion={false}
+          makerAddress={duel.maker}
+          acceptorAddress={duel.acceptor}
         />
       </div>
       {isWinnerReveal && duel.winner && (
