@@ -211,6 +211,7 @@
     "acceptBetTitle": "Accept Bet?",
     "acceptingBtn": "Accepting...",
     "acceptBetBtn": "Accept Bet",
+    "yourBalance": "Your balance",
     "insufficientForAccept": "Insufficient balance. You need {amount} COIN (available: {available}).",
     "insufficientTitle": "Insufficient Balance",
     "insufficientRequired": "Required",

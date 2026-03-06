@@ -211,6 +211,7 @@
     "acceptBetTitle": "Принять ставку?",
     "acceptingBtn": "Принятие...",
     "acceptBetBtn": "Принять ставку",
+    "yourBalance": "Ваш баланс",
     "insufficientForAccept": "Недостаточно средств. Нужно {amount} COIN (доступно: {available}).",
     "insufficientTitle": "Недостаточно средств",
     "insufficientRequired": "Требуется",

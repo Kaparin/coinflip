@@ -73,7 +73,7 @@ async function queryTxViaRpc(txHash: string): Promise<TxPollResult | null> {
  *  Uses progressive intervals: starts fast (500ms) and backs off to cap. */
 async function pollForTx(
   txHash: string,
-  maxMs = 40_000,
+  maxMs = 60_000,
   startIntervalMs = 500,
 ): Promise<TxPollResult | null> {
   const start = Date.now();
@@ -456,7 +456,7 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
           } catch (err) {
             logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
           }
-        }, 60_000);
+        }, 15_000);
 
         return;
       }

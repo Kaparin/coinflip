@@ -16,6 +16,7 @@ import {
 } from '@coinflip/shared/constants';
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { usePendingBalance } from '@/contexts/pending-balance-context';
+import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
 import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { GameTokenIcon } from '@/components/ui';
 import { InsufficientBalanceModal } from '@/components/features/vault/insufficient-balance-modal';
@@ -31,14 +32,16 @@ import type { ActiveDuel } from '@/hooks/use-active-duels';
 
 type AmountFilter = 'all' | 'low' | 'mid' | 'high';
 
-function extractError(err: unknown): { msg: string; is429: boolean; isCanceled: boolean; isClaimed: boolean; isGone: boolean } {
-  const { message: msg } = extractErrorPayload(err);
+function extractError(err: unknown): { msg: string; code?: string; is429: boolean; isCanceled: boolean; isClaimed: boolean; isGone: boolean; isInsufficientBalance: boolean } {
+  const { message: msg, code } = extractErrorPayload(err);
   return {
     msg: msg || 'Unknown error',
+    code,
     is429: isActionInProgress(msg),
     isCanceled: isBetCanceled(msg),
     isClaimed: isBetClaimed(msg),
     isGone: isBetGone(msg),
+    isInsufficientBalance: code === 'INSUFFICIENT_BALANCE' || msg.includes('INSUFFICIENT_BALANCE') || msg.includes('insufficient balance'),
   };
 }
 
@@ -63,6 +66,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const { openDeposit } = useDepositTrigger();
   const { data: grantStatus } = useGrantStatus();
   const oneClickEnabled = grantStatus?.authz_granted ?? false;
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -253,8 +257,16 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
             return next;
           });
         }
-        const { is429, isCanceled, isClaimed, isGone } = extractError(err);
-        if (isCanceled || isGone) {
+        const { is429, isCanceled, isClaimed, isGone, isInsufficientBalance } = extractError(err);
+        if (isInsufficientBalance) {
+          // Show insufficient balance modal with deposit button
+          const bet = betId ? bets.find(b => String(b.id) === betId) : null;
+          setInsufficientInfo({
+            required: bet?.amount ?? '0',
+            available: String(rawAvailableMicro),
+          });
+          invalidateAll();
+        } else if (isCanceled || isGone) {
           addToast('warning', t('bets.betUnavailable'));
           invalidateAll();
         } else if (isClaimed) {
@@ -527,6 +539,8 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
         {acceptTarget && (() => {
           const humanAmount = fromMicroLaunch(acceptTarget.amount);
           const winAmount = humanAmount * 2 * (1 - COMMISSION_BPS / 10000);
+          const betMicro = BigInt(acceptTarget.amount);
+          const hasEnough = availableMicro >= betMicro;
           return (
             <div className="space-y-4">
               {/* Bet amount */}
@@ -534,6 +548,14 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
                 <span className="text-sm text-[var(--color-text-secondary)]">{t('history.betAmount')}</span>
                 <span className="flex items-center gap-1.5 text-lg font-bold tabular-nums">
                   {formatLaunch(acceptTarget.amount)} <GameTokenIcon size={18} />
+                </span>
+              </div>
+
+              {/* Your balance */}
+              <div className={`flex items-center justify-between rounded-lg p-3 ${hasEnough ? 'bg-[var(--color-bg)]' : 'bg-red-500/5 border border-red-500/10'}`}>
+                <span className="text-sm text-[var(--color-text-secondary)]">{t('bets.yourBalance')}</span>
+                <span className={`flex items-center gap-1.5 text-lg font-bold tabular-nums ${hasEnough ? '' : 'text-red-400'}`}>
+                  {formatLaunch(String(availableMicro))} <GameTokenIcon size={18} />
                 </span>
               </div>
 
@@ -565,13 +587,23 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
                 >
                   {t('common.cancel')}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmAccept}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98]"
-                >
-                  {t('bets.acceptBetBtn')}
-                </button>
+                {hasEnough ? (
+                  <button
+                    type="button"
+                    onClick={handleConfirmAccept}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98]"
+                  >
+                    {t('bets.acceptBetBtn')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setAcceptTarget(null); setTimeout(() => openDeposit(), 250); }}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-3 text-sm font-bold text-white transition-all hover:from-amber-400 hover:to-amber-500 active:scale-[0.98]"
+                  >
+                    {t('bets.insufficientDeposit')}
+                  </button>
+                )}
               </div>
             </div>
           );
