@@ -358,7 +358,7 @@ function CoinDropBubble({
             className="rounded-full" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-black text-amber-400">{formatLaunch(drop.amount)} COIN</div>
+          <div className="flex items-center gap-1 text-sm font-black text-amber-400">{formatLaunch(drop.amount)} <LaunchTokenIcon size={14} className="shrink-0" /></div>
           {isClaimed && (
             <p className="text-[9px] text-[var(--color-text-secondary)]">{drop.claimedByNickname || shortAddr(drop.claimedBy!)}</p>
           )}
@@ -622,7 +622,7 @@ function ChatPanel() {
                       className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[9px] font-semibold transition-all border ${
                         style === key ? `bg-gradient-to-b ${g} text-white border-transparent` : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-amber-500/30'}`}>
                       <span>{label}</span>
-                      <span className="text-[8px]">{formatLaunch(price)}</span>
+                      <span className="flex items-center justify-center gap-0.5 text-[8px]">{formatLaunch(price)} <LaunchTokenIcon size={10} className="shrink-0" /></span>
                     </button>
                   ))}
                   <button type="button" onClick={() => { setShowDrop(!showDrop); setStyle(null); setEffect(null); }}
@@ -639,7 +639,7 @@ function ChatPanel() {
                         className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg py-1 text-[9px] font-semibold border ${
                           effect === key ? 'bg-[var(--color-primary)]/20 border-[var(--color-primary)]' : 'border-[var(--color-border)] text-[var(--color-text-secondary)]'}`}>
                         {key === 'confetti' ? '🎉' : key === 'coins' ? '🪙' : '🔥'}
-                        <span className="text-[8px]">+{formatLaunch(prices.effect)}</span>
+                        <span className="flex items-center gap-0.5 text-[8px]">+{formatLaunch(prices.effect)} <LaunchTokenIcon size={10} className="shrink-0" /></span>
                       </button>
                     ))}
                   </div>
@@ -667,7 +667,7 @@ function ChatPanel() {
                     onClick={() => { if (Number(dropAmount) >= 1) handleCoinDrop(Number(dropAmount), dropMsg || undefined); }}
                     className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-30">
                     {sending ? <Loader2 size={10} className="animate-spin" /> : <Gift size={10} />}
-                    {dropAmount || '0'}
+                    <span className="flex items-center gap-0.5">{dropAmount || '0'} {dropAmount && <LaunchTokenIcon size={10} className="shrink-0" />}</span>
                   </button>
                 </div>
               </div>
@@ -694,7 +694,7 @@ function ChatPanel() {
                   className={`flex h-8 shrink-0 items-center justify-center rounded-lg text-white transition-all active:scale-95 disabled:opacity-30 ${
                     totalCost > 0 ? 'bg-gradient-to-r from-amber-500 to-yellow-600 gap-1 px-2.5' : 'bg-[var(--color-primary)] w-8'}`}>
                   {sending ? <Loader2 size={14} className="animate-spin" /> : totalCost > 0 ? (
-                    <><Send size={12} /><span className="text-[9px] font-bold">{formatLaunch(totalCost)}</span></>
+                    <><Send size={12} /><span className="flex items-center gap-0.5 text-[9px] font-bold">{formatLaunch(totalCost)} <LaunchTokenIcon size={10} className="shrink-0" /></span></>
                   ) : <Send size={14} />}
                 </button>
               </div>

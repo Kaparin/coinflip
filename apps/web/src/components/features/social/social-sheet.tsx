@@ -382,7 +382,7 @@ function CoinDropBubble({
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-black text-amber-400">{formatLaunch(drop.amount)} COIN</div>
+          <div className="flex items-center gap-1.5 text-lg font-black text-amber-400">{formatLaunch(drop.amount)} <LaunchTokenIcon size={18} className="shrink-0" /></div>
           {msg.message && msg.message !== `${formatLaunch(drop.amount)} COIN` && (
             <p className="text-xs text-[var(--color-text-secondary)] truncate">{msg.message}</p>
           )}
@@ -509,8 +509,9 @@ function PremiumSelector({
               }`}
             >
               <span className="text-[11px]">{label}</span>
-              <span className={`text-[9px] ${active ? 'text-white/80' : 'text-[var(--color-text-secondary)]'}`}>
-                {formatLaunch(price)} COIN
+              <span className={`flex items-center justify-center gap-0.5 ${active ? 'text-white/80' : 'text-[var(--color-text-secondary)]'}`}>
+                <span className="text-[9px]">{formatLaunch(price)}</span>
+                <LaunchTokenIcon size={10} className="shrink-0" />
               </span>
             </button>
           );
@@ -544,7 +545,7 @@ function PremiumSelector({
                 }`}
               >
                 <span>{emoji}</span>
-                <span className="text-[9px]">+{formatLaunch(prices!.effect)}</span>
+                <span className="flex items-center gap-0.5 text-[9px]">+{formatLaunch(prices!.effect)} <LaunchTokenIcon size={10} className="shrink-0" /></span>
               </button>
             );
           })}
@@ -616,7 +617,7 @@ function CoinDropInput({
           className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-bold text-white transition-all hover:from-emerald-400 hover:to-teal-400 active:scale-95 disabled:opacity-30 shadow-lg shadow-emerald-500/20"
         >
           {sending ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
-          <span>{amount ? `${amount} COIN` : 'Drop'}</span>
+          <span className="flex items-center gap-1">{amount ? <>{amount} <LaunchTokenIcon size={12} className="shrink-0" /></> : 'Drop'}</span>
         </button>
       </div>
     </div>
@@ -911,7 +912,7 @@ function ChatTab() {
                   ) : totalCost > 0 ? (
                     <>
                       <Send size={14} />
-                      <span className="text-[10px] font-bold">{formatLaunch(totalCost)}</span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold">{formatLaunch(totalCost)} <LaunchTokenIcon size={12} className="shrink-0" /></span>
                     </>
                   ) : (
                     <Send size={16} />
