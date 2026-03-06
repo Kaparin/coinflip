@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Trophy, Users, Target, User, Eye, Clock, BarChart3 } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { GameTokenIcon } from '@/components/ui';
+import { AxmTokenIcon, GameTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
@@ -73,6 +73,8 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
   const isCompleted = event.status === 'completed' || event.status === 'calculating';
   const isLive = isActive || isUpcoming;
 
+  const isSponsored = !!event.sponsorAddress;
+  const PrizeIcon = isSponsored ? GameTokenIcon : AxmTokenIcon;
   const TypeIcon = event.type === 'contest' ? Target : Trophy;
 
   const typeBadge = event.type === 'contest'
@@ -97,7 +99,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <GameTokenIcon size={16} />
+          <PrizeIcon size={16} />
         </div>
       </Link>
     );
@@ -222,7 +224,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
         <div className="flex items-center gap-1.5">
           <Trophy size={12} className="text-[var(--color-warning)]" />
           <span className="text-sm font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-          <GameTokenIcon size={16} />
+          <PrizeIcon size={16} />
         </div>
       </div>
     </Link>

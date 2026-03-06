@@ -106,7 +106,7 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
               {r.description && <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{r.description}</div>}
               <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] text-[var(--color-text-secondary)]">
                 <span>{fmtDate(r.startsAt)} — {fmtDate(r.endsAt)}</span>
-                <span className="font-bold text-[var(--color-success)]">Приз: {formatLaunch(r.totalPrizePool)} {GAME_TOKEN}</span>
+                <span className="font-bold text-[var(--color-success)]">Приз: {formatLaunch(r.totalPrizePool)} {GAME_TOKEN} (виртуальный)</span>
                 {r.pricePaid && <span>Оплата: {formatLaunch(r.pricePaid)} {GAME_TOKEN}</span>}
               </div>
               {(r.sponsorNickname || r.sponsorAddress) && (
@@ -868,7 +868,7 @@ export function EventsTab() {
 
           {/* Prize Pool */}
           <div>
-            <label className={labelCls}>Призовой фонд ({GAME_TOKEN})</label>
+            <label className={labelCls}>Призовой фонд (AXM)</label>
             <input
               value={formPrizePool}
               onChange={(e) => setFormPrizePool(e.target.value)}
@@ -909,7 +909,7 @@ export function EventsTab() {
                     : 'text-[var(--color-text-secondary)]'
                 }`}
               >
-                Итого: {prizesTotal} / {formPrizePool || '0'} {GAME_TOKEN}
+                Итого: {prizesTotal} / {formPrizePool || '0'} AXM
               </span>
             </div>
 
@@ -927,7 +927,7 @@ export function EventsTab() {
                     type="number"
                     min="1"
                   />
-                  <span className="text-[10px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</span>
+                  <span className="text-[10px] text-[var(--color-text-secondary)]">AXM</span>
                   <button
                     type="button"
                     onClick={() => removePrize(index)}
@@ -1073,7 +1073,7 @@ export function EventsTab() {
                     <span className="font-bold">Конец:</span> {fmtDate(detailEvent.endsAt)}
                   </div>
                   <div>
-                    <span className="font-bold">Призовой фонд:</span> {formatLaunch(detailEvent.totalPrizePool)} {GAME_TOKEN}
+                    <span className="font-bold">Призовой фонд:</span> {formatLaunch(detailEvent.totalPrizePool)} AXM
                   </div>
                   <div>
                     <span className="font-bold">Участников:</span> {detailEvent.participantCount}
@@ -1261,7 +1261,7 @@ export function EventsTab() {
                             <td className="px-2 py-1.5 font-bold">#{w.finalRank ?? idx + 1}</td>
                             <td className="px-2 py-1.5 font-mono">{shortAddr(w.address)}</td>
                             <td className="px-2 py-1.5 text-right">
-                              {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} ${GAME_TOKEN}` : '-'}
+                              {w.prizeAmount ? `${formatLaunch(w.prizeAmount)} AXM` : '-'}
                             </td>
                             <td className="px-2 py-1.5 text-center">
                               {w.prizeTxHash ? (
@@ -1339,7 +1339,7 @@ export function EventsTab() {
                         {fmtDate(event.startsAt)} &mdash; {fmtDate(event.endsAt)}
                       </span>
                       <span>{event.participantCount} участн.</span>
-                      <span>Приз: {formatLaunch(event.totalPrizePool)} {GAME_TOKEN}</span>
+                      <span>Приз: {formatLaunch(event.totalPrizePool)} AXM</span>
                     </div>
                     {configStr && (
                       <div className="mt-1 text-[10px] italic text-[var(--color-text-secondary)]">{configStr}</div>

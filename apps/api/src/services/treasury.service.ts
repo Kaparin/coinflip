@@ -168,65 +168,43 @@ export class TreasuryService {
   }
 
   /**
-   * Send tokens from treasury wallet to a recipient address.
-   * AXM mode: native MsgSend. COIN mode: CW20 transfer.
-   * If the treasury wallet doesn't have enough, auto-withdraws from vault first.
+   * Send native AXM prize from treasury wallet to a recipient address.
+   * Prizes are ALWAYS in native AXM regardless of GAME_CURRENCY mode.
+   * Checks treasury wallet's native AXM balance before sending.
    */
   async sendPrize(
     recipientAddress: string,
     amount: string,
-  ): Promise<{ txHash: string; amount: string; withdrawTxHash?: string }> {
+  ): Promise<{ txHash: string; amount: string }> {
     if (!relayerService.isReady()) {
       throw Errors.relayerNotReady();
     }
 
-    const amountBig = BigInt(amount);
-    let withdrawTxHash: string | undefined;
-
-    // Step 1: Check wallet balance, auto-withdraw from vault if needed
-    const balance = await this.getBalance();
-    const walletBig = BigInt(balance.walletBalance);
-
-    if (walletBig < amountBig) {
-      const deficit = amountBig - walletBig;
-      // Need to withdraw at least the deficit from vault
-      const vaultBig = BigInt(balance.vaultAvailable);
-      if (vaultBig + walletBig < amountBig) {
-        throw Errors.insufficientBalance(
-          amount,
-          (vaultBig + walletBig).toString(),
-        );
+    // Check treasury native AXM balance
+    let walletBalance = '0';
+    try {
+      const res = await chainRest(
+        `/cosmos/bank/v1beta1/balances/${env.TREASURY_ADDRESS}/by_denom?denom=${env.AXM_DENOM}`,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { balance: { amount: string } };
+        walletBalance = data.balance.amount;
       }
-
-      logger.info(
-        { deficit: deficit.toString(), vaultAvailable: balance.vaultAvailable },
-        'Treasury wallet insufficient for prize, withdrawing from vault',
-      );
-
-      const withdrawResult = await this.withdrawFromVault(deficit.toString());
-      withdrawTxHash = withdrawResult.txHash;
+    } catch (err) {
+      logger.warn({ err }, 'Failed to query treasury native AXM balance for prize');
     }
 
-    // Step 2: Transfer tokens from treasury to recipient
-    let result;
-    if (isAxmMode()) {
-      // AXM mode: direct native MsgSend from treasury (relayer) wallet
-      result = await relayerService.relayNativeSend(
-        recipientAddress,
-        amount,
-        env.AXM_DENOM,
-        'CoinFlip event prize',
-      );
-    } else {
-      // COIN mode: CW20 transfer from treasury to recipient
-      result = await relayerService.relayCw20Transfer(
-        env.TREASURY_ADDRESS,
-        env.LAUNCH_CW20_ADDR,
-        recipientAddress,
-        amount,
-        'CoinFlip event prize',
-      );
+    if (BigInt(walletBalance) < BigInt(amount)) {
+      throw Errors.insufficientBalance(amount, walletBalance);
     }
+
+    // Send native AXM via MsgSend
+    const result = await relayerService.relayNativeSend(
+      recipientAddress,
+      amount,
+      env.AXM_DENOM,
+      'CoinFlip event prize',
+    );
 
     if (!result.success) {
       logger.error({ result, recipientAddress, amount }, 'Prize transfer failed');
@@ -240,11 +218,11 @@ export class TreasuryService {
     }
 
     logger.info(
-      { txHash: result.txHash, recipientAddress, amount, withdrawTxHash },
-      'Prize sent to recipient wallet',
+      { txHash: result.txHash, recipientAddress, amount },
+      'AXM prize sent to recipient wallet',
     );
 
-    return { txHash: result.txHash!, amount, withdrawTxHash };
+    return { txHash: result.txHash!, amount };
   }
 
   /**

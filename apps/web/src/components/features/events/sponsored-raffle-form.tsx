@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, X, Send, Loader2, CheckCircle } from 'lucide-react';
-import { GameTokenIcon } from '@/components/ui';
+import { GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
 import { useTranslation } from '@/lib/i18n';
 import { useSponsoredRaffleConfig, useSubmitSponsoredRaffle } from '@/hooks/use-sponsored-raffle';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';

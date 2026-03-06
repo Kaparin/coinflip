@@ -43,3 +43,19 @@ export function GameTokenIcon({ size = 16, className = '' }: LaunchTokenIconProp
   }
   return <LaunchTokenIcon size={size} className={className} />;
 }
+
+/**
+ * AXM token icon — always shows AXM regardless of GAME_CURRENCY mode.
+ * Use for prizes (events, raffles) which are always in native AXM.
+ */
+export function AxmTokenIcon({ size = 16, className = '' }: LaunchTokenIconProps) {
+  return (
+    <Image
+      src={AXM_LOGO}
+      alt="AXM"
+      width={size}
+      height={size}
+      className={`inline-block align-middle object-cover shrink-0 rounded-full ${className}`}
+    />
+  );
+}

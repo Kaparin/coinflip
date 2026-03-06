@@ -2,7 +2,7 @@
 
 import { useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { GameTokenIcon, UserAvatar } from '@/components/ui';
+import { AxmTokenIcon, GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -11,6 +11,7 @@ import { Trophy, CheckCircle, Crown } from 'lucide-react';
 interface EventResultsProps {
   eventId: string;
   eventType?: string;
+  isSponsored?: boolean;
 }
 
 const RANK_ICONS = ['', '\u{1F947}', '\u{1F948}', '\u{1F949}'];
@@ -27,7 +28,7 @@ function getWinnerStyle(rank: number): string {
   return '';
 }
 
-export function EventResults({ eventId }: EventResultsProps) {
+export function EventResults({ eventId, isSponsored }: EventResultsProps) {
   const { t } = useTranslation();
   const { data, isLoading } = useGetEventResults(eventId, {
     query: { staleTime: 60_000 },
@@ -101,7 +102,7 @@ export function EventResults({ eventId }: EventResultsProps) {
               <span className={`font-bold text-[var(--color-success)] ${isFirst ? 'text-base' : 'text-sm'}`}>
                 {formatLaunch(amount)}
               </span>
-              <GameTokenIcon size={isFirst ? 18 : 16} />
+              {isSponsored ? <GameTokenIcon size={isFirst ? 18 : 16} /> : <AxmTokenIcon size={isFirst ? 18 : 16} />}
               {txHash && (
                 <CheckCircle size={14} className="text-[var(--color-success)] animate-scale-in" />
               )}

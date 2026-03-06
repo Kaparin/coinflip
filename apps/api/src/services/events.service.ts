@@ -801,19 +801,34 @@ class EventsService {
   }
 
   async distributePrize(eventId: string, userId: string): Promise<void> {
+    const event = await this.getEventById(eventId);
+    if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+
     const winners = await this.getWinnersForDistribution(eventId);
     const winner = winners.find((w) => w.userId === userId);
     if (!winner) throw new AppError('WINNER_NOT_FOUND', 'Winner not found for this event', 404);
     if (winner.prizeTxHash) throw new AppError('ALREADY_DISTRIBUTED', 'Prize already distributed', 400);
     if (!winner.prizeAmount) throw new AppError('NO_PRIZE', 'No prize amount set', 400);
 
-    // Send real CW20 tokens from treasury to winner's wallet
-    const result = await treasuryService.sendPrize(winner.address, winner.prizeAmount);
-    await this.markPrizeDistributed(eventId, userId, result.txHash);
-    logger.info(
-      { eventId, userId, address: winner.address, amount: winner.prizeAmount, txHash: result.txHash },
-      'Prize distributed via CW20 transfer',
-    );
+    const isSponsored = !!event.userId;
+
+    if (isSponsored) {
+      // Sponsored raffle: credit COIN to winner's vault balance (virtual)
+      await vaultService.creditWinner(winner.userId, winner.prizeAmount);
+      await this.markPrizeDistributed(eventId, userId, `coin_credit_${eventId}_${userId}`);
+      logger.info(
+        { eventId, userId, amount: winner.prizeAmount },
+        'Sponsored prize credited as COIN to winner vault balance',
+      );
+    } else {
+      // Admin event: send native AXM from treasury wallet
+      const result = await treasuryService.sendPrize(winner.address, winner.prizeAmount);
+      await this.markPrizeDistributed(eventId, userId, result.txHash);
+      logger.info(
+        { eventId, userId, address: winner.address, amount: winner.prizeAmount, txHash: result.txHash },
+        'Prize distributed via native AXM transfer',
+      );
+    }
   }
 
   async distributeAllPrizes(eventId: string): Promise<{ distributed: number; failed: number }> {
