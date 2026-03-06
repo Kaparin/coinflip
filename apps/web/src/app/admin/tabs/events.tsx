@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw, User } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
-import { GAME_TOKEN } from '@/lib/constants';
+
 import { useAdminPendingSponsoredRaffles, useAdminApproveSponsoredRaffle, useAdminRejectSponsoredRaffle } from '@/hooks/use-admin';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -106,8 +106,8 @@ function PendingSponsoredRaffles({ onRefreshEvents }: { onRefreshEvents: () => v
               {r.description && <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{r.description}</div>}
               <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] text-[var(--color-text-secondary)]">
                 <span>{fmtDate(r.startsAt)} — {fmtDate(r.endsAt)}</span>
-                <span className="font-bold text-[var(--color-success)]">Приз: {formatLaunch(r.totalPrizePool)} {GAME_TOKEN} (виртуальный)</span>
-                {r.pricePaid && <span>Оплата: {formatLaunch(r.pricePaid)} {GAME_TOKEN}</span>}
+                <span className="font-bold text-[var(--color-success)]">Приз: {formatLaunch(r.totalPrizePool)} COIN (виртуальный)</span>
+                {r.pricePaid && <span>Оплата: {formatLaunch(r.pricePaid)} COIN</span>}
               </div>
               {(r.sponsorNickname || r.sponsorAddress) && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--color-text-secondary)]">

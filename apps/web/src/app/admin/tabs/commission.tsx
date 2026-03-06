@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PieChart, Plus, Trash2, Loader2 } from 'lucide-react';
+import { PieChart, Plus, Trash2, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
   useAdminCommissionBreakdown,
@@ -11,15 +11,17 @@ import {
   useAdminDeletePartner,
   useAdminConfig,
   useAdminUpdateConfig,
+  useAdminEconomyOverview,
   type AdminPartner,
 } from '@/hooks/use-admin';
-import { StatCard, TableWrapper, ActionButton, shortAddr, timeAgo } from '../_shared';
+import { StatCard, TableWrapper, ActionButton, shortAddr } from '../_shared';
 
 export function CommissionTab() {
   const { data: breakdown, isLoading: breakdownLoading } = useAdminCommissionBreakdown();
   const { data: partners, isLoading: partnersLoading } = useAdminPartners();
   const { data: allConfig } = useAdminConfig();
   const updateConfig = useAdminUpdateConfig();
+  const economy = useAdminEconomyOverview();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function CommissionTab() {
   }
 
   const bd = breakdown?.breakdown;
+  const eco = economy.data;
 
   const startEditReferral = () => {
     if (!allConfig) return;
@@ -74,7 +77,95 @@ export function CommissionTab() {
 
   return (
     <div className="space-y-6">
-      {/* Commission Breakdown */}
+      {/* ═══ Financial P&L ═══ */}
+      {eco && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <TrendingUp size={16} className="text-emerald-400" />
+            Финансовый отчёт (AXM)
+          </h3>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-4">
+            {/* Income */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1">
+                <TrendingUp size={12} /> Доходы
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <StatCard
+                  label="Комиссия со ставок"
+                  value={formatLaunch(eco.axm.commissionEarned)}
+                  sub={`${eco.axm.commissionEntries} записей`}
+                />
+                <StatCard
+                  label="Магазин COIN (AXM)"
+                  value={formatLaunch(eco.coin.shopAxmRevenue)}
+                  sub={`${eco.coin.shopPurchases} покупок`}
+                />
+                <StatCard
+                  label="Объём ставок"
+                  value={formatLaunch(eco.betting.totalVolume)}
+                  sub={`${eco.betting.totalBets} ставок / ${eco.betting.uniquePlayers} игроков`}
+                />
+              </div>
+            </div>
+
+            {/* Expenses */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-red-400 mb-2 flex items-center gap-1">
+                <TrendingDown size={12} /> Расходы из комиссии
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatCard
+                  label="Рефералы"
+                  value={formatLaunch(eco.axm.referralPaid)}
+                  sub={`${eco.axm.referralCount} выплат`}
+                />
+                <StatCard
+                  label="Джекпоты"
+                  value={formatLaunch(eco.axm.jackpotPaid)}
+                  sub={`${eco.axm.jackpotCount} выплат`}
+                />
+                <StatCard
+                  label="Партнёры"
+                  value={formatLaunch(eco.axm.partnerPaid)}
+                  sub={`${eco.axm.partnerCount} выплат`}
+                />
+                <StatCard
+                  label="Призы ивентов"
+                  value={formatLaunch(eco.axm.eventPrizes)}
+                  sub={`${eco.axm.eventWinners} победителей`}
+                />
+              </div>
+            </div>
+
+            {/* Net */}
+            <div className="border-t border-[var(--color-border)] pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className={`rounded-xl border p-4 ${BigInt(eco.axm.netTreasury) >= 0n ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Чистая прибыль платформы</p>
+                  <p className={`text-2xl font-bold ${BigInt(eco.axm.netTreasury) >= 0n ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {formatLaunch(eco.axm.netTreasury)} AXM
+                  </p>
+                  <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
+                    комиссия - рефералы - джекпоты - партнёры
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">COIN в обращении</p>
+                  <p className="text-2xl font-bold text-amber-400">
+                    {formatLaunch(eco.coin.totalCirculating)} COIN
+                  </p>
+                  <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
+                    у {eco.coin.holdersCount} юзеров (виртуальные, к листингу)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Commission Breakdown (BPS) ═══ */}
       {bd && (
         <div className="space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2">
@@ -233,7 +324,7 @@ export function CommissionTab() {
                   <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Адрес</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">BPS</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Статус</th>
-                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Заработано</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Заработано (AXM)</th>
                   <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Действия</th>
                 </tr>
               </thead>

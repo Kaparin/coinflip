@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { useAdminUsers, useAdminUserDetail, useAdminAdjustCoin } from '@/hooks/use-admin';
+import { useAdminUsers, useAdminUserDetail, useAdminAdjustCoin, useAdminEconomyOverview } from '@/hooks/use-admin';
 import {
   StatCard,
   shortAddr,
@@ -21,6 +21,7 @@ export function UsersTab() {
 
   const users = useAdminUsers(page, 50, debouncedSearch);
   const userDetail = useAdminUserDetail(selectedUserId);
+  const economy = useAdminEconomyOverview();
 
   const handleSearch = useCallback((val: string) => {
     setSearch(val);
@@ -42,8 +43,24 @@ export function UsersTab() {
     );
   }
 
+  const eco = economy.data;
+
   return (
     <div className="space-y-4">
+      {/* Summary stats */}
+      {eco && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Всего юзеров" value={users.data?.pagination.total ?? '...'} />
+          <StatCard label="С AXM балансом" value={eco.vaultTotals.usersWithBalance} />
+          <StatCard label="COIN холдеров" value={eco.coin.holdersCount} />
+          <StatCard
+            label="COIN в обращении"
+            value={formatLaunch(eco.coin.totalCirculating)}
+            sub="виртуальных COIN"
+          />
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
           Пользователи ({users.data?.pagination.total ?? '...'})
@@ -59,19 +76,20 @@ export function UsersTab() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="text-left px-4 py-2">Адрес</th>
-              <th className="text-left px-4 py-2">Ник</th>
-              <th className="text-right px-4 py-2">Доступно</th>
-              <th className="text-right px-4 py-2">Заблокировано</th>
-              <th className="text-right px-4 py-2">Ставки</th>
-              <th className="text-left px-4 py-2">Дата рег.</th>
+              <th className="text-left px-3 py-2">Адрес</th>
+              <th className="text-left px-3 py-2">Ник</th>
+              <th className="text-right px-3 py-2">AXM баланс</th>
+              <th className="text-right px-3 py-2">AXM locked</th>
+              <th className="text-right px-3 py-2">COIN</th>
+              <th className="text-right px-3 py-2">Ставки</th>
+              <th className="text-left px-3 py-2">Рег.</th>
             </tr>
           </thead>
           <tbody>
             {users.isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Загрузка...</td></tr>
             ) : !users.data?.data.length ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Пользователи не найдены</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">Пользователи не найдены</td></tr>
             ) : (
               users.data.data.map((u) => (
                 <tr
@@ -79,14 +97,17 @@ export function UsersTab() {
                   onClick={() => setSelectedUserId(u.id)}
                   className="border-b border-[var(--color-border)]/50 last:border-0 hover:bg-[var(--color-surface)]/50 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-2.5 font-mono" title={u.address}>{shortAddr(u.address)}</td>
-                  <td className="px-4 py-2.5">{u.nickname || <span className="text-[var(--color-text-secondary)]">—</span>}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{formatLaunch(u.vault.available)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${BigInt(u.vault.locked) > 0n ? 'text-yellow-400' : ''}`}>
-                    {formatLaunch(u.vault.locked)}
+                  <td className="px-3 py-2.5 font-mono" title={u.address}>{shortAddr(u.address)}</td>
+                  <td className="px-3 py-2.5">{u.nickname || <span className="text-[var(--color-text-secondary)]">--</span>}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{formatLaunch(u.axmBalance)}</td>
+                  <td className={`px-3 py-2.5 text-right font-mono ${BigInt(u.axmLocked) > 0n ? 'text-yellow-400' : ''}`}>
+                    {formatLaunch(u.axmLocked)}
                   </td>
-                  <td className="px-4 py-2.5 text-right">{u.totalBets}</td>
-                  <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{timeAgo(u.createdAt)}</td>
+                  <td className={`px-3 py-2.5 text-right font-mono ${BigInt(u.coinBalance) > 0n ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'}`}>
+                    {formatLaunch(u.coinBalance)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">{u.totalBets}</td>
+                  <td className="px-3 py-2.5 text-[var(--color-text-secondary)]">{timeAgo(u.createdAt)}</td>
                 </tr>
               ))
             )}
@@ -122,6 +143,9 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
     );
   }
 
+  const avail = BigInt(detail.vault.available);
+  const effectiveAxm = avail; // already includes bonus-offchainSpent in DB query for detail
+
   return (
     <div className="space-y-6">
       <button type="button" onClick={onBack} className="text-xs text-[var(--color-primary)] hover:underline">&larr; К списку</button>
@@ -131,35 +155,36 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
         <p className="text-sm font-bold">{detail.user.nickname || 'Без ника'}</p>
         <p className="text-xs font-mono text-[var(--color-text-secondary)]">{detail.user.address}</p>
         <p className="text-[10px] text-[var(--color-text-secondary)]">ID: {detail.user.id}</p>
-        <p className="text-[10px] text-[var(--color-text-secondary)]">Joined: {detail.user.createdAt ? new Date(detail.user.createdAt).toLocaleString() : '—'}</p>
+        <p className="text-[10px] text-[var(--color-text-secondary)]">Joined: {detail.user.createdAt ? new Date(detail.user.createdAt).toLocaleString() : '--'}</p>
       </div>
 
-      {/* Vault — DB vs Chain (chain is source of truth for UI) */}
+      {/* Balances — AXM + COIN side by side */}
       <div className="space-y-2">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Хранилище</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="БД доступно" value={formatLaunch(detail.vault.available)} />
-          <StatCard label="БД заблокировано" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Балансы</p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <StatCard label="AXM (БД)" value={formatLaunch(detail.vault.available)} sub="доступно" />
+          <StatCard label="AXM locked" value={formatLaunch(detail.vault.locked)} warn={BigInt(detail.vault.locked) > 0n} />
           {detail.chainVault && (
             <>
-              <StatCard label="Чейн доступно" value={formatLaunch(detail.chainVault.available)} />
-              <StatCard label="Чейн заблокировано" value={formatLaunch(detail.chainVault.locked)} warn={BigInt(detail.chainVault.locked) > 0n} />
+              <StatCard label="AXM (чейн)" value={formatLaunch(detail.chainVault.available)} sub="доступно" />
+              <StatCard label="AXM locked (чейн)" value={formatLaunch(detail.chainVault.locked)} warn={BigInt(detail.chainVault.locked) > 0n} />
             </>
           )}
+          <StatCard label="COIN" value={formatLaunch(detail.vault.coinBalance)} sub="виртуальный" />
         </div>
         {detail.chainVault && (BigInt(detail.vault.locked) !== BigInt(detail.chainVault.locked)) && (
-          <p className="text-[11px] text-amber-500">Расхождение БД/Чейн — запустите sync-balances для исправления</p>
+          <p className="text-[11px] text-amber-500">Расхождение БД/Чейн -- запустите sync-balances для исправления</p>
         )}
       </div>
 
       {/* COIN Balance Management */}
       <CoinBalanceSection userId={userId} coinBalance={detail.vault.coinBalance} />
 
-      {/* Chain user bets — bets on chain where user is maker or acceptor */}
+      {/* Chain user bets */}
       {detail.chainUserBets?.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Ставки в чейне (user_bets)
+            Ставки в чейне ({detail.chainUserBets.length})
           </p>
           <TableWrapper>
             <table className="w-full text-xs">
@@ -167,7 +192,7 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
                 <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
                   <th className="text-left px-3 py-2">ID</th>
                   <th className="text-left px-3 py-2">Status</th>
-                  <th className="text-right px-3 py-2">Amount</th>
+                  <th className="text-right px-3 py-2">AXM</th>
                   <th className="text-left px-3 py-2">Maker</th>
                   <th className="text-left px-3 py-2">Acceptor</th>
                 </tr>
@@ -179,31 +204,28 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
                     <td className="px-3 py-2"><StatusBadge status={b.status} /></td>
                     <td className="px-3 py-2 text-right font-mono">{formatLaunch(b.amount)}</td>
                     <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)]">{shortAddr(b.maker)}</td>
-                    <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)]">{b.acceptor ? shortAddr(b.acceptor) : '—'}</td>
+                    <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)]">{b.acceptor ? shortAddr(b.acceptor) : '--'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </TableWrapper>
-          <p className="text-[11px] text-[var(--color-text-secondary)]">
-            Заблокированные средства из активных ставок. Разрешается через отмену, раскрытие или claim_timeout.
-          </p>
         </div>
       )}
 
-      {/* Bets */}
+      {/* DB Bets */}
       <div className="space-y-2">
         <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          Ставки ({detail.bets.length})
+          Ставки в БД ({detail.bets.length})
         </h3>
         <TableWrapper>
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
                 <th className="text-left px-3 py-2">ID</th>
-                <th className="text-right px-3 py-2">Amount</th>
+                <th className="text-right px-3 py-2">AXM</th>
                 <th className="text-left px-3 py-2">Status</th>
-                <th className="text-left px-3 py-2">Сторона</th>
+                <th className="text-left px-3 py-2">Side</th>
                 <th className="text-left px-3 py-2">Secret</th>
                 <th className="text-left px-3 py-2">Created</th>
               </tr>
@@ -217,7 +239,7 @@ function UserDetailView({ userId, detail, isLoading, onBack }: {
                     <td className="px-3 py-2 font-mono">#{b.betId}</td>
                     <td className="px-3 py-2 text-right font-mono">{formatLaunch(b.amount)}</td>
                     <td className="px-3 py-2"><StatusBadge status={b.status} /></td>
-                    <td className="px-3 py-2">{b.makerSide || '—'}</td>
+                    <td className="px-3 py-2">{b.makerSide || '--'}</td>
                     <td className="px-3 py-2">
                       <span className={b.makerSecret === 'present' ? 'text-green-400' : 'text-red-400'}>
                         {b.makerSecret === 'present' ? 'Yes' : 'No'}
@@ -251,7 +273,7 @@ function CoinBalanceSection({ userId, coinBalance }: { userId: string; coinBalan
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">COIN баланс</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Управление COIN</p>
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
         <div className="flex items-center gap-3">
           <StatCard label="COIN баланс" value={formatLaunch(coinBalance)} />
@@ -293,7 +315,7 @@ function CoinBalanceSection({ userId, coinBalance }: { userId: string; coinBalan
             disabled={adjustCoin.isPending || !amount}
             className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 transition-colors"
           >
-            − Списать
+            - Списать
           </button>
         </div>
         {adjustCoin.isError && (

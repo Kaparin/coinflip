@@ -13,8 +13,8 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
         <div className="min-h-screen flex flex-col">
           <MaintenanceBanner />
           <Header />
-          <div className="flex-1 flex">
-            <main className="flex-1 min-w-0">{children}</main>
+          <div className="flex-1 flex min-h-0 overflow-hidden">
+            <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
             <SocialSidebar />
           </div>
           <BottomNav />

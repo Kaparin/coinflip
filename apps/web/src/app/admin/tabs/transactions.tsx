@@ -41,7 +41,7 @@ const ACTION_OPTIONS = [
   { value: 'claim_timeout', label: 'Таймаут' },
   { value: 'withdraw', label: 'Вывод' },
   { value: 'deposit', label: 'Депозит' },
-  { value: 'transfer', label: 'CW20 перевод' },
+  { value: 'transfer', label: 'Перевод токенов' },
 ];
 
 const STATUS_OPTIONS = [

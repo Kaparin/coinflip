@@ -557,7 +557,7 @@ export function SocialSidebar() {
   ];
 
   return (
-    <aside className="hidden lg:flex flex-col w-80 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]">
+    <aside className="hidden lg:flex flex-col w-80 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)] h-full min-h-0">
       {/* Tabs */}
       <div className="flex gap-1 px-2 py-2 border-b border-[var(--color-border)] shrink-0">
         {tabs.map(({ key, label }) => (

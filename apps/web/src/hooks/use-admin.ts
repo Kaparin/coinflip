@@ -97,7 +97,9 @@ export interface AdminUser {
   address: string;
   nickname: string | null;
   createdAt: string | null;
-  vault: { available: string; locked: string };
+  axmBalance: string;
+  axmLocked: string;
+  coinBalance: string;
   totalBets: number;
 }
 
@@ -208,6 +210,63 @@ export interface UserDetail {
     winnerUserId: string | null;
     txhashCreate: string;
   }>;
+}
+
+// ─── Economy Overview ─────────────────────────────────────────────
+
+export interface EconomyOverview {
+  axm: {
+    commissionEarned: string;
+    commissionEntries: number;
+    referralPaid: string;
+    referralCount: number;
+    jackpotPaid: string;
+    jackpotCount: number;
+    partnerPaid: string;
+    partnerCount: number;
+    eventPrizes: string;
+    eventWinners: number;
+    netTreasury: string;
+  };
+  coin: {
+    totalCirculating: string;
+    holdersCount: number;
+    shopSold: string;
+    shopAxmRevenue: string;
+    shopPurchases: number;
+    shopUniqueBuyers: number;
+    achievementsClaimed: string;
+    achievementsCount: number;
+    transfersTotal: string;
+    transfersFees: string;
+    transfersCount: number;
+    coinDropsTotal: string;
+  };
+  vaultTotals: {
+    totalAvailable: string;
+    totalLocked: string;
+    totalBonus: string;
+    totalOffchainSpent: string;
+    usersWithBalance: number;
+  };
+  betting: {
+    totalVolume: string;
+    totalCommission: string;
+    resolvedBets: number;
+    totalBets: number;
+    uniquePlayers: number;
+  };
+}
+
+export function useAdminEconomyOverview() {
+  const { address, isConnected } = useWalletContext();
+  return useQuery({
+    queryKey: ['admin', 'economy', 'overview', address],
+    queryFn: () => adminFetch<EconomyOverview>('/api/v1/admin/economy/overview', address!),
+    enabled: isConnected && !!address,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
 }
 
 // ─── Treasury Hooks (existing) ────────────────────────────────────

@@ -9,7 +9,7 @@ import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
-import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications } from '@coinflip/db/schema';
+import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, eventParticipants, events as eventsTable } from '@coinflip/db/schema';
 import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
@@ -122,13 +122,16 @@ adminRouter.get('/users', zValidator('query', UsersQuerySchema), async (c) => {
       .where(conditions),
   ]);
 
-  // Attach vault balances
+  // Attach vault balances (AXM + COIN)
   const userIds = rows.map(u => u.id);
   const balances = userIds.length > 0
     ? await db.select({
         userId: vaultBalances.userId,
         available: vaultBalances.available,
         locked: vaultBalances.locked,
+        bonus: vaultBalances.bonus,
+        offchainSpent: vaultBalances.offchainSpent,
+        coinBalance: vaultBalances.coinBalance,
       })
         .from(vaultBalances)
         .where(inArray(vaultBalances.userId, userIds))
@@ -149,17 +152,23 @@ adminRouter.get('/users', zValidator('query', UsersQuerySchema), async (c) => {
 
   const betCountMap = new Map(betCounts.map(b => [b.makerUserId, b.count]));
 
-  const data = rows.map(u => ({
-    id: u.id,
-    address: u.address,
-    nickname: u.nickname,
-    createdAt: u.createdAt?.toISOString() ?? null,
-    vault: {
-      available: balanceMap.get(u.id)?.available ?? '0',
-      locked: balanceMap.get(u.id)?.locked ?? '0',
-    },
-    totalBets: betCountMap.get(u.id) ?? 0,
-  }));
+  const data = rows.map(u => {
+    const b = balanceMap.get(u.id);
+    const avail = BigInt(b?.available ?? '0');
+    const bonus = BigInt(b?.bonus ?? '0');
+    const spent = BigInt(b?.offchainSpent ?? '0');
+    const effectiveAxm = avail + bonus - spent;
+    return {
+      id: u.id,
+      address: u.address,
+      nickname: u.nickname,
+      createdAt: u.createdAt?.toISOString() ?? null,
+      axmBalance: effectiveAxm.toString(),
+      axmLocked: b?.locked ?? '0',
+      coinBalance: b?.coinBalance ?? '0',
+      totalBets: betCountMap.get(u.id) ?? 0,
+    };
+  });
 
   return c.json({
     data,
@@ -729,6 +738,162 @@ adminRouter.post('/actions/recover-secret', zValidator('json', RecoverSecretSche
     });
   } catch (err: any) {
     return c.json({ error: { code: 'RECOVER_FAILED', message: err.message } }, 500);
+  }
+});
+
+// ═══════════════════════════════════════════
+// Economy Overview — full P&L, COIN circulation
+// ═══════════════════════════════════════════
+
+adminRouter.get('/economy/overview', async (c) => {
+  const db = getDb();
+
+  try {
+    // --- AXM P&L ---
+    // Total commission earned (treasury ledger)
+    const [commStats] = await db.select({
+      totalEarned: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      entries: sql<number>`count(*)::int`,
+    }).from(treasuryLedgerTable);
+
+    // Referral payouts
+    const [refStats] = await db.select({
+      totalPaid: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      count: sql<number>`count(*)::int`,
+    }).from(referralRewards);
+
+    // Jackpot payouts (completed pools with winners)
+    const [jackpotStats] = await db.select({
+      totalPaid: sql<string>`coalesce(sum(current_amount::numeric), 0)::text`,
+      count: sql<number>`count(*)::int`,
+    }).from(jackpotPools).where(sql`status = 'completed' AND winner_user_id IS NOT NULL`);
+
+    // Partner payouts
+    const [partnerStats] = await db.select({
+      totalPaid: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      count: sql<number>`count(*)::int`,
+    }).from(partnerLedger);
+
+    // Event prizes distributed (AXM)
+    const [eventStats] = await db.select({
+      totalPrizes: sql<string>`coalesce(sum(ep.prize_amount::numeric), 0)::text`,
+      winnersCount: sql<number>`count(*) filter (where ep.prize_amount::numeric > 0)::int`,
+    }).from(sql`event_participants ep`);
+
+    // --- COIN Economy ---
+    // Total COIN in circulation (sum of all user coin_balances)
+    const [coinCirculation] = await db.select({
+      totalCoin: sql<string>`coalesce(sum(coin_balance::numeric), 0)::text`,
+      holdersCount: sql<number>`count(*) filter (where coin_balance::numeric > 0)::int`,
+    }).from(vaultBalances);
+
+    // COIN purchased via shop
+    const [shopStats] = await db.select({
+      totalCoinSold: sql<string>`coalesce(sum(coin_amount::numeric), 0)::text`,
+      totalAxmRevenue: sql<string>`coalesce(sum(axm_amount::numeric), 0)::text`,
+      purchasesCount: sql<number>`count(*) filter (where status = 'confirmed')::int`,
+      uniqueBuyers: sql<number>`count(distinct user_id) filter (where status = 'confirmed')::int`,
+    }).from(shopPurchases);
+
+    // COIN from achievement claims
+    const [achieveStats] = await db.select({
+      totalCoin: sql<string>`coalesce(sum(coin_amount::numeric), 0)::text`,
+      claimsCount: sql<number>`count(*)::int`,
+    }).from(achievementClaims);
+
+    // COIN transfers (P2P) — fees burned
+    const [transferStats] = await db.execute(sql`
+      SELECT
+        coalesce(sum(amount::numeric), 0)::text AS total_transferred,
+        coalesce(sum(fee::numeric), 0)::text AS total_fees,
+        count(*)::int AS count
+      FROM coin_transfers
+    `);
+    const xferRow = (transferStats as unknown as Array<{ total_transferred: string; total_fees: string; count: number }>)[0];
+
+    // COIN spent on chat (premium messages, coin drops)
+    const [chatSpend] = await db.execute(sql`
+      SELECT coalesce(sum(amount::numeric), 0)::text AS total_drops
+      FROM chat_coin_drops
+    `) as unknown as Array<{ total_drops: string }>;
+
+    // --- AXM Vault totals ---
+    const [vaultTotals] = await db.select({
+      totalAvailable: sql<string>`coalesce(sum(available::numeric), 0)::text`,
+      totalLocked: sql<string>`coalesce(sum(locked::numeric), 0)::text`,
+      totalBonus: sql<string>`coalesce(sum(bonus::numeric), 0)::text`,
+      totalOffchainSpent: sql<string>`coalesce(sum(offchain_spent::numeric), 0)::text`,
+      usersWithBalance: sql<number>`count(*) filter (where available::numeric > 0 or bonus::numeric > 0)::int`,
+    }).from(vaultBalances);
+
+    // Total bet volume and commission from bets
+    const [betTotals] = await db.select({
+      totalVolume: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      totalCommission: sql<string>`coalesce(sum(commission_amount::numeric), 0)::text`,
+      resolvedCount: sql<number>`count(*) filter (where status in ('revealed', 'timeout_claimed'))::int`,
+      totalBets: sql<number>`count(*)::int`,
+      totalUsers: sql<number>`count(distinct maker_user_id)::int`,
+    }).from(bets);
+
+    return c.json({
+      data: {
+        // AXM P&L
+        axm: {
+          commissionEarned: commStats!.totalEarned,
+          commissionEntries: commStats!.entries,
+          referralPaid: refStats!.totalPaid,
+          referralCount: refStats!.count,
+          jackpotPaid: jackpotStats!.totalPaid,
+          jackpotCount: jackpotStats!.count,
+          partnerPaid: partnerStats!.totalPaid,
+          partnerCount: partnerStats!.count,
+          eventPrizes: eventStats!.totalPrizes,
+          eventWinners: eventStats!.winnersCount,
+          // Net = commission earned - referrals - jackpots - partners
+          // (events paid from treasury wallet, not commission)
+          netTreasury: (
+            BigInt(commStats!.totalEarned)
+            - BigInt(refStats!.totalPaid)
+            - BigInt(jackpotStats!.totalPaid)
+            - BigInt(partnerStats!.totalPaid)
+          ).toString(),
+        },
+        // COIN Economy
+        coin: {
+          totalCirculating: coinCirculation!.totalCoin,
+          holdersCount: coinCirculation!.holdersCount,
+          shopSold: shopStats!.totalCoinSold,
+          shopAxmRevenue: shopStats!.totalAxmRevenue,
+          shopPurchases: shopStats!.purchasesCount,
+          shopUniqueBuyers: shopStats!.uniqueBuyers,
+          achievementsClaimed: achieveStats!.totalCoin,
+          achievementsCount: achieveStats!.claimsCount,
+          transfersTotal: xferRow?.total_transferred ?? '0',
+          transfersFees: xferRow?.total_fees ?? '0',
+          transfersCount: xferRow?.count ?? 0,
+          coinDropsTotal: chatSpend?.total_drops ?? '0',
+        },
+        // AXM user vault totals
+        vaultTotals: {
+          totalAvailable: vaultTotals!.totalAvailable,
+          totalLocked: vaultTotals!.totalLocked,
+          totalBonus: vaultTotals!.totalBonus,
+          totalOffchainSpent: vaultTotals!.totalOffchainSpent,
+          usersWithBalance: vaultTotals!.usersWithBalance,
+        },
+        // Betting overview
+        betting: {
+          totalVolume: betTotals!.totalVolume,
+          totalCommission: betTotals!.totalCommission,
+          resolvedBets: betTotals!.resolvedCount,
+          totalBets: betTotals!.totalBets,
+          uniquePlayers: betTotals!.totalUsers,
+        },
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'admin: economy overview failed');
+    return c.json({ error: { code: 'ECONOMY_FAILED', message: err.message } }, 500);
   }
 });
 

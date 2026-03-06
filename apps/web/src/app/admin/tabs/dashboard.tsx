@@ -11,21 +11,20 @@ import {
   useAdminSweepPreview,
   useAdminSweepExecute,
   useAdminSweepStatus,
+  useAdminEconomyOverview,
 } from '@/hooks/use-admin';
 import type { SweepSummary } from '@/hooks/use-admin';
-import { useTranslation } from '@/lib/i18n';
-import { GAME_TOKEN } from '@/lib/constants';
 import { StatCard, shortHash, timeAgo } from '../_shared';
 
-function fmtLaunch(micro: string | number): string {
+function fmt(micro: string | number): string {
   return formatLaunch(micro);
 }
 
 export function DashboardTab() {
-  const { t } = useTranslation();
   const balance = useAdminTreasuryBalance();
   const stats = useAdminTreasuryStats();
   const platform = useAdminPlatformStats();
+  const economy = useAdminEconomyOverview();
   const withdraw = useAdminWithdraw();
 
   const [ledgerPage, setLedgerPage] = useState(0);
@@ -53,63 +52,155 @@ export function DashboardTab() {
     const microAmount = toMicroLaunch(humanAmount);
     try {
       const result = await withdraw.mutateAsync(microAmount);
-      setWithdrawSuccess(`Выведено ${withdrawAmount} ${GAME_TOKEN}. Tx: ${result.txHash}`);
+      setWithdrawSuccess(`Выведено ${withdrawAmount} AXM. Tx: ${result.txHash}`);
       setWithdrawAmount('');
     } catch (err) {
       setWithdrawError(err instanceof Error ? err.message : 'Ошибка вывода');
     }
   };
 
+  const eco = economy.data;
+
   return (
     <div className="space-y-6">
-      {/* Treasury Balance */}
+      {/* ═══ AXM P&L ═══ */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          {t('admin.treasuryBalance')}
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label={t('admin.vaultAvailable')} value={balance.data ? fmtLaunch(balance.data.vault.available) : '...'} sub={t('admin.launchInContract')} />
-          <StatCard label={t('admin.vaultLocked')} value={balance.data ? fmtLaunch(balance.data.vault.locked) : '...'} sub={t('admin.inActiveBets')} />
-          <StatCard label={t('admin.wallet')} value={balance.data ? fmtLaunch(balance.data.wallet.balance) : '...'} sub={t('admin.cw20InTreasury')} />
-        </div>
-      </section>
-
-      {/* Commission Stats */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          {t('admin.commissionStats')}
+          AXM — Доходы и расходы платформы
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label={t('admin.totalEarned')} value={stats.data ? fmtLaunch(stats.data.totalCommissions) : '...'} sub={t('admin.allTime')} />
-          <StatCard label={t('admin.last24h')} value={stats.data ? fmtLaunch(stats.data.last24h) : '...'} />
-          <StatCard label={t('admin.last7d')} value={stats.data ? fmtLaunch(stats.data.last7d) : '...'} />
-          <StatCard label={t('admin.totalEntries')} value={stats.data?.totalEntries ?? '...'} />
+          <StatCard
+            label="Комиссия заработана"
+            value={eco ? fmt(eco.axm.commissionEarned) : '...'}
+            sub={eco ? `${eco.axm.commissionEntries} записей` : ''}
+          />
+          <StatCard
+            label="Рефералам выплачено"
+            value={eco ? fmt(eco.axm.referralPaid) : '...'}
+            sub={eco ? `${eco.axm.referralCount} выплат` : ''}
+          />
+          <StatCard
+            label="Джекпоты выплачены"
+            value={eco ? fmt(eco.axm.jackpotPaid) : '...'}
+            sub={eco ? `${eco.axm.jackpotCount} розыгр.` : ''}
+          />
+          <StatCard
+            label="Партнёрам выплачено"
+            value={eco ? fmt(eco.axm.partnerPaid) : '...'}
+            sub={eco ? `${eco.axm.partnerCount} выплат` : ''}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Призы ивентов"
+            value={eco ? fmt(eco.axm.eventPrizes) : '...'}
+            sub={eco ? `${eco.axm.eventWinners} победит.` : ''}
+          />
+          <StatCard
+            label="Чистая прибыль платформы"
+            value={eco ? fmt(eco.axm.netTreasury) : '...'}
+            sub="комиссия − рефералы − джекпоты − партнёры"
+          />
+          <StatCard
+            label="Комиссия за 24ч / 7д"
+            value={stats.data ? `${fmt(stats.data.last24h)} / ${fmt(stats.data.last7d)}` : '...'}
+          />
         </div>
       </section>
 
-      {/* Platform Stats */}
+      {/* ═══ AXM Treasury ═══ */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          {t('admin.platformStats')}
+          AXM — Казна (контракт + кошелёк)
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="Контракт (доступно)"
+            value={balance.data ? fmt(balance.data.vault.available) : '...'}
+            sub="AXM в контракте"
+          />
+          <StatCard
+            label="Контракт (заблокировано)"
+            value={balance.data ? fmt(balance.data.vault.locked) : '...'}
+            sub="в активных ставках"
+          />
+          <StatCard
+            label="Кошелёк казны"
+            value={balance.data ? fmt(balance.data.wallet.balance) : '...'}
+            sub="AXM на кошельке"
+          />
+          <StatCard
+            label="Юзеры AXM (vault)"
+            value={eco ? `${eco.vaultTotals.usersWithBalance} чел.` : '...'}
+            sub={eco ? `всего: ${fmt(eco.vaultTotals.totalAvailable)}` : ''}
+          />
+        </div>
+      </section>
+
+      {/* ═══ COIN Economy ═══ */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-amber-400">
+          COIN — Виртуальная валюта
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="В обращении"
+            value={eco ? fmt(eco.coin.totalCirculating) : '...'}
+            sub={eco ? `у ${eco.coin.holdersCount} юзеров` : ''}
+          />
+          <StatCard
+            label="Продано через магазин"
+            value={eco ? fmt(eco.coin.shopSold) : '...'}
+            sub={eco ? `${eco.coin.shopPurchases} покупок (${eco.coin.shopUniqueBuyers} юзеров)` : ''}
+          />
+          <StatCard
+            label="Выручка магазина (AXM)"
+            value={eco ? fmt(eco.coin.shopAxmRevenue) : '...'}
+            sub="AXM получено за COIN"
+          />
+          <StatCard
+            label="Ачивки"
+            value={eco ? fmt(eco.coin.achievementsClaimed) : '...'}
+            sub={eco ? `${eco.coin.achievementsCount} клеймов` : ''}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Переводы P2P"
+            value={eco ? fmt(eco.coin.transfersTotal) : '...'}
+            sub={eco ? `${eco.coin.transfersCount} перевод. / сожжено: ${fmt(eco.coin.transfersFees)}` : ''}
+          />
+          <StatCard
+            label="CoinDrop (чат)"
+            value={eco ? fmt(eco.coin.coinDropsTotal) : '...'}
+            sub="роздано через чат"
+          />
+        </div>
+      </section>
+
+      {/* ═══ Platform Stats ═══ */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+          Игровая статистика
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label={t('admin.totalBets')} value={platform.data?.totalBets ?? '...'} />
-          <StatCard label={t('admin.totalVolume')} value={platform.data ? fmtLaunch(platform.data.totalVolume) : '...'} sub={t('admin.launchWagered')} />
-          <StatCard label={t('admin.totalUsers')} value={platform.data?.totalUsers ?? '...'} />
-          <StatCard label={t('admin.activeBets')} value={platform.data?.activeBets ?? '...'} sub={t('admin.openPlusAccepted')} />
-          <StatCard label={t('admin.resolvedBets')} value={platform.data?.resolvedBets ?? '...'} />
-          <StatCard label={t('admin.canceledBets')} value={platform.data?.canceledBets ?? '...'} />
+          <StatCard label="Всего ставок" value={platform.data?.totalBets ?? '...'} />
+          <StatCard label="Общий объём (AXM)" value={platform.data ? fmt(platform.data.totalVolume) : '...'} />
+          <StatCard label="Всего юзеров" value={platform.data?.totalUsers ?? '...'} />
+          <StatCard label="Активные ставки" value={platform.data?.activeBets ?? '...'} sub="open + accepted" />
+          <StatCard label="Разрешённые" value={platform.data?.resolvedBets ?? '...'} />
+          <StatCard label="Отменённые" value={platform.data?.canceledBets ?? '...'} />
         </div>
       </section>
 
-      {/* Withdraw */}
+      {/* ═══ Withdraw ═══ */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          {t('admin.withdrawFromVault')}
+          Вывод AXM из контракта
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
           <p className="text-xs text-[var(--color-text-secondary)]">
-            {t('admin.withdrawDesc', { amount: balance.data ? `${fmtLaunch(balance.data.vault.available)} ${t('common.launch')}` : '...' })}
+            Доступно для вывода: {balance.data ? `${fmt(balance.data.vault.available)} AXM` : '...'}
           </p>
           <div className="flex gap-3">
             <input
@@ -118,7 +209,7 @@ export function DashboardTab() {
               min="0"
               value={withdrawAmount}
               onChange={(e) => { setWithdrawAmount(e.target.value); setWithdrawError(''); setWithdrawSuccess(''); }}
-              placeholder={t('admin.amountPlaceholder')}
+              placeholder="Сумма AXM"
               className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm focus:border-[var(--color-primary)] focus:outline-none"
             />
             <button
@@ -127,7 +218,7 @@ export function DashboardTab() {
               onClick={handleWithdraw}
               className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-bold disabled:opacity-40 whitespace-nowrap"
             >
-              {withdraw.isPending ? t('admin.withdrawing') : t('common.withdraw')}
+              {withdraw.isPending ? 'Вывод...' : 'Вывести AXM'}
             </button>
           </div>
           <div className="flex gap-2">
@@ -138,7 +229,7 @@ export function DashboardTab() {
             ))}
             {balance.data && BigInt(balance.data.vault.available) > 0n && (
               <button type="button" onClick={() => setWithdrawAmount(String(fromMicroLaunch(balance.data!.vault.available)))} className="rounded-lg border border-[var(--color-primary)]/30 text-[var(--color-primary)] px-3 py-1 text-xs hover:bg-[var(--color-primary)]/10 transition-colors">
-                {t('common.max')}
+                Макс
               </button>
             )}
           </div>
@@ -147,14 +238,14 @@ export function DashboardTab() {
         </div>
       </section>
 
-      {/* Treasury Sweep */}
+      {/* ═══ Treasury Sweep ═══ */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
           Сбор средств (Sweep)
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-4">
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Сбор offchain_spent токенов из хранилищ пользователей в казну. Пользователи оплатили VIP/пины/анонсы/розыгрыши в БД,
+            Сбор offchain_spent AXM из хранилищ пользователей в казну. Пользователи оплатили VIP/пины/анонсы в БД,
             но токены остаются в контракте.
           </p>
 
@@ -165,7 +256,7 @@ export function DashboardTab() {
                 Кандидаты: {sweepPreview.data?.candidates.length ?? '...'}
               </span>
               <span className="text-xs font-bold text-[var(--color-primary)]">
-                Всего к сбору: {sweepPreview.data ? fmtLaunch(sweepPreview.data.totalSweepable) : '...'} {GAME_TOKEN}
+                Всего к сбору: {sweepPreview.data ? fmt(sweepPreview.data.totalSweepable) : '...'} AXM
               </span>
             </div>
 
@@ -182,9 +273,9 @@ export function DashboardTab() {
                     <span className="font-mono truncate" title={c.address}>
                       {c.nickname || shortHash(c.address)}
                     </span>
-                    <span className="font-mono">{fmtLaunch(c.offchainSpent)}</span>
-                    <span className="font-mono">{fmtLaunch(c.chainAvailable)}</span>
-                    <span className="font-mono font-bold text-[var(--color-primary)]">{fmtLaunch(c.sweepable)}</span>
+                    <span className="font-mono">{fmt(c.offchainSpent)}</span>
+                    <span className="font-mono">{fmt(c.chainAvailable)}</span>
+                    <span className="font-mono font-bold text-[var(--color-primary)]">{fmt(c.sweepable)}</span>
                   </div>
                 ))}
               </div>
@@ -241,7 +332,7 @@ export function DashboardTab() {
                 <span className="text-[var(--color-success)]">Успешно: {sweepResult.succeeded}</span>
                 <span className="text-[var(--color-danger)]">Ошибки: {sweepResult.failed}</span>
                 <span className="text-[var(--color-text-secondary)]">Пропущено: {sweepResult.skipped}</span>
-                <span className="font-bold">Всего собрано: {fmtLaunch(sweepResult.totalSwept)} {GAME_TOKEN}</span>
+                <span className="font-bold">Всего собрано: {fmt(sweepResult.totalSwept)} AXM</span>
               </div>
               {sweepResult.results.filter((r) => r.status !== 'skipped').length > 0 && (
                 <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--color-border)]">
@@ -256,7 +347,7 @@ export function DashboardTab() {
                       >
                         <span>{r.status === 'success' ? '+' : 'x'}</span>
                         <span className="font-mono truncate">{shortHash(r.address)}</span>
-                        <span className="font-mono">{fmtLaunch(r.amount)}</span>
+                        <span className="font-mono">{fmt(r.amount)}</span>
                         {r.error && <span className="text-[var(--color-danger)] truncate">{r.error}</span>}
                       </div>
                     ))}
@@ -267,28 +358,28 @@ export function DashboardTab() {
         </div>
       </section>
 
-      {/* Commission Ledger */}
+      {/* ═══ Commission Ledger ═══ */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-          {t('admin.commissionLedger')}
+          Журнал комиссий (AXM)
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
           <div className="hidden sm:grid grid-cols-4 gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-            <span>{t('admin.time')}</span>
-            <span>{t('admin.amount')}</span>
-            <span>{t('admin.source')}</span>
-            <span>{t('admin.txHash')}</span>
+            <span>Время</span>
+            <span>Сумма</span>
+            <span>Источник</span>
+            <span>TX Hash</span>
           </div>
 
           {ledger.isLoading ? (
-            <div className="px-4 py-8 text-center text-xs text-[var(--color-text-secondary)]">{t('common.loading')}</div>
+            <div className="px-4 py-8 text-center text-xs text-[var(--color-text-secondary)]">Загрузка...</div>
           ) : !ledger.data?.data?.length ? (
-            <div className="px-4 py-8 text-center text-xs text-[var(--color-text-secondary)]">{t('admin.noCommission')}</div>
+            <div className="px-4 py-8 text-center text-xs text-[var(--color-text-secondary)]">Нет записей</div>
           ) : (
             ledger.data.data.map((entry) => (
               <div key={entry.id} className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 px-4 py-2.5 text-xs border-b border-[var(--color-border)]/50 last:border-0 hover:bg-[var(--color-surface)]/50">
                 <span className="text-[var(--color-text-secondary)]" title={entry.createdAt}>{timeAgo(entry.createdAt)}</span>
-                <span className="font-mono font-bold">+{fmtLaunch(entry.amount)}</span>
+                <span className="font-mono font-bold">+{fmt(entry.amount)}</span>
                 <span className="text-[var(--color-text-secondary)]">{entry.source}</span>
                 <span className="font-mono text-[var(--color-text-secondary)]" title={entry.txhash}>{shortHash(entry.txhash)}</span>
               </div>
@@ -302,10 +393,10 @@ export function DashboardTab() {
               </span>
               <div className="flex gap-2">
                 <button type="button" disabled={ledgerPage === 0} onClick={() => setLedgerPage((p) => Math.max(0, p - 1))} className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-xs disabled:opacity-30">
-                  {t('admin.prev')}
+                  Назад
                 </button>
                 <button type="button" disabled={!ledger.data.pagination.hasMore} onClick={() => setLedgerPage((p) => p + 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-xs disabled:opacity-30">
-                  {t('admin.next')}
+                  Далее
                 </button>
               </div>
             </div>

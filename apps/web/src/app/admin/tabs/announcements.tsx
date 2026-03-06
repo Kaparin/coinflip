@@ -29,7 +29,6 @@ import {
   Save,
 } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { GAME_TOKEN } from '@/lib/constants';
 
 export function AnnouncementsTab() {
   const [page, setPage] = useState(0);
@@ -312,7 +311,7 @@ function AnnouncementCard({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[10px] text-[var(--color-text-secondary)]">
             <span>{timeAgo(a.createdAt)}</span>
             {a.sentCount > 0 && <span>Отправлено {a.sentCount} польз.</span>}
-            {a.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(a.pricePaid)} {GAME_TOKEN}</span></span>}
+            {a.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(a.pricePaid)} COIN</span></span>}
           </div>
 
           {/* Truncated message preview */}
@@ -466,7 +465,7 @@ function PendingSponsoredCard({ item, onResult }: { item: PendingSponsored; onRe
           <h4 className="text-sm font-bold truncate">{item.title}</h4>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
             <span>От: <span className="text-[var(--color-text-primary)]">{item.userNickname || shortAddr(item.userAddress)}</span></span>
-            {item.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(item.pricePaid)} {GAME_TOKEN}</span></span>}
+            {item.pricePaid && <span>Оплачено: <span className="text-teal-400">{formatLaunch(item.pricePaid)} COIN</span></span>}
             <span>{timeAgo(item.createdAt)}</span>
           </div>
         </div>
