@@ -224,6 +224,10 @@ export interface EconomyOverview {
     jackpotCount: number;
     partnerPaid: string;
     partnerCount: number;
+    stakingAccrued: string;
+    stakingFlushed: string;
+    stakingPending: string;
+    stakingCount: number;
     eventPrizes: string;
     eventWinners: number;
     netTreasury: string;
@@ -836,6 +840,7 @@ export interface CommissionBreakdown {
     commissionBps: number;
     referralMaxBps: number;
     jackpotBps: number;
+    stakingBps: number;
     partnerBps: number;
     treasuryBps: number;
     totalAllocated: number;

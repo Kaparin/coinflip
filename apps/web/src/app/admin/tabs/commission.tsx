@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PieChart, Plus, Trash2, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { PieChart, Plus, Trash2, Loader2, TrendingUp, TrendingDown, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
   useAdminCommissionBreakdown,
@@ -12,6 +12,8 @@ import {
   useAdminConfig,
   useAdminUpdateConfig,
   useAdminEconomyOverview,
+  useAdminStakingStats,
+  useAdminStakingFlush,
   type AdminPartner,
 } from '@/hooks/use-admin';
 import { StatCard, TableWrapper, ActionButton, shortAddr } from '../_shared';
@@ -23,8 +25,12 @@ export function CommissionTab() {
   const updateConfig = useAdminUpdateConfig();
   const economy = useAdminEconomyOverview();
 
+  const { data: stakingStats } = useAdminStakingStats();
+  const flush = useAdminStakingFlush();
   const [showAddForm, setShowAddForm] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [flushResult, setFlushResult] = useState<{ txHash: string; amount: string } | null>(null);
+  const [flushError, setFlushError] = useState<string | null>(null);
 
   // Editable referral BPS
   const [editingReferral, setEditingReferral] = useState(false);
@@ -114,7 +120,7 @@ export function CommissionTab() {
               <p className="text-[10px] uppercase tracking-wider text-red-400 mb-2 flex items-center gap-1">
                 <TrendingDown size={12} /> Расходы из комиссии
               </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <StatCard
                   label="Рефералы"
                   value={formatLaunch(eco.axm.referralPaid)}
@@ -124,6 +130,12 @@ export function CommissionTab() {
                   label="Джекпоты"
                   value={formatLaunch(eco.axm.jackpotPaid)}
                   sub={`${eco.axm.jackpotCount} выплат`}
+                />
+                <StatCard
+                  label="Стейкинг LAUNCH"
+                  value={formatLaunch(eco.axm.stakingAccrued ?? '0')}
+                  sub={`${eco.axm.stakingCount ?? 0} записей`}
+                  warn={BigInt(eco.axm.stakingPending ?? '0') > 0n}
                 />
                 <StatCard
                   label="Партнёры"
@@ -147,7 +159,7 @@ export function CommissionTab() {
                     {formatLaunch(eco.axm.netTreasury)} AXM
                   </p>
                   <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-                    комиссия - рефералы - джекпоты - партнёры
+                    комиссия - рефералы - джекпоты - стейкинг - партнёры
                   </p>
                 </div>
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -192,6 +204,14 @@ export function CommissionTab() {
                   ДП {bd.jackpotBps / 100}%
                 </div>
               )}
+              {bd.stakingBps > 0 && (
+                <div
+                  className="bg-emerald-500 flex items-center justify-center text-[9px] font-bold text-white"
+                  style={{ width: `${(bd.stakingBps / bd.commissionBps) * 100}%` }}
+                >
+                  Стейкинг {bd.stakingBps / 100}%
+                </div>
+              )}
               {bd.partnerBps > 0 && (
                 <div
                   className="bg-teal-500 flex items-center justify-center text-[9px] font-bold text-white"
@@ -210,9 +230,10 @@ export function CommissionTab() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               <StatCard label="Рефералы (макс)" value={`${bd.referralMaxBps} BPS`} sub={`${bd.referralMaxBps / 100}% от банка`} />
               <StatCard label="Джекпот" value={`${bd.jackpotBps} BPS`} sub={`${bd.jackpotBps / 100}% от банка`} />
+              <StatCard label="Стейкинг LAUNCH" value={`${bd.stakingBps} BPS`} sub={`${bd.stakingBps / 100}% от банка`} />
               <StatCard label="Партнёры" value={`${bd.partnerBps} BPS`} sub={`${bd.partnerBps / 100}% от банка`} />
               <StatCard label="Казна" value={`${bd.treasuryBps} BPS`} sub={`${bd.treasuryBps / 100}% от банка`} />
             </div>
@@ -223,6 +244,90 @@ export function CommissionTab() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ═══ Staking Flush ═══ */}
+      {stakingStats && (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Send size={14} className="text-emerald-400" />
+                Стейкинг LAUNCH — распределение AXM
+              </h3>
+              <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
+                Накопленные {bd?.stakingBps ? `${bd.stakingBps / 100}%` : '2%'} от каждого банка → стейкинг-контракт → держателям LAUNCH
+              </p>
+            </div>
+            <ActionButton
+              onClick={async () => {
+                setFlushError(null);
+                setFlushResult(null);
+                try {
+                  const result = await flush.mutateAsync();
+                  setFlushResult(result);
+                } catch (err) {
+                  setFlushError(err instanceof Error ? err.message : 'Flush failed');
+                }
+              }}
+              disabled={BigInt(stakingStats.pendingAmount) <= 0n || flush.isPending}
+              variant="success"
+            >
+              {flush.isPending ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" />
+                  Отправка...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <Send size={12} />
+                  Отправить {formatLaunch(stakingStats.pendingAmount)} AXM
+                </span>
+              )}
+            </ActionButton>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <StatCard
+              label="Всего начислено"
+              value={formatLaunch(stakingStats.totalAccumulated)}
+              sub={`${stakingStats.totalEntries} ставок`}
+            />
+            <StatCard
+              label="Ожидает отправки"
+              value={formatLaunch(stakingStats.pendingAmount)}
+              sub={`${stakingStats.pendingEntries} записей`}
+              warn={BigInt(stakingStats.pendingAmount) > 0n}
+            />
+            <StatCard
+              label="Отправлено"
+              value={formatLaunch(stakingStats.flushedAmount)}
+              sub={`${stakingStats.flushedEntries} записей`}
+            />
+            <StatCard
+              label="Ставка"
+              value={`${bd?.stakingBps ? bd.stakingBps / 100 : 2}%`}
+              sub="от каждого банка"
+            />
+          </div>
+
+          {flushResult && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle size={16} className="text-green-400 shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="text-green-400 font-medium">Отправлено {formatLaunch(flushResult.amount)} AXM</p>
+                <p className="text-[var(--color-text-secondary)] font-mono mt-1">TX: {flushResult.txHash}</p>
+              </div>
+            </div>
+          )}
+
+          {flushError && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-400">{flushError}</p>
+            </div>
+          )}
         </div>
       )}
 

@@ -17,6 +17,7 @@ import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 import { relayerService } from './relayer.js';
+import { configService } from './config.service.js';
 
 class StakingService {
   /**
@@ -27,7 +28,8 @@ class StakingService {
    * @param totalPot - Total pot in micro-units (amount * 2)
    */
   async recordContribution(betId: bigint, totalPot: bigint): Promise<void> {
-    const amount = (totalPot * BigInt(STAKING_BPS)) / 10000n;
+    const bps = await configService.getNumber('STAKING_BPS', STAKING_BPS);
+    const amount = (totalPot * BigInt(bps)) / 10000n;
     if (amount <= 0n) return;
 
     const db = getDb();

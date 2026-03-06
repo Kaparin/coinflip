@@ -151,6 +151,7 @@ class ConfigService {
       commissionBps: number;
       referralMaxBps: number;
       jackpotBps: number;
+      stakingBps: number;
       partnerBps: number;
       treasuryBps: number;
       totalAllocated: number;
@@ -162,6 +163,7 @@ class ConfigService {
     const commissionBps = await this.getNumber('COMMISSION_BPS', 1000);
     const referralMaxBps = await this.getNumber('MAX_REFERRAL_BPS_PER_BET', 500);
     const jackpotBps = await this.getNumber('JACKPOT_TOTAL_BPS', 100);
+    const stakingBps = await this.getNumber('STAKING_BPS', 200);
 
     const [partnerRow] = await db
       .select({ totalBps: sql<number>`COALESCE(SUM(bps), 0)::int` })
@@ -169,7 +171,7 @@ class ConfigService {
       .where(eq(partnerConfig.isActive, 1));
     const partnerBps = partnerRow?.totalBps ?? 0;
 
-    const totalAllocated = referralMaxBps + jackpotBps + partnerBps;
+    const totalAllocated = referralMaxBps + jackpotBps + stakingBps + partnerBps;
     const treasuryBps = commissionBps - totalAllocated;
 
     return {
@@ -178,6 +180,7 @@ class ConfigService {
         commissionBps,
         referralMaxBps,
         jackpotBps,
+        stakingBps,
         partnerBps,
         treasuryBps: Math.max(0, treasuryBps),
         totalAllocated,

@@ -80,6 +80,7 @@ const KEY_LABELS: Record<string, string> = {
   MINIMUM_CLAIM_AMOUNT_MICRO: `Мин. сумма клейма (${GAME_TOKEN})`,
   WASH_TRADE_PAIR_DAILY_LIMIT: 'Лимит пар/24ч (анти-абьюз)',
   JACKPOT_TOTAL_BPS: 'Джекпот (BPS)',
+  STAKING_BPS: 'Стейкинг LAUNCH (BPS)',
 };
 
 export function ConfigTab() {
