@@ -98,7 +98,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-6 space-y-4">
+      <div className="mx-auto max-w-4xl px-4 lg:px-6 py-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full rounded-xl" />
         <Skeleton className="h-60 w-full rounded-xl" />
@@ -108,7 +108,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!event) {
     return (
-      <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-12 text-center space-y-3">
+      <div className="mx-auto max-w-4xl px-4 lg:px-6 py-12 text-center space-y-3">
         <p className="text-sm text-[var(--color-text-secondary)]">{t('events.notFoundOrCanceled')}</p>
         <Link href="/game/events" className="inline-block text-sm text-[var(--color-primary)] hover:underline">
           {t('events.backToEvents')}
@@ -143,7 +143,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const raffleSeed = resultsResponse?.data?.raffleSeed ?? null;
 
   return (
-    <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-6 pb-24 md:pb-6 space-y-4 overflow-y-auto">
+    <div className="mx-auto max-w-4xl px-4 lg:px-6 py-6 pb-24 md:pb-6 space-y-4 overflow-y-auto">
       {/* Back link */}
       <Link href="/game/events" className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} />

@@ -1197,7 +1197,7 @@ export default function ProfilePage() {
 
   if (!wallet.address) {
     return (
-      <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-6 py-12 text-center pb-24 md:pb-6">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-12 text-center pb-24 md:pb-6">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
           <User size={48} className="mx-auto mb-4 text-[var(--color-text-secondary)]" />
           <h2 className="text-lg font-bold mb-2">{t('profile.title')}</h2>
@@ -1269,7 +1269,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-6 py-4 space-y-3 pb-24 md:pb-6">
+    <div className="max-w-3xl mx-auto px-4 lg:px-6 py-4 space-y-3 pb-24 md:pb-6">
       {/* Profile card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">

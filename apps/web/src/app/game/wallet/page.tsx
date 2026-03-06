@@ -22,7 +22,7 @@ export default function WalletPage() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-lg lg:max-w-2xl mx-auto px-4 lg:px-6 py-12 text-center pb-24 md:pb-6">
+      <div className="max-w-2xl mx-auto px-4 lg:px-6 py-12 text-center pb-24 md:pb-6">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
           <Wallet size={48} strokeWidth={1} className="mx-auto mb-4 text-[var(--color-text-secondary)]" />
           <h2 className="text-lg font-bold mb-2">{t('walletPage.connectTitle')}</h2>
@@ -39,7 +39,7 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="max-w-lg lg:max-w-2xl mx-auto px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
+    <div className="max-w-2xl mx-auto px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
       {/* Address card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <div className="flex items-center justify-between mb-2">

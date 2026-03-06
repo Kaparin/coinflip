@@ -522,7 +522,7 @@ export default function PlayerProfilePage() {
   // Loading state
   if (isLoading && page === 0) {
     return (
-      <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-4">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-4">
         <Skeleton className="h-8 w-24 rounded-lg" />
         <div className="flex items-center gap-4">
           <Skeleton className="h-16 w-16 rounded-full" />
@@ -543,7 +543,7 @@ export default function PlayerProfilePage() {
   // Error / not found
   if (error || !profile) {
     return (
-      <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6">
         <button
           type="button"
           onClick={() => router.back()}
@@ -572,7 +572,7 @@ export default function PlayerProfilePage() {
   const selectedCategory = selectedAch ? ACHIEVEMENT_CATEGORIES.find((c) => c.id === selectedAch) : null;
 
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-3 pb-24 md:pb-6">
+    <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-3 pb-24 md:pb-6">
       {/* Back button */}
       <button
         type="button"

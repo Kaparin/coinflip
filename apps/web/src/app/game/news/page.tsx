@@ -39,7 +39,7 @@ export default function NewsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl lg:max-w-5xl px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
+    <div className="mx-auto max-w-4xl px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
