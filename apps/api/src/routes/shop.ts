@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { eq, and, count, sum, countDistinct, desc } from 'drizzle-orm';
+import { eq, count, sum, countDistinct, desc } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth.js';
 import { adminMiddleware } from '../middleware/admin.js';
 import { getDb } from '../lib/db.js';
@@ -220,26 +220,10 @@ shopRouter.post(
       return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient game balance' } }, 400);
     }
 
-    // Check per-tier first purchase bonus
-    const [tierCount] = await db
-      .select({ total: count() })
-      .from(shopPurchases)
-      .where(
-        and(
-          eq(shopPurchases.userId, user.id),
-          eq(shopPurchases.chestTier, body.chest_tier),
-        ),
-      );
-
-    const isFirstTierPurchase = (tierCount?.total ?? 0) === 0;
     const microCoin = String(Math.floor(tierConfig.coinAmount * 1_000_000));
-    const totalMicroCoin = isFirstTierPurchase
-      ? String(Math.floor(tierConfig.coinAmount * 2 * 1_000_000))
-      : microCoin;
-    const bonusMicroCoin = isFirstTierPurchase ? microCoin : '0';
 
     // Credit COIN to user balance
-    await vaultService.creditCoin(user.id, totalMicroCoin);
+    await vaultService.creditCoin(user.id, microCoin);
 
     // Record purchase (use synthetic ID instead of tx hash)
     const syntheticTxHash = `vault-${crypto.randomUUID()}`;
@@ -251,21 +235,19 @@ shopRouter.post(
         chestTier: body.chest_tier,
         axmAmount: microAxm,
         coinAmount: microCoin,
-        bonusCredited: bonusMicroCoin,
+        bonusCredited: '0',
         txHash: syntheticTxHash,
         status: 'confirmed',
       });
 
     const coinAmount = tierConfig.coinAmount;
-    const bonusAmount = isFirstTierPurchase ? tierConfig.coinAmount : 0;
-    const totalCoin = coinAmount + bonusAmount;
 
     // Notify via WS
     wsService.sendToAddress(address, {
       type: 'purchase_confirmed',
       data: {
         tx_hash: syntheticTxHash,
-        coin_amount: String(totalCoin),
+        coin_amount: String(coinAmount),
       },
     });
 
@@ -276,16 +258,15 @@ shopRouter.post(
     });
 
     logger.info(
-      { userId: user.id, tier: body.chest_tier, axm: tierConfig.axmPrice, coin: totalCoin, bonus: bonusAmount },
+      { userId: user.id, tier: body.chest_tier, axm: tierConfig.axmPrice, coin: coinAmount },
       'Shop vault purchase completed',
     );
 
     return c.json({
       data: {
         coin_amount: coinAmount,
-        bonus_amount: bonusAmount,
-        total_coin: totalCoin,
-        is_first_tier_purchase: isFirstTierPurchase,
+        bonus_amount: 0,
+        total_coin: coinAmount,
       },
     });
   },
@@ -363,7 +344,6 @@ function resolveShopPurchaseInBackground(
   address: string,
   txHash: string,
   tierConfig: TierConfig,
-  isFirstPurchase: boolean,
 ) {
   (async () => {
     const db = getDb();
@@ -374,13 +354,10 @@ function resolveShopPurchaseInBackground(
       if (result && result.code === 0) {
         // AXM payment confirmed on-chain — credit COIN to user's DB balance
         const microCoin = String(Math.floor(tierConfig.coinAmount * 1_000_000));
-        const totalMicroCoin = isFirstPurchase
-          ? String(Math.floor(tierConfig.coinAmount * 2 * 1_000_000))
-          : microCoin;
 
         try {
           // Credit COIN balance in DB (no on-chain CW20 transfer needed)
-          await vaultService.creditCoin(userId, totalMicroCoin);
+          await vaultService.creditCoin(userId, microCoin);
 
           // Mark as confirmed
           await db
@@ -388,17 +365,15 @@ function resolveShopPurchaseInBackground(
             .set({ status: 'confirmed' })
             .where(eq(shopPurchases.id, purchaseId));
 
-          const totalCoin = isFirstPurchase ? tierConfig.coinAmount * 2 : tierConfig.coinAmount;
-
           wsService.sendToAddress(address, {
             type: 'purchase_confirmed',
             data: {
               tx_hash: txHash,
-              coin_amount: String(totalCoin),
+              coin_amount: String(tierConfig.coinAmount),
             },
           });
 
-          logger.info({ purchaseId, txHash, totalMicroCoin, isFirstPurchase }, 'Shop purchase confirmed — COIN credited to DB');
+          logger.info({ purchaseId, txHash, microCoin }, 'Shop purchase confirmed — COIN credited to DB');
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
 
@@ -500,16 +475,8 @@ shopRouter.post(
       });
     }
 
-    // Check if first purchase
-    const [countResult] = await db
-      .select({ total: count() })
-      .from(shopPurchases)
-      .where(eq(shopPurchases.userId, user.id));
-
-    const isFirstPurchase = (countResult?.total ?? 0) === 0;
     const microAxm = String(Math.floor(tierConfig.axmPrice * 1_000_000));
     const microCoin = String(Math.floor(tierConfig.coinAmount * 1_000_000));
-    const bonusAmount = isFirstPurchase ? microCoin : '0';
 
     // Insert purchase record with status='pending'
     const [purchase] = await db
@@ -520,7 +487,7 @@ shopRouter.post(
         chestTier: body.chest_tier,
         axmAmount: microAxm,
         coinAmount: microCoin,
-        bonusCredited: bonusAmount,
+        bonusCredited: '0',
         txHash: body.tx_hash,
         status: 'pending',
       })
@@ -533,15 +500,13 @@ shopRouter.post(
       address,
       body.tx_hash,
       tierConfig,
-      isFirstPurchase,
     );
 
     return c.json({
       data: {
         purchase_id: purchase!.id,
         coin_amount: tierConfig.coinAmount,
-        bonus_amount: isFirstPurchase ? tierConfig.coinAmount : 0,
-        is_first_purchase: isFirstPurchase,
+        bonus_amount: 0,
         tx_hash: body.tx_hash,
       },
     }, 202);

@@ -829,7 +829,11 @@
     "totalReferralPaid": "Total referral paid",
     "rewardSourceTitle": "Where rewards come from",
     "rewardSourceDesc": "Rewards come from the platform commission (10% of each pot). When you claim, tokens are sent from the treasury vault directly to your Axiome wallet — not to your game vault. You can then deposit to play or keep them in your wallet.",
-    "linkCopied": "Referral link copied!"
+    "linkCopied": "Referral link copied!",
+    "claimBelowMinimum": "Minimum claim amount is {amount} COIN. Keep playing to earn more!",
+    "claimNothing": "No unclaimed rewards.",
+    "claimInProgress": "Claim is already being processed.",
+    "claimTreasuryLow": "Rewards pool is temporarily low. Try again later."
   },
   "events": {
     "title": "Events",
