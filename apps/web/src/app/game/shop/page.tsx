@@ -201,7 +201,7 @@ export default function ShopPage() {
                     setSelectedTier(tier);
                   }}
                   disabled={!isEnabled || isBuying}
-                  className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
+                  className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 pb-2 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
                 >
                   {/* Per-tier bonus badge */}
                   {isFirstForTier && bonusAmount > 0 && (
@@ -220,16 +220,8 @@ export default function ShopPage() {
                     </div>
                   )}
 
-                  {/* COIN amount — top */}
-                  <div className="flex items-center gap-1 mt-1">
-                    <LaunchTokenIcon size={16} />
-                    <p className="text-lg font-extrabold text-[var(--color-primary)] leading-tight">
-                      {fmtNum(tier.coinAmount)} COIN
-                    </p>
-                  </div>
-
                   {/* Image */}
-                  <div className="relative h-20 w-20 my-2">
+                  <div className="relative h-20 w-20 mt-1 mb-1">
                     <Image
                       src={tier.image}
                       alt={t(tier.nameKey)}
@@ -242,15 +234,26 @@ export default function ShopPage() {
                   {/* Name */}
                   <p className="text-[11px] font-bold text-[var(--color-text-secondary)] text-center leading-tight">{t(tier.nameKey)}</p>
 
-                  {/* Price — AXM with game token icon */}
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <GameTokenIcon size={14} />
-                    <span className="text-lg font-extrabold">{tier.axmPrice} AXM</span>
+                  {/* Reward — what you GET */}
+                  <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-[var(--color-primary)]/10 px-2.5 py-1">
+                    <LaunchTokenIcon size={14} />
+                    <span className="text-sm font-extrabold text-[var(--color-primary)]">
+                      {fmtNum(tier.coinAmount)} COIN
+                    </span>
+                  </div>
+
+                  {/* Separator */}
+                  <div className="w-full border-t border-[var(--color-border)]/50 mt-2 mb-1.5" />
+
+                  {/* Price — what you PAY */}
+                  <div className="flex items-center gap-1.5">
+                    <GameTokenIcon size={13} />
+                    <span className="text-xs font-bold text-[var(--color-text-secondary)]">{tier.axmPrice} AXM</span>
                   </div>
 
                   {/* Insufficient balance warning */}
                   {isConnected && !canAfford && (
-                    <p className="text-[9px] text-[var(--color-danger)] mt-1">{t('shop.notEnough')}</p>
+                    <p className="text-[9px] text-[var(--color-danger)] mt-0.5">{t('shop.notEnough')}</p>
                   )}
                 </button>
               );
