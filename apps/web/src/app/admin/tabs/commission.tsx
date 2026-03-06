@@ -281,7 +281,7 @@ export function CommissionTab() {
                 Стейкинг LAUNCH — распределение AXM
               </h3>
               <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
-                Накопленные {bd?.stakingBps ? `${bd.stakingBps / 100}%` : '2%'} от каждого банка → стейкинг-контракт → держателям LAUNCH
+                Накопленные 20% от комиссии → стейкинг-контракт → держателям LAUNCH
               </p>
             </div>
             <ActionButton

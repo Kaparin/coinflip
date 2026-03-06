@@ -117,7 +117,7 @@ export const EMPTY_EVENT_ARCHIVE_GRACE_MS = 5 * 60 * 1000;
 export const EVENT_AUTO_APPROVE_GRACE_MS = 10 * 60 * 1000;
 
 // ---- Staking ----
-/** LAUNCH staking contribution from each pot in basis points (200 = 2%) */
+/** LAUNCH staking contribution from each pot in basis points (200 = 2% of pot = 20% of 10% commission) */
 export const STAKING_BPS = 200;
 
 // ---- Jackpot ----

@@ -387,7 +387,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
           <div className="flex items-center justify-between text-[10px] px-1">
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[var(--color-text-secondary)]">{t('staking.revenueSource')}: 2% {t('staking.perPot')}</span>
+              <span className="text-[var(--color-text-secondary)]">{t('staking.revenueSource')}: 20% {t('staking.ofCommission')}</span>
             </div>
             {STAKING_CONTRACT && (
               <a

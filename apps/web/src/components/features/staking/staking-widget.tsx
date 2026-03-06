@@ -313,7 +313,7 @@ export function StakingWidget() {
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             <span className="text-[var(--color-text-secondary)]">{t('staking.revenueSource')}</span>
           </div>
-          <span className="font-bold">2% {t('staking.perPot')}</span>
+          <span className="font-bold">20% {t('staking.ofCommission')}</span>
         </div>
       </div>
 

@@ -59,8 +59,8 @@ export function StakingTab() {
         />
         <StatCard
           label="Ставка для стейкеров"
-          value="2%"
-          sub="от каждого банка"
+          value="20%"
+          sub="от комиссии"
         />
       </div>
 
@@ -68,7 +68,7 @@ export function StakingTab() {
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <h3 className="text-sm font-semibold mb-2">Как это работает</h3>
         <div className="text-xs text-[var(--color-text-secondary)] space-y-1">
-          <p>1. При каждом завершении ставки 2% банка записывается в staking_ledger со статусом "pending"</p>
+          <p>1. При каждом завершении ставки 20% от комиссии записывается в staking_ledger со статусом "pending"</p>
           <p>2. Накопленная сумма отображается выше как "Ожидает отправки"</p>
           <p>3. Нажмите "Отправить в контракт" чтобы перевести AXM в стейкинг-контракт</p>
           <p>4. Контракт автоматически распределит AXM пропорционально стейкам держателей LAUNCH</p>
