@@ -26,12 +26,18 @@ function getTopRankStyle(rank: number): string {
   return '';
 }
 
-function getMetricValue(entry: Record<string, unknown>): { label: string; value: string } {
+function getMetricValue(entry: Record<string, unknown>): { key: string; value: string } {
   const metric = entry.metric as string | undefined;
-  if (metric === 'wins') return { label: 'wins', value: String(entry.wins ?? '0') };
-  if (metric === 'profit') return { label: 'profit', value: String(entry.profit ?? '0') };
-  return { label: 'turnover', value: String(entry.turnover ?? '0') };
+  if (metric === 'wins') return { key: 'wins', value: String(entry.wins ?? '0') };
+  if (metric === 'profit') return { key: 'profit', value: String(entry.profit ?? '0') };
+  return { key: 'turnover', value: String(entry.turnover ?? '0') };
 }
+
+const METRIC_I18N: Record<string, string> = {
+  turnover: 'events.rules.metricTurnover',
+  wins: 'events.rules.metricWins',
+  profit: 'events.rules.metricProfit',
+};
 
 export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
   const { t } = useTranslation();
@@ -70,7 +76,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
         const isTopThree = rank <= 3;
         const topStyle = getTopRankStyle(rank);
         const staggerClass = i < 10 ? `stagger-${i + 1}` : '';
-        const { label: metricLabel, value: metricValue } = getMetricValue(entry);
+        const { key: metricKey, value: metricValue } = getMetricValue(entry);
 
         return (
           <div
@@ -103,7 +109,7 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
                   {isCurrentUser && <span className="ml-1 text-indigo-400">({t('leaderboard.you')})</span>}
                 </p>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  {String(entry.games ?? 0)} games / {String(entry.wins ?? 0)} wins
+                  {String(entry.games ?? 0)} {t('events.leaderboardStats.games')} / {String(entry.wins ?? 0)} {t('events.leaderboardStats.wins')}
                 </p>
               </div>
             </div>
@@ -112,9 +118,9 @@ export function ContestLeaderboard({ eventId }: ContestLeaderboardProps) {
             <div className="flex items-center gap-1 shrink-0">
               <div className="text-right">
                 <span className={`font-bold tabular-nums ${rank === 1 ? 'text-base' : 'text-sm'}`}>
-                  {metricLabel === 'wins' ? metricValue : formatLaunch(metricValue)}
+                  {metricKey === 'wins' ? metricValue : formatLaunch(metricValue)}
                 </span>
-                <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{metricLabel}</p>
+                <p className="text-[9px] text-[var(--color-text-secondary)] uppercase">{t(METRIC_I18N[metricKey] ?? metricKey)}</p>
               </div>
               <GameTokenIcon size={rank === 1 ? 16 : 16} />
             </div>

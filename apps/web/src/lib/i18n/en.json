@@ -577,7 +577,7 @@
       "timingsTitle": "Timings",
       "timingsBody": "An open bet lives for 3 hours. Accept and result — typically 2–10 seconds on-chain (single atomic transaction). Deposit/withdraw transactions — 2–10 seconds.",
       "branchChangeTitle": "Referral branch change",
-      "branchChangeBody": "Cost — 1,000 COIN. Two transactions: withdraw from vault to wallet, then transfer to treasury. Usually 10–20 seconds. The new referrer must exist in the system and not create a cycle.",
+      "branchChangeBody": "Fee is deducted from your COIN balance instantly. The new referrer must exist in the system and not create a cycle.",
       "contractTitle": "Smart contract",
       "contractBody": "CosmWasm contract coinflip-pvp-vault. Stores: balances (available, locked), bets (commitment, status), config (10% commission, min bet, timeouts). Messages: deposit, withdraw, create_bet, accept_and_reveal, cancel_bet. The chain is the single source of truth.",
       "relayerTitle": "Relayer and account activation",
@@ -806,6 +806,7 @@
     "changeBranch": "Change Branch",
     "changeBranchDesc": "Switch to a different referral tree. This is a paid feature.",
     "changeBranchCost": "Cost: 1,000 COIN",
+    "changeBranchCostLabel": "Cost",
     "changeBranchInput": "New referrer's wallet address (axm1...)",
     "changeBranchConfirm": "Change for 1,000 COIN",
     "changeBranchSuccess": "Referral branch changed!",
@@ -830,6 +831,10 @@
     "participants": "participants",
     "prizes": "Prizes",
     "leaderboard": "Leaderboard",
+    "leaderboardStats": {
+      "games": "games",
+      "wins": "wins"
+    },
     "resultsTitle": "Results",
     "notFound": "Event not found",
     "backToEvents": "Back to events",
@@ -854,6 +859,14 @@
     "prize": "Prize",
     "you": "(you)",
     "noLeaderboardData": "No leaderboard data yet",
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "completed": "Completed",
+      "calculating": "Calculating",
+      "archived": "Archived",
+      "canceled": "Canceled"
+    },
     "participantsList": "Participants",
     "winner": "Winner",
     "joined": "Joined",

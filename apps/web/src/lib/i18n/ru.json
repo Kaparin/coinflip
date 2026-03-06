@@ -577,7 +577,7 @@
       "timingsTitle": "Тайминги",
       "timingsBody": "Открытая ставка живёт 3 часа. Принятие и результат — обычно 2–10 секунд на блокчейне (одна атомарная транзакция). Транзакции депозита/вывода — 2–10 секунд.",
       "branchChangeTitle": "Смена ветки реферала",
-      "branchChangeBody": "Стоимость — 1 000 COIN. Две транзакции: вывод из vault в кошелёк, затем перевод в казну. Обычно 10–20 секунд. Новый реферер должен существовать в системе и не создавать цикл.",
+      "branchChangeBody": "Комиссия списывается из баланса COIN мгновенно. Новый реферер должен существовать в системе и не создавать цикл.",
       "contractTitle": "Смарт-контракт",
       "contractBody": "CosmWasm-контракт coinflip-pvp-vault. Хранит: балансы (available, locked), ставки (commitment, статус), конфиг (комиссия 10%, min bet, таймауты). Сообщения: deposit, withdraw, create_bet, accept_and_reveal, cancel_bet. Цепь — единственный источник правды.",
       "relayerTitle": "Релейер и активация аккаунта",
@@ -806,6 +806,7 @@
     "changeBranch": "Сменить ветку",
     "changeBranchDesc": "Перейти в другое реферальное дерево. Платная функция.",
     "changeBranchCost": "Стоимость: 1 000 COIN",
+    "changeBranchCostLabel": "Стоимость",
     "changeBranchInput": "Адрес кошелька нового реферера (axm1...)",
     "changeBranchConfirm": "Сменить за 1 000 COIN",
     "changeBranchSuccess": "Реферальная ветка изменена!",
@@ -830,6 +831,10 @@
     "participants": "участников",
     "prizes": "Призы",
     "leaderboard": "Лидерборд",
+    "leaderboardStats": {
+      "games": "игр",
+      "wins": "побед"
+    },
     "resultsTitle": "Результаты",
     "notFound": "Событие не найдено",
     "backToEvents": "Назад к событиям",
@@ -854,6 +859,14 @@
     "prize": "Приз",
     "you": "(вы)",
     "noLeaderboardData": "Данных лидерборда пока нет",
+    "status": {
+      "draft": "Черновик",
+      "active": "Активно",
+      "completed": "Завершено",
+      "calculating": "Подсчёт",
+      "archived": "В архиве",
+      "canceled": "Отменено"
+    },
     "participantsList": "Участники",
     "winner": "Победитель",
     "joined": "Участвует",

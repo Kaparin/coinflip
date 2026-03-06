@@ -401,16 +401,20 @@ function ChangeBranchSection() {
   const [errorMsg, setErrorMsg] = useState('');
   const [referrer, setReferrer] = useState<{ address: string; nickname: string | null } | null>(null);
   const [loadingRef, setLoadingRef] = useState(true);
+  const [branchCost, setBranchCost] = useState<string | null>(null);
 
   const isRu = locale === 'ru';
   const isProcessing = step === 'processing';
 
-  // Fetch current referrer on mount
+  // Fetch current referrer + branch cost on mount
   useEffect(() => {
-    import('@/hooks/use-referral').then(({ checkHasReferrer }) => {
+    import('@/hooks/use-referral').then(({ checkHasReferrer, fetchReferralConfig }) => {
       checkHasReferrer().then((data) => {
         setReferrer(data.referrer);
         setLoadingRef(false);
+      });
+      fetchReferralConfig().then((cfg) => {
+        if (cfg?.changeBranchCostMicro) setBranchCost(cfg.changeBranchCostMicro);
       });
     });
   }, []);
@@ -539,7 +543,7 @@ function ChangeBranchSection() {
                 {t('referral.changeBranchDesc')}
               </p>
               <p className="text-[10px] font-bold text-amber-500">
-                {t('referral.changeBranchCost')}
+                {t('referral.changeBranchCostLabel')}: {branchCost ? formatLaunch(branchCost) : '...'} COIN
               </p>
               <input
                 type="text"

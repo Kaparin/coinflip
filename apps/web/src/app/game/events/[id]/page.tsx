@@ -180,7 +180,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             event.status === 'calculating' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
             'bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]'
           }`}>
-            {isUpcoming ? t('events.upcoming') : event.status}
+            {isUpcoming ? t('events.upcoming') : t(`events.status.${event.status}`)}
           </span>
         </div>
 
