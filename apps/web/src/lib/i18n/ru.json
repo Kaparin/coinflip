@@ -920,6 +920,10 @@
     "vipPurchase": "Подписка {tier} VIP",
     "transferSent": "Перевод для {to}",
     "transferReceived": "Получено от {from}",
+    "deposit": "Пополнение хранилища",
+    "withdrawal": "Вывод из хранилища",
+    "eventPrize": "Приз #{rank} — {title}",
+    "achievementClaim": "Ачивка: {achievement}",
     "loadMore": "Загрузить ещё",
     "noActivity": "Пока нет активности"
   },

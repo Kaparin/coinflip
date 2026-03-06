@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, Award, Medal } from 'lucide-react';
 import { GiOpenTreasureChest } from 'react-icons/gi';
 import Link from 'next/link';
 
@@ -92,6 +92,34 @@ const TYPE_CONFIG: Record<ActivityType, {
     borderClass: 'border-sky-400/20',
     sign: '+',
   },
+  deposit: {
+    icon: ArrowDownToLine,
+    colorClass: 'text-emerald-400',
+    bgClass: 'bg-emerald-400/15',
+    borderClass: 'border-emerald-400/20',
+    sign: '+',
+  },
+  withdrawal: {
+    icon: ArrowUpFromLine,
+    colorClass: 'text-red-400',
+    bgClass: 'bg-red-400/15',
+    borderClass: 'border-red-400/20',
+    sign: '-',
+  },
+  event_prize: {
+    icon: Award,
+    colorClass: 'text-yellow-400',
+    bgClass: 'bg-yellow-400/15',
+    borderClass: 'border-yellow-400/20',
+    sign: '+',
+  },
+  achievement_claim: {
+    icon: Medal,
+    colorClass: 'text-indigo-400',
+    bgClass: 'bg-indigo-400/15',
+    borderClass: 'border-indigo-400/20',
+    sign: '+',
+  },
 };
 
 function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?: Record<string, string | number>) => string }) {
@@ -142,6 +170,23 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
     case 'transfer_received': {
       const sender = (meta.senderNickname as string) || truncAddr((meta.senderAddress as string) ?? '');
       description = t('activity.transferReceived', { from: sender });
+      break;
+    }
+    case 'deposit':
+      description = t('activity.deposit');
+      break;
+    case 'withdrawal':
+      description = t('activity.withdrawal');
+      break;
+    case 'event_prize': {
+      const eventTitle = (meta.eventTitle as string) ?? '';
+      const rank = meta.rank as number;
+      description = t('activity.eventPrize', { title: eventTitle, rank: rank ?? 0 });
+      break;
+    }
+    case 'achievement_claim': {
+      const achId = meta.achievementId as string;
+      description = t('activity.achievementClaim', { achievement: t(`achievements.${achId}.name`) || achId });
       break;
     }
     default:

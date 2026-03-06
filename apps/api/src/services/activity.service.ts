@@ -9,7 +9,7 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
-export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received';
+export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received' | 'deposit' | 'withdrawal' | 'event_prize' | 'achievement_claim';
 
 export interface ActivityItem {
   id: string;
@@ -33,7 +33,7 @@ class ActivityService {
     // Build type filter
     const allowedTypes = options.types?.length
       ? options.types
-      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase', 'transfer_sent', 'transfer_received'];
+      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase', 'transfer_sent', 'transfer_received', 'deposit', 'withdrawal', 'event_prize', 'achievement_claim'];
 
     const unionParts: ReturnType<typeof sql>[] = [];
 
@@ -218,6 +218,80 @@ class ActivityService {
           ) AS metadata
         FROM coin_transfers ct
         WHERE ct.recipient_id = ${userId}
+      `);
+    }
+
+    // Deposits
+    if (allowedTypes.includes('deposit')) {
+      unionParts.push(sql`
+        SELECT
+          'deposit_' || vt.id AS id,
+          'deposit' AS type,
+          vt.amount::text AS amount,
+          vt.created_at AS ts,
+          jsonb_build_object(
+            'txHash', vt.tx_hash
+          ) AS metadata
+        FROM vault_transactions vt
+        WHERE vt.user_id = ${userId}
+          AND vt.type = 'deposit'
+          AND vt.status = 'confirmed'
+      `);
+    }
+
+    // Withdrawals
+    if (allowedTypes.includes('withdrawal')) {
+      unionParts.push(sql`
+        SELECT
+          'withdrawal_' || vt.id AS id,
+          'withdrawal' AS type,
+          vt.amount::text AS amount,
+          vt.created_at AS ts,
+          jsonb_build_object(
+            'txHash', vt.tx_hash
+          ) AS metadata
+        FROM vault_transactions vt
+        WHERE vt.user_id = ${userId}
+          AND vt.type = 'withdraw'
+          AND vt.status = 'confirmed'
+      `);
+    }
+
+    // Event prizes (contests / raffles)
+    if (allowedTypes.includes('event_prize')) {
+      unionParts.push(sql`
+        SELECT
+          'event_prize_' || ep.id AS id,
+          'event_prize' AS type,
+          ep.prize_amount::text AS amount,
+          e.ends_at AS ts,
+          jsonb_build_object(
+            'eventId', e.id,
+            'eventTitle', e.title,
+            'eventType', e.type,
+            'rank', ep.final_rank
+          ) AS metadata
+        FROM event_participants ep
+        INNER JOIN events e ON e.id = ep.event_id
+        WHERE ep.user_id = ${userId}
+          AND ep.prize_amount IS NOT NULL
+          AND ep.prize_amount::numeric > 0
+      `);
+    }
+
+    // Achievement claims
+    if (allowedTypes.includes('achievement_claim')) {
+      unionParts.push(sql`
+        SELECT
+          'achievement_' || ac.id AS id,
+          'achievement_claim' AS type,
+          ac.coin_amount::text AS amount,
+          ac.claimed_at AS ts,
+          jsonb_build_object(
+            'achievementId', ac.achievement_id
+          ) AS metadata
+        FROM achievement_claims ac
+        WHERE ac.user_id = ${userId}
       `);
     }
 

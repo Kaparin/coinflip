@@ -18,6 +18,7 @@ import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
 import { chainRest, chainRestPost } from '../lib/chain-fetch.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 import { resolveGasGranter } from '../lib/gas-granter.js';
+import { vaultTransactions } from '@coinflip/db/schema';
 
 /** Throw an appropriate AppError for a failed relay result */
 function throwRelayError(relayResult: RelayResult): never {
@@ -286,12 +287,12 @@ async function pollTxConfirmation(txHash: string, maxPollMs = 30_000): Promise<{
 //   5. Server syncs balance and returns result
 //
 // This is ~3-5x faster than the old flow where everything went through Vercel proxy.
-const DepositBroadcastSchema = z.object({ tx_bytes: z.string().min(1).max(100_000) });
+const DepositBroadcastSchema = z.object({ tx_bytes: z.string().min(1).max(100_000), amount: z.string().optional() });
 vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', DepositBroadcastSchema), async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  const { tx_bytes: txBytesBase64 } = c.req.valid('json');
+  const { tx_bytes: txBytesBase64, amount: depositAmount } = c.req.valid('json');
 
   // Pre-flight: verify user's wallet balance before broadcasting.
   // This prevents wasting gas on a tx that will fail due to insufficient balance.
@@ -388,6 +389,13 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
             return;
           }
           logger.info({ txHash, address, height: result.height }, 'Async deposit confirmed on chain');
+          // Log deposit to vault_transactions
+          if (depositAmount) {
+            const db = (await import('../lib/db.js')).getDb();
+            await db.insert(vaultTransactions).values({
+              userId: user.id, type: 'deposit', amount: depositAmount, txHash, status: 'confirmed',
+            }).catch(e => logger.warn({ e }, 'Failed to log deposit transaction'));
+          }
           // Small delay to let REST node catch up with the new block state
           await new Promise(r => setTimeout(r, 1_500));
           invalidateBalanceCache(address);
@@ -470,6 +478,13 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
 
     // Step 3: Success — invalidate cache and sync balance
     logger.info({ txHash, address, height: txResult.height }, 'Deposit confirmed on chain');
+    // Log deposit to vault_transactions
+    if (depositAmount) {
+      const db = (await import('../lib/db.js')).getDb();
+      await db.insert(vaultTransactions).values({
+        userId: user.id, type: 'deposit', amount: depositAmount, txHash, status: 'confirmed',
+      }).catch(e => logger.warn({ e }, 'Failed to log deposit transaction'));
+    }
     invalidateBalanceCache(address);
 
     // Sync balance from chain in background (don't block response)
@@ -584,8 +599,15 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
         return;
       }
 
-      // Confirmed — sync balance
+      // Confirmed — log + sync balance
       logger.info({ txHash, address, height: result.height }, 'Withdraw confirmed on chain');
+      // Log withdrawal to vault_transactions
+      {
+        const db = (await import('../lib/db.js')).getDb();
+        await db.insert(vaultTransactions).values({
+          userId: user.id, type: 'withdraw', amount, txHash, status: 'confirmed',
+        }).catch(e => logger.warn({ e }, 'Failed to log withdraw transaction'));
+      }
       await new Promise(r => setTimeout(r, 1_500));
       invalidateBalanceCache(address);
       const newChainBalance = await getChainVaultBalance(address);

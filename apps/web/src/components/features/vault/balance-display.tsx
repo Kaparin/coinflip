@@ -620,7 +620,7 @@ export function BalanceDisplay() {
           ...getAuthHeaders(),
         },
         credentials: 'include',
-        body: JSON.stringify({ tx_bytes: txBytes }),
+        body: JSON.stringify({ tx_bytes: txBytes, amount: toMicroLaunch(parsedHuman) }),
       });
 
       const broadcastData = await broadcastRes.json();

@@ -920,6 +920,10 @@
     "vipPurchase": "{tier} VIP subscription",
     "transferSent": "Sent to {to}",
     "transferReceived": "Received from {from}",
+    "deposit": "Deposited to vault",
+    "withdrawal": "Withdrawn from vault",
+    "eventPrize": "Prize #{rank} — {title}",
+    "achievementClaim": "Achievement: {achievement}",
     "loadMore": "Load more",
     "noActivity": "No activity yet"
   },
