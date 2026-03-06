@@ -23,9 +23,10 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import {
   ChevronDown, ChevronRight, Code, ExternalLink, Coins, Building, Pencil, User, Check,
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
-  Loader2, BarChart3, Gift, Target, MessageCircle,
+  Loader2, BarChart3, Gift, Target, MessageCircle, History,
 } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
+import { HistoryList } from '@/components/features/history/history-list';
 import { TelegramLoginButton, type TelegramUser, consumeTelegramAuthData } from '@/components/features/profile/telegram-login-button';
 import { useTelegramContext } from '@/contexts/telegram-context';
 
@@ -1354,6 +1355,15 @@ export default function ProfilePage() {
         icon={<Trophy size={20} />}
       >
         <GameStatsSection />
+      </CollapsibleSection>
+
+      {/* Transaction History */}
+      <CollapsibleSection
+        title={t('game.historyTab')}
+        defaultOpen={false}
+        icon={<History size={20} />}
+      >
+        <HistoryList />
       </CollapsibleSection>
 
       {/* About */}
