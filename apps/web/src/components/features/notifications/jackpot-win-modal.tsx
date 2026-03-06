@@ -3,36 +3,41 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
-import { GiOpenTreasureChest } from 'react-icons/gi';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
+import Image from 'next/image';
 
-const TIER_THEMES: Record<string, { gradient: string; glow: string; textColor: string }> = {
+const TIER_THEMES: Record<string, { gradient: string; glow: string; textColor: string; image: string }> = {
   mini: {
     gradient: 'from-emerald-500/20 via-emerald-600/10 to-transparent',
     glow: 'drop-shadow-[0_0_20px_rgba(16,185,129,0.6)]',
     textColor: 'text-emerald-400',
+    image: '/jackpot-pack-1.png',
   },
   medium: {
     gradient: 'from-blue-500/20 via-blue-600/10 to-transparent',
     glow: 'drop-shadow-[0_0_20px_rgba(59,130,246,0.6)]',
     textColor: 'text-blue-400',
+    image: '/jackpot-pack-2.png',
   },
   large: {
     gradient: 'from-violet-500/20 via-violet-600/10 to-transparent',
     glow: 'drop-shadow-[0_0_20px_rgba(139,92,246,0.6)]',
     textColor: 'text-violet-400',
+    image: '/jackpot-pack-3.png',
   },
   mega: {
     gradient: 'from-amber-500/20 via-amber-600/10 to-transparent',
     glow: 'drop-shadow-[0_0_20px_rgba(245,158,11,0.6)]',
     textColor: 'text-amber-400',
+    image: '/jackpot-pack-4.png',
   },
   super_mega: {
     gradient: 'from-rose-500/20 via-rose-600/10 to-transparent',
     glow: 'drop-shadow-[0_0_30px_rgba(244,63,94,0.8)]',
     textColor: 'text-rose-400',
+    image: '/jackpot-pack-5.png',
   },
 };
 
@@ -136,9 +141,16 @@ export function JackpotWinModal({ open, onDismiss, tierName, amount }: JackpotWi
 
         {/* Content */}
         <div className="relative z-10">
-          {/* Treasure chest icon */}
-          <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-bg)] ${theme.glow}`}>
-            <GiOpenTreasureChest size={42} className={theme.textColor} />
+          {/* Tier image */}
+          <div className={`mx-auto mb-4 ${theme.glow}`}>
+            <Image
+              src={theme.image}
+              alt={displayName}
+              width={96}
+              height={96}
+              className="drop-shadow-xl"
+              sizes="96px"
+            />
           </div>
 
           {/* Title */}

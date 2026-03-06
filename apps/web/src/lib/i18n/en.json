@@ -978,6 +978,7 @@
     "date": "Date",
     "seed": "Verification seed",
     "noHistory": "No completed jackpots yet",
+    "noWinner": "No winner",
     "noPools": "No active jackpot pools",
     "loadMore": "Load more",
     "minGames": "Min. {count} games to participate",
