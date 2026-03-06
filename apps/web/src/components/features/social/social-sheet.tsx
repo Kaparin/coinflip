@@ -8,7 +8,8 @@ import {
   useMemo,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Send, Loader2, Sparkles, Pin } from 'lucide-react';
+import { X, Search, Send, Loader2, Sparkles, Pin, Gift, CheckCircle, XCircle } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -110,7 +111,6 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Sub-tabs */}
       <div className="flex gap-1 px-3 pt-1 pb-2 shrink-0">
         {subTabs.map(({ key, label }) => (
           <button
@@ -128,7 +128,6 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
         ))}
       </div>
 
-      {/* Search (only for "All" tab) */}
       {subTab === 'all' && (
         <div className="px-3 pb-2 shrink-0">
           <div className="relative">
@@ -144,7 +143,6 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
         </div>
       )}
 
-      {/* User list */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-1 min-h-0">
         {currentLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -208,13 +206,97 @@ function EffectOverlay({ effect, onDone }: { effect: ChatEffect; onDone: () => v
   );
 }
 
+// ─── Coin Drop Message ────────────────────────────────────
+
+function CoinDropBubble({
+  msg,
+  onClaim,
+  claiming,
+  currentAddress,
+}: {
+  msg: ChatMessage;
+  onClaim: (messageId: string) => void;
+  claiming: string | null;
+  currentAddress: string | null;
+}) {
+  const drop = msg.coinDrop;
+  if (!drop) return null;
+
+  const isClaimed = !!drop.claimedBy;
+  const isMine = msg.address === currentAddress;
+  const canClaim = !isClaimed && !isMine && !!currentAddress;
+  const isClaiming = claiming === msg.id;
+
+  return (
+    <div className={`relative rounded-2xl border-2 p-3 transition-all ${
+      isClaimed
+        ? 'border-[var(--color-border)] bg-[var(--color-bg)] opacity-60'
+        : 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-lg shadow-amber-500/10'
+    }`}>
+      {/* Sender info */}
+      <div className="flex items-center gap-2 mb-2">
+        <Link href={`/game/profile/${msg.address}`} className="shrink-0">
+          <UserAvatar address={msg.address} size={24} />
+        </Link>
+        <Link href={`/game/profile/${msg.address}`} className={`text-xs font-semibold hover:underline ${getVipNameClass(msg.vipTier, null)}`}>
+          {msg.nickname || shortAddr(msg.address)}
+        </Link>
+        <span className="text-[9px] text-[var(--color-text-secondary)] ml-auto">{formatTime(msg.createdAt)}</span>
+      </div>
+
+      {/* Coin drop card */}
+      <div className="flex items-center gap-3">
+        <div className={`relative shrink-0 ${isClaimed ? 'grayscale' : ''}`}>
+          <Image
+            src="/coin-token-logo.png"
+            alt="COIN"
+            width={48}
+            height={48}
+            className={`rounded-full ${!isClaimed ? 'animate-[spin_8s_linear_infinite] drop-shadow-[0_0_12px_rgba(245,158,11,0.5)]' : ''}`}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-black text-amber-400">
+            {formatLaunch(drop.amount)} COIN
+          </div>
+          {msg.message && msg.message !== `${formatLaunch(drop.amount)} COIN` && (
+            <p className="text-xs text-[var(--color-text-secondary)] truncate">{msg.message}</p>
+          )}
+          {isClaimed && (
+            <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+              {drop.claimedByNickname || shortAddr(drop.claimedBy!)}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0">
+          {isClaimed ? (
+            <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
+              <CheckCircle size={14} />
+            </div>
+          ) : canClaim ? (
+            <button
+              type="button"
+              onClick={() => onClaim(msg.id)}
+              disabled={isClaiming}
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-2 text-xs font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 active:scale-95 disabled:opacity-50 shadow-lg shadow-amber-500/30"
+            >
+              {isClaiming ? <Loader2 size={14} className="animate-spin" /> : 'Grab!'}
+            </button>
+          ) : isMine ? (
+            <Gift size={18} className="text-amber-400/50" />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Chat Bubble ──────────────────────────────────────────
 
 function ChatBubble({ msg, onEffect }: { msg: ChatMessage; onEffect?: (effect: ChatEffect) => void }) {
   const isHighlighted = msg.style === 'highlighted';
   const isPinned = msg.style === 'pinned';
 
-  // Trigger effect on new pinned/effect messages
   const triggered = useRef(false);
   useEffect(() => {
     if (triggered.current) return;
@@ -225,18 +307,17 @@ function ChatBubble({ msg, onEffect }: { msg: ChatMessage; onEffect?: (effect: C
   }, [msg.effect, onEffect]);
 
   const wrapperClass = isPinned
-    ? 'relative flex items-start gap-2 py-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30'
+    ? 'relative flex items-start gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/25 shadow-sm shadow-amber-500/10'
     : isHighlighted
-      ? 'relative flex items-start gap-2 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-transparent border-l-2 border-amber-400/50'
+      ? 'relative flex items-start gap-2 py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-amber-500/8 to-transparent border-l-2 border-amber-400/40'
       : 'relative flex items-start gap-2 py-1';
 
   return (
     <div className={wrapperClass}>
-      {/* Super Chat label */}
       {isPinned && (
-        <div className="absolute -top-2.5 left-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-2 py-0.5 shadow-lg shadow-amber-500/25">
-          <Pin size={8} className="text-black" />
-          <span className="text-[8px] font-black tracking-wider text-black uppercase">SUPER CHAT</span>
+        <div className="absolute -top-2 left-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-2 py-0.5 shadow-lg shadow-amber-500/25">
+          <Pin size={7} className="text-black" />
+          <span className="text-[7px] font-black tracking-wider text-black uppercase">SUPER CHAT</span>
         </div>
       )}
 
@@ -267,77 +348,185 @@ function ChatBubble({ msg, onEffect }: { msg: ChatMessage; onEffect?: (effect: C
 // ─── Premium Selector ─────────────────────────────────────
 
 function PremiumSelector({
-  style, setStyle, effect, setEffect, prices, t,
+  style, setStyle, effect, setEffect, prices,
+  showDrop, setShowDrop, t,
 }: {
   style: ChatStyle;
   setStyle: (s: ChatStyle) => void;
   effect: ChatEffect;
   setEffect: (e: ChatEffect) => void;
-  prices: { highlighted: number; pinned: number; effect: number } | null;
+  prices: { highlighted: number; pinned: number; effect: number; coinDropMin: number } | null;
+  showDrop: boolean;
+  setShowDrop: (v: boolean) => void;
   t: (k: string, v?: Record<string, string | number>) => string;
 }) {
   if (!prices) return null;
 
-  const styleOptions: { key: ChatStyle; label: string; price: number; color: string }[] = [
-    { key: 'highlighted', label: t('social.highlighted'), price: prices.highlighted, color: 'from-amber-500 to-yellow-500' },
-    { key: 'pinned', label: t('social.pinned'), price: prices.pinned, color: 'from-orange-500 to-red-500' },
+  const styleOptions: { key: ChatStyle; label: string; price: number; gradient: string }[] = [
+    { key: 'highlighted', label: t('social.highlighted'), price: prices.highlighted, gradient: 'from-amber-600 to-yellow-500' },
+    { key: 'pinned', label: t('social.pinned'), price: prices.pinned, gradient: 'from-orange-600 to-red-500' },
   ];
 
-  const effectOptions: { key: ChatEffect; label: string; emoji: string }[] = [
-    { key: 'confetti', label: t('social.effectConfetti'), emoji: '🎉' },
-    { key: 'coins', label: t('social.effectCoins'), emoji: '🪙' },
-    { key: 'fire', label: t('social.effectFire'), emoji: '🔥' },
+  const effectOptions: { key: ChatEffect; emoji: string }[] = [
+    { key: 'confetti', emoji: '🎉' },
+    { key: 'coins', emoji: '🪙' },
+    { key: 'fire', emoji: '🔥' },
   ];
 
   return (
     <div className="space-y-2 px-1 py-2 animate-in slide-in-from-bottom-2 duration-200">
-      {/* Styles */}
+      {/* Message styles */}
       <div className="flex gap-1.5">
-        {styleOptions.map(({ key, label, price, color }) => {
+        {styleOptions.map(({ key, label, price, gradient }) => {
           const active = style === key;
           return (
             <button
               key={key}
               type="button"
-              onClick={() => setStyle(active ? null : key)}
-              className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg py-1.5 px-1 text-[10px] font-semibold transition-all border ${
+              onClick={() => { setStyle(active ? null : key); setShowDrop(false); }}
+              className={`flex-1 flex flex-col items-center gap-0.5 rounded-xl py-2 px-1 text-[10px] font-semibold transition-all border ${
                 active
-                  ? `bg-gradient-to-b ${color} text-white border-transparent shadow-lg`
-                  : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-amber-500/30 hover:text-amber-300'
+                  ? `bg-gradient-to-b ${gradient} text-white border-transparent shadow-lg`
+                  : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-amber-500/30'
               }`}
             >
-              <span>{label}</span>
+              <span className="text-[11px]">{label}</span>
               <span className={`text-[9px] ${active ? 'text-white/80' : 'text-[var(--color-text-secondary)]'}`}>
                 {formatLaunch(price)} COIN
               </span>
             </button>
           );
         })}
+        {/* Coin Drop button */}
+        <button
+          type="button"
+          onClick={() => { setShowDrop(!showDrop); setStyle(null); setEffect(null); }}
+          className={`flex-1 flex flex-col items-center gap-0.5 rounded-xl py-2 px-1 text-[10px] font-semibold transition-all border ${
+            showDrop
+              ? 'bg-gradient-to-b from-emerald-500 to-teal-600 text-white border-transparent shadow-lg'
+              : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-emerald-500/30'
+          }`}
+        >
+          <Gift size={14} />
+          <span className="text-[9px]">COIN Drop</span>
+        </button>
       </div>
 
-      {/* Effects */}
+      {/* Effects — only show when style selected, not for drop */}
+      {!showDrop && (style === 'highlighted' || style === 'pinned') && (
+        <div className="flex gap-1.5">
+          {effectOptions.map(({ key, emoji }) => {
+            const active = effect === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setEffect(active ? null : key)}
+                className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-semibold transition-all border ${
+                  active
+                    ? 'bg-[var(--color-primary)]/20 border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30'
+                }`}
+              >
+                <span>{emoji}</span>
+                <span className="text-[9px]">+{formatLaunch(prices!.effect)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Coin Drop Input ──────────────────────────────────────
+
+function CoinDropInput({
+  onSend,
+  sending,
+  cooldown,
+}: {
+  onSend: (amount: number, message?: string) => void;
+  sending: boolean;
+  cooldown: number;
+}) {
+  const [amount, setAmount] = useState('');
+  const [message, setMessage] = useState('');
+  const { t } = useTranslation();
+
+  const presets = [5, 10, 50, 100];
+
+  return (
+    <div className="space-y-2 px-1 pb-1 animate-in slide-in-from-bottom-2 duration-200">
+      {/* Amount presets */}
       <div className="flex gap-1.5">
-        {effectOptions.map(({ key, emoji }) => {
-          const active = effect === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setEffect(active ? null : key)}
-              className={`flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-all border ${
-                active
-                  ? 'bg-[var(--color-primary)]/20 border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30'
-              }`}
-            >
-              <span>{emoji}</span>
-              <span className={`text-[9px] ${active ? '' : 'text-[var(--color-text-secondary)]'}`}>
-                +{formatLaunch(prices!.effect)}
-              </span>
-            </button>
-          );
-        })}
+        {presets.map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setAmount(String(v))}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all border ${
+              amount === String(v)
+                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-emerald-500/30'
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+        <input
+          type="number"
+          value={presets.includes(Number(amount)) ? '' : amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={t('social.customAmount')}
+          min="1"
+          className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-xs text-center focus:outline-none focus:border-emerald-500"
+        />
       </div>
+
+      {/* Message + Send */}
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={t('social.dropMessage')}
+          maxLength={200}
+          className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const num = Number(amount);
+            if (num >= 1) onSend(num, message || undefined);
+          }}
+          disabled={!amount || Number(amount) < 1 || sending || cooldown > 0}
+          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-bold text-white transition-all hover:from-emerald-400 hover:to-teal-400 active:scale-95 disabled:opacity-30 shadow-lg shadow-emerald-500/20"
+        >
+          {sending ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
+          <span>{amount ? `${amount} COIN` : 'Drop'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Claim Toast ──────────────────────────────────────────
+
+function ClaimToast({ message, type, onDone }: { message: string; type: 'success' | 'error'; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div className={`absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold shadow-2xl animate-in slide-in-from-top-4 duration-300 ${
+      type === 'success'
+        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/30'
+        : 'bg-[var(--color-danger)] text-white shadow-red-500/30'
+    }`}>
+      {type === 'success' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+      {message}
     </div>
   );
 }
@@ -346,8 +535,8 @@ function PremiumSelector({
 
 function ChatTab() {
   const { t } = useTranslation();
-  const { isConnected } = useWalletContext();
-  const { messages, loading, sendMessage, messagesEndRef } = useChat(true);
+  const { isConnected, address: currentAddress } = useWalletContext();
+  const { messages, loading, sendMessage, sendCoinDrop, claimCoinDrop, messagesEndRef } = useChat(true);
   const prices = useChatPrices();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -357,9 +546,12 @@ function ChatTab() {
   const [linkError, setLinkError] = useState(false);
   const [balanceError, setBalanceError] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
+  const [showDrop, setShowDrop] = useState(false);
   const [style, setStyle] = useState<ChatStyle>(null);
   const [effect, setEffect] = useState<ChatEffect>(null);
   const [activeEffect, setActiveEffect] = useState<ChatEffect>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Pinned messages (super chat) — show latest at the top
   const pinnedMessages = useMemo(
@@ -432,7 +624,6 @@ function ChatTab() {
       } else {
         startCooldown(3000);
       }
-      // Reset premium options after successful send
       setStyle(null);
       setEffect(null);
       setShowPremium(false);
@@ -442,6 +633,47 @@ function ChatTab() {
       setSending(false);
     }
   }, [input, sending, cooldown, isConnected, sendMessage, startCooldown, style, effect]);
+
+  const handleCoinDrop = useCallback(async (amount: number, message?: string) => {
+    setSending(true);
+    try {
+      const result = await sendCoinDrop(amount, message);
+      if (result.error === 'INSUFFICIENT_BALANCE') {
+        setBalanceError(true);
+        setTimeout(() => setBalanceError(false), 3000);
+        setSending(false);
+        return;
+      }
+      if (result.waitMs) {
+        startCooldown(result.waitMs);
+      } else {
+        startCooldown(3000);
+      }
+      setShowDrop(false);
+      setShowPremium(false);
+    } catch {
+      // ignore
+    } finally {
+      setSending(false);
+    }
+  }, [sendCoinDrop, startCooldown]);
+
+  const handleClaim = useCallback(async (messageId: string) => {
+    if (claimingId) return;
+    setClaimingId(messageId);
+    try {
+      const result = await claimCoinDrop(messageId);
+      if (result.success) {
+        setToast({ message: `+${formatLaunch(result.amount!)} COIN!`, type: 'success' });
+      } else {
+        setToast({ message: t('social.dropAlreadyClaimed'), type: 'error' });
+      }
+    } catch {
+      setToast({ message: t('social.dropClaimFailed'), type: 'error' });
+    } finally {
+      setClaimingId(null);
+    }
+  }, [claimCoinDrop, claimingId, t]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -456,6 +688,11 @@ function ChatTab() {
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
+      {/* Toast notification */}
+      {toast && (
+        <ClaimToast message={toast.message} type={toast.type} onDone={() => setToast(null)} />
+      )}
+
       {/* Effect animation overlay */}
       {activeEffect && (
         <EffectOverlay effect={activeEffect} onDone={() => setActiveEffect(null)} />
@@ -463,14 +700,15 @@ function ChatTab() {
 
       {/* Pinned super-chat messages at top */}
       {pinnedMessages.length > 0 && (
-        <div className="shrink-0 border-b border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent px-3 py-1.5 space-y-1">
+        <div className="shrink-0 border-b border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent px-3 py-2 space-y-1">
           {pinnedMessages.map((msg) => (
             <div key={msg.id} className="flex items-center gap-2 text-[10px]">
-              <Pin size={10} className="text-amber-400 shrink-0" />
+              <Pin size={9} className="text-amber-400 shrink-0 rotate-45" />
+              <UserAvatar address={msg.address} size={16} />
               <Link href={`/game/profile/${msg.address}`} className="font-semibold text-amber-300 hover:underline shrink-0">
                 {msg.nickname || shortAddr(msg.address)}
               </Link>
-              <span className="text-amber-200/70 truncate">{msg.message}</span>
+              <span className="text-amber-200/60 truncate flex-1">{msg.message}</span>
             </div>
           ))}
         </div>
@@ -478,7 +716,6 @@ function ChatTab() {
 
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain px-3 min-h-0">
-        {/* Daily reset notice */}
         <div className="text-center py-2">
           <span className="text-[9px] text-[var(--color-text-secondary)] bg-[var(--color-bg)] rounded-full px-2.5 py-0.5">
             {t('social.chatDailyReset')}
@@ -492,10 +729,20 @@ function ChatTab() {
         ) : messages.length === 0 ? (
           <p className="text-center text-xs text-[var(--color-text-secondary)] py-12">{t('social.chatEmpty')}</p>
         ) : (
-          <div className="space-y-1">
-            {messages.map((msg) => (
-              <ChatBubble key={msg.id} msg={msg} onEffect={handleEffect} />
-            ))}
+          <div className="space-y-1.5">
+            {messages.map((msg) =>
+              msg.style === 'coin_drop' ? (
+                <CoinDropBubble
+                  key={msg.id}
+                  msg={msg}
+                  onClaim={handleClaim}
+                  claiming={claimingId}
+                  currentAddress={currentAddress ?? null}
+                />
+              ) : (
+                <ChatBubble key={msg.id} msg={msg} onEffect={handleEffect} />
+              ),
+            )}
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -523,59 +770,71 @@ function ChatTab() {
                 effect={effect}
                 setEffect={setEffect}
                 prices={prices}
+                showDrop={showDrop}
+                setShowDrop={setShowDrop}
                 t={t}
               />
             )}
 
-            {/* Input row */}
-            <div className="flex items-center gap-1.5">
-              {/* Premium toggle */}
-              <button
-                type="button"
-                onClick={() => setShowPremium(!showPremium)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${
-                  showPremium || style || effect
-                    ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-lg shadow-amber-500/25'
-                    : 'text-[var(--color-text-secondary)] hover:text-amber-400 hover:bg-[var(--color-surface-hover)]'
-                }`}
-              >
-                <Sparkles size={16} />
-              </button>
-
-              <input
-                type="text"
-                value={cooldown > 0 ? '' : input}
-                onChange={(e) => { setInput(e.target.value); setLinkError(false); setBalanceError(false); }}
-                onKeyDown={handleKeyDown}
-                disabled={cooldown > 0 || sending}
-                placeholder={cooldown > 0 ? t('social.chatCooldown', { seconds: cooldown }) : t('social.chatPlaceholder')}
-                className={`flex-1 rounded-xl border bg-[var(--color-bg)] py-2 px-3 text-xs placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50 ${
-                  linkError || balanceError ? 'border-red-400' : 'border-[var(--color-border)]'
-                }`}
+            {/* Coin drop input */}
+            {showPremium && showDrop && (
+              <CoinDropInput
+                onSend={handleCoinDrop}
+                sending={sending}
+                cooldown={cooldown}
               />
+            )}
 
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!input.trim() || cooldown > 0 || sending}
-                className={`flex h-9 shrink-0 items-center justify-center rounded-xl text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-30 ${
-                  totalCost > 0
-                    ? 'bg-gradient-to-r from-amber-500 to-yellow-600 gap-1.5 px-3 shadow-lg shadow-amber-500/20'
-                    : 'bg-[var(--color-primary)] w-9'
-                }`}
-              >
-                {sending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : totalCost > 0 ? (
-                  <>
-                    <Send size={14} />
-                    <span className="text-[10px] font-bold">{formatLaunch(totalCost)}</span>
-                  </>
-                ) : (
-                  <Send size={16} />
-                )}
-              </button>
-            </div>
+            {/* Regular input row — hide when drop mode active */}
+            {!(showPremium && showDrop) && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setShowPremium(!showPremium); setShowDrop(false); }}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${
+                    showPremium || style || effect
+                      ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-lg shadow-amber-500/25'
+                      : 'text-[var(--color-text-secondary)] hover:text-amber-400 hover:bg-[var(--color-surface-hover)]'
+                  }`}
+                >
+                  <Sparkles size={16} />
+                </button>
+
+                <input
+                  type="text"
+                  value={cooldown > 0 ? '' : input}
+                  onChange={(e) => { setInput(e.target.value); setLinkError(false); setBalanceError(false); }}
+                  onKeyDown={handleKeyDown}
+                  disabled={cooldown > 0 || sending}
+                  placeholder={cooldown > 0 ? t('social.chatCooldown', { seconds: cooldown }) : t('social.chatPlaceholder')}
+                  className={`flex-1 rounded-xl border bg-[var(--color-bg)] py-2 px-3 text-xs placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50 ${
+                    linkError || balanceError ? 'border-red-400' : 'border-[var(--color-border)]'
+                  }`}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!input.trim() || cooldown > 0 || sending}
+                  className={`flex h-9 shrink-0 items-center justify-center rounded-xl text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-30 ${
+                    totalCost > 0
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-600 gap-1.5 px-3 shadow-lg shadow-amber-500/20'
+                      : 'bg-[var(--color-primary)] w-9'
+                  }`}
+                >
+                  {sending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : totalCost > 0 ? (
+                    <>
+                      <Send size={14} />
+                      <span className="text-[10px] font-bold">{formatLaunch(totalCost)}</span>
+                    </>
+                  ) : (
+                    <Send size={16} />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -598,7 +857,6 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
     setMounted(true);
   }, []);
 
-  // Animate in/out
   useEffect(() => {
     if (open) {
       const id = requestAnimationFrame(() => setVisible(true));
@@ -610,7 +868,6 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
     }
   }, [open]);
 
-  // Escape key
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -620,7 +877,6 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // Android back button
   useEffect(() => {
     if (!open) return;
     history.pushState({ socialSheet: true }, '');
@@ -657,11 +913,10 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
         className={`w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl flex flex-col transition-all duration-300 ${
           visible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
         }`}
-        style={{ height: '70vh', maxHeight: '70vh' }}
+        style={{ height: '75vh', maxHeight: '75vh' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] shrink-0">
-          {/* Main tabs */}
           <div className="flex gap-1">
             {mainTabs.map(({ key, label }) => (
               <button

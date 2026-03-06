@@ -1189,6 +1189,10 @@
     "effectCoins": "Coins",
     "effectFire": "Fire",
     "insufficientBalance": "Not enough COIN",
-    "superChat": "SUPER CHAT"
+    "superChat": "SUPER CHAT",
+    "customAmount": "Custom",
+    "dropMessage": "Message (optional)",
+    "dropAlreadyClaimed": "Already grabbed!",
+    "dropClaimFailed": "Failed to grab"
   }
 }

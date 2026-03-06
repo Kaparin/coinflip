@@ -171,7 +171,7 @@ referralRouter.post('/change-branch', authMiddleware, zValidator('json', ChangeB
   }
 
   // Step 2: Deduct fee from vault balance (off-chain, instant)
-  const deducted = await vaultService.deductBalance(userId, cost);
+  const deducted = await vaultService.deductCoin(userId, cost);
   if (!deducted) {
     return c.json({
       error: {

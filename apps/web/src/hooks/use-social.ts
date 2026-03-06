@@ -21,6 +21,13 @@ export interface SocialUser {
   is_online: boolean;
 }
 
+export interface CoinDropInfo {
+  dropId: string;
+  amount: string;
+  claimedBy: string | null;
+  claimedByNickname: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   userId: string;
@@ -28,15 +35,30 @@ export interface ChatMessage {
   nickname: string | null;
   vipTier: string | null;
   message: string;
-  style: 'highlighted' | 'pinned' | null;
+  style: 'highlighted' | 'pinned' | 'coin_drop' | null;
   effect: 'confetti' | 'coins' | 'fire' | null;
   createdAt: string;
+  coinDrop?: CoinDropInfo;
 }
 
 export interface ChatPrices {
   highlighted: number;
   pinned: number;
   effect: number;
+  coinDropMin: number;
+}
+
+export interface CoinTransfer {
+  id: string;
+  type: 'sent' | 'received';
+  amount: string;
+  fee: string;
+  message: string | null;
+  counterparty: {
+    address: string;
+    nickname: string | null;
+  };
+  createdAt: string;
 }
 
 // ─── Online Count ─────────────────────────────────────────
@@ -46,7 +68,6 @@ export function useOnlineCount() {
   const { subscribe } = useWebSocketContext();
 
   useEffect(() => {
-    // Fetch initial count
     fetch(`${API_URL}/api/v1/social/online-count`)
       .then((r) => r.json())
       .then((d) => setCount(d.data?.count ?? 0))
@@ -84,7 +105,6 @@ export function useOnlineUsers(enabled: boolean) {
     fetchOnline();
   }, [enabled, fetchOnline]);
 
-  // Refetch when online_count changes (debounced to avoid spam)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!enabled) return;
@@ -178,7 +198,6 @@ export function useChat(enabled: boolean) {
   const { subscribe } = useWebSocketContext();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch initial messages
   useEffect(() => {
     if (!enabled) return;
     setLoading(true);
@@ -189,17 +208,26 @@ export function useChat(enabled: boolean) {
       .finally(() => setLoading(false));
   }, [enabled]);
 
-  // Listen for new chat messages via WS
+  // Listen for new chat messages + coin drop claims via WS
   useEffect(() => {
     if (!enabled) return;
     const unsub = subscribe((event: WsEvent) => {
       if (event.type === 'chat_message') {
         const msg = event.data as unknown as ChatMessage;
         setMessages((prev) => {
-          // Deduplicate
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+      }
+      if (event.type === 'coin_drop_claimed') {
+        const claim = event.data as { messageId: string; claimedByAddress: string; claimedByNickname: string | null };
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === claim.messageId && m.coinDrop
+              ? { ...m, coinDrop: { ...m.coinDrop, claimedBy: claim.claimedByAddress, claimedByNickname: claim.claimedByNickname } }
+              : m,
+          ),
+        );
       }
     });
     return unsub;
@@ -230,7 +258,47 @@ export function useChat(enabled: boolean) {
     return {};
   }, []);
 
-  return { messages, loading, sendMessage, messagesEndRef };
+  const sendCoinDrop = useCallback(async (
+    amount: number,
+    message?: string,
+  ): Promise<{ waitMs?: number; error?: string }> => {
+    const res = await fetch(`${API_URL}/api/v1/social/chat/coin-drop`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, message }),
+    });
+    if (res.status === 429) {
+      const data = await res.json();
+      return { waitMs: data.error?.waitMs ?? 3000 };
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.error?.code === 'INSUFFICIENT_BALANCE') {
+        return { error: 'INSUFFICIENT_BALANCE' };
+      }
+      throw new Error('Failed to send coin drop');
+    }
+    return {};
+  }, []);
+
+  const claimCoinDrop = useCallback(async (
+    messageId: string,
+  ): Promise<{ success: boolean; amount?: string; error?: string }> => {
+    const res = await fetch(`${API_URL}/api/v1/social/chat/coin-drop/${messageId}/claim`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { success: false, error: data.error?.code ?? 'FAILED' };
+    }
+    const data = await res.json();
+    return { success: true, amount: data.data?.amount };
+  }, []);
+
+  return { messages, loading, sendMessage, sendCoinDrop, claimCoinDrop, messagesEndRef };
 }
 
 // ─── Chat Prices ─────────────────────────────────────────
@@ -284,4 +352,64 @@ export function useFavoriteStatus(address: string | undefined) {
   }, [address, isFavorite, loading]);
 
   return { isFavorite, toggle, loading };
+}
+
+// ─── P2P Transfer ─────────────────────────────────────────
+
+export function useTransferCoin() {
+  const [loading, setLoading] = useState(false);
+
+  const transfer = useCallback(async (
+    recipientAddress: string,
+    amount: number,
+    message?: string,
+  ): Promise<{ success: boolean; error?: string; fee?: string }> => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/social/transfer`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientAddress, amount, message }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { success: false, error: data.error?.code ?? 'FAILED' };
+      }
+      const data = await res.json();
+      return { success: true, fee: data.data?.fee };
+    } catch {
+      return { success: false, error: 'NETWORK_ERROR' };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { transfer, loading };
+}
+
+// ─── Transfer History ─────────────────────────────────────
+
+export function useTransferHistory(enabled: boolean) {
+  const [transfers, setTransfers] = useState<CoinTransfer[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refetch = useCallback(() => {
+    setLoading(true);
+    fetch(`${API_URL}/api/v1/social/transfers`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then((r) => r.json())
+      .then((d) => setTransfers(d.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    refetch();
+  }, [enabled, refetch]);
+
+  return { transfers, loading, refetch };
 }

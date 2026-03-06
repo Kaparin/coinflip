@@ -5,11 +5,15 @@ import { sql } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { chatService } from '../services/chat.service.js';
+import { vaultService } from '../services/vault.service.js';
 import { wsService } from '../services/ws.service.js';
 import { getDb } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
 import type { AppEnv } from '../types.js';
 
 export const socialRouter = new Hono<AppEnv>();
+
+// ─── Online Users ──────────────────────────────────────────
 
 // GET /api/v1/social/online — Online users with profiles
 socialRouter.get('/online', async (c) => {
@@ -19,7 +23,6 @@ socialRouter.get('/online', async (c) => {
   }
 
   const db = getDb();
-  // Build address list for IN clause
   const addressList = onlineAddresses.map(a => `'${a.replace(/'/g, "''")}'`).join(',');
   const rows = await db.execute(sql.raw(`
     SELECT u.address, u.profile_nickname as nickname,
@@ -49,7 +52,8 @@ socialRouter.get('/online', async (c) => {
   return c.json({ data: users, count: onlineAddresses.length });
 });
 
-// GET /api/v1/social/users — All users with search + pagination
+// ─── All Users ──────────────────────────────────────────────
+
 const UsersQuerySchema = z.object({
   q: z.string().optional(),
   cursor: z.string().optional(),
@@ -107,7 +111,8 @@ socialRouter.get('/users', zValidator('query', UsersQuerySchema), async (c) => {
   return c.json({ data: users, nextCursor });
 });
 
-// GET /api/v1/social/favorites — My favorites list
+// ─── Favorites ──────────────────────────────────────────────
+
 socialRouter.get('/favorites', authMiddleware, async (c) => {
   const user = c.get('user');
   const db = getDb();
@@ -142,7 +147,6 @@ socialRouter.get('/favorites', authMiddleware, async (c) => {
   return c.json({ data: users });
 });
 
-// POST /api/v1/social/favorites/:address — Add to favorites
 socialRouter.post('/favorites/:address', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.req.param('address');
@@ -160,7 +164,6 @@ socialRouter.post('/favorites/:address', authMiddleware, async (c) => {
   return c.json({ data: { added: true } });
 });
 
-// DELETE /api/v1/social/favorites/:address — Remove from favorites
 socialRouter.delete('/favorites/:address', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.req.param('address');
@@ -176,7 +179,6 @@ socialRouter.delete('/favorites/:address', authMiddleware, async (c) => {
   return c.json({ data: { removed: true } });
 });
 
-// GET /api/v1/social/favorites/check/:address — Check if user is in favorites
 socialRouter.get('/favorites/check/:address', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.req.param('address');
@@ -193,13 +195,13 @@ socialRouter.get('/favorites/check/:address', authMiddleware, async (c) => {
   return c.json({ data: { isFavorite: rawRows.length > 0 } });
 });
 
-// GET /api/v1/social/chat — Get today's messages
+// ─── Chat ──────────────────────────────────────────────────
+
 socialRouter.get('/chat', async (c) => {
   const messages = await chatService.getTodayMessages();
   return c.json({ data: messages });
 });
 
-// POST /api/v1/social/chat — Send message
 const ChatMessageSchema = z.object({
   message: z.string().min(1).max(500).transform(s => s.trim()),
   style: z.enum(['highlighted', 'pinned']).nullable().optional(),
@@ -220,26 +222,17 @@ socialRouter.post('/chat', authMiddleware, zValidator('json', ChatMessageSchema)
   }
 
   try {
-    const chatMsg = await chatService.sendMessage(
-      user.id,
-      message,
-      style ?? null,
-      effect ?? null,
-    );
-
-    // Broadcast to all via WS
+    const chatMsg = await chatService.sendMessage(user.id, message, style ?? null, effect ?? null);
     wsService.emitChatMessage(chatMsg as unknown as Record<string, unknown>);
-
     return c.json({ data: chatMsg });
   } catch (err: any) {
     if (err?.message === 'INSUFFICIENT_BALANCE') {
-      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient balance for this message type' } }, 400);
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
     }
     throw err;
   }
 });
 
-// GET /api/v1/social/chat/prices — Get premium chat prices
 socialRouter.get('/chat/prices', async (c) => {
   const { CHAT_PRICES } = await import('../services/chat.service.js');
   return c.json({
@@ -247,11 +240,186 @@ socialRouter.get('/chat/prices', async (c) => {
       highlighted: CHAT_PRICES.highlighted,
       pinned: CHAT_PRICES.pinned,
       effect: CHAT_PRICES.effect,
+      coinDropMin: CHAT_PRICES.coinDropMin,
     },
   });
 });
 
-// GET /api/v1/social/online-count — Just the count
+// ─── COIN Drop ─────────────────────────────────────────────
+
+const CoinDropSchema = z.object({
+  amount: z.number().min(1).max(100000),
+  message: z.string().min(1).max(200).transform(s => s.trim()).optional(),
+});
+
+socialRouter.post('/chat/coin-drop', authMiddleware, zValidator('json', CoinDropSchema), async (c) => {
+  const user = c.get('user');
+  const { amount, message } = c.req.valid('json');
+
+  const check = chatService.canSend(user.id);
+  if (!check.allowed) {
+    return c.json({ error: { code: 'RATE_LIMITED', message: 'Please wait', waitMs: check.waitMs } }, 429);
+  }
+
+  const microAmount = String(Math.floor(amount * 1_000_000));
+  const dropMessage = message || `${amount} COIN`;
+
+  try {
+    const chatMsg = await chatService.sendCoinDrop(user.id, microAmount, dropMessage);
+    wsService.emitChatMessage(chatMsg as unknown as Record<string, unknown>);
+    return c.json({ data: chatMsg });
+  } catch (err: any) {
+    if (err?.message === 'INSUFFICIENT_BALANCE') {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
+    }
+    if (err?.message === 'MIN_AMOUNT') {
+      return c.json({ error: { code: 'MIN_AMOUNT', message: 'Minimum drop is 1 COIN' } }, 400);
+    }
+    throw err;
+  }
+});
+
+socialRouter.post('/chat/coin-drop/:messageId/claim', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const messageId = c.req.param('messageId');
+
+  try {
+    const result = await chatService.claimCoinDrop(messageId, user.id);
+
+    if (!result.success) {
+      return c.json({ error: { code: 'ALREADY_CLAIMED', message: 'This coin drop has already been claimed' } }, 400);
+    }
+
+    // Broadcast claim event so all clients update the drop state
+    wsService.broadcast({
+      type: 'coin_drop_claimed',
+      data: {
+        messageId,
+        claimedByAddress: result.drop!.claimedByAddress,
+        claimedByNickname: result.drop!.claimedByNickname,
+      },
+    });
+
+    return c.json({ data: { claimed: true, amount: result.drop!.amount } });
+  } catch (err) {
+    logger.error({ err, messageId }, 'Failed to claim coin drop');
+    throw err;
+  }
+});
+
+// ─── P2P COIN Transfer ────────────────────────────────────
+
+const TRANSFER_FEE_BPS = 500; // 5% fee
+
+const TransferSchema = z.object({
+  recipientAddress: z.string().min(1),
+  amount: z.number().min(1).max(1000000),
+  message: z.string().max(200).optional(),
+});
+
+socialRouter.post('/transfer', authMiddleware, zValidator('json', TransferSchema), async (c) => {
+  const user = c.get('user');
+  const { recipientAddress, amount, message } = c.req.valid('json');
+
+  // Find recipient
+  const recipient = await userService.getUserByAddress(recipientAddress);
+  if (!recipient) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Recipient not found' } }, 404);
+  }
+  if (recipient.id === user.id) {
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Cannot transfer to yourself' } }, 400);
+  }
+
+  const microAmount = String(Math.floor(amount * 1_000_000));
+  const fee = String(Math.floor(amount * 1_000_000 * TRANSFER_FEE_BPS / 10000));
+  const totalDeduct = String(BigInt(microAmount) + BigInt(fee));
+
+  // Deduct total (amount + fee) from sender
+  const deducted = await vaultService.deductCoin(user.id, totalDeduct);
+  if (!deducted) {
+    return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient COIN balance' } }, 400);
+  }
+
+  // Credit amount to recipient (fee is burned/kept by platform)
+  await vaultService.creditCoin(recipient.id, microAmount);
+
+  // Record transfer
+  const db = getDb();
+  await db.execute(sql`
+    INSERT INTO coin_transfers (sender_id, recipient_id, amount, fee, message)
+    VALUES (${user.id}, ${recipient.id}, ${microAmount}, ${fee}, ${message ?? null})
+  `);
+
+  // Get sender info for notification
+  const senderInfo = await db.execute(sql`
+    SELECT address, profile_nickname as nickname FROM users WHERE id = ${user.id}
+  `);
+  const rawSender = (Array.isArray(senderInfo) ? senderInfo : (senderInfo as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+  const sender = rawSender[0]!;
+
+  // Notify recipient via WS
+  wsService.sendToAddress(recipientAddress, {
+    type: 'coin_transfer',
+    data: {
+      fromAddress: String(sender.address),
+      fromNickname: sender.nickname ? String(sender.nickname) : null,
+      amount: microAmount,
+      fee,
+      message: message ?? null,
+    },
+  });
+
+  logger.info({ senderId: user.id, recipientId: recipient.id, amount: microAmount, fee }, 'COIN transfer completed');
+
+  return c.json({
+    data: {
+      success: true,
+      amount: microAmount,
+      fee,
+      recipientAddress,
+    },
+  });
+});
+
+// GET /api/v1/social/transfers — Transfer history
+socialRouter.get('/transfers', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const db = getDb();
+
+  const rows = await db.execute(sql`
+    SELECT t.id::text, t.amount::text, t.fee::text, t.message, t.created_at,
+      t.sender_id::text, t.recipient_id::text,
+      su.address as sender_address, su.profile_nickname as sender_nickname,
+      ru.address as recipient_address, ru.profile_nickname as recipient_nickname
+    FROM coin_transfers t
+    JOIN users su ON su.id = t.sender_id
+    JOIN users ru ON ru.id = t.recipient_id
+    WHERE t.sender_id = ${user.id} OR t.recipient_id = ${user.id}
+    ORDER BY t.created_at DESC
+    LIMIT 50
+  `);
+  const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+
+  const transfers = rawRows.map((r) => ({
+    id: String(r.id),
+    type: String(r.sender_id) === user.id ? 'sent' : 'received',
+    amount: String(r.amount),
+    fee: String(r.fee),
+    message: r.message ? String(r.message) : null,
+    counterparty: {
+      address: String(r.sender_id) === user.id ? String(r.recipient_address) : String(r.sender_address),
+      nickname: String(r.sender_id) === user.id
+        ? (r.recipient_nickname ? String(r.recipient_nickname) : null)
+        : (r.sender_nickname ? String(r.sender_nickname) : null),
+    },
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+  }));
+
+  return c.json({ data: transfers });
+});
+
+// ─── Online Count ──────────────────────────────────────────
+
 socialRouter.get('/online-count', async (c) => {
   return c.json({ data: { count: wsService.getOnlineAddresses().length } });
 });

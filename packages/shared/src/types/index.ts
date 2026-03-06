@@ -80,6 +80,8 @@ export type WsEventType =
   | 'purchase_confirmed'
   | 'purchase_failed'
   | 'chat_message'
+  | 'coin_drop_claimed'
+  | 'coin_transfer'
   | 'online_count';
 
 export type WsEvent = {

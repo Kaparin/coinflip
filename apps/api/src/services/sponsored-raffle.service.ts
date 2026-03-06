@@ -83,7 +83,7 @@ class SponsoredRaffleService {
     const totalCost = (BigInt(config.price) + prizeNum).toString();
 
     // Deduct payment
-    const deducted = await vaultService.deductBalance(userId, totalCost);
+    const deducted = await vaultService.deductCoin(userId, totalCost);
     if (!deducted) {
       throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient balance', 400);
     }
@@ -127,7 +127,7 @@ class SponsoredRaffleService {
       eventRow = row;
     } catch (err) {
       // Compensating refund
-      await vaultService.creditAvailable(userId, totalCost);
+      await vaultService.creditCoin(userId, totalCost);
       logger.error({ err, userId }, 'Sponsored raffle insert failed, refunded');
       throw err;
     }
@@ -204,7 +204,7 @@ class SponsoredRaffleService {
 
     // Refund the full amount (service fee + prize pool)
     if (event.userId && event.pricePaid) {
-      await vaultService.creditAvailable(event.userId, event.pricePaid);
+      await vaultService.creditCoin(event.userId, event.pricePaid);
 
       // Record refund in treasury ledger
       await db.insert(treasuryLedger).values({
@@ -254,7 +254,7 @@ class SponsoredRaffleService {
 
     // Full refund
     if (event.pricePaid) {
-      await vaultService.creditAvailable(userId, event.pricePaid);
+      await vaultService.creditCoin(userId, event.pricePaid);
 
       // Record refund in treasury ledger
       await db.insert(treasuryLedger).values({

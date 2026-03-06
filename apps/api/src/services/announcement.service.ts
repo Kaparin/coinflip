@@ -59,7 +59,7 @@ class AnnouncementService {
     }
 
     // Deduct payment
-    const deducted = await vaultService.deductBalance(userId, config.price);
+    const deducted = await vaultService.deductCoin(userId, config.price);
     if (!deducted) {
       throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient balance', 400);
     }
@@ -91,7 +91,7 @@ class AnnouncementService {
       ann = row;
     } catch (err) {
       // Compensating refund — balance was already deducted
-      await vaultService.creditAvailable(userId, config.price);
+      await vaultService.creditCoin(userId, config.price);
       logger.error({ err, userId }, 'Sponsored announcement insert failed, refunded');
       throw err;
     }
@@ -161,7 +161,7 @@ class AnnouncementService {
 
     // Refund to available balance (user paid from available, refund goes back there)
     if (ann.userId && ann.pricePaid) {
-      await vaultService.creditAvailable(ann.userId, ann.pricePaid);
+      await vaultService.creditCoin(ann.userId, ann.pricePaid);
 
       // Record refund in treasury ledger
       await db.insert(treasuryLedger).values({

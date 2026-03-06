@@ -1189,6 +1189,10 @@
     "effectCoins": "Монеты",
     "effectFire": "Огонь",
     "insufficientBalance": "Недостаточно COIN",
-    "superChat": "SUPER CHAT"
+    "superChat": "SUPER CHAT",
+    "customAmount": "Своя сумма",
+    "dropMessage": "Сообщение (необязательно)",
+    "dropAlreadyClaimed": "Уже забрали!",
+    "dropClaimFailed": "Не удалось забрать"
   }
 }

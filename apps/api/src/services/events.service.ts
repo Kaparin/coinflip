@@ -868,7 +868,7 @@ class EventsService {
 
     // Refund sponsored raffle creator (service fee + prize pool)
     if (event.userId && event.pricePaid) {
-      await vaultService.creditAvailable(event.userId, event.pricePaid);
+      await vaultService.creditCoin(event.userId, event.pricePaid);
       logger.info({ eventId, userId: event.userId, refund: event.pricePaid }, 'Sponsored raffle refunded on cancel');
     }
 
