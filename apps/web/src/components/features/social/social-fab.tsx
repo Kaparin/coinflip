@@ -14,7 +14,7 @@ export function SocialFab() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-4 z-40 md:hidden group"
+        className="fixed left-4 z-40 group md:bottom-6"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)' }}
       >
         {/* Main button */}

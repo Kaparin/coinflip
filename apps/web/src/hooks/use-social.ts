@@ -60,16 +60,37 @@ export function useOnlineCount() {
 export function useOnlineUsers(enabled: boolean) {
   const [users, setUsers] = useState<SocialUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const { subscribe } = useWebSocketContext();
 
-  useEffect(() => {
-    if (!enabled) return;
+  const fetchOnline = useCallback(() => {
     setLoading(true);
     fetch(`${API_URL}/api/v1/social/online`)
       .then((r) => r.json())
       .then((d) => setUsers(d.data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [enabled]);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    fetchOnline();
+  }, [enabled, fetchOnline]);
+
+  // Refetch when online_count changes (debounced to avoid spam)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    const unsub = subscribe((event: WsEvent) => {
+      if (event.type === 'online_count') {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(fetchOnline, 2000);
+      }
+    });
+    return () => {
+      unsub();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [enabled, subscribe, fetchOnline]);
 
   return { users, loading };
 }
