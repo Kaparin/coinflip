@@ -6,7 +6,12 @@
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
-const DEEPL_API_URL = 'https://api-free.deepl.com/v2/translate';
+/** DeepL Free keys end with ":fx", Pro keys don't */
+function getDeeplApiUrl(apiKey: string): string {
+  return apiKey.endsWith(':fx')
+    ? 'https://api-free.deepl.com/v2/translate'
+    : 'https://api.deepl.com/v2/translate';
+}
 
 export interface TranslatedContent {
   titleEn: string;
@@ -20,12 +25,16 @@ class TranslationService {
   private async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
     if (!text.trim()) return text;
     if (!env.DEEPL_API_KEY) {
-      logger.debug('DEEPL_API_KEY not set — skipping translation');
+      logger.warn('DEEPL_API_KEY not set — skipping translation');
       return text;
     }
 
+    const apiUrl = getDeeplApiUrl(env.DEEPL_API_KEY);
+
     try {
-      const res = await fetch(DEEPL_API_URL, {
+      logger.info({ sourceLang, targetLang, textLen: text.length, apiUrl }, 'DeepL: translating');
+
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -38,14 +47,16 @@ class TranslationService {
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        logger.warn({ status: res.status, errText, sourceLang, targetLang }, 'DeepL API error');
+        logger.error({ status: res.status, errText, sourceLang, targetLang, apiUrl }, 'DeepL API error');
         return text;
       }
 
       const data = (await res.json()) as { translations: Array<{ text: string }> };
-      return data.translations?.[0]?.text ?? text;
+      const translated = data.translations?.[0]?.text ?? text;
+      logger.info({ sourceLang, targetLang, originalLen: text.length, translatedLen: translated.length }, 'DeepL: success');
+      return translated;
     } catch (err) {
-      logger.warn({ err, sourceLang, targetLang, textLen: text.length }, 'Translation request failed');
+      logger.error({ err, sourceLang, targetLang, textLen: text.length, apiUrl }, 'DeepL translation request failed');
       return text;
     }
   }

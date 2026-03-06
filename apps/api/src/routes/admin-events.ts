@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/admin.js';
 import { eventsService } from '../services/events.service.js';
+import { translationService } from '../services/translation.service.js';
 import { sponsoredRaffleService } from '../services/sponsored-raffle.service.js';
 import { wsService } from '../services/ws.service.js';
 import { AppError } from '../lib/errors.js';
@@ -101,6 +102,25 @@ adminEventsRouter.put('/:id', zValidator('json', UpdateEventRequestSchema), asyn
   if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
   const data = await eventsService.formatEventResponse(event);
   return c.json({ data });
+});
+
+// POST /admin/events/:id/retranslate — Re-run DeepL translation for an event
+adminEventsRouter.post('/:id/retranslate', async (c) => {
+  const eventId = c.req.param('id');
+  const event = await eventsService.getEventById(eventId);
+  if (!event) throw new AppError('EVENT_NOT_FOUND', 'Event not found', 404);
+
+  const i18n = await translationService.translateEvent(event.title, event.description ?? null);
+  logger.info({ eventId, i18n }, 'Retranslation result');
+
+  await eventsService.updateEvent(eventId, {
+    title: event.title,
+    description: event.description ?? undefined,
+  });
+
+  const updated = await eventsService.getEventById(eventId);
+  const data = updated ? await eventsService.formatEventResponse(updated) : null;
+  return c.json({ data, i18n });
 });
 
 // DELETE /admin/events/:id — Delete event (draft only)
