@@ -2,9 +2,24 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
+/** Regex to catch URLs, domains, and common spam patterns */
+const LINK_PATTERNS = [
+  /https?:\/\/\S+/i,
+  /www\.\S+/i,
+  /\S+\.(com|net|org|io|co|me|xyz|ru|info|biz|cc|tk|ml|ga|cf|gq|gg|ly|bit|link|click|top|pro|dev|app|site|online|store|shop|club|live|fun|tech|space|website)\b/i,
+  /t\.me\/\S+/i,
+  /discord\.(gg|com)\/\S+/i,
+  /wa\.me\/\S+/i,
+];
+
 class ChatService {
   private db = getDb();
   private lastMessageTime = new Map<string, number>();
+
+  /** Check if message contains links/spam */
+  containsLinks(message: string): boolean {
+    return LINK_PATTERNS.some((pattern) => pattern.test(message));
+  }
 
   /** Check if user can send message (3s cooldown) */
   canSend(userId: string): { allowed: boolean; waitMs: number } {

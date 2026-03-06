@@ -1180,6 +1180,7 @@
     "chatPlaceholder": "Write a message...",
     "chatCooldown": "Wait {seconds}s...",
     "loadMore": "Load more",
-    "onlineCount": "{count} online"
+    "onlineCount": "{count} online",
+    "noLinks": "Links are not allowed"
   }
 }

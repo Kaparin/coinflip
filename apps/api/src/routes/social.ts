@@ -208,6 +208,10 @@ socialRouter.post('/chat', authMiddleware, zValidator('json', ChatMessageSchema)
   const user = c.get('user');
   const { message } = c.req.valid('json');
 
+  if (chatService.containsLinks(message)) {
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Links are not allowed in chat' } }, 400);
+  }
+
   const check = chatService.canSend(user.id);
   if (!check.allowed) {
     return c.json({ error: { code: 'RATE_LIMITED', message: 'Please wait', waitMs: check.waitMs } }, 429);

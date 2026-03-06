@@ -1180,6 +1180,7 @@
     "chatPlaceholder": "Написать сообщение...",
     "chatCooldown": "Подождите {seconds}с...",
     "loadMore": "Загрузить ещё",
-    "onlineCount": "{count} онлайн"
+    "onlineCount": "{count} онлайн",
+    "noLinks": "Ссылки запрещены"
   }
 }

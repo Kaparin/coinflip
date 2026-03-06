@@ -45,6 +45,12 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+const LINK_RE = /https?:\/\/\S+|www\.\S+|\S+\.(com|net|org|io|co|me|xyz|ru|info|biz|gg|ly|link|click|top|app|site|online|store|shop)\b|t\.me\/\S+|discord\.(gg|com)\/\S+/i;
+
+function containsLinks(text: string): boolean {
+  return LINK_RE.test(text);
+}
+
 // ─── User Card ────────────────────────────────────────────
 
 function UserCard({ user, t, onNavigate }: { user: SocialUser; t: (k: string, v?: Record<string, string | number>) => string; onNavigate: () => void }) {
@@ -207,9 +213,16 @@ function ChatTab() {
     };
   }, []);
 
+  const [linkError, setLinkError] = useState(false);
+
   const handleSend = useCallback(async () => {
     const msg = input.trim();
     if (!msg || sending || cooldown > 0 || !isConnected) return;
+    if (containsLinks(msg)) {
+      setLinkError(true);
+      setTimeout(() => setLinkError(false), 2000);
+      return;
+    }
     setSending(true);
     setInput('');
     try {
@@ -265,16 +278,22 @@ function ChatTab() {
         {!isConnected ? (
           <p className="text-center text-xs text-[var(--color-text-secondary)] py-1">{t('errors.unauthorized')}</p>
         ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={cooldown > 0 ? '' : input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={cooldown > 0 || sending}
-              placeholder={cooldown > 0 ? t('social.chatCooldown', { seconds: cooldown }) : t('social.chatPlaceholder')}
-              className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] py-2 px-3 text-xs placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
-            />
+          <div>
+            {linkError && (
+              <p className="text-[10px] text-red-400 mb-1">{t('social.noLinks')}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={cooldown > 0 ? '' : input}
+                onChange={(e) => { setInput(e.target.value); setLinkError(false); }}
+                onKeyDown={handleKeyDown}
+                disabled={cooldown > 0 || sending}
+                placeholder={cooldown > 0 ? t('social.chatCooldown', { seconds: cooldown }) : t('social.chatPlaceholder')}
+                className={`flex-1 rounded-xl border bg-[var(--color-bg)] py-2 px-3 text-xs placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50 ${
+                  linkError ? 'border-red-400' : 'border-[var(--color-border)]'
+                }`}
+              />
             <button
               type="button"
               onClick={handleSend}
@@ -286,7 +305,8 @@ function ChatTab() {
               ) : (
                 <Send size={16} />
               )}
-            </button>
+              </button>
+            </div>
           </div>
         )}
       </div>
