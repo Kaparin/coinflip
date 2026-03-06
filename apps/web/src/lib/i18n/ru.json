@@ -1244,6 +1244,8 @@
     "unstakeLaunch": "Анстейкнуть LAUNCH",
     "signing": "Подписание...",
     "revenueSource": "Heads or Tails",
-    "perPot": "от банка"
+    "perPot": "от банка",
+    "contractUnavailable": "Контракт стейкинга временно недоступен",
+    "retry": "Попробовать снова"
   }
 }

@@ -136,10 +136,13 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
         </div>
       ) : !stats ? (
         <div className="text-center py-8">
-          <p className="text-sm text-[var(--color-text-secondary)]">{t('staking.subtitle')}</p>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-2">{t('staking.subtitle')}</p>
+          <p className="text-xs text-[var(--color-text-secondary)]/60 mb-4">
+            {t('staking.contractUnavailable')}
+          </p>
           <button type="button" onClick={() => { setIsLoading(true); refresh(); }}
-            className="mt-3 text-xs text-violet-400 hover:underline">
-            {t('common.refresh')}
+            className="text-xs text-violet-400 hover:underline">
+            {t('staking.retry')}
           </button>
         </div>
       ) : (

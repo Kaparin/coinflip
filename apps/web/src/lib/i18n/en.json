@@ -1244,6 +1244,8 @@
     "unstakeLaunch": "Unstake LAUNCH",
     "signing": "Signing...",
     "revenueSource": "Heads or Tails",
-    "perPot": "per pot"
+    "perPot": "per pot",
+    "contractUnavailable": "Staking contract is temporarily unavailable",
+    "retry": "Try again"
   }
 }

@@ -253,10 +253,10 @@ export function Header() {
                   <button
                     type="button"
                     onClick={() => setStakingOpen(true)}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-violet-500/10 transition-colors"
-                    title={t('staking.title')}
+                    className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
                   >
-                    <Image src="/launch-token-logo2.png" alt="LAUNCH" width={18} height={18} className="rounded-full" />
+                    <Image src="/launch-token-logo2.png" alt="LAUNCH" width={22} height={22} className="rounded-full" />
+                    <span>{t('staking.stake')}</span>
                   </button>
 
                   {refCode && (

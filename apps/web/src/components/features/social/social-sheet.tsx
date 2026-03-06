@@ -152,19 +152,21 @@ function UserCard({
   t,
   onTransfer,
   onNavigate,
+  menuOpen,
+  onToggleMenu,
 }: {
   user: SocialUser;
   t: (k: string, v?: Record<string, string | number>) => string;
   onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
   onNavigate: () => void;
+  menuOpen: boolean;
+  onToggleMenu: (address: string) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => setMenuOpen(!menuOpen)}
+        onClick={() => onToggleMenu(user.address)}
         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--color-surface-hover)] active:scale-[0.99] text-left"
       >
         <div className="relative shrink-0">
@@ -189,7 +191,7 @@ function UserCard({
       {menuOpen && (
         <UserActionMenu
           user={user}
-          onClose={() => setMenuOpen(false)}
+          onClose={() => onToggleMenu(user.address)}
           onTransfer={(currency) => { onTransfer(user, currency); }}
           onNavigate={onNavigate}
           t={t}
@@ -212,6 +214,7 @@ function UsersTab({
   const { isConnected } = useWalletContext();
   const [subTab, setSubTab] = useState<UsersSubTab>('online');
   const [search, setSearch] = useState('');
+  const [openMenuAddr, setOpenMenuAddr] = useState<string | null>(null);
 
   const { users: onlineUsers, loading: onlineLoading } = useOnlineUsers(subTab === 'online');
   const { users: favUsers, loading: favLoading } = useFavorites(subTab === 'favorites' && isConnected);
@@ -277,6 +280,8 @@ function UsersTab({
                 t={t}
                 onTransfer={onTransfer}
                 onNavigate={onNavigate}
+                menuOpen={openMenuAddr === user.address}
+                onToggleMenu={(addr) => setOpenMenuAddr((prev) => prev === addr ? null : addr)}
               />
             ))}
             {subTab === 'all' && nextCursor && (
