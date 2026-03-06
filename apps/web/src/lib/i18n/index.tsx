@@ -23,20 +23,24 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string | un
 
 /** In AXM mode, replace "COIN" token references with "AXM" in translated strings */
 const _axmMode = isAxmMode();
-function postProcess(str: string): string {
+/** Shop sells COIN tokens for AXM — never replace COIN with AXM in these keys */
+const SHOP_COIN_KEYS = new Set(['shop.sectionCoin', 'shop.sectionCoinDesc', 'shop.subtitle']);
+
+function postProcess(str: string, key?: string): string {
   if (!_axmMode) return str;
+  if (key && SHOP_COIN_KEYS.has(key)) return str; // Shop: always COIN tokens for AXM
   return str.replace(/\bCOIN\b/g, 'AXM');
 }
 
-function interpolate(template: string, vars?: Record<string, string | number>): string {
+function interpolate(template: string, vars?: Record<string, string | number>, key?: string): string {
   let result = template;
   if (vars) {
-    result = result.replace(/\{(\w+)\}/g, (_, key) => {
-      const val = vars[key];
-      return val !== undefined ? String(val) : `{${key}}`;
+    result = result.replace(/\{(\w+)\}/g, (_, k) => {
+      const val = vars[k];
+      return val !== undefined ? String(val) : `{${k}}`;
     });
   }
-  return postProcess(result);
+  return postProcess(result, key);
 }
 
 interface I18nContextType {
@@ -91,10 +95,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const t = useCallback((key: string, vars?: Record<string, string | number>): string => {
     const currentLocale = mounted ? locale : 'en';
     const value = getNestedValue(translations[currentLocale], key);
-    if (value) return interpolate(value, vars);
+    if (value) return interpolate(value, vars, key);
     // Fallback to English
     const fallback = getNestedValue(translations.en, key);
-    if (fallback) return interpolate(fallback, vars);
+    if (fallback) return interpolate(fallback, vars, key);
     return key;
   }, [locale, mounted]);
 

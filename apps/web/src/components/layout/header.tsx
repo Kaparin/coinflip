@@ -8,7 +8,7 @@ import { GameTokenIcon, LaunchTokenIcon, AxmIcon, UserAvatar } from '@/component
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance, useGetActiveEvents, useGetCurrentUser } from '@coinflip/api-client';
-import { useWalletBalance, useNativeBalance, useCoinBalance } from '@/hooks/use-wallet-balance';
+import { useWalletBalance, useNativeBalance } from '@/hooks/use-wallet-balance';
 import { VipPurchaseModal } from '@/components/features/vip/vip-purchase-modal';
 import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
@@ -39,7 +39,8 @@ export function Header() {
   const activeEventCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
   const { data: walletBalanceRaw } = useWalletBalance(wallet.address);
   const { data: nativeBalanceRaw } = useNativeBalance(wallet.address);
-  const { data: coinBalanceRaw } = useCoinBalance(wallet.address);
+  // coin_balance from vault API (virtual COIN from DB, not on-chain CW20)
+  const coinBalanceRaw = (balanceData as any)?.data?.coin_balance as string | undefined;
   const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
   const isDiamond = vipStatus?.active && vipStatus.tier === 'diamond';
