@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatLaunch, toMicroLaunch } from '@coinflip/shared/constants';
-import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw, User } from 'lucide-react';
+import { Trophy, Target, Plus, Play, Calculator, CheckCircle, Archive, Trash2, Clock, Gift, Minus, Eye, Send, XCircle, Ban, Pencil, RotateCcw, User, Languages } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 
 import { useAdminPendingSponsoredRaffles, useAdminApproveSponsoredRaffle, useAdminRejectSponsoredRaffle } from '@/hooks/use-admin';
@@ -633,6 +633,7 @@ export function EventsTab() {
           approve: 'Результаты подтверждены!',
           archive: 'Ивент архивирован!',
           distribute: 'Призы розданы!',
+          retranslate: 'Перевод обновлён!',
         };
         setMessage(actionLabels[action] ?? `${action} выполнено!`);
         fetchEvents();
@@ -1112,6 +1113,14 @@ export function EventsTab() {
                   <Pencil size={12} /> Изменить
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => { handleAction(detailEvent.id, 'retranslate'); }}
+                disabled={!!actionLoading}
+                className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40"
+              >
+                <Languages size={12} /> Перевести
+              </button>
               {detailEvent.status === 'draft' && (
                 <>
                   <button
@@ -1356,6 +1365,15 @@ export function EventsTab() {
                       title="Подробности"
                     >
                       <Eye size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAction(event.id, 'retranslate')}
+                      disabled={!!actionLoading}
+                      className="rounded-lg border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40"
+                      title="Перевести (DeepL)"
+                    >
+                      <Languages size={12} />
                     </button>
 
                     {/* Draft: Activate + Delete */}

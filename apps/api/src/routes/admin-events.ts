@@ -113,10 +113,8 @@ adminEventsRouter.post('/:id/retranslate', async (c) => {
   const i18n = await translationService.translateEvent(event.title, event.description ?? null);
   logger.info({ eventId, i18n }, 'Retranslation result');
 
-  await eventsService.updateEvent(eventId, {
-    title: event.title,
-    description: event.description ?? undefined,
-  });
+  // Update i18n fields directly (bypass updateEvent status restrictions)
+  await eventsService.updateI18n(eventId, i18n);
 
   const updated = await eventsService.getEventById(eventId);
   const data = updated ? await eventsService.formatEventResponse(updated) : null;

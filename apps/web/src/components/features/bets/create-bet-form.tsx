@@ -399,7 +399,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   const parts = val.split('.');
                   if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                  if (parts.length === 2 && parts[1].length > 6) val = parts[0] + '.' + parts[1].slice(0, 6);
+                  if (parts.length === 2 && parts[1]!.length > 6) val = parts[0] + '.' + parts[1]!.slice(0, 6);
                   setAmount(val);
                 }}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-12 text-sm font-medium placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)] focus:outline-none transition-colors"

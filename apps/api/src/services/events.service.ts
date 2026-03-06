@@ -150,6 +150,24 @@ class EventsService {
     return updated ?? null;
   }
 
+  /** Update only i18n fields — no status restrictions (used by retranslate) */
+  async updateI18n(eventId: string, i18n: {
+    titleEn: string; titleRu: string;
+    descriptionEn: string | null; descriptionRu: string | null;
+  }) {
+    const db = getDb();
+    await db
+      .update(events)
+      .set({
+        titleEn: i18n.titleEn,
+        titleRu: i18n.titleRu,
+        descriptionEn: i18n.descriptionEn,
+        descriptionRu: i18n.descriptionRu,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, eventId));
+  }
+
   async deleteEvent(eventId: string) {
     const db = getDb();
     const [event] = await db
