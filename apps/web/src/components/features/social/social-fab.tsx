@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { Users } from 'lucide-react';
 import { useOnlineCount } from '@/hooks/use-social';
 import { SocialSheet } from './social-sheet';
 
@@ -11,24 +11,22 @@ export function SocialFab() {
 
   return (
     <>
+      {/* Circular FAB — bottom-left, mirrors CreateBetFab style */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-4 z-40 group md:bottom-6"
+        className="fixed left-4 z-40 group md:hidden"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)' }}
       >
+        {/* Outer glow ring */}
+        <span className="absolute inset-0 rounded-full bg-emerald-500 animate-[fabPing_2s_ease-out_infinite] opacity-0" />
+
         {/* Main button */}
-        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)] border border-[var(--color-border)] shadow-xl transition-all duration-200 group-active:scale-90">
-          <Image
-            src="/users-chat.png"
-            alt="Social"
-            width={28}
-            height={28}
-            className="pointer-events-none"
-          />
+        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 shadow-xl shadow-emerald-500/30 transition-all duration-200 group-active:scale-90">
+          <Users size={24} strokeWidth={2.5} className="text-white" />
           {/* Online count badge */}
           {onlineCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-success)] px-1 text-[9px] font-bold text-white shadow-sm">
+            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-white text-emerald-600 px-1 text-[9px] font-bold shadow-sm">
               {onlineCount}
             </span>
           )}
