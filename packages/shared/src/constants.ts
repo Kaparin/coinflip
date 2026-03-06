@@ -113,8 +113,8 @@ export const LEADERBOARD_CACHE_TTL_MS = 30_000;
 /** Grace period before auto-archiving empty calculating events (5 minutes) */
 export const EMPTY_EVENT_ARCHIVE_GRACE_MS = 5 * 60 * 1000;
 
-/** Grace period before auto-approving calculating events with results (10 minutes) */
-export const EVENT_AUTO_APPROVE_GRACE_MS = 10 * 60 * 1000;
+/** Grace period before auto-approving calculating events with results (1 minute) */
+export const EVENT_AUTO_APPROVE_GRACE_MS = 60 * 1000;
 
 // ---- Staking ----
 /** LAUNCH staking contribution from each pot in basis points (200 = 2% of pot = 20% of 10% commission) */

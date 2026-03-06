@@ -7,6 +7,7 @@ import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { JackpotWinModal } from './jackpot-win-modal';
 import { AnnouncementModal } from './announcement-modal';
 import { EventStartModal } from './event-start-modal';
+import { EventWinModal } from './event-win-modal';
 import type { WsEvent } from '@coinflip/shared/types';
 import { feedback } from '@/lib/feedback';
 
@@ -45,6 +46,9 @@ interface QueuedNotification {
   description?: string | null;
   totalPrizePool?: string;
   endsAt?: string;
+  // event_win fields
+  rank?: number;
+  prizeAmount?: string;
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -135,6 +139,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           messageRu: data.messageRu ? String(data.messageRu) : undefined,
         },
       ]);
+    } else if (event.type === 'event_results_published') {
+      const eventId = String(data.eventId ?? '');
+      const title = String(data.title ?? '');
+      const wsId = `ws_event_win_${eventId}`;
+      if (processedIds.current.has(wsId) || !address) return;
+      processedIds.current.add(wsId);
+
+      // Async: fetch results and check if user is among winners
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+      fetch(`${apiBase}/api/v1/events/${eventId}/results`, { credentials: 'include' })
+        .then((res) => res.ok ? res.json() : null)
+        .then((json) => {
+          const winners = (json?.data?.winners ?? []) as Array<{ address: string; prizeAmount: string | null; finalRank: number | null }>;
+          const me = winners.find((w) => w.address.toLowerCase() === address.toLowerCase());
+          if (me && me.prizeAmount && Number(me.prizeAmount) > 0) {
+            setQueue((prev) => [
+              ...prev,
+              {
+                id: wsId,
+                type: 'event_win',
+                title,
+                rank: me.finalRank ?? 1,
+                prizeAmount: me.prizeAmount!,
+              },
+            ]);
+          }
+        })
+        .catch(() => { /* silently ignore */ });
     } else if (event.type === 'event_started') {
       const wsId = `ws_event_${data.eventId}`;
       if (processedIds.current.has(wsId)) return;
@@ -165,7 +197,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setCurrent(next!);
     setQueue(rest);
     // Play feedback when showing a notification
-    if (next!.type === 'jackpot_won') {
+    if (next!.type === 'jackpot_won' || next!.type === 'event_win') {
       feedback('jackpot');
     } else {
       feedback('notification');
@@ -209,6 +241,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           priority={current.priority ?? 'normal'}
           sponsorAddress={current.sponsorAddress}
           sponsorNickname={current.sponsorNickname}
+        />
+      )}
+      {current?.type === 'event_win' && (
+        <EventWinModal
+          open={true}
+          onDismiss={handleDismiss}
+          eventTitle={current.title ?? ''}
+          rank={current.rank ?? 1}
+          prizeAmount={current.prizeAmount ?? '0'}
         />
       )}
       {current?.type === 'event_started' && (

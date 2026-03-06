@@ -899,6 +899,11 @@
       "rulesTitle": "General Rules",
       "rulesDesc": "Events are launched periodically by the CoinFlip team. Prizes are credited to your vault balance automatically after results are finalized. Keep an eye on active events — they appear in this section. Each event has a limited duration."
     },
+    "winModal": {
+      "title": "Congratulations!",
+      "rank": "#{{rank}} place",
+      "dismiss": "Awesome!"
+    },
     "rules": {
       "title": "How to participate",
       "contestAutoJoin": "All players participate automatically — just play during the event!",
