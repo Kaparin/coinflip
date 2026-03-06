@@ -193,7 +193,10 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
     }
     case 'achievement_claim': {
       const achId = meta.achievementId as string;
-      description = t('activity.achievementClaim', { achievement: t(`achievements.${achId}.name`) || achId });
+      // achId is "category_tier" like "profit_1", "streak_3" — extract category part
+      const catId = achId.replace(/_\d+$/, '');
+      const achName = t(`playerProfile.cat_${catId}`);
+      description = t('activity.achievementClaim', { achievement: achName || achId });
       break;
     }
     case 'branch_change': {
