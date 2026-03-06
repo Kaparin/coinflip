@@ -447,7 +447,7 @@ function ChangeBranchSection() {
           USER_NOT_FOUND: t('referral.changeBranchNotFound'),
           SELF_REFERRAL: t('referral.changeBranchSelf'),
           WOULD_CREATE_CYCLE: t('referral.changeBranchCycle'),
-          INSUFFICIENT_BALANCE: t('referral.changeBranchNoBalance'),
+          INSUFFICIENT_BALANCE: t('referral.changeBranchNoBalance', { amount: branchCost ? formatLaunch(branchCost) : '?' }),
         };
         setStep('error');
         setErrorMsg(msg[result.reason!] ?? result.reason ?? 'Error');
@@ -543,7 +543,7 @@ function ChangeBranchSection() {
                 {t('referral.changeBranchDesc')}
               </p>
               <p className="text-[10px] font-bold text-amber-500">
-                {t('referral.changeBranchCostLabel')}: {branchCost ? formatLaunch(branchCost) : '...'} COIN
+                {t('referral.changeBranchCost', { amount: branchCost ? formatLaunch(branchCost) : '...' })}
               </p>
               <input
                 type="text"
@@ -560,7 +560,7 @@ function ChangeBranchSection() {
                 disabled={!addr.trim()}
                 className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                {t('referral.changeBranchConfirm')}
+                {t('referral.changeBranchConfirm', { amount: branchCost ? formatLaunch(branchCost) : '...' })}
               </button>
             </>
           )}
