@@ -9,7 +9,7 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
-export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase';
+export type ActivityType = 'bet_win' | 'bet_loss' | 'referral_reward' | 'jackpot_win' | 'shop_purchase' | 'vip_purchase' | 'transfer_sent' | 'transfer_received';
 
 export interface ActivityItem {
   id: string;
@@ -33,7 +33,7 @@ class ActivityService {
     // Build type filter
     const allowedTypes = options.types?.length
       ? options.types
-      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase'];
+      : ['bet_win', 'bet_loss', 'referral_reward', 'jackpot_win', 'shop_purchase', 'vip_purchase', 'transfer_sent', 'transfer_received'];
 
     const unionParts: ReturnType<typeof sql>[] = [];
 
@@ -176,6 +176,48 @@ class ActivityService {
           ) AS metadata
         FROM vip_subscriptions vs
         WHERE vs.user_id = ${userId}
+      `);
+    }
+
+    // Transfers sent
+    if (allowedTypes.includes('transfer_sent')) {
+      unionParts.push(sql`
+        SELECT
+          'transfer_sent_' || ct.id AS id,
+          'transfer_sent' AS type,
+          ct.amount::text AS amount,
+          ct.created_at AS ts,
+          jsonb_build_object(
+            'recipientAddress', (SELECT address FROM users WHERE id = ct.recipient_id),
+            'recipientNickname', (SELECT profile_nickname FROM users WHERE id = ct.recipient_id),
+            'recipientVipTier', (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = ct.recipient_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1),
+            'currency', ct.currency,
+            'fee', ct.fee,
+            'message', ct.message
+          ) AS metadata
+        FROM coin_transfers ct
+        WHERE ct.sender_id = ${userId}
+      `);
+    }
+
+    // Transfers received
+    if (allowedTypes.includes('transfer_received')) {
+      unionParts.push(sql`
+        SELECT
+          'transfer_received_' || ct.id AS id,
+          'transfer_received' AS type,
+          ct.amount::text AS amount,
+          ct.created_at AS ts,
+          jsonb_build_object(
+            'senderAddress', (SELECT address FROM users WHERE id = ct.sender_id),
+            'senderNickname', (SELECT profile_nickname FROM users WHERE id = ct.sender_id),
+            'senderVipTier', (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = ct.sender_id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1),
+            'currency', ct.currency,
+            'fee', ct.fee,
+            'message', ct.message
+          ) AS metadata
+        FROM coin_transfers ct
+        WHERE ct.recipient_id = ${userId}
       `);
     }
 

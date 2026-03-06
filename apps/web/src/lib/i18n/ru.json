@@ -918,6 +918,8 @@
     "jackpotWin": "Джекпот {tier} выигран!",
     "shopPurchase": "Покупка сундука Тир {tier}",
     "vipPurchase": "Подписка {tier} VIP",
+    "transferSent": "Перевод для {to}",
+    "transferReceived": "Получено от {from}",
     "loadMore": "Загрузить ещё",
     "noActivity": "Пока нет активности"
   },

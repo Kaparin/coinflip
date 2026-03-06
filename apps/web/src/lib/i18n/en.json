@@ -918,6 +918,8 @@
     "jackpotWin": "{tier} Jackpot won!",
     "shopPurchase": "Chest Tier {tier} purchased",
     "vipPurchase": "{tier} VIP subscription",
+    "transferSent": "Sent to {to}",
+    "transferReceived": "Received from {from}",
     "loadMore": "Load more",
     "noActivity": "No activity yet"
   },

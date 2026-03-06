@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GameTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy, Skull, Gift, History, ShoppingBag, Crown } from 'lucide-react';
+import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { GiOpenTreasureChest } from 'react-icons/gi';
 import Link from 'next/link';
 
@@ -78,6 +78,20 @@ const TYPE_CONFIG: Record<ActivityType, {
     borderClass: 'border-amber-400/20',
     sign: '-',
   },
+  transfer_sent: {
+    icon: ArrowUpRight,
+    colorClass: 'text-orange-400',
+    bgClass: 'bg-orange-400/15',
+    borderClass: 'border-orange-400/20',
+    sign: '-',
+  },
+  transfer_received: {
+    icon: ArrowDownLeft,
+    colorClass: 'text-sky-400',
+    bgClass: 'bg-sky-400/15',
+    borderClass: 'border-sky-400/20',
+    sign: '+',
+  },
 };
 
 function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?: Record<string, string | number>) => string }) {
@@ -120,11 +134,24 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
       description = t('activity.vipPurchase', { tier });
       break;
     }
+    case 'transfer_sent': {
+      const recipient = (meta.recipientNickname as string) || truncAddr((meta.recipientAddress as string) ?? '');
+      description = t('activity.transferSent', { to: recipient });
+      break;
+    }
+    case 'transfer_received': {
+      const sender = (meta.senderNickname as string) || truncAddr((meta.senderAddress as string) ?? '');
+      description = t('activity.transferReceived', { from: sender });
+      break;
+    }
     default:
       description = item.type;
   }
 
-  const opponentAddress = (meta.opponentAddress as string) ?? null;
+  const opponentAddress = (meta.opponentAddress as string)
+    ?? (meta.recipientAddress as string)
+    ?? (meta.senderAddress as string)
+    ?? null;
 
   return (
     <div className={`rounded-xl border ${config.borderClass} bg-[var(--color-surface)] transition-all`}>
