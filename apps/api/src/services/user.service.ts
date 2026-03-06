@@ -857,9 +857,10 @@ export class UserService {
     const totalMicro = BigInt(totalCoin) * BigInt(MICRO);
 
     for (const claim of toClaim) {
+      const claimMicro = (BigInt(claim.coinAmount) * BigInt(MICRO)).toString();
       await this.db.execute(sql`
         INSERT INTO achievement_claims (user_id, achievement_id, coin_amount)
-        VALUES (${userId}, ${claim.achievementId}, ${claim.coinAmount})
+        VALUES (${userId}, ${claim.achievementId}, ${claimMicro})
         ON CONFLICT (user_id, achievement_id) DO NOTHING
       `);
     }
