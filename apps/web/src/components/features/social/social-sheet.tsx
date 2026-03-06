@@ -5,20 +5,23 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Send, Loader2 } from 'lucide-react';
+import { X, Search, Send, Loader2, Sparkles, Pin } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { UserAvatar } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
+import { formatLaunch } from '@coinflip/shared/constants';
 import {
   useOnlineUsers,
   useFavorites,
   useAllUsers,
   useChat,
+  useChatPrices,
   type SocialUser,
   type ChatMessage,
 } from '@/hooks/use-social';
@@ -27,6 +30,8 @@ import {
 
 type MainTab = 'users' | 'chat';
 type UsersSubTab = 'online' | 'favorites' | 'all';
+type ChatStyle = 'highlighted' | 'pinned' | null;
+type ChatEffect = 'confetti' | 'coins' | 'fire' | null;
 
 interface SocialSheetProps {
   open: boolean;
@@ -169,23 +174,213 @@ function UsersTab({ onNavigate }: { onNavigate: () => void }) {
   );
 }
 
+// ─── Effect Animation ─────────────────────────────────────
+
+function EffectOverlay({ effect, onDone }: { effect: ChatEffect; onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 2500);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+
+  if (!effect) return null;
+
+  const particles = Array.from({ length: 20 }, (_, i) => i);
+  const emoji = effect === 'confetti' ? ['🎉', '🎊', '✨', '🥳'] : effect === 'coins' ? ['🪙', '💰', '💎', '🏆'] : ['🔥', '💥', '⚡', '☄️'];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden z-10">
+      {particles.map((i) => (
+        <span
+          key={i}
+          className="absolute animate-[chatEffect_2.5s_ease-out_forwards]"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: '-20px',
+            fontSize: `${12 + Math.random() * 14}px`,
+            animationDelay: `${Math.random() * 0.8}s`,
+            opacity: 0,
+          }}
+        >
+          {emoji[i % emoji.length]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─── Chat Bubble ──────────────────────────────────────────
+
+function ChatBubble({ msg, onEffect }: { msg: ChatMessage; onEffect?: (effect: ChatEffect) => void }) {
+  const isHighlighted = msg.style === 'highlighted';
+  const isPinned = msg.style === 'pinned';
+
+  // Trigger effect on new pinned/effect messages
+  const triggered = useRef(false);
+  useEffect(() => {
+    if (triggered.current) return;
+    if (msg.effect && onEffect) {
+      triggered.current = true;
+      onEffect(msg.effect);
+    }
+  }, [msg.effect, onEffect]);
+
+  const wrapperClass = isPinned
+    ? 'relative flex items-start gap-2 py-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30'
+    : isHighlighted
+      ? 'relative flex items-start gap-2 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-transparent border-l-2 border-amber-400/50'
+      : 'relative flex items-start gap-2 py-1';
+
+  return (
+    <div className={wrapperClass}>
+      {/* Super Chat label */}
+      {isPinned && (
+        <div className="absolute -top-2.5 left-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-2 py-0.5 shadow-lg shadow-amber-500/25">
+          <Pin size={8} className="text-black" />
+          <span className="text-[8px] font-black tracking-wider text-black uppercase">SUPER CHAT</span>
+        </div>
+      )}
+
+      <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
+        <UserAvatar address={msg.address} size={isPinned ? 28 : 24} />
+      </Link>
+      <div className="min-w-0 flex-1 text-xs leading-relaxed">
+        <Link
+          href={`/game/profile/${msg.address}`}
+          className={`font-semibold hover:underline ${isPinned ? 'text-amber-300' : getVipNameClass(msg.vipTier, null)}`}
+        >
+          {msg.nickname || shortAddr(msg.address)}
+        </Link>
+        {msg.vipTier && <>{' '}<VipBadge tier={msg.vipTier} /></>}
+        <span className="text-[9px] text-[var(--color-text-secondary)] ml-1">{formatTime(msg.createdAt)}</span>
+        {msg.effect && (
+          <span className="ml-1 text-[9px]">
+            {msg.effect === 'confetti' ? '🎉' : msg.effect === 'coins' ? '🪙' : '🔥'}
+          </span>
+        )}
+        <span className="text-[var(--color-text-secondary)] mx-1">&middot;</span>
+        <span className={`break-words ${isPinned ? 'font-medium text-amber-100/90' : ''}`}>{msg.message}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Premium Selector ─────────────────────────────────────
+
+function PremiumSelector({
+  style, setStyle, effect, setEffect, prices, t,
+}: {
+  style: ChatStyle;
+  setStyle: (s: ChatStyle) => void;
+  effect: ChatEffect;
+  setEffect: (e: ChatEffect) => void;
+  prices: { highlighted: number; pinned: number; effect: number } | null;
+  t: (k: string, v?: Record<string, string | number>) => string;
+}) {
+  if (!prices) return null;
+
+  const styleOptions: { key: ChatStyle; label: string; price: number; color: string }[] = [
+    { key: 'highlighted', label: t('social.highlighted'), price: prices.highlighted, color: 'from-amber-500 to-yellow-500' },
+    { key: 'pinned', label: t('social.pinned'), price: prices.pinned, color: 'from-orange-500 to-red-500' },
+  ];
+
+  const effectOptions: { key: ChatEffect; label: string; emoji: string }[] = [
+    { key: 'confetti', label: t('social.effectConfetti'), emoji: '🎉' },
+    { key: 'coins', label: t('social.effectCoins'), emoji: '🪙' },
+    { key: 'fire', label: t('social.effectFire'), emoji: '🔥' },
+  ];
+
+  return (
+    <div className="space-y-2 px-1 py-2 animate-in slide-in-from-bottom-2 duration-200">
+      {/* Styles */}
+      <div className="flex gap-1.5">
+        {styleOptions.map(({ key, label, price, color }) => {
+          const active = style === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setStyle(active ? null : key)}
+              className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg py-1.5 px-1 text-[10px] font-semibold transition-all border ${
+                active
+                  ? `bg-gradient-to-b ${color} text-white border-transparent shadow-lg`
+                  : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-amber-500/30 hover:text-amber-300'
+              }`}
+            >
+              <span>{label}</span>
+              <span className={`text-[9px] ${active ? 'text-white/80' : 'text-[var(--color-text-secondary)]'}`}>
+                {formatLaunch(price)} COIN
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Effects */}
+      <div className="flex gap-1.5">
+        {effectOptions.map(({ key, emoji }) => {
+          const active = effect === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setEffect(active ? null : key)}
+              className={`flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-all border ${
+                active
+                  ? 'bg-[var(--color-primary)]/20 border-[var(--color-primary)] text-[var(--color-primary)]'
+                  : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30'
+              }`}
+            >
+              <span>{emoji}</span>
+              <span className={`text-[9px] ${active ? '' : 'text-[var(--color-text-secondary)]'}`}>
+                +{formatLaunch(prices!.effect)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Chat Tab ─────────────────────────────────────────────
 
 function ChatTab() {
   const { t } = useTranslation();
   const { isConnected } = useWalletContext();
   const { messages, loading, sendMessage, messagesEndRef } = useChat(true);
+  const prices = useChatPrices();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [linkError, setLinkError] = useState(false);
+  const [balanceError, setBalanceError] = useState(false);
+  const [showPremium, setShowPremium] = useState(false);
+  const [style, setStyle] = useState<ChatStyle>(null);
+  const [effect, setEffect] = useState<ChatEffect>(null);
+  const [activeEffect, setActiveEffect] = useState<ChatEffect>(null);
+
+  // Pinned messages (super chat) — show latest at the top
+  const pinnedMessages = useMemo(
+    () => messages.filter((m) => m.style === 'pinned').slice(-3),
+    [messages],
+  );
+
+  // Calculate total cost
+  const totalCost = useMemo(() => {
+    if (!prices) return 0;
+    let cost = 0;
+    if (style === 'highlighted') cost += prices.highlighted;
+    if (style === 'pinned') cost += prices.pinned;
+    if (effect) cost += prices.effect;
+    return cost;
+  }, [prices, style, effect]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    // Only auto-scroll if user is near the bottom (within 100px)
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -213,8 +408,6 @@ function ChatTab() {
     };
   }, []);
 
-  const [linkError, setLinkError] = useState(false);
-
   const handleSend = useCallback(async () => {
     const msg = input.trim();
     if (!msg || sending || cooldown > 0 || !isConnected) return;
@@ -226,18 +419,29 @@ function ChatTab() {
     setSending(true);
     setInput('');
     try {
-      const result = await sendMessage(msg);
+      const result = await sendMessage(msg, style, effect);
+      if (result.error === 'INSUFFICIENT_BALANCE') {
+        setBalanceError(true);
+        setInput(msg);
+        setTimeout(() => setBalanceError(false), 3000);
+        setSending(false);
+        return;
+      }
       if (result.waitMs) {
         startCooldown(result.waitMs);
       } else {
         startCooldown(3000);
       }
+      // Reset premium options after successful send
+      setStyle(null);
+      setEffect(null);
+      setShowPremium(false);
     } catch {
-      setInput(msg); // restore on error
+      setInput(msg);
     } finally {
       setSending(false);
     }
-  }, [input, sending, cooldown, isConnected, sendMessage, startCooldown]);
+  }, [input, sending, cooldown, isConnected, sendMessage, startCooldown, style, effect]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -246,8 +450,32 @@ function ChatTab() {
     }
   }, [handleSend]);
 
+  const handleEffect = useCallback((eff: ChatEffect) => {
+    setActiveEffect(eff);
+  }, []);
+
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 relative">
+      {/* Effect animation overlay */}
+      {activeEffect && (
+        <EffectOverlay effect={activeEffect} onDone={() => setActiveEffect(null)} />
+      )}
+
+      {/* Pinned super-chat messages at top */}
+      {pinnedMessages.length > 0 && (
+        <div className="shrink-0 border-b border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent px-3 py-1.5 space-y-1">
+          {pinnedMessages.map((msg) => (
+            <div key={msg.id} className="flex items-center gap-2 text-[10px]">
+              <Pin size={10} className="text-amber-400 shrink-0" />
+              <Link href={`/game/profile/${msg.address}`} className="font-semibold text-amber-300 hover:underline shrink-0">
+                {msg.nickname || shortAddr(msg.address)}
+              </Link>
+              <span className="text-amber-200/70 truncate">{msg.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain px-3 min-h-0">
         {/* Daily reset notice */}
@@ -266,7 +494,7 @@ function ChatTab() {
         ) : (
           <div className="space-y-1">
             {messages.map((msg) => (
-              <ChatBubble key={msg.id} msg={msg} />
+              <ChatBubble key={msg.id} msg={msg} onEffect={handleEffect} />
             ))}
           </div>
         )}
@@ -279,58 +507,77 @@ function ChatTab() {
           <p className="text-center text-xs text-[var(--color-text-secondary)] py-1">{t('errors.unauthorized')}</p>
         ) : (
           <div>
+            {/* Error messages */}
             {linkError && (
               <p className="text-[10px] text-red-400 mb-1">{t('social.noLinks')}</p>
             )}
-            <div className="flex items-center gap-2">
+            {balanceError && (
+              <p className="text-[10px] text-red-400 mb-1">{t('social.insufficientBalance')}</p>
+            )}
+
+            {/* Premium selector */}
+            {showPremium && (
+              <PremiumSelector
+                style={style}
+                setStyle={setStyle}
+                effect={effect}
+                setEffect={setEffect}
+                prices={prices}
+                t={t}
+              />
+            )}
+
+            {/* Input row */}
+            <div className="flex items-center gap-1.5">
+              {/* Premium toggle */}
+              <button
+                type="button"
+                onClick={() => setShowPremium(!showPremium)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${
+                  showPremium || style || effect
+                    ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-lg shadow-amber-500/25'
+                    : 'text-[var(--color-text-secondary)] hover:text-amber-400 hover:bg-[var(--color-surface-hover)]'
+                }`}
+              >
+                <Sparkles size={16} />
+              </button>
+
               <input
                 type="text"
                 value={cooldown > 0 ? '' : input}
-                onChange={(e) => { setInput(e.target.value); setLinkError(false); }}
+                onChange={(e) => { setInput(e.target.value); setLinkError(false); setBalanceError(false); }}
                 onKeyDown={handleKeyDown}
                 disabled={cooldown > 0 || sending}
                 placeholder={cooldown > 0 ? t('social.chatCooldown', { seconds: cooldown }) : t('social.chatPlaceholder')}
                 className={`flex-1 rounded-xl border bg-[var(--color-bg)] py-2 px-3 text-xs placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50 ${
-                  linkError ? 'border-red-400' : 'border-[var(--color-border)]'
+                  linkError || balanceError ? 'border-red-400' : 'border-[var(--color-border)]'
                 }`}
               />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!input.trim() || cooldown > 0 || sending}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-30"
-            >
-              {sending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Send size={16} />
-              )}
+
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!input.trim() || cooldown > 0 || sending}
+                className={`flex h-9 shrink-0 items-center justify-center rounded-xl text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-30 ${
+                  totalCost > 0
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-600 gap-1.5 px-3 shadow-lg shadow-amber-500/20'
+                    : 'bg-[var(--color-primary)] w-9'
+                }`}
+              >
+                {sending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : totalCost > 0 ? (
+                  <>
+                    <Send size={14} />
+                    <span className="text-[10px] font-bold">{formatLaunch(totalCost)}</span>
+                  </>
+                ) : (
+                  <Send size={16} />
+                )}
               </button>
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ChatBubble({ msg }: { msg: ChatMessage }) {
-  return (
-    <div className="flex items-start gap-2 py-1">
-      <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
-        <UserAvatar address={msg.address} size={24} />
-      </Link>
-      <div className="min-w-0 flex-1 text-xs leading-relaxed">
-        <Link
-          href={`/game/profile/${msg.address}`}
-          className={`font-semibold hover:underline ${getVipNameClass(msg.vipTier, null)}`}
-        >
-          {msg.nickname || shortAddr(msg.address)}
-        </Link>
-        {msg.vipTier && <>{' '}<VipBadge tier={msg.vipTier} /></>}
-        <span className="text-[9px] text-[var(--color-text-secondary)] ml-1">{formatTime(msg.createdAt)}</span>
-        <span className="text-[var(--color-text-secondary)] mx-1">·</span>
-        <span className="break-words">{msg.message}</span>
       </div>
     </div>
   );

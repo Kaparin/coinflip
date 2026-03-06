@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
+import { vaultService } from './vault.service.js';
 
 /** Regex to catch URLs, domains, and common spam patterns */
 const LINK_PATTERNS = [
@@ -11,6 +12,33 @@ const LINK_PATTERNS = [
   /discord\.(gg|com)\/\S+/i,
   /wa\.me\/\S+/i,
 ];
+
+const MICRO = 1_000_000;
+
+/** Prices in micro-COIN */
+export const CHAT_PRICES = {
+  highlighted: 10 * MICRO,   // 10 COIN — golden border message
+  pinned: 50 * MICRO,        // 50 COIN — super chat, pinned at top
+  effect: 5 * MICRO,         // 5 COIN — message with visual effect
+} as const;
+
+export const VALID_STYLES = ['highlighted', 'pinned'] as const;
+export const VALID_EFFECTS = ['confetti', 'coins', 'fire'] as const;
+
+export type ChatStyle = typeof VALID_STYLES[number] | null;
+export type ChatEffect = typeof VALID_EFFECTS[number] | null;
+
+interface ChatMsg {
+  id: string;
+  userId: string;
+  address: string;
+  nickname: string | null;
+  vipTier: string | null;
+  message: string;
+  style: string | null;
+  effect: string | null;
+  createdAt: string;
+}
 
 class ChatService {
   private db = getDb();
@@ -32,21 +60,39 @@ class ChatService {
     return { allowed: true, waitMs: 0 };
   }
 
+  /** Calculate cost for message options */
+  calculateCost(style: ChatStyle, effect: ChatEffect): number {
+    let cost = 0;
+    if (style === 'highlighted') cost += CHAT_PRICES.highlighted;
+    if (style === 'pinned') cost += CHAT_PRICES.pinned;
+    if (effect) cost += CHAT_PRICES.effect;
+    return cost;
+  }
+
   /** Save and return chat message */
-  async sendMessage(userId: string, message: string): Promise<{
-    id: string;
-    userId: string;
-    address: string;
-    nickname: string | null;
-    vipTier: string | null;
-    message: string;
-    createdAt: string;
-  }> {
+  async sendMessage(
+    userId: string,
+    message: string,
+    style: ChatStyle = null,
+    effect: ChatEffect = null,
+  ): Promise<ChatMsg> {
     this.lastMessageTime.set(userId, Date.now());
 
+    // Deduct payment if premium features used
+    const cost = this.calculateCost(style, effect);
+    if (cost > 0) {
+      const deducted = await vaultService.deductBalance(userId, cost.toString());
+      if (!deducted) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+    }
+
+    const styleVal = style ?? null;
+    const effectVal = effect ?? null;
+
     const rows = await this.db.execute(sql`
-      INSERT INTO global_chat_messages (user_id, message)
-      VALUES (${userId}, ${message})
+      INSERT INTO global_chat_messages (user_id, message, style, effect)
+      VALUES (${userId}, ${message}, ${styleVal}, ${effectVal})
       RETURNING id::text, created_at
     `);
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
@@ -68,22 +114,16 @@ class ChatService {
       nickname: user.nickname ? String(user.nickname) : null,
       vipTier: user.vip_tier ? String(user.vip_tier) : null,
       message,
+      style: styleVal,
+      effect: effectVal,
       createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     };
   }
 
   /** Get today's messages (since midnight UTC) */
-  async getTodayMessages(): Promise<Array<{
-    id: string;
-    userId: string;
-    address: string;
-    nickname: string | null;
-    vipTier: string | null;
-    message: string;
-    createdAt: string;
-  }>> {
+  async getTodayMessages(): Promise<ChatMsg[]> {
     const rows = await this.db.execute(sql`
-      SELECT m.id::text, m.user_id::text as user_id, m.message, m.created_at,
+      SELECT m.id::text, m.user_id::text as user_id, m.message, m.style, m.effect, m.created_at,
         u.address, u.profile_nickname as nickname,
         (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier
       FROM global_chat_messages m
@@ -100,6 +140,8 @@ class ChatService {
       nickname: r.nickname ? String(r.nickname) : null,
       vipTier: r.vip_tier ? String(r.vip_tier) : null,
       message: String(r.message),
+      style: r.style ? String(r.style) : null,
+      effect: r.effect ? String(r.effect) : null,
       createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     }));
   }

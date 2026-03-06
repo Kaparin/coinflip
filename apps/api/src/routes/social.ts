@@ -202,11 +202,13 @@ socialRouter.get('/chat', async (c) => {
 // POST /api/v1/social/chat — Send message
 const ChatMessageSchema = z.object({
   message: z.string().min(1).max(500).transform(s => s.trim()),
+  style: z.enum(['highlighted', 'pinned']).nullable().optional(),
+  effect: z.enum(['confetti', 'coins', 'fire']).nullable().optional(),
 });
 
 socialRouter.post('/chat', authMiddleware, zValidator('json', ChatMessageSchema), async (c) => {
   const user = c.get('user');
-  const { message } = c.req.valid('json');
+  const { message, style, effect } = c.req.valid('json');
 
   if (chatService.containsLinks(message)) {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Links are not allowed in chat' } }, 400);
@@ -217,12 +219,36 @@ socialRouter.post('/chat', authMiddleware, zValidator('json', ChatMessageSchema)
     return c.json({ error: { code: 'RATE_LIMITED', message: 'Please wait', waitMs: check.waitMs } }, 429);
   }
 
-  const chatMsg = await chatService.sendMessage(user.id, message);
+  try {
+    const chatMsg = await chatService.sendMessage(
+      user.id,
+      message,
+      style ?? null,
+      effect ?? null,
+    );
 
-  // Broadcast to all via WS
-  wsService.emitChatMessage(chatMsg);
+    // Broadcast to all via WS
+    wsService.emitChatMessage(chatMsg as unknown as Record<string, unknown>);
 
-  return c.json({ data: chatMsg });
+    return c.json({ data: chatMsg });
+  } catch (err: any) {
+    if (err?.message === 'INSUFFICIENT_BALANCE') {
+      return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient balance for this message type' } }, 400);
+    }
+    throw err;
+  }
+});
+
+// GET /api/v1/social/chat/prices — Get premium chat prices
+socialRouter.get('/chat/prices', async (c) => {
+  const { CHAT_PRICES } = await import('../services/chat.service.js');
+  return c.json({
+    data: {
+      highlighted: CHAT_PRICES.highlighted,
+      pinned: CHAT_PRICES.pinned,
+      effect: CHAT_PRICES.effect,
+    },
+  });
 });
 
 // GET /api/v1/social/online-count — Just the count

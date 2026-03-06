@@ -28,7 +28,15 @@ export interface ChatMessage {
   nickname: string | null;
   vipTier: string | null;
   message: string;
+  style: 'highlighted' | 'pinned' | null;
+  effect: 'confetti' | 'coins' | 'fire' | null;
   createdAt: string;
+}
+
+export interface ChatPrices {
+  highlighted: number;
+  pinned: number;
+  effect: number;
 }
 
 // ─── Online Count ─────────────────────────────────────────
@@ -197,22 +205,47 @@ export function useChat(enabled: boolean) {
     return unsub;
   }, [enabled, subscribe]);
 
-  const sendMessage = useCallback(async (message: string): Promise<{ waitMs?: number }> => {
+  const sendMessage = useCallback(async (
+    message: string,
+    style?: 'highlighted' | 'pinned' | null,
+    effect?: 'confetti' | 'coins' | 'fire' | null,
+  ): Promise<{ waitMs?: number; error?: string }> => {
     const res = await fetch(`${API_URL}/api/v1/social/chat`, {
       method: 'POST',
       credentials: 'include',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, style: style ?? null, effect: effect ?? null }),
     });
     if (res.status === 429) {
       const data = await res.json();
       return { waitMs: data.error?.waitMs ?? 3000 };
     }
-    if (!res.ok) throw new Error('Failed to send');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.error?.code === 'INSUFFICIENT_BALANCE') {
+        return { error: 'INSUFFICIENT_BALANCE' };
+      }
+      throw new Error('Failed to send');
+    }
     return {};
   }, []);
 
   return { messages, loading, sendMessage, messagesEndRef };
+}
+
+// ─── Chat Prices ─────────────────────────────────────────
+
+export function useChatPrices() {
+  const [prices, setPrices] = useState<ChatPrices | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/v1/social/chat/prices`)
+      .then((r) => r.json())
+      .then((d) => setPrices(d.data ?? null))
+      .catch(() => {});
+  }, []);
+
+  return prices;
 }
 
 // ─── Favorite check/toggle ────────────────────────────────

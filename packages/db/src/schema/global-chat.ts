@@ -7,6 +7,8 @@ export const globalChatMessages = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id').notNull().references(() => users.id),
     message: text('message').notNull(),
+    style: text('style'), // null = normal, 'highlighted' = golden border, 'pinned' = super chat
+    effect: text('effect'), // null = none, 'confetti' | 'coins' | 'fire'
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

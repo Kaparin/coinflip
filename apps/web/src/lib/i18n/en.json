@@ -1181,6 +1181,14 @@
     "chatCooldown": "Wait {seconds}s...",
     "loadMore": "Load more",
     "onlineCount": "{count} online",
-    "noLinks": "Links are not allowed"
+    "noLinks": "Links are not allowed",
+    "premiumMsg": "Premium message",
+    "highlighted": "Highlight",
+    "pinned": "Pin",
+    "effectConfetti": "Confetti",
+    "effectCoins": "Coins",
+    "effectFire": "Fire",
+    "insufficientBalance": "Not enough COIN",
+    "superChat": "SUPER CHAT"
   }
 }

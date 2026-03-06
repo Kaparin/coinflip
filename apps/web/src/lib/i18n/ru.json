@@ -1181,6 +1181,14 @@
     "chatCooldown": "Подождите {seconds}с...",
     "loadMore": "Загрузить ещё",
     "onlineCount": "{count} онлайн",
-    "noLinks": "Ссылки запрещены"
+    "noLinks": "Ссылки запрещены",
+    "premiumMsg": "Премиум-сообщение",
+    "highlighted": "Яркое",
+    "pinned": "Закреп",
+    "effectConfetti": "Конфетти",
+    "effectCoins": "Монеты",
+    "effectFire": "Огонь",
+    "insufficientBalance": "Недостаточно COIN",
+    "superChat": "SUPER CHAT"
   }
 }
