@@ -36,10 +36,12 @@ class TranslationService {
 
       const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          auth_key: env.DEEPL_API_KEY,
-          text,
+        headers: {
+          'Authorization': `DeepL-Auth-Key ${env.DEEPL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: [text],
           source_lang: sourceLang.toUpperCase(),
           target_lang: targetLang.toUpperCase(),
         }),
