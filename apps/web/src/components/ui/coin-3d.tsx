@@ -23,6 +23,7 @@ interface CoinMeshProps {
   result: 'heads' | 'tails';
   frontTexturePath: string;
   backTexturePath: string;
+  spinSpeed?: number;
   onComplete?: () => void;
 }
 
@@ -32,7 +33,7 @@ function easeOutCubic(t: number): number {
 }
 
 // ─── Coin mesh with animation ────────────────────────────────
-function CoinMesh({ state, result, frontTexturePath, backTexturePath, onComplete }: CoinMeshProps) {
+function CoinMesh({ state, result, frontTexturePath, backTexturePath, spinSpeed = IDLE_SPIN_SPEED, onComplete }: CoinMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null!);
   const flipStart = useRef(0);
   const completed = useRef(false);
@@ -92,7 +93,7 @@ function CoinMesh({ state, result, frontTexturePath, backTexturePath, onComplete
       mesh.position.y = 0;
       mesh.rotation.x = 0;
       mesh.rotation.z = 0;
-      mesh.rotation.y += delta * IDLE_SPIN_SPEED;
+      mesh.rotation.y += delta * spinSpeed;
     } else if (state === 'flipping') {
       const elapsed = performance.now() / 1000 - flipStart.current;
       const t = Math.min(elapsed / FLIP_DURATION, 1);
@@ -158,6 +159,8 @@ export interface Coin3DProps {
   className?: string;
   frontTexture?: string;
   backTexture?: string;
+  spinSpeed?: number;
+  cameraPosition?: [number, number, number];
 }
 
 export function Coin3D({
@@ -168,6 +171,8 @@ export function Coin3D({
   className = '',
   frontTexture = '/coin-token-logo.png',
   backTexture = '/coin-token-logo.back.png',
+  spinSpeed,
+  cameraPosition = [0, 3.5, 5],
 }: Coin3DProps) {
   return (
     <div
@@ -175,7 +180,7 @@ export function Coin3D({
       style={{ width: size, height: size }}
     >
       <Canvas
-        camera={{ position: [0, 3.5, 5], fov: 30, near: 0.1, far: 50 }}
+        camera={{ position: cameraPosition, fov: 30, near: 0.1, far: 50 }}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
         dpr={[1, 2]}
         style={{ background: 'transparent' }}
@@ -187,6 +192,7 @@ export function Coin3D({
           result={result}
           frontTexturePath={frontTexture}
           backTexturePath={backTexture}
+          spinSpeed={spinSpeed}
           onComplete={onFlipComplete}
         />
       </Canvas>

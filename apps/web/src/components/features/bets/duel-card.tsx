@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Send, Smile } from 'lucide-react';
@@ -11,6 +11,14 @@ import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { API_URL } from '@/lib/constants';
 import type { ActiveDuel, DuelMessage } from '@/hooks/use-active-duels';
+
+// Lazy-load 3D coin (code-split Three.js bundle)
+const Coin3D = lazy(() =>
+  import('@/components/ui/coin-3d').then((m) => ({ default: m.Coin3D }))
+);
+
+// Toggle: set to false to revert to CSS coin animation
+const USE_3D_COIN = true;
 
 interface DuelCardProps {
   duel: ActiveDuel;
@@ -297,16 +305,20 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
                 </div>
               </div>
             </div>
+          ) : USE_3D_COIN ? (
+            /* 3D spinning logo coin (Three.js) */
+            <Suspense fallback={<CssCoinFallback />}>
+              <Coin3D
+                state="idle"
+                result="heads"
+                size={88}
+                spinSpeed={1.5}
+                cameraPosition={[0, 3, 4.2]}
+              />
+            </Suspense>
           ) : (
-            /* Normal: spinning logo coin */
-            <div className="duel-coin-3d animate-duel-coin-spin">
-              <div className="duel-coin-face duel-coin-front">
-                <Image src="/coin-token-logo.png" alt="COIN front" width={44} height={44} className="rounded-full" unoptimized />
-              </div>
-              <div className="duel-coin-face duel-coin-back-face">
-                <Image src="/coin-token-logo.back.png" alt="COIN back" width={44} height={44} className="rounded-full" unoptimized />
-              </div>
-            </div>
+            /* CSS fallback: spinning logo coin */
+            <CssCoinFallback />
           )}
           {duel.phase === 'resolving' && (
             <span className="text-[9px] text-[var(--color-text-secondary)] mt-1 animate-live-pulse">
@@ -406,6 +418,20 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Original CSS 3D spinning coin — used as Suspense fallback and when USE_3D_COIN=false */
+function CssCoinFallback() {
+  return (
+    <div className="duel-coin-3d animate-duel-coin-spin">
+      <div className="duel-coin-face duel-coin-front">
+        <Image src="/coin-token-logo.png" alt="COIN front" width={44} height={44} className="rounded-full" unoptimized />
+      </div>
+      <div className="duel-coin-face duel-coin-back-face">
+        <Image src="/coin-token-logo.back.png" alt="COIN back" width={44} height={44} className="rounded-full" unoptimized />
+      </div>
     </div>
   );
 }

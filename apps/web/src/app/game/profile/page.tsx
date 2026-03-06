@@ -608,9 +608,17 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['/api/v1/vault/balance'] });
       fetchPlatformStats().then(setPlatformStats);
     } else {
-      addToast('error', result.error ?? t('referral.claimFailed'));
+      const minClaim = refConfig?.minimumClaimMicro ? formatLaunch(refConfig.minimumClaimMicro) : '10';
+      const claimErrors: Record<string, string> = {
+        BELOW_MINIMUM_CLAIM: t('referral.claimBelowMinimum', { amount: minClaim }),
+        NOTHING_TO_CLAIM: t('referral.claimNothing'),
+        ACTION_IN_PROGRESS: t('referral.claimInProgress'),
+        INSUFFICIENT_TREASURY: t('referral.claimTreasuryLow'),
+      };
+      const msg = (result.errorCode && claimErrors[result.errorCode]) || result.error || t('referral.claimFailed');
+      addToast('error', msg);
     }
-  }, [claim, addToast, queryClient, t]);
+  }, [claim, addToast, queryClient, t, refConfig]);
 
   const unclaimedAmount = stats?.balance?.unclaimed ? BigInt(stats.balance.unclaimed) : 0n;
   const totalEarnedAmount = stats?.balance?.totalEarned ? BigInt(stats.balance.totalEarned) : 0n;
