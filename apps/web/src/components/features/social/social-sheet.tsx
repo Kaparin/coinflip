@@ -13,7 +13,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { UserAvatar, LaunchTokenIcon, GameTokenIcon } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon, AxmIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -106,7 +106,7 @@ function UserActionMenu({
         <button
           type="button"
           onClick={() => { onTransfer('coin'); onClose(); }}
-          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-amber-400"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-amber-300 text-amber-400"
         >
           <LaunchTokenIcon size={16} />
           {t('social.sendCoin')}
@@ -116,9 +116,9 @@ function UserActionMenu({
         <button
           type="button"
           onClick={() => { onTransfer('axm'); onClose(); }}
-          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-indigo-400"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-indigo-300 text-indigo-400"
         >
-          <GameTokenIcon size={16} />
+          <AxmIcon size={16} />
           {t('social.sendAxm')}
         </button>
       )}
@@ -127,7 +127,7 @@ function UserActionMenu({
           type="button"
           onClick={() => { toggleFav(); }}
           disabled={favLoading}
-          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
         >
           <Heart size={14} className={isFavorite ? 'fill-pink-500 text-pink-500' : 'text-[var(--color-text-secondary)]'} />
           {isFavorite ? t('social.removeFavorite') : t('social.addFavorite')}
@@ -136,7 +136,7 @@ function UserActionMenu({
       <Link
         href={`/game/profile/${user.address}`}
         onClick={() => { onClose(); onNavigate(); }}
-        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10"
       >
         <User size={14} className="text-[var(--color-text-secondary)]" />
         {t('social.viewProfile')}

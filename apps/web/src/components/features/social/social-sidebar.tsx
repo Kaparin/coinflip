@@ -12,7 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { UserAvatar, LaunchTokenIcon, GameTokenIcon } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon, AxmIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -71,6 +71,20 @@ function UserActionMenu({
   );
   const menuRef = useRef<HTMLDivElement>(null);
   const isSelf = address === user.address;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Calculate fixed position from anchor element
+  useEffect(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const menuWidth = 192; // w-48 = 12rem = 192px
+    let top = rect.bottom + 4;
+    let left = rect.right - menuWidth;
+    // Ensure menu stays within viewport
+    if (top + 200 > window.innerHeight) top = rect.top - 200;
+    if (left < 8) left = 8;
+    setPos({ top, left });
+  }, [anchorRef]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -87,17 +101,20 @@ function UserActionMenu({
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose, anchorRef]);
 
+  if (!pos) return null;
+
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+      style={{ top: pos.top, left: pos.left }}
+      className="fixed z-[60] w-48 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
     >
       {/* Send COIN */}
       {isConnected && !isSelf && (
         <button
           type="button"
           onClick={() => { onTransfer('coin'); onClose(); }}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-amber-400"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-amber-300 text-amber-400"
         >
           <LaunchTokenIcon size={16} />
           {t('social.sendCoin')}
@@ -109,9 +126,9 @@ function UserActionMenu({
         <button
           type="button"
           onClick={() => { onTransfer('axm'); onClose(); }}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] text-indigo-400"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-indigo-300 text-indigo-400"
         >
-          <GameTokenIcon size={16} />
+          <AxmIcon size={16} />
           {t('social.sendAxm')}
         </button>
       )}
@@ -122,7 +139,7 @@ function UserActionMenu({
           type="button"
           onClick={() => { toggleFav(); }}
           disabled={favLoading}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
         >
           <Heart size={14} className={isFavorite ? 'fill-pink-500 text-pink-500' : 'text-[var(--color-text-secondary)]'} />
           {isFavorite ? t('social.removeFavorite') : t('social.addFavorite')}
@@ -133,7 +150,7 @@ function UserActionMenu({
       <Link
         href={`/game/profile/${user.address}`}
         onClick={onClose}
-        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10"
       >
         <User size={14} className="text-[var(--color-text-secondary)]" />
         {t('social.viewProfile')}
