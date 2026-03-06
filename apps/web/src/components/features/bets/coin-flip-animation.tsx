@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from '@/lib/i18n';
 import { feedback } from '@/lib/feedback';
+import type { CoinState } from '@/components/ui/coin-3d';
+
+// Lazy-load 3D coin (SSR-safe, code-split)
+const Coin3D = lazy(() =>
+  import('@/components/ui/coin-3d').then((m) => ({ default: m.Coin3D }))
+);
 
 interface CoinFlipAnimationProps {
   result?: 'heads' | 'tails';
@@ -35,24 +41,39 @@ export function CoinFlipAnimation({
 }: CoinFlipAnimationProps) {
   const { t } = useTranslation();
   const [showResult, setShowResult] = useState(false);
+  const [coinState, setCoinState] = useState<CoinState>('idle');
   const confetti = useConfetti(20, showResult && isWin === true);
   const flipSoundPlayed = useRef(false);
+  const [canRender3D, setCanRender3D] = useState(false);
 
+  // Only render 3D on client after mount (SSR-safe)
+  useEffect(() => {
+    setCanRender3D(true);
+  }, []);
+
+  // Drive coin state from props
   useEffect(() => {
     if (isFlipping) {
       setShowResult(false);
+      setCoinState('flipping');
       if (!flipSoundPlayed.current) {
         feedback('coinFlip');
         flipSoundPlayed.current = true;
       }
-      const timer = setTimeout(() => {
-        setShowResult(true);
-        onComplete?.();
-      }, 2000);
-      return () => clearTimeout(timer);
+    } else {
+      flipSoundPlayed.current = false;
+      if (!showResult) {
+        setCoinState('idle');
+      }
     }
-    flipSoundPlayed.current = false;
-  }, [isFlipping, onComplete]);
+  }, [isFlipping, showResult]);
+
+  // When 3D flip completes
+  const handleFlipComplete = () => {
+    setCoinState('landed');
+    setShowResult(true);
+    onComplete?.();
+  };
 
   // Play win/lose feedback when result is shown
   useEffect(() => {
@@ -62,7 +83,7 @@ export function CoinFlipAnimation({
   }, [showResult, isWin]);
 
   return (
-    <div className="relative flex flex-col items-center gap-4 py-6 overflow-hidden">
+    <div className="relative flex flex-col items-center gap-2 py-4 overflow-hidden">
       {/* Confetti on win */}
       {confetti.map((p) => (
         <div
@@ -80,23 +101,25 @@ export function CoinFlipAnimation({
         />
       ))}
 
-      {/* Coin */}
-      <div
-        className={`relative flex h-24 w-24 items-center justify-center rounded-full border-4 text-4xl transition-all duration-300 ${
-          isFlipping && !showResult
-            ? 'animate-coin-flip border-[var(--color-primary)]'
-            : showResult && result
-              ? isWin
-                ? 'border-[var(--color-success)] bg-[var(--color-success)]/10 win-glow animate-bounce-in'
-                : 'border-[var(--color-danger)] bg-[var(--color-danger)]/10 loss-glow animate-shake'
-              : 'border-[var(--color-border)]'
-        }`}
-        style={{ perspective: '1000px' }}
-      >
-        {showResult && result ? (
-          result === 'heads' ? '👑' : '🪙'
+      {/* 3D Coin */}
+      <div className={`relative transition-all duration-500 ${
+        showResult && result
+          ? isWin
+            ? 'win-glow rounded-full'
+            : 'loss-glow rounded-full'
+          : ''
+      }`}>
+        {canRender3D ? (
+          <Suspense fallback={<CoinFallback isFlipping={isFlipping} />}>
+            <Coin3D
+              state={coinState}
+              result={result ?? 'heads'}
+              onFlipComplete={handleFlipComplete}
+              size={160}
+            />
+          </Suspense>
         ) : (
-          '🪙'
+          <CoinFallback isFlipping={isFlipping} />
         )}
       </div>
 
@@ -117,6 +140,19 @@ export function CoinFlipAnimation({
           {t('coinFlip.flipping')}
         </p>
       )}
+    </div>
+  );
+}
+
+/** CSS fallback while 3D loads or for reduced-motion */
+function CoinFallback({ isFlipping }: { isFlipping: boolean }) {
+  return (
+    <div
+      className={`flex h-24 w-24 items-center justify-center rounded-full border-4 text-4xl ${
+        isFlipping ? 'animate-coin-flip border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+      }`}
+    >
+      🪙
     </div>
   );
 }
