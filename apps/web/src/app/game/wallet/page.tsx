@@ -3,6 +3,7 @@
 import { Wallet } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
+import { StakingWidget } from '@/components/features/staking/staking-widget';
 import { UserAvatar } from '@/components/ui';
 import { useState, useCallback } from 'react';
 import { EXPLORER_URL } from '@/lib/constants';
@@ -110,6 +111,9 @@ export default function WalletPage() {
 
       {/* Full Balance Display with deposit/withdraw */}
       <BalanceDisplay />
+
+      {/* LAUNCH Staking */}
+      <StakingWidget />
     </div>
   );
 }

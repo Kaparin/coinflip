@@ -1222,5 +1222,26 @@
     "cannotSendToSelf": "Cannot send to yourself",
     "minAmount": "Minimum amount: 1",
     "availableBalance": "Available: {amount}"
+  },
+  "staking": {
+    "title": "LAUNCH Staking",
+    "subtitle": "Earn AXM by staking LAUNCH",
+    "totalStaked": "Total Staked LAUNCH",
+    "distributed": "Distributed AXM",
+    "yourPosition": "Your Position",
+    "staked": "Staked",
+    "rewards": "Rewards",
+    "claimed": "Claimed",
+    "balance": "Balance",
+    "stake": "Stake",
+    "unstake": "Unstake",
+    "claim": "Claim",
+    "amountToStake": "Amount to stake",
+    "amountToUnstake": "Amount to unstake",
+    "stakeLaunch": "Stake LAUNCH",
+    "unstakeLaunch": "Unstake LAUNCH",
+    "signing": "Signing...",
+    "revenueSource": "Heads or Tails",
+    "perPot": "per pot"
   }
 }

@@ -1222,5 +1222,26 @@
     "cannotSendToSelf": "Нельзя отправить самому себе",
     "minAmount": "Минимальная сумма: 1",
     "availableBalance": "Доступно: {amount}"
+  },
+  "staking": {
+    "title": "Стейкинг LAUNCH",
+    "subtitle": "Зарабатывай AXM за стейкинг",
+    "totalStaked": "Всего застейкано LAUNCH",
+    "distributed": "Распределено AXM",
+    "yourPosition": "Твоя позиция",
+    "staked": "Застейкано",
+    "rewards": "Награды",
+    "claimed": "Получено",
+    "balance": "Баланс",
+    "stake": "Стейк",
+    "unstake": "Анстейк",
+    "claim": "Забрать",
+    "amountToStake": "Сумма для стейка",
+    "amountToUnstake": "Сумма для анстейка",
+    "stakeLaunch": "Застейкать LAUNCH",
+    "unstakeLaunch": "Анстейкнуть LAUNCH",
+    "signing": "Подписание...",
+    "revenueSource": "Heads or Tails",
+    "perPot": "от банка"
   }
 }
