@@ -775,6 +775,27 @@ export class UserService {
     const uniqueOpponents = Number(r?.unique_opponents ?? 0);
     const activeDays = Number(r?.active_days ?? 0);
 
+    // Count event wins (contests vs raffles) and jackpot wins
+    const extraRows = await this.db.execute(sql`
+      SELECT
+        coalesce(sum(case when e.type = 'contest' then 1 else 0 end), 0)::int AS contest_wins,
+        coalesce(sum(case when e.type = 'raffle' then 1 else 0 end), 0)::int AS raffle_wins
+      FROM event_participants ep
+      JOIN events e ON e.id = ep.event_id
+      WHERE ep.user_id = ${userId} AND ep.status = 'winner'
+    `);
+    const extraRaw = (Array.isArray(extraRows) ? extraRows : (extraRows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    const ex = extraRaw[0];
+    const contestWins = Number(ex?.contest_wins ?? 0);
+    const raffleWins = Number(ex?.raffle_wins ?? 0);
+
+    const jpRows = await this.db.execute(sql`
+      SELECT count(*)::int AS jackpot_wins
+      FROM jackpot_pools WHERE winner_user_id = ${userId}
+    `);
+    const jpRaw = (Array.isArray(jpRows) ? jpRows : (jpRows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    const jackpotWins = Number(jpRaw[0]?.jackpot_wins ?? 0);
+
     return {
       earned: [], // legacy field, kept for backward compat
       progress: {
@@ -787,6 +808,9 @@ export class UserService {
         max_win_streak: maxWinStreak,
         unique_opponents: uniqueOpponents,
         active_days: activeDays,
+        contest_wins: contestWins,
+        raffle_wins: raffleWins,
+        jackpot_wins: jackpotWins,
       },
     };
   }
@@ -820,6 +844,9 @@ export class UserService {
       { id: 'profit', thresholds: [1, 500*MICRO, 2500*MICRO, 10000*MICRO, 50000*MICRO], getVal: (p: any) => p.net_pnl > 0 ? p.net_pnl : 0 },
       { id: 'social', thresholds: [3, 10, 25, 50, 100], getVal: (p: any) => p.unique_opponents },
       { id: 'loyal', thresholds: [3, 7, 30, 90, 365], getVal: (p: any) => p.active_days },
+      { id: 'champion', thresholds: [1, 3, 5, 10, 25], getVal: (p: any) => p.contest_wins ?? 0 },
+      { id: 'lucky', thresholds: [1, 3, 5, 10, 25], getVal: (p: any) => p.raffle_wins ?? 0 },
+      { id: 'jackpot_hunter', thresholds: [1, 2, 5, 10, 20], getVal: (p: any) => p.jackpot_wins ?? 0 },
     ];
 
     // Get current progress

@@ -30,6 +30,9 @@ import {
   GiOpenTreasureChest,
   GiThreeFriends,
   GiSandsOfTime,
+  GiLaurelsTrophy,
+  GiClover,
+  GiDiamondTrophy,
 } from 'react-icons/gi';
 import type { IconType } from 'react-icons';
 
@@ -93,6 +96,9 @@ interface AchProgressData {
   total_won: number;     // in micro
   unique_opponents: number;
   active_days: number;
+  contest_wins: number;
+  raffle_wins: number;
+  jackpot_wins: number;
 }
 
 const MICRO = 1_000_000;
@@ -193,6 +199,42 @@ const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
       { threshold: 365, label: '365' },
     ],
     getValue: (p) => p.active_days,
+  },
+  {
+    id: 'champion',
+    icon: GiLaurelsTrophy,
+    tiers: [
+      { threshold: 1, label: '1' },
+      { threshold: 3, label: '3' },
+      { threshold: 5, label: '5' },
+      { threshold: 10, label: '10' },
+      { threshold: 25, label: '25' },
+    ],
+    getValue: (p) => p.contest_wins,
+  },
+  {
+    id: 'lucky',
+    icon: GiClover,
+    tiers: [
+      { threshold: 1, label: '1' },
+      { threshold: 3, label: '3' },
+      { threshold: 5, label: '5' },
+      { threshold: 10, label: '10' },
+      { threshold: 25, label: '25' },
+    ],
+    getValue: (p) => p.raffle_wins,
+  },
+  {
+    id: 'jackpot_hunter',
+    icon: GiDiamondTrophy,
+    tiers: [
+      { threshold: 1, label: '1' },
+      { threshold: 2, label: '2' },
+      { threshold: 5, label: '5' },
+      { threshold: 10, label: '10' },
+      { threshold: 20, label: '20' },
+    ],
+    getValue: (p) => p.jackpot_wins,
   },
 ];
 
@@ -370,13 +412,13 @@ function AchievementModal({
                   }`}>
                     {tierNum}
                   </div>
-                  <span className={`text-[8px] ${unlocked ? 'text-[var(--color-text)]' : 'text-[var(--color-text-secondary)]'}`}>
+                  <span className={`text-[10px] font-medium ${unlocked ? 'text-[var(--color-text)]' : 'text-[var(--color-text-secondary)]'}`}>
                     {tierDef.label}
                   </span>
-                  <span className={`text-[7px] font-bold ${
+                  <span className={`flex items-center gap-0.5 text-[9px] font-bold ${
                     claimed ? 'text-[var(--color-success)]' : unlocked ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'
                   }`}>
-                    {claimed ? '\u2713' : `${reward}`}
+                    {claimed ? '\u2713' : <>{reward}<LaunchTokenIcon size={10} /></>}
                   </span>
                 </div>
               );
@@ -439,6 +481,9 @@ export default function PlayerProfilePage() {
       total_won: totalWon,
       unique_opponents: (p as any).unique_opponents ?? 0,
       active_days: (p as any).active_days ?? 0,
+      contest_wins: (p as any).contest_wins ?? 0,
+      raffle_wins: (p as any).raffle_wins ?? 0,
+      jackpot_wins: (p as any).jackpot_wins ?? 0,
     };
   }, [profile?.achievements]);
 

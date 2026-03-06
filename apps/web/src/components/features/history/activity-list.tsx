@@ -4,11 +4,11 @@ import { useMemo } from 'react';
 import { useActivity, type ActivityItem, type ActivityType } from '@/hooks/use-activity';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GameTokenIcon } from '@/components/ui';
+import { GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
 import { formatLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { Trophy, Skull, Gift, History, ShoppingBag, Crown, ArrowUpRight, ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, Award, Medal, Users } from 'lucide-react';
-import { GiOpenTreasureChest } from 'react-icons/gi';
+import { GiOpenTreasureChest, GiTrophy } from 'react-icons/gi';
 import Link from 'next/link';
 
 function truncAddr(addr: string): string {
@@ -220,6 +220,8 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${config.bgClass}`}>
           {item.type === 'jackpot_win' ? (
             <GiOpenTreasureChest size={18} className={config.colorClass} />
+          ) : item.type === 'achievement_claim' ? (
+            <GiTrophy size={18} className={config.colorClass} />
           ) : (
             <config.icon size={16} className={config.colorClass} />
           )}
@@ -250,7 +252,7 @@ function ActivityRow({ item, t }: { item: ActivityItem; t: (key: string, params?
           <span className={`text-sm font-bold tabular-nums ${config.colorClass}`}>
             {config.sign}{formatted}
           </span>
-          <GameTokenIcon size={18} />
+          {item.type === 'achievement_claim' ? <LaunchTokenIcon size={18} /> : <GameTokenIcon size={18} />}
         </div>
       </div>
     </div>
