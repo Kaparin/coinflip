@@ -330,7 +330,7 @@ function CoinDropBubble({
     <div className={`relative rounded-xl border p-2.5 transition-all ${
       isClaimed
         ? 'border-[var(--color-border)] bg-[var(--color-bg)] opacity-60'
-        : 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-md shadow-amber-500/10'
+        : 'border-amber-500/30 bg-amber-500/5'
     }`}>
       <div className="flex items-center gap-2 mb-1.5">
         <Link href={`/game/profile/${msg.address}`} className="shrink-0">
@@ -344,7 +344,7 @@ function CoinDropBubble({
       <div className="flex items-center gap-2">
         <div className={`relative shrink-0 ${isClaimed ? 'grayscale' : ''}`}>
           <Image src="/coin-token-logo.png" alt="COIN" width={36} height={36}
-            className={`rounded-full ${!isClaimed ? 'animate-[spin_8s_linear_infinite] drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : ''}`} />
+            className="rounded-full" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-black text-amber-400">{formatLaunch(drop.amount)} COIN</div>
@@ -356,7 +356,7 @@ function CoinDropBubble({
           <CheckCircle size={12} className="text-[var(--color-text-secondary)] shrink-0" />
         ) : canClaim ? (
           <button type="button" onClick={() => onClaim(msg.id)} disabled={isClaiming}
-            className="rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:from-amber-400 active:scale-95 disabled:opacity-50">
+            className="rounded-lg bg-amber-500 px-3 py-1.5 text-[10px] font-bold text-black transition-colors hover:bg-amber-400 active:scale-95 disabled:opacity-50">
             {isClaiming ? <Loader2 size={12} className="animate-spin" /> : 'Grab!'}
           </button>
         ) : isMine ? (

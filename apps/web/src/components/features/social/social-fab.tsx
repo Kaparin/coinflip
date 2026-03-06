@@ -18,11 +18,8 @@ export function SocialFab() {
         className="fixed left-4 z-40 group md:hidden"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)' }}
       >
-        {/* Outer glow ring */}
-        <span className="absolute inset-0 rounded-full bg-emerald-500 animate-[fabPing_2s_ease-out_infinite] opacity-0" />
-
         {/* Main button */}
-        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 shadow-xl shadow-emerald-500/30 transition-all duration-200 group-active:scale-90">
+        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 shadow-lg transition-all duration-200 group-active:scale-90">
           <Users size={24} strokeWidth={2.5} className="text-white" />
           {/* Online count badge */}
           {onlineCount > 0 && (

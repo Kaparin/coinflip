@@ -306,8 +306,8 @@ function EffectOverlay({ effect, onDone }: { effect: ChatEffect; onDone: () => v
 
   if (!effect) return null;
 
-  const particles = Array.from({ length: 20 }, (_, i) => i);
-  const emoji = effect === 'confetti' ? ['🎉', '🎊', '✨', '🥳'] : effect === 'coins' ? ['🪙', '💰', '💎', '🏆'] : ['🔥', '💥', '⚡', '☄️'];
+  const particles = Array.from({ length: 6 }, (_, i) => i);
+  const emoji = effect === 'confetti' ? ['🎉', '✨', '🥳'] : effect === 'coins' ? ['🪙', '💰', '🏆'] : ['🔥', '⚡', '☄️'];
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden z-10">
@@ -355,7 +355,7 @@ function CoinDropBubble({
     <div className={`relative rounded-2xl border-2 p-3 transition-all ${
       isClaimed
         ? 'border-[var(--color-border)] bg-[var(--color-bg)] opacity-60'
-        : 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-lg shadow-amber-500/10'
+        : 'border-amber-500/30 bg-amber-500/5'
     }`}>
       <div className="flex items-center gap-2 mb-2">
         <Link href={`/game/profile/${msg.address}`} className="shrink-0">
@@ -373,7 +373,7 @@ function CoinDropBubble({
             alt="COIN"
             width={48}
             height={48}
-            className={`rounded-full ${!isClaimed ? 'animate-[spin_8s_linear_infinite] drop-shadow-[0_0_12px_rgba(245,158,11,0.5)]' : ''}`}
+            className={`rounded-full ${!isClaimed ? 'drop-shadow-[0_0_6px_rgba(245,158,11,0.3)]' : ''}`}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -393,7 +393,7 @@ function CoinDropBubble({
               type="button"
               onClick={() => onClaim(msg.id)}
               disabled={isClaiming}
-              className="rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-2 text-xs font-bold text-black transition-all hover:from-amber-400 hover:to-yellow-400 active:scale-95 disabled:opacity-50 shadow-lg shadow-amber-500/30"
+              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-black transition-all hover:bg-amber-400 active:scale-95 disabled:opacity-50"
             >
               {isClaiming ? <Loader2 size={14} className="animate-spin" /> : 'Grab!'}
             </button>
