@@ -349,9 +349,20 @@ export function useWebSocket({
                   );
                 }
               }
-              // Skip '/api/v1/bets' invalidation — the bet stays in cache as 'accepting'
-              // for FlipCard duel animation. Cleaned up by filteredBets filter + next poll.
+              // Also remove resolved bet from open bets cache immediately.
+              // The filteredBets filter hides 'accepting' bets without active duel,
+              // but the cache entry should be cleaned up to prevent flicker.
+              if (resolvedBetId && (parsed.type === 'bet_revealed' || parsed.type === 'bet_timeout_claimed')) {
+                queryClientRef.current.setQueriesData(
+                  { queryKey: ['/api/v1/bets'] },
+                  (old: any) => {
+                    if (!old?.data) return old;
+                    return { ...old, data: old.data.filter((b: any) => String(b.id) !== resolvedBetId) };
+                  },
+                );
+              }
               scheduleInvalidation(
+                '/api/v1/bets',
                 '/api/v1/bets/mine',
                 '/api/v1/bets/history',
                 '/api/v1/vault/balance',
