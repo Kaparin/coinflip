@@ -477,121 +477,15 @@ body {
 
 /* ═══ VIP Cosmetics ═══ */
 
-/* Silver: liquid chrome sweep */
-@keyframes vip-silver-sweep {
-  0% {
-    box-shadow:
-      0 0 6px 2px rgba(192, 192, 192, 0.3),
-      inset 0 0 4px rgba(255, 255, 255, 0.1);
-    border-color: rgba(160, 160, 170, 0.6);
-  }
-  25% {
-    box-shadow:
-      3px -2px 12px 3px rgba(220, 220, 230, 0.6),
-      inset 0 0 6px rgba(255, 255, 255, 0.2);
-    border-color: rgba(210, 210, 220, 0.8);
-  }
-  50% {
-    box-shadow:
-      0 0 8px 2px rgba(192, 192, 192, 0.4),
-      -3px 2px 10px 2px rgba(180, 180, 200, 0.3),
-      inset 0 0 4px rgba(255, 255, 255, 0.1);
-    border-color: rgba(180, 180, 195, 0.7);
-  }
-  75% {
-    box-shadow:
-      -3px 2px 12px 3px rgba(200, 200, 215, 0.5),
-      inset 0 0 6px rgba(255, 255, 255, 0.15);
-    border-color: rgba(200, 200, 210, 0.75);
-  }
-  100% {
-    box-shadow:
-      0 0 6px 2px rgba(192, 192, 192, 0.3),
-      inset 0 0 4px rgba(255, 255, 255, 0.1);
-    border-color: rgba(160, 160, 170, 0.6);
-  }
+/* Animatable custom property for conic-gradient rotation */
+@property --vip-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 
-/* Gold: molten glow with rotating highlight */
-@keyframes vip-gold-molten {
-  0% {
-    box-shadow:
-      0 0 8px 2px rgba(255, 180, 0, 0.4),
-      0 0 20px 4px rgba(255, 140, 0, 0.15);
-    border-color: rgba(218, 165, 32, 0.7);
-  }
-  33% {
-    box-shadow:
-      3px -1px 14px 4px rgba(255, 215, 0, 0.6),
-      0 0 24px 6px rgba(255, 165, 0, 0.25),
-      0 0 4px 1px rgba(255, 230, 100, 0.3);
-    border-color: rgba(255, 215, 0, 0.85);
-  }
-  66% {
-    box-shadow:
-      -2px 2px 12px 3px rgba(255, 190, 0, 0.5),
-      0 0 20px 5px rgba(218, 165, 32, 0.2);
-    border-color: rgba(240, 190, 20, 0.75);
-  }
-  100% {
-    box-shadow:
-      0 0 8px 2px rgba(255, 180, 0, 0.4),
-      0 0 20px 4px rgba(255, 140, 0, 0.15);
-    border-color: rgba(218, 165, 32, 0.7);
-  }
-}
-
-/* Diamond: prismatic rainbow with holographic glow */
-@keyframes vip-diamond-prism {
-  0% {
-    border-color: #ff6b6b;
-    box-shadow:
-      0 0 10px 3px rgba(255, 107, 107, 0.5),
-      0 0 20px 6px rgba(255, 107, 107, 0.2),
-      inset 0 0 4px rgba(255, 107, 107, 0.15);
-  }
-  16% {
-    border-color: #ffa500;
-    box-shadow:
-      0 0 10px 3px rgba(255, 165, 0, 0.5),
-      0 0 20px 6px rgba(255, 165, 0, 0.2),
-      inset 0 0 4px rgba(255, 165, 0, 0.15);
-  }
-  33% {
-    border-color: #ffd700;
-    box-shadow:
-      0 0 10px 3px rgba(255, 215, 0, 0.5),
-      0 0 20px 6px rgba(255, 215, 0, 0.2),
-      inset 0 0 4px rgba(255, 215, 0, 0.15);
-  }
-  50% {
-    border-color: #50fa7b;
-    box-shadow:
-      0 0 10px 3px rgba(80, 250, 123, 0.5),
-      0 0 20px 6px rgba(80, 250, 123, 0.2),
-      inset 0 0 4px rgba(80, 250, 123, 0.15);
-  }
-  66% {
-    border-color: #6bcaff;
-    box-shadow:
-      0 0 10px 3px rgba(107, 202, 255, 0.5),
-      0 0 20px 6px rgba(107, 202, 255, 0.2),
-      inset 0 0 4px rgba(107, 202, 255, 0.15);
-  }
-  83% {
-    border-color: #bd93f9;
-    box-shadow:
-      0 0 10px 3px rgba(189, 147, 249, 0.5),
-      0 0 20px 6px rgba(189, 147, 249, 0.2),
-      inset 0 0 4px rgba(189, 147, 249, 0.15);
-  }
-  100% {
-    border-color: #ff6b6b;
-    box-shadow:
-      0 0 10px 3px rgba(255, 107, 107, 0.5),
-      0 0 20px 6px rgba(255, 107, 107, 0.2),
-      inset 0 0 4px rgba(255, 107, 107, 0.15);
-  }
+@keyframes vip-border-spin {
+  to { --vip-angle: 360deg; }
 }
 
 @keyframes vip-shimmer {
@@ -599,22 +493,88 @@ body {
   100% { background-position: 200% center; }
 }
 
+/* ── Orbiting particle system ── */
+@keyframes vip-orbit-spin {
+  to { rotate: 360deg; }
+}
+
+.vip-orbit {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: vip-orbit-spin linear infinite;
+}
+.vip-orbit::after {
+  content: '';
+  position: absolute;
+  top: -1.5px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+}
+
+.vip-orbit-silver { animation-duration: 4s; }
+.vip-orbit-silver::after {
+  background: #e8e8f0;
+  box-shadow: 0 0 5px 2px rgba(220, 220, 235, 0.8), 0 0 10px 3px rgba(200, 200, 220, 0.4);
+}
+
+.vip-orbit-gold { animation-duration: 3.5s; }
+.vip-orbit-gold::after {
+  background: #ffe44d;
+  box-shadow: 0 0 5px 2px rgba(255, 215, 0, 0.8), 0 0 10px 3px rgba(255, 180, 0, 0.4);
+}
+
+.vip-orbit-diamond { animation-duration: 3s; }
+.vip-orbit-diamond::after {
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(189, 147, 249, 0.9), 0 0 12px 4px rgba(107, 202, 255, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vip-orbit { animation: none; display: none; }
+}
+
+/* ── Silver: chrome conic-gradient border ── */
 .vip-frame-silver {
-  animation: vip-silver-sweep 3s ease-in-out infinite;
-  border: 2px solid rgba(192, 192, 192, 0.6);
   border-radius: 50%;
+  border: none;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--vip-angle),
+    #8a8a94, #b0b0bc, #d8d8e4, #f0f0ff, #d8d8e4, #b0b0bc, #8a8a94
+  );
+  animation: vip-border-spin 4s linear infinite;
+  box-shadow: 0 0 8px 2px rgba(192, 192, 192, 0.3), 0 0 16px 4px rgba(200, 200, 220, 0.12);
 }
 
+/* ── Gold: molten conic-gradient border ── */
 .vip-frame-gold {
-  animation: vip-gold-molten 2.5s ease-in-out infinite;
-  border: 2px solid rgba(218, 165, 32, 0.7);
   border-radius: 50%;
+  border: none;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--vip-angle),
+    #8b6914, #b8860b, #daa520, #ffd700, #ffe44d, #ffd700, #daa520, #b8860b, #8b6914
+  );
+  animation: vip-border-spin 3s linear infinite;
+  box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.3), 0 0 20px 6px rgba(255, 180, 0, 0.12);
 }
 
+/* ── Diamond: prismatic rainbow conic-gradient border ── */
 .vip-frame-diamond {
-  animation: vip-diamond-prism 3.5s linear infinite;
-  border: 2px solid;
   border-radius: 50%;
+  border: none;
+  padding: 3px;
+  background: conic-gradient(
+    from var(--vip-angle),
+    #ff6b6b, #ff8c42, #ffd700, #50fa7b, #6bcaff, #bd93f9, #ff79c6, #ff6b6b
+  );
+  animation: vip-border-spin 2.5s linear infinite;
+  box-shadow: 0 0 12px 3px rgba(189, 147, 249, 0.35), 0 0 24px 8px rgba(107, 202, 255, 0.15);
 }
 
 .vip-name-silver {
@@ -874,7 +834,7 @@ body {
   border: 2px solid rgba(189, 147, 249, 0.7);
   border-radius: 50%;
   box-shadow: 0 0 0 4px rgba(15, 15, 30, 1), 0 0 0 6px rgba(107, 202, 255, 0.7);
-  animation: vip-diamond-prism 3.5s linear infinite;
+  animation: vip-conic-spin-fallback 3.5s linear infinite;
 }
 
 .vip-frame-diamond-neon-pulse {

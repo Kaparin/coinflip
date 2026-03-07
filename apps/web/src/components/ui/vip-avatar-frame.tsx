@@ -9,22 +9,46 @@ interface VipAvatarFrameProps {
   className?: string;
 }
 
+const PARTICLE_CONFIG: Record<VipTier, { count: number; duration: number }> = {
+  silver: { count: 1, duration: 4 },
+  gold: { count: 2, duration: 3.5 },
+  diamond: { count: 3, duration: 3 },
+};
+
 /**
- * Wraps an avatar/image with an animated VIP border frame.
- * No JS cost — pure CSS animations defined in globals.css.
+ * Wraps an avatar with animated VIP border frame.
+ * Base tiers use rotating conic-gradient borders + orbiting particles.
+ * Custom diamond frames use themed border effects + particles.
  */
 export function VipAvatarFrame({ tier, frameStyle, children, className = '' }: VipAvatarFrameProps) {
   if (!tier || !['silver', 'gold', 'diamond'].includes(tier)) {
     return <div className={`inline-flex ${className}`}>{children}</div>;
   }
 
-  const frameClass = tier === 'diamond' && frameStyle && frameStyle !== 'default'
+  const vipTier = tier as VipTier;
+  const isCustomDiamond = tier === 'diamond' && frameStyle && frameStyle !== 'default';
+  const frameClass = isCustomDiamond
     ? `vip-frame-diamond-${frameStyle}`
-    : `vip-frame-${tier as VipTier}`;
+    : `vip-frame-${vipTier}`;
+
+  // Custom diamond frames still use border (not conic-gradient), so need padding
+  const paddingClass = isCustomDiamond ? 'p-0.5' : '';
+
+  const { count, duration } = PARTICLE_CONFIG[vipTier];
 
   return (
-    <div className={`${frameClass} inline-flex p-0.5 ${className}`}>
+    <div className={`${frameClass} inline-flex relative ${paddingClass} ${className}`}>
       {children}
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className={`vip-orbit vip-orbit-${vipTier}`}
+          style={{
+            animationDelay: `${-(i * (duration / count))}s`,
+            animationDuration: `${duration}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }
