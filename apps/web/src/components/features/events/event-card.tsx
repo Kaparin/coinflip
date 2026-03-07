@@ -75,8 +75,8 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
   const isLive = isActive || isUpcoming;
 
   const isSponsored = !!event.sponsorAddress;
-  const PrizeIcon = isSponsored ? LaunchTokenIcon : AxmTokenIcon;
   const isContest = event.type === 'contest';
+  const PrizeIcon = isContest ? LaunchTokenIcon : AxmTokenIcon;
   const TypeIcon = isContest ? Target : Trophy;
 
   const typeBadge = isContest
@@ -274,6 +274,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
             height={208}
             className="w-full h-auto object-contain drop-shadow-[0_0_20px_rgba(245,158,11,0.35)]"
             sizes="208px"
+            unoptimized
           />
         </div>
 

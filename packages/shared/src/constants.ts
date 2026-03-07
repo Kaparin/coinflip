@@ -49,8 +49,8 @@ export const MAX_BATCH_SIZE = 20;
 /** Minimum bets in a batch request */
 export const MIN_BATCH_SIZE = 2;
 
-/** Minimum bet size in micro-COIN (on-chain). 0.1 COIN = 100,000 micro */
-export const MIN_BET_AMOUNT = '100000'; // = 0.1 COIN
+/** Minimum bet size in micro-COIN (on-chain). 1 COIN = 1,000,000 micro */
+export const MIN_BET_AMOUNT = '1000000'; // = 1 COIN
 
 /** Commission in basis points (1000 = 10%) */
 export const COMMISSION_BPS = 1000;
@@ -66,8 +66,8 @@ export const MAX_DAILY_AMOUNT = '1000000000000'; // = 1,000,000 COIN
 
 // ---- Preset bet amounts ----
 // Values are in HUMAN-READABLE COIN. Frontend converts to micro for API.
-export const BET_PRESETS = [0.5, 1, 5, 10, 50, 100] as const;
-export const BET_PRESET_LABELS = ['0.5', '1', '5', '10', '50', '100'] as const;
+export const BET_PRESETS = [1, 5, 10, 50, 100, 500] as const;
+export const BET_PRESET_LABELS = ['1', '5', '10', '50', '100', '500'] as const;
 
 // ---- Commitment prefix ----
 export const COMMITMENT_PREFIX = 'coinflip_v1';
