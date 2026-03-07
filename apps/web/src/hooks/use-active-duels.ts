@@ -89,8 +89,8 @@ function revealWinner(betId: string, winner: string) {
 
 const FADE_OUT_DELAY = 10_000; // 10s after winner reveal
 const REMOVE_DELAY = 500; // after fade-out animation
-const STALE_DUEL_MAX_AGE = 90_000; // 90s — safety net for missed WS events
-const STALE_CLEANUP_INTERVAL = 30_000; // check every 30s
+const STALE_DUEL_MAX_AGE = 45_000; // 45s — tighter safety net (backend timeout is ~35s now)
+const STALE_CLEANUP_INTERVAL = 10_000; // check every 10s (was 30s — too slow for stuck cards)
 
 /**
  * Hook to access and manage active duels.

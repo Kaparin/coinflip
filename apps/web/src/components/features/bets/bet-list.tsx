@@ -316,10 +316,8 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
   const cancelBet = cancelMutation.mutate;
   const acceptBetAsync = acceptMutation.mutateAsync;
 
-  // Sequential accept queue — prevents broadcast queue pileup on the server.
-  // Without this, rapid accepts fire N parallel API calls, each waiting for the
-  // relayer's broadcast lock (~2-3s per tx), causing later requests to timeout.
-  const acceptQueueRef = useRef<Promise<void>>(Promise.resolve());
+  // No frontend queue needed — relayer's broadcast mutex serializes chain txs.
+  // Parallel API calls are fine: each waits ~200ms for the mutex, not 2-3s.
 
   const handleCancelClick = useCallback((id: string) => {
     setPendingBetId(id);
@@ -377,19 +375,15 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     const deductionId = addDeduction(String(bet.amount), false);
     acceptDeductionRef.current.set(id, deductionId);
 
-    // Queue the API call — processes one at a time to avoid overwhelming
-    // the relayer's broadcast queue (which serializes all chain transactions).
-    acceptQueueRef.current = acceptQueueRef.current.then(async () => {
-      try {
-        await acceptBetAsync({
-          betId: Number(id),
-          data: { guess: 'heads', ...(msg ? { message: msg } : {}) },
-        });
-      } catch {
-        // Error already handled by mutation's onError callback
-      }
+    // Fire API call immediately — relayer's broadcast mutex handles serialization.
+    // No frontend queue needed.
+    acceptBetAsync({
+      betId: Number(id),
+      data: { guess: 'heads', ...(msg ? { message: msg } : {}) },
+    }).catch(() => {
+      // Error already handled by mutation's onError callback
     });
-  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, acceptMessage, addToast, t]);
+  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, acceptMessage]);
 
   if (isLoading) {
     return (

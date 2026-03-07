@@ -172,8 +172,8 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
     let chainBetId: string | undefined;
 
     try {
-      // Step 1: Poll for tx result
-      const txResult = await pollForTx(txHash);
+      // Step 1: Poll for tx result (30s timeout, 200ms first interval)
+      const txResult = await pollForTx(txHash, 30_000, 200);
 
       if (txResult && txResult.code !== 0) {
         // Transaction failed on chain (contract error)
@@ -407,58 +407,60 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
     const tag = 'bg:accept_and_reveal';
 
     try {
-      const txResult = await pollForTx(txHash);
+      // Poll with tighter timeout: Axiome blocks every ~6s, tx should confirm in 3-4 blocks.
+      // 30s is plenty; old 60s just delayed error feedback for stuck txs.
+      const txResult = await pollForTx(txHash, 30_000, 200);
 
       if (!txResult) {
         // Timeout — tx might still be in mempool
-        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout`);
+        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout (30s)`);
 
-        setTimeout(async () => {
-          try {
-            const bet = await betService.getBetById(betId);
-            if (bet && bet.status === 'accepting') {
-              // Try syncing from chain — tx might have succeeded
-              const synced = await syncBetFromChain(betId);
-              if (synced) {
-                logger.info({ betId: betId.toString() }, `${tag} — synced from chain after timeout`);
+        // Quick retry: try syncing from chain + one more short poll (5s).
+        // No need for a 15s setTimeout — that just delays the inevitable.
+        try {
+          const bet = await betService.getBetById(betId);
+          if (bet && bet.status === 'accepting') {
+            // Try syncing from chain — tx might have succeeded but REST was slow
+            const synced = await syncBetFromChain(betId);
+            if (synced) {
+              logger.info({ betId: betId.toString() }, `${tag} — synced from chain after timeout`);
+              if (pendingLockId) removePendingLock(address, pendingLockId);
+              invalidateBalanceCache(address);
+              return;
+            }
+
+            // Last attempt: short poll (5s) in case REST just caught up
+            const retryResult = await pollForTx(txHash, 5_000, 500);
+            if (retryResult?.found && retryResult.code === 0) {
+              const syncedRetry = await syncBetFromChain(betId);
+              if (syncedRetry) {
+                logger.info({ betId: betId.toString() }, `${tag} — synced on retry after extended timeout`);
                 if (pendingLockId) removePendingLock(address, pendingLockId);
                 invalidateBalanceCache(address);
                 return;
               }
-
-              // Second attempt: poll chain REST one more time (LCD indexer might be lagging)
-              const retryResult = await pollForTx(txHash, 15_000);
-              if (retryResult?.found && retryResult.code === 0) {
-                const syncedRetry = await syncBetFromChain(betId);
-                if (syncedRetry) {
-                  logger.info({ betId: betId.toString() }, `${tag} — synced on retry after extended timeout`);
-                  if (pendingLockId) removePendingLock(address, pendingLockId);
-                  invalidateBalanceCache(address);
-                  return;
-                }
-              }
-
-              // Not resolved — revert
-              if (pendingLockId) removePendingLock(address, pendingLockId);
-              const reverted = await betService.revertAccepting(betId).catch(() => null);
-              await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
-                logger.warn({ err }, `${tag} — unlockFunds failed`));
-              invalidateBalanceCache(address);
-              wsService.emitAcceptFailed(address, {
-                betId: betId.toString(),
-                txHash,
-                reason: 'Accept confirmation timed out. Please try again.',
-              });
-              // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
-              if (reverted) {
-                const addressMap = await betService.buildAddressMap([reverted]);
-                wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
-              }
             }
-          } catch (err) {
-            logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
+
+            // Not resolved — revert
+            if (pendingLockId) removePendingLock(address, pendingLockId);
+            const reverted = await betService.revertAccepting(betId).catch(() => null);
+            await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
+              logger.warn({ err }, `${tag} — unlockFunds failed`));
+            invalidateBalanceCache(address);
+            wsService.emitAcceptFailed(address, {
+              betId: betId.toString(),
+              txHash,
+              reason: 'Accept confirmation timed out. Please try again.',
+            });
+            // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
+            if (reverted) {
+              const addressMap = await betService.buildAddressMap([reverted]);
+              wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+            }
           }
-        }, 15_000);
+        } catch (err) {
+          logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
+        }
 
         return;
       }
