@@ -55,13 +55,16 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   const { t } = useTranslation();
 
   const queryClient = useQueryClient();
-  const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount } = usePendingBalance();
+  const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount, isFrozen } = usePendingBalance();
 
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: isConnected,
       refetchInterval: () => {
-        if (isInBalanceGracePeriod()) return false;
+        // Block polling while pending deductions are active (in-flight API calls)
+        // or during balance grace period (post-202 response protection).
+        // Without this, a stale refetch can overwrite the correct optimistic balance.
+        if (isFrozen || isInBalanceGracePeriod()) return false;
         return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
       },
     },

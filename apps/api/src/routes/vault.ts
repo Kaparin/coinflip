@@ -127,62 +127,64 @@ export function invalidateBalanceCache(address: string): void {
 }
 
 // GET /api/v1/vault/balance — Get balance (auth required)
-// Uses chain balance adjusted by:
-//   1. Server-side pending locks (bets being created, not yet on-chain)
-//   2. Off-chain spending (VIP, pins, announcements) tracked via offchain_spent
-//   3. Bonus balance (raffle prizes, etc.)
+// Strategy:
+//   - When pending locks exist → use DB balance (lockFunds/unlockFunds are atomic and always correct)
+//   - When no pending locks  → use chain balance + sync to DB (source of truth for settled state)
+// This eliminates the TTL-expiry bug where in-memory pending locks expire
+// but chain hasn't confirmed yet, causing available to jump back up.
 vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
   const address = c.get('address');
 
-  // Fetch chain balance + DB offchain columns + COIN balance + open bet count in parallel
-  const [chainBalance, offchain, coinBalance, dbOpenCount] = await Promise.all([
-    getChainVaultBalance(address),
-    vaultService.getOffchainBalances(user.id),
+  const pendingLockAmount = getTotalPendingLocks(address);
+  const pendingBets = getPendingBetCount(user.id);
+  const hasPending = pendingLockAmount > 0n || pendingBets > 0;
+
+  // Fetch COIN balance + open bet count always; chain balance only when no pending
+  const [coinBalance, dbOpenCount, dbBalance, chainBalance] = await Promise.all([
     vaultService.getCoinBalance(user.id),
     betService.getOpenBetCountForUser(user.id),
+    // DB balance is always fetched — cheap single row read
+    vaultService.getBalance(user.id),
+    // Chain balance fetched always for sync, but only used when no pending
+    getChainVaultBalance(address),
   ]);
 
-  let chainAvailable = BigInt(chainBalance.available);
-  const chainLocked = BigInt(chainBalance.locked);
+  let available: bigint;
+  let locked: bigint;
 
-  // Subtract pending locks that chain hasn't reflected yet
-  const pendingLockAmount = getTotalPendingLocks(address);
-  if (pendingLockAmount > 0n) {
-    chainAvailable = chainAvailable - pendingLockAmount;
-    if (chainAvailable < 0n) chainAvailable = 0n;
-  }
-
-  // Account for off-chain spending (VIP, pins, announcements, sponsored raffles)
-  // and bonus balance (prizes). offchain_spent is deducted from available first,
-  // overflow goes to bonus — mirrors vaultService.getBalance() logic.
-  const offchainSpent = BigInt(offchain.offchainSpent);
-  const bonus = BigInt(offchain.bonus);
-
-  let effectiveAvailable: bigint;
-  let effectiveBonus: bigint;
-
-  if (offchainSpent <= chainAvailable) {
-    effectiveAvailable = chainAvailable - offchainSpent;
-    effectiveBonus = bonus;
+  if (hasPending) {
+    // ── Pending locks/bets exist → trust DB balance ──
+    // lockFunds atomically decrements available and increments locked in DB.
+    // This is always correct regardless of chain confirmation status.
+    available = BigInt(dbBalance.available);
+    locked = BigInt(dbBalance.locked);
   } else {
-    effectiveAvailable = 0n;
-    const overflowFromBonus = offchainSpent - chainAvailable;
-    effectiveBonus = bonus > overflowFromBonus ? bonus - overflowFromBonus : 0n;
-  }
+    // ── No pending → use chain balance (source of truth for settled state) ──
+    let chainAvailable = BigInt(chainBalance.available);
+    const chainLocked = BigInt(chainBalance.locked);
 
-  const available = effectiveAvailable + effectiveBonus;
-  const locked = chainLocked + pendingLockAmount;
-  const total = available + locked;
+    // Account for off-chain spending + bonus (same logic as vaultService.getBalance)
+    const offchain = await vaultService.getOffchainBalances(user.id);
+    const offchainSpent = BigInt(offchain.offchainSpent);
+    const bonus = BigInt(offchain.bonus);
 
-  // Include server-side pending bet count
-  const pendingBets = getPendingBetCount(user.id);
+    let effectiveAvailable: bigint;
+    let effectiveBonus: bigint;
 
-  // Sync chain balance to DB ONLY when no pending locks/bets exist.
-  // During rapid bet creation/acceptance, lockFunds atomically decrements DB available.
-  // If we sync stale chain values (chain hasn't confirmed the lock yet), we overwrite
-  // the correct DB available with a higher chain value — allowing double-spending.
-  if (pendingLockAmount === 0n && pendingBets === 0) {
+    if (offchainSpent <= chainAvailable) {
+      effectiveAvailable = chainAvailable - offchainSpent;
+      effectiveBonus = bonus;
+    } else {
+      effectiveAvailable = 0n;
+      const overflowFromBonus = offchainSpent - chainAvailable;
+      effectiveBonus = bonus > overflowFromBonus ? bonus - overflowFromBonus : 0n;
+    }
+
+    available = effectiveAvailable + effectiveBonus;
+    locked = chainLocked;
+
+    // Sync chain balance to DB (safe — no pending locks can race)
     vaultService.syncBalanceFromChain(
       user.id,
       chainBalance.available,
@@ -190,6 +192,8 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
       0n,
     ).catch(err => logger.warn({ err }, 'Background vault sync failed'));
   }
+
+  const total = available + locked;
   const openBetsCount = dbOpenCount + pendingBets;
 
   return c.json({

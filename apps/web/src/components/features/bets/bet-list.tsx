@@ -85,13 +85,13 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     },
   );
   const vaultKey = ['/api/v1/vault/balance'];
-  const { pendingDeduction, addDeduction, removeDeduction } = usePendingBalance();
+  const { pendingDeduction, addDeduction, removeDeduction, isFrozen } = usePendingBalance();
   // Use WS-aware shared balance query (no dedicated polling — WS events + main balance handle it)
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: isConnected,
       refetchInterval: () => {
-        if (isInBalanceGracePeriod()) return false;
+        if (isFrozen || isInBalanceGracePeriod()) return false;
         return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
       },
     },

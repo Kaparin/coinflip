@@ -320,12 +320,12 @@ export function BalanceDisplay() {
   const { t, locale } = useTranslation();
   const { addToast } = useToast();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
-  const { pendingDeduction } = usePendingBalance();
+  const { pendingDeduction, isFrozen } = usePendingBalance();
   const { data, isLoading } = useGetVaultBalance({
     query: {
       enabled: isConnected,
       refetchInterval: () => {
-        if (isInBalanceGracePeriod()) return false;
+        if (isFrozen || isInBalanceGracePeriod()) return false;
         return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
       },
     },
