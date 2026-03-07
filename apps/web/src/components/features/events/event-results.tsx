@@ -2,7 +2,7 @@
 
 import { useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { AxmTokenIcon, LaunchTokenIcon, UserAvatar } from '@/components/ui';
+import { AxmTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
@@ -102,7 +102,7 @@ export function EventResults({ eventId, isSponsored }: EventResultsProps) {
               <span className={`font-bold text-[var(--color-success)] ${isFirst ? 'text-base' : 'text-sm'}`}>
                 {formatLaunch(amount)}
               </span>
-              {isSponsored ? <LaunchTokenIcon size={isFirst ? 18 : 16} /> : <AxmTokenIcon size={isFirst ? 18 : 16} />}
+              <AxmTokenIcon size={isFirst ? 18 : 16} />
               {txHash && (
                 <CheckCircle size={14} className="text-[var(--color-success)] animate-scale-in" />
               )}

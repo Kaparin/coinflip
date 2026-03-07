@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Trophy, Users, Target, User, Eye, Clock, BarChart3, Megaphone } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { AxmTokenIcon, LaunchTokenIcon } from '@/components/ui';
+import { AxmTokenIcon } from '@/components/ui';
 import { EventTimer } from './event-timer';
 import { getEventTheme } from './event-theme';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
@@ -76,7 +76,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
 
   const isSponsored = !!event.sponsorAddress;
   const isContest = event.type === 'contest';
-  const PrizeIcon = isContest ? LaunchTokenIcon : AxmTokenIcon;
+  const PrizeIcon = AxmTokenIcon;
   const TypeIcon = isContest ? Target : Trophy;
 
   const typeBadge = isContest
