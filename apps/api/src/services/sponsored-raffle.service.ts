@@ -1,10 +1,14 @@
 /**
- * Sponsored Raffle Service — players pay LAUNCH to create raffles.
+ * Sponsored Raffle Service — players create raffles.
+ *
+ * Fee (commission) paid in COIN (virtual).
+ * Prize pool paid in AXM (from vault balance).
+ * Prize distributed to winner as native AXM on-chain.
  *
  * Raffles are auto-published (no admin approval needed).
  * If startsAt > 1 hour from now → only visible to creator, can edit/cancel.
  * Once within 1 hour of start → visible to all, locked (no changes).
- * On cancel: full refund (service fee + prize pool).
+ * On cancel: full refund (COIN fee + AXM prize separately).
  */
 
 import { eq, sql, and, desc, gte } from 'drizzle-orm';
@@ -35,7 +39,7 @@ class SponsoredRaffleService {
 
   /**
    * Submit a sponsored raffle.
-   * Deducts service fee + prize pool from user's vault balance.
+   * Deducts COIN fee from coinBalance + AXM prize from vault balance.
    */
   async submitSponsored(
     userId: string,
@@ -57,10 +61,10 @@ class SponsoredRaffleService {
       throw new AppError('VALIDATION_ERROR', `Description exceeds max length of ${config.maxDesc}`, 400);
     }
 
-    // Validate prize amount (minimum 1 COIN = 1_000_000 micro)
+    // Validate prize amount (minimum 1 AXM = 1_000_000 uaxm)
     const prizeNum = BigInt(prizeAmount);
     if (prizeNum < 1_000_000n) {
-      throw new AppError('VALIDATION_ERROR', 'Prize amount must be at least 1 COIN', 400);
+      throw new AppError('VALIDATION_ERROR', 'Prize amount must be at least 1 AXM', 400);
     }
 
     // Validate duration
@@ -79,13 +83,18 @@ class SponsoredRaffleService {
       throw new AppError('VALIDATION_ERROR', 'Start time must be at least 5 minutes from now', 400);
     }
 
-    // Total cost = service fee + prize pool
-    const totalCost = (BigInt(config.price) + prizeNum).toString();
+    // 1) Deduct COIN fee from coinBalance
+    const feeDeducted = await vaultService.deductCoin(userId, config.price);
+    if (!feeDeducted) {
+      throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient COIN balance for service fee', 400);
+    }
 
-    // Deduct payment
-    const deducted = await vaultService.deductCoin(userId, totalCost);
-    if (!deducted) {
-      throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient balance', 400);
+    // 2) Lock AXM prize in vault (available → locked). Sweep will collect later.
+    const prizeLocked = await vaultService.lockFunds(userId, prizeAmount);
+    if (!prizeLocked) {
+      // Refund COIN fee since AXM lock failed
+      await vaultService.creditCoin(userId, config.price);
+      throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient AXM balance for prize pool', 400);
     }
 
     const db = getDb();
@@ -117,7 +126,7 @@ class SponsoredRaffleService {
           createdBy: userRow?.address ?? 'sponsored',
           userId,
           sponsoredStatus: 'approved',
-          pricePaid: totalCost,
+          pricePaid: config.price,
           titleEn: i18n.titleEn,
           titleRu: i18n.titleRu,
           descriptionEn: i18n.descriptionEn,
@@ -126,13 +135,14 @@ class SponsoredRaffleService {
         .returning({ id: events.id });
       eventRow = row;
     } catch (err) {
-      // Compensating refund
-      await vaultService.creditCoin(userId, totalCost);
+      // Compensating refund — COIN fee + unlock AXM prize
+      await vaultService.creditCoin(userId, config.price);
+      await vaultService.unlockFunds(userId, prizeAmount);
       logger.error({ err, userId }, 'Sponsored raffle insert failed, refunded');
       throw err;
     }
 
-    // Record service fee in treasury ledger (only the fee, not the prize pool)
+    // Record service fee in treasury ledger
     await db.insert(treasuryLedger).values({
       txhash: `raffle_${eventRow!.id}`,
       amount: config.price,
@@ -140,8 +150,8 @@ class SponsoredRaffleService {
       source: 'sponsored_raffle',
     });
 
-    logger.info({ eventId: eventRow!.id, userId, totalCost }, 'Sponsored raffle submitted');
-    return { id: eventRow!.id, totalCost };
+    logger.info({ eventId: eventRow!.id, userId, fee: config.price, prize: prizeAmount }, 'Sponsored raffle submitted');
+    return { id: eventRow!.id, fee: config.price, prize: prizeAmount };
   }
 
   /** Approve a pending sponsored raffle (admin) */
@@ -202,19 +212,23 @@ class SponsoredRaffleService {
       })
       .where(eq(events.id, eventId));
 
-    // Refund the full amount (service fee + prize pool)
-    if (event.userId && event.pricePaid) {
-      await vaultService.creditCoin(event.userId, event.pricePaid);
+    // Refund COIN fee + unlock AXM prize
+    if (event.userId) {
+      if (event.pricePaid) {
+        await vaultService.creditCoin(event.userId, event.pricePaid);
+      }
+      if (event.totalPrizePool) {
+        await vaultService.unlockFunds(event.userId, event.totalPrizePool);
+      }
 
-      // Record refund in treasury ledger
       await db.insert(treasuryLedger).values({
         txhash: `refund_raffle_${eventId}`,
-        amount: event.pricePaid,
+        amount: event.pricePaid ?? '0',
         denom: gameDenom(),
         source: 'sponsored_raffle_refund',
       });
 
-      logger.info({ eventId, userId: event.userId, refund: event.pricePaid }, 'Sponsored raffle rejected, refunded');
+      logger.info({ eventId, userId: event.userId, feeRefund: event.pricePaid, prizeRefund: event.totalPrizePool }, 'Sponsored raffle rejected, refunded');
     }
 
     return { status: 'rejected' };
@@ -222,7 +236,7 @@ class SponsoredRaffleService {
 
   /**
    * Cancel a sponsored raffle (by creator).
-   * Only allowed if startsAt > now + 1 hour. Full refund (service fee + prize pool).
+   * Only allowed if startsAt > now + 1 hour. Full refund (COIN fee + AXM prize).
    */
   async cancelSponsored(eventId: string, userId: string) {
     const db = getDb();
@@ -252,27 +266,30 @@ class SponsoredRaffleService {
       .set({ status: 'archived', sponsoredStatus: 'canceled' })
       .where(eq(events.id, eventId));
 
-    // Full refund
+    // Refund COIN fee + unlock AXM prize
     if (event.pricePaid) {
       await vaultService.creditCoin(userId, event.pricePaid);
-
-      // Record refund in treasury ledger
-      await db.insert(treasuryLedger).values({
-        txhash: `refund_raffle_${eventId}`,
-        amount: event.pricePaid,
-        denom: gameDenom(),
-        source: 'sponsored_raffle_refund',
-      });
-
-      logger.info({ eventId, userId, refund: event.pricePaid }, 'Sponsored raffle canceled by creator, refunded');
     }
+    if (event.totalPrizePool) {
+      await vaultService.unlockFunds(userId, event.totalPrizePool);
+    }
+
+    // Record refund in treasury ledger
+    await db.insert(treasuryLedger).values({
+      txhash: `refund_raffle_${eventId}`,
+      amount: event.pricePaid ?? '0',
+      denom: gameDenom(),
+      source: 'sponsored_raffle_refund',
+    });
+
+    logger.info({ eventId, userId, feeRefund: event.pricePaid, prizeRefund: event.totalPrizePool }, 'Sponsored raffle canceled by creator, refunded');
 
     wsService.broadcast({
       type: 'event_canceled',
       data: { eventId, title: event.title, type: event.type },
     });
 
-    return { status: 'canceled', refund: event.pricePaid };
+    return { status: 'canceled', feeRefund: event.pricePaid, prizeRefund: event.totalPrizePool };
   }
 
   /**
