@@ -476,10 +476,10 @@ function CssCoinScene({
             style={{ transform: `rotateY(${isWinnerMaker ? 0 : 180}deg)` }}
           >
             <div className="duel-coin-face duel-coin-front">
-              <UserAvatar address={duel.maker} size={88} className="rounded-full" />
+              <UserAvatar address={duel.maker} size={88} flat />
             </div>
             <div className="duel-coin-face duel-coin-back-face">
-              <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
+              <UserAvatar address={duel.acceptor} size={88} flat />
             </div>
           </div>
         </div>
@@ -513,10 +513,10 @@ function CssCoinScene({
         <div className="absolute inset-0 animate-duel-avatar-coin-fade-in">
           <div className={`w-full h-full ${isWinnerMaker ? 'animate-duel-avatar-coin-spin-to-front' : 'animate-duel-avatar-coin-spin-to-back'}`}>
             <div className="duel-coin-face duel-coin-front">
-              <UserAvatar address={duel.maker} size={88} className="rounded-full" />
+              <UserAvatar address={duel.maker} size={88} flat />
             </div>
             <div className="duel-coin-face duel-coin-back-face">
-              <UserAvatar address={duel.acceptor} size={88} className="rounded-full" />
+              <UserAvatar address={duel.acceptor} size={88} flat />
             </div>
           </div>
         </div>
