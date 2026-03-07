@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useTexture, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -169,6 +169,15 @@ function CoinMesh({
   const flipStart = useRef(0);
   const completed = useRef(false);
 
+  // Refs for reliable access in useFrame (avoids stale closures in R3F)
+  const stateRef = useRef(state);
+  const resultRef = useRef(result);
+  stateRef.current = state;
+  resultRef.current = result;
+
+  // Track previous state to detect transitions
+  const prevStateRef = useRef(state);
+
   // Load logo textures
   const textures = useTexture([frontTexturePath, backTexturePath]);
   const frontTex = textures[0] as THREE.Texture;
@@ -192,8 +201,8 @@ function CoinMesh({
     }
   }, [frontTex, backTex]);
 
-  // Load avatar textures async (boring-avatars beam → SVG → canvas → texture)
-  const [avatarTextures, setAvatarTextures] = useState<{
+  // Load avatar textures async — stored in ref (no state needed inside R3F)
+  const avatarTexturesRef = useRef<{
     maker: THREE.CanvasTexture;
     acceptor: THREE.CanvasTexture;
   } | null>(null);
@@ -205,7 +214,7 @@ function CoinMesh({
       loadAvatarTexture(makerAddress),
       loadAvatarTexture(acceptorAddress),
     ]).then(([maker, acceptor]) => {
-      if (!cancelled) setAvatarTextures({ maker, acceptor });
+      if (!cancelled) avatarTexturesRef.current = { maker, acceptor };
     });
     return () => { cancelled = true; };
   }, [makerAddress, acceptorAddress]);
@@ -246,43 +255,49 @@ function CoinMesh({
 
   const materials = useMemo(() => [edgeMat, topMat, bottomMat], [edgeMat, topMat, bottomMat]);
 
-  // Swap textures: idle → logo, flipping/landed → avatars
-  useEffect(() => {
-    if (state === 'flipping' || state === 'landed') {
-      if (avatarTextures) {
-        // Top cap = maker, bottom cap = acceptor
-        // heads (maker wins) → top stays up; tails (acceptor wins) → bottom up
-        topMat.map = avatarTextures.maker;
-        bottomMat.map = avatarTextures.acceptor;
-        topMat.needsUpdate = true;
-        bottomMat.needsUpdate = true;
-      }
-    } else {
-      topMat.map = frontTex;
-      bottomMat.map = backTex;
-      topMat.needsUpdate = true;
-      bottomMat.needsUpdate = true;
-    }
-  }, [state, avatarTextures, topMat, bottomMat, frontTex, backTex]);
-
-  // Reset on flip start
-  useEffect(() => {
-    if (state === 'flipping') {
-      flipStart.current = performance.now() / 1000;
-      completed.current = false;
-    }
-  }, [state]);
+  // Track which textures are currently on the faces
+  const currentTextureMode = useRef<'logo' | 'avatar'>('logo');
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
 
-    if (state === 'idle') {
+    const s = stateRef.current;
+    const r = resultRef.current;
+
+    // Detect state transition → flipping (reset flip timer)
+    if (s === 'flipping' && prevStateRef.current !== 'flipping') {
+      flipStart.current = performance.now() / 1000;
+      completed.current = false;
+    }
+    prevStateRef.current = s;
+
+    // Swap textures in frame loop (reliable, no async React state issues)
+    if (s === 'flipping' || s === 'landed') {
+      if (currentTextureMode.current !== 'avatar' && avatarTexturesRef.current) {
+        topMat.map = avatarTexturesRef.current.maker;
+        bottomMat.map = avatarTexturesRef.current.acceptor;
+        topMat.needsUpdate = true;
+        bottomMat.needsUpdate = true;
+        currentTextureMode.current = 'avatar';
+      }
+    } else {
+      if (currentTextureMode.current !== 'logo') {
+        topMat.map = frontTex;
+        bottomMat.map = backTex;
+        topMat.needsUpdate = true;
+        bottomMat.needsUpdate = true;
+        currentTextureMode.current = 'logo';
+      }
+    }
+
+    // Animation
+    if (s === 'idle') {
       mesh.position.y = 0;
       mesh.rotation.x = 0;
       mesh.rotation.z = 0;
       mesh.rotation.y += delta * spinSpeed;
-    } else if (state === 'flipping') {
+    } else if (s === 'flipping') {
       const elapsed = performance.now() / 1000 - flipStart.current;
       const t = Math.min(elapsed / flipDuration, 1);
 
@@ -292,7 +307,7 @@ function CoinMesh({
       // X-axis rotation with deceleration
       const eased = easeOutCubic(t);
       const finalAngle =
-        result === 'heads'
+        r === 'heads'
           ? totalSpins * Math.PI * 2
           : totalSpins * Math.PI * 2 + Math.PI;
       mesh.rotation.x = eased * finalAngle;
@@ -306,9 +321,9 @@ function CoinMesh({
         completed.current = true;
         onComplete?.();
       }
-    } else if (state === 'landed') {
+    } else if (s === 'landed') {
       mesh.position.y = 0;
-      mesh.rotation.x = result === 'heads' ? 0 : Math.PI;
+      mesh.rotation.x = r === 'heads' ? 0 : Math.PI;
       mesh.rotation.y = 0;
       mesh.rotation.z = 0;
     }

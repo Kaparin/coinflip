@@ -424,7 +424,7 @@ function Coin3DScene({
   return (
     <div className="flex flex-col items-center">
       {/* CSS handles vertical toss motion + scale; Three.js handles rotation only */}
-      <div className={`transition-transform ${
+      <div className={`${
         isMergingPhase ? 'animate-duel-3d-coin-toss' : ''
       } ${isWinnerReveal ? 'animate-duel-coin-winner-glow' : ''}`}>
         <Coin3D
