@@ -407,42 +407,47 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
     const tag = 'bg:accept_and_reveal';
 
     try {
-      // Poll with tighter timeout: Axiome blocks every ~6s, tx should confirm in 3-4 blocks.
-      // 30s is plenty; old 60s just delayed error feedback for stuck txs.
-      const txResult = await pollForTx(txHash, 30_000, 200);
+      // Poll for tx confirmation. Use 60s timeout to handle queue congestion
+      // during rapid play (many txs serialized through relayer mutex).
+      const txResult = await pollForTx(txHash, 60_000, 200);
 
       if (!txResult) {
-        // Timeout — tx might still be in mempool
-        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout (30s)`);
+        // Timeout — tx was broadcast to mempool (CheckTx passed) but not yet confirmed.
+        // DO NOT revert or unlock funds — the tx will almost certainly land on chain.
+        // Reverting + unlocking here is WRONG: the chain will consume the funds,
+        // but DB would show them as unlocked → double-spend vulnerability.
+        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout (60s), deferring to indexer`);
 
-        // Quick retry: try syncing from chain + one more short poll (5s).
-        // No need for a 15s setTimeout — that just delays the inevitable.
-        try {
-          const bet = await betService.getBetById(betId);
-          if (bet && bet.status === 'accepting') {
-            // Try syncing from chain — tx might have succeeded but REST was slow
+        if (pendingLockId) removePendingLock(address, pendingLockId);
+
+        // Schedule a delayed chain state check (90s).
+        // If the bet resolved on chain, sync it. If still open, THEN revert.
+        setTimeout(async () => {
+          try {
+            const bet = await betService.getBetById(betId);
+            if (!bet || bet.status !== 'accepting') return; // Already handled
+
+            // Try syncing from chain — tx likely succeeded
             const synced = await syncBetFromChain(betId);
             if (synced) {
-              logger.info({ betId: betId.toString() }, `${tag} — synced from chain after timeout`);
-              if (pendingLockId) removePendingLock(address, pendingLockId);
+              logger.info({ betId: betId.toString() }, `${tag} — deferred sync successful`);
               invalidateBalanceCache(address);
               return;
             }
 
-            // Last attempt: short poll (5s) in case REST just caught up
-            const retryResult = await pollForTx(txHash, 5_000, 500);
+            // Poll one more time (the tx might just now be in a block)
+            const retryResult = await pollForTx(txHash, 10_000, 1_000);
             if (retryResult?.found && retryResult.code === 0) {
               const syncedRetry = await syncBetFromChain(betId);
               if (syncedRetry) {
-                logger.info({ betId: betId.toString() }, `${tag} — synced on retry after extended timeout`);
-                if (pendingLockId) removePendingLock(address, pendingLockId);
+                logger.info({ betId: betId.toString() }, `${tag} — deferred retry sync successful`);
                 invalidateBalanceCache(address);
                 return;
               }
             }
 
-            // Not resolved — revert
-            if (pendingLockId) removePendingLock(address, pendingLockId);
+            // Tx truly didn't land (very rare) — NOW it's safe to revert
+            logger.warn({ betId: betId.toString(), txHash }, `${tag} — tx not found after deferred check, reverting`);
             const reverted = await betService.revertAccepting(betId).catch(() => null);
             await vaultService.unlockFunds(acceptorUserId, amount).catch(err =>
               logger.warn({ err }, `${tag} — unlockFunds failed`));
@@ -452,15 +457,14 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
               txHash,
               reason: 'Accept confirmation timed out. Please try again.',
             });
-            // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
             if (reverted) {
               const addressMap = await betService.buildAddressMap([reverted]);
               wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
             }
+          } catch (err) {
+            logger.error({ err, betId: betId.toString() }, `${tag} — deferred cleanup failed`);
           }
-        } catch (err) {
-          logger.error({ err, betId: betId.toString() }, `${tag} — cleanup failed`);
-        }
+        }, 90_000);
 
         return;
       }
@@ -510,19 +514,27 @@ export function confirmAcceptAndRevealInBackground(task: AcceptAndRevealTask): v
     } catch (err) {
       logger.error({ err, txHash, betId: betId.toString() }, `${tag} — unexpected error`);
       if (pendingLockId) removePendingLock(address, pendingLockId);
-      const reverted = await betService.revertAccepting(betId).catch(() => null);
-      await vaultService.unlockFunds(acceptorUserId, amount).catch(unlockErr =>
-        logger.warn({ err: unlockErr }, `${tag} — unlockFunds failed`));
-      invalidateBalanceCache(address);
-      wsService.emitAcceptFailed(address, {
-        betId: betId.toString(),
-        txHash,
-        reason: 'An unexpected error occurred. Please try again.',
-      });
-      // Broadcast bet_reverted to ALL clients so spectators' duel cards are cleaned up
-      if (reverted) {
-        const addressMap = await betService.buildAddressMap([reverted]).catch(() => new Map());
-        wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+
+      // tx was already broadcast — DON'T revert/unlock, let indexer handle it.
+      // Only revert if tx was never broadcast (no txHash), which shouldn't happen
+      // since the API route already validated the relay result before calling us.
+      if (!txHash) {
+        const reverted = await betService.revertAccepting(betId).catch(() => null);
+        await vaultService.unlockFunds(acceptorUserId, amount).catch(unlockErr =>
+          logger.warn({ err: unlockErr }, `${tag} — unlockFunds failed`));
+        invalidateBalanceCache(address);
+        wsService.emitAcceptFailed(address, {
+          betId: betId.toString(),
+          txHash: '',
+          reason: 'An unexpected error occurred. Please try again.',
+        });
+        if (reverted) {
+          const addressMap = await betService.buildAddressMap([reverted]).catch(() => new Map());
+          wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
+        }
+      } else {
+        // Tx was broadcast — defer to indexer/sweep. Log but don't revert.
+        logger.warn({ txHash, betId: betId.toString() }, `${tag} — error after broadcast, deferring to indexer`);
       }
     }
   })();
@@ -587,40 +599,52 @@ export function confirmAcceptBetInBackground(task: AcceptBetTask): void {
       const txResult = await pollForTx(txHash);
 
       if (!txResult) {
-        // Timeout — tx might still be in mempool.
-        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout, indexer will handle`);
+        // Timeout — tx was broadcast to mempool. DO NOT revert/unlock.
+        // Defer to indexer; schedule a delayed chain check as backup.
+        logger.warn({ txHash, betId: betId.toString() }, `${tag} — poll timeout, deferring to indexer`);
+        if (pendingLockId) removePendingLock(address, pendingLockId);
 
         setTimeout(async () => {
           try {
             const bet = await betService.getBetById(betId);
-            if (bet && bet.status === 'accepting') {
-              // Try syncing from chain first — tx might have succeeded (REST was slow)
-              const synced = await syncBetFromChain(betId);
-              if (synced) {
-                logger.info({ betId: betId.toString() }, `${tag} — synced from chain after poll timeout, no revert`);
-                if (pendingLockId) removePendingLock(address, pendingLockId);
+            if (!bet || bet.status !== 'accepting') return;
+
+            const synced = await syncBetFromChain(betId);
+            if (synced) {
+              logger.info({ betId: betId.toString() }, `${tag} — deferred sync successful`);
+              invalidateBalanceCache(address);
+              return;
+            }
+
+            // Poll one more time
+            const retryResult = await pollForTx(txHash, 10_000, 1_000);
+            if (retryResult?.found && retryResult.code === 0) {
+              const syncedRetry = await syncBetFromChain(betId);
+              if (syncedRetry) {
+                logger.info({ betId: betId.toString() }, `${tag} — deferred retry sync successful`);
                 invalidateBalanceCache(address);
                 return;
               }
-              logger.warn({ betId: betId.toString() }, `${tag} — still "accepting" after cleanup timeout, reverting`);
-              if (pendingLockId) removePendingLock(address, pendingLockId);
-              const reverted = await betService.revertAccepting(betId).catch(err => { logger.warn({ err }, `${tag} — revertAccepting failed`); return null; });
-              await vaultService.unlockFunds(acceptorUserId, amount).catch(err => logger.warn({ err, acceptorUserId }, `${tag} — unlockFunds failed`));
-              invalidateBalanceCache(address);
-              wsService.emitAcceptFailed(address, {
-                betId: betId.toString(),
-                txHash,
-                reason: 'Accept confirmation timed out. Please try again.',
-              });
-              if (reverted) {
-                const addressMap = await betService.buildAddressMap([reverted]);
-                wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
-              }
+            }
+
+            // Tx truly didn't land — NOW revert
+            logger.warn({ betId: betId.toString(), txHash }, `${tag} — tx not found after deferred check, reverting`);
+            const reverted = await betService.revertAccepting(betId).catch(err => { logger.warn({ err }, `${tag} — revertAccepting failed`); return null; });
+            await vaultService.unlockFunds(acceptorUserId, amount).catch(err => logger.warn({ err, acceptorUserId }, `${tag} — unlockFunds failed`));
+            invalidateBalanceCache(address);
+            wsService.emitAcceptFailed(address, {
+              betId: betId.toString(),
+              txHash,
+              reason: 'Accept confirmation timed out. Please try again.',
+            });
+            if (reverted) {
+              const addressMap = await betService.buildAddressMap([reverted]);
+              wsService.emitBetReverted(formatBetResponse(reverted, addressMap) as unknown as Record<string, unknown>);
             }
           } catch (err) {
-            logger.error({ err, betId: betId.toString() }, `${tag} — cleanup check failed`);
+            logger.error({ err, betId: betId.toString() }, `${tag} — deferred cleanup failed`);
           }
-        }, 45_000); // 45s safety timeout (was 3min)
+        }, 90_000);
 
         return;
       }
@@ -921,7 +945,15 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
           if (currentBet.acceptorUserId) {
             await vaultService.forfeitLocked(currentBet.acceptorUserId, currentBet.amount);
           }
-          // Sync actual chain balances for both players (payout for winner, loss for loser)
+
+          // Credit winner with payout atomically (mirrors indexer logic)
+          const payoutAmount = chainState.payout_amount;
+          if (winnerUserId && payoutAmount) {
+            await vaultService.creditWinnings(winnerUserId, payoutAmount).catch(err =>
+              logger.warn({ err, betId: betId.toString(), winnerUserId, payoutAmount }, `${tag} — creditWinnings failed`));
+          }
+
+          // Notify both players of updated balances
           await syncPlayersBalanceFromChain(
             currentBet.makerUserId,
             currentBet.acceptorUserId,
