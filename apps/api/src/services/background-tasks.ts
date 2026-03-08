@@ -15,7 +15,7 @@ import { env, getActiveContractAddr } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { decrementPendingBetCount } from '../lib/pending-counts.js';
-import { removePendingLock, removePendingLockDelayed, invalidateBalanceCache, getChainVaultBalance, getTotalPendingLocks } from '../routes/vault.js';
+import { removePendingLock, removePendingLockDelayed, invalidateBalanceCache } from '../routes/vault.js';
 import { referralService } from './referral.service.js';
 import { chainCached } from '../lib/chain-cache.js';
 import { pendingSecretsService, normalizeCommitmentToHex } from './pending-secrets.service.js';
@@ -773,20 +773,20 @@ async function syncPlayersBalanceFromChain(
       acceptorUserId ? resolveAddress(acceptorUserId) : null,
     ]);
 
-    // Sync chain → DB for both players, then send DB-derived balance via WS
-    const syncAndNotify = async (userId: string, addr: string) => {
-      const chainBal = await getChainVaultBalance(addr);
-      await vaultService.syncBalanceFromChain(userId, chainBal.available, chainBal.locked, 0n);
+    // Send DB-derived balance via WS (no chain sync — DB is source of truth after
+    // lockFunds/forfeitLocked/creditAvailable atomics; chain sync would overwrite
+    // concurrent lockFunds deductions for other in-flight bets).
+    const notifyBalance = async (userId: string, addr: string) => {
       const dbBal = await vaultService.getBalance(userId);
       wsService.emitBalanceUpdated(addr, { available: dbBal.available, locked: dbBal.locked });
     };
 
     const tasks: Promise<void>[] = [];
-    if (makerAddr) tasks.push(syncAndNotify(makerUserId, makerAddr));
-    if (acceptorAddr && acceptorUserId) tasks.push(syncAndNotify(acceptorUserId, acceptorAddr));
+    if (makerAddr) tasks.push(notifyBalance(makerUserId, makerAddr));
+    if (acceptorAddr && acceptorUserId) tasks.push(notifyBalance(acceptorUserId, acceptorAddr));
     await Promise.all(tasks);
 
-    logger.debug({ betId }, 'Post-resolution balance sync completed for both players');
+    logger.debug({ betId }, 'Post-resolution balance notification completed for both players');
   } catch (err) {
     logger.warn({ err, betId }, 'Post-resolution balance sync failed (non-critical)');
   }

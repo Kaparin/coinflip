@@ -136,9 +136,31 @@ export class VaultService {
   }
 
   /**
+   * Atomically credit winner's available balance after bet resolution.
+   * Unlike syncBalanceFromChain, this is additive and won't overwrite concurrent lockFunds.
+   */
+  async creditWinnings(userId: string, amount: string) {
+    const result = await this.db
+      .update(vaultBalances)
+      .set({
+        available: sql`${vaultBalances.available}::numeric + ${amount}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(eq(vaultBalances.userId, userId))
+      .returning();
+
+    if (result.length === 0) {
+      logger.warn({ userId, amount }, 'creditWinnings: no balance row found');
+      return null;
+    }
+
+    return result[0];
+  }
+
+  /**
    * Forfeit locked funds after a resolved bet (revealed/timeout_claimed).
    * Only decrements locked — does NOT add back to available (funds are gone on-chain).
-   * For the winner, chain sync will update available with the payout.
+   * For the winner, creditWinnings() adds the payout separately.
    * For the loser, available stays at the correct post-lock value.
    *
    * Use this instead of unlockFunds when funds were consumed (not returned).

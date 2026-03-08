@@ -539,6 +539,14 @@ export class IndexerService {
                 await vaultService.forfeitLocked(prev.acceptorUserId, prev.amount).catch(err =>
                   logger.warn({ err, betId }, 'bet_revealed: forfeitLocked acceptor failed'));
               }
+
+              // Credit winner with payout atomically (additive, never overwrites concurrent lockFunds).
+              // This replaces the old syncBalanceFromChain approach which could overwrite
+              // lockFunds deductions for other in-flight bets.
+              if (winnerUserId && payoutAmount) {
+                await vaultService.creditWinnings(winnerUserId, payoutAmount).catch(err =>
+                  logger.warn({ err, betId, winnerUserId, payoutAmount }, 'bet_revealed: creditAvailable winner failed'));
+              }
             }
           }
 
@@ -643,6 +651,13 @@ export class IndexerService {
               if (prev.acceptorUserId) {
                 await vaultService.forfeitLocked(prev.acceptorUserId, prev.amount).catch(err =>
                   logger.warn({ err, betId }, 'timeout_claimed: forfeitLocked acceptor failed'));
+              }
+
+              // Credit winner (acceptor) with payout — same as bet_revealed.
+              const payoutStr = event.attributes.payout ?? event.attributes.payout_amount ?? null;
+              if (winnerUserId && payoutStr) {
+                await vaultService.creditWinnings(winnerUserId, payoutStr).catch(err =>
+                  logger.warn({ err, betId, winnerUserId, payoutStr }, 'timeout_claimed: creditAvailable winner failed'));
               }
             }
           }
