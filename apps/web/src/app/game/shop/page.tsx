@@ -13,7 +13,6 @@ import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { CHEST_TIERS, mergeTierConfig, type ChestTier } from './chest-config';
 import Image from 'next/image';
 
@@ -21,15 +20,12 @@ export default function ShopPage() {
   const { t } = useTranslation();
   const { isConnected, address } = useWalletContext();
   const queryClient = useQueryClient();
-  const { pendingDeduction } = usePendingBalance();
 
   // Vault balance (AXM)
   const { data: balanceData } = useGetVaultBalance({
     query: { enabled: isConnected },
   });
-  const rawAvailable = BigInt(balanceData?.data?.available ?? '0');
-  const adjusted = rawAvailable - pendingDeduction;
-  const vaultBalanceHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
+  const vaultBalanceHuman = fromMicroLaunch(balanceData?.data?.available ?? '0');
 
   // Load tier config from server
   const { data: shopConfig, isLoading: configLoading } = useQuery({

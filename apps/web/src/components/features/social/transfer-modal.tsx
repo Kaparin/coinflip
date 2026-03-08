@@ -26,7 +26,6 @@ import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance } from '@coinflip/api-client';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import {
   useFavorites,
   useAllUsers,
@@ -452,11 +451,8 @@ export function TransferModal({
 
   // Balances
   const { data: vaultData } = useGetVaultBalance({ query: { enabled: !!address } });
-  const { pendingDeduction } = usePendingBalance();
   const vaultBalance = vaultData?.data;
-  const rawAvailable = BigInt(vaultBalance?.available ?? '0');
-  const adjusted = rawAvailable - pendingDeduction;
-  const axmBalance = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
+  const axmBalance = fromMicroLaunch(vaultBalance?.available ?? '0');
   const coinBalance = fromMicroLaunch((vaultBalance as any)?.coin_balance ?? '0');
 
   // State

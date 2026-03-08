@@ -527,9 +527,12 @@ export class IndexerService {
 
           // Forfeit locked funds for both players (do NOT restore to available).
           // Funds were consumed on-chain: loser's stake is gone, winner received payout.
+          // Only forfeit if we actually transitioned the status (UPDATE matched a row).
+          // This prevents double-forfeit when both indexer and background-tasks process the same bet.
           if (betBeforeReveal.length > 0) {
             const prev = betBeforeReveal[0]!;
-            if (['open', 'accepted', 'accepting'].includes(prev.status)) {
+            const wasTransitioned = ['open', 'accepted', 'accepting'].includes(prev.status);
+            if (wasTransitioned) {
               await vaultService.forfeitLocked(prev.makerUserId, prev.amount).catch(err =>
                 logger.warn({ err, betId }, 'bet_revealed: forfeitLocked maker failed'));
               if (prev.acceptorUserId) {
@@ -576,10 +579,12 @@ export class IndexerService {
               inArray(bets.status, ['open', 'canceling']),
             ));
 
-          // Unlock vault funds for maker (and acceptor if exists)
+          // Unlock vault funds for maker (and acceptor if exists).
+          // Only unlock if the bet was actually in a pre-cancel state to prevent double-unlock.
           if (betBeforeCancel.length > 0) {
             const prev = betBeforeCancel[0]!;
-            if (['open', 'canceling'].includes(prev.status)) {
+            const wasTransitioned = ['open', 'canceling'].includes(prev.status);
+            if (wasTransitioned) {
               await vaultService.unlockFunds(prev.makerUserId, prev.amount).catch(err =>
                 logger.warn({ err, betId }, 'bet_canceled: unlockFunds maker failed'));
               if (prev.acceptorUserId) {
@@ -627,10 +632,12 @@ export class IndexerService {
               inArray(bets.status, ['accepted']),
             ));
 
-          // Forfeit locked funds (do NOT restore to available — stake consumed on-chain)
+          // Forfeit locked funds (do NOT restore to available — stake consumed on-chain).
+          // Only forfeit if bet was actually in 'accepted' state to prevent double-forfeit.
           if (betBeforeTimeout.length > 0) {
             const prev = betBeforeTimeout[0]!;
-            if (prev.status === 'accepted') {
+            const wasTransitioned = prev.status === 'accepted';
+            if (wasTransitioned) {
               await vaultService.forfeitLocked(prev.makerUserId, prev.amount).catch(err =>
                 logger.warn({ err, betId }, 'timeout_claimed: forfeitLocked maker failed'));
               if (prev.acceptorUserId) {

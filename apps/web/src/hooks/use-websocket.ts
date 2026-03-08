@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WS_URL, isAxmMode } from '@/lib/constants';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
-import { isInBalanceGracePeriod, clearBalanceGracePeriod } from '@/lib/balance-grace';
 import { emitDepositEvent } from '@/lib/deposit-status-events';
 
 /** Query key prefix for wallet game-token balance (CW20 or native depending on mode) */
@@ -80,19 +78,11 @@ export function useWebSocket({
   const isConnectedRef = useRef(false);
   const reconnectCountRef = useRef(0);
 
-  // Wire up pending balance context — isFrozen guards vault balance invalidation.
-  // When frontend deductions are active, GET /balance returns server-adjusted data
-  // (chain - pending locks) which overlaps with the frontend pendingDeduction overlay,
-  // causing double-subtraction. Skipping vault refetch during this window prevents that.
-  const { isFrozen } = usePendingBalance();
-  const isFrozenRef = useRef(false);
 
   // Update refs on every render (without triggering effects)
   addressRef.current = address;
   enabledRef.current = enabled;
   onEventRef.current = onEvent;
-  isFrozenRef.current = isFrozen;
-
   const flushInvalidations = useCallback(() => {
     const keys = pendingInvalidations.current;
     if (keys.size === 0) return;
@@ -104,17 +94,6 @@ export function useWebSocket({
 
   const scheduleInvalidation = useCallback((...queryKeys: string[]) => {
     for (const key of queryKeys) {
-      // Skip vault balance invalidation while pending deductions are active
-      // or during a balance grace period (after deposit/accept 202 response).
-      // The frontend pendingDeduction overlay already shows accurate values;
-      // a server refetch during this window returns data adjusted for server-side
-      // pending locks that overlap with frontend deductions → double-subtraction.
-      if (
-        (key === '/api/v1/vault/balance' || key === WALLET_BALANCE_KEY) &&
-        (isFrozenRef.current || isInBalanceGracePeriod())
-      ) {
-        continue;
-      }
       pendingInvalidations.current.add(key);
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -375,14 +354,27 @@ export function useWebSocket({
             case 'accept_failed':
               scheduleInvalidation('/api/v1/bets', '/api/v1/bets/mine', '/api/v1/vault/balance');
               break;
-            case 'balance_updated':
-              // Skip during grace period — optimistic update is more accurate
-              if (!isInBalanceGracePeriod()) {
+            case 'balance_updated': {
+              // Apply DB-derived balance directly from WS event — no refetch needed.
+              // The server sends available/locked from the DB after chain sync.
+              const balData = parsed.data as any;
+              if (balData?.available != null || balData?.locked != null) {
+                queryClientRef.current.setQueryData(['/api/v1/vault/balance'], (old: any) => ({
+                  ...old,
+                  data: {
+                    ...(old?.data ?? {}),
+                    ...(balData.available != null ? { available: balData.available } : {}),
+                    ...(balData.locked != null ? { locked: balData.locked } : {}),
+                  },
+                }));
+              } else {
+                // Fallback: invalidate if no data in event
                 pendingInvalidations.current.add('/api/v1/vault/balance');
                 pendingInvalidations.current.add(WALLET_BALANCE_KEY);
                 flushInvalidations();
               }
               break;
+            }
             case 'event_started':
             case 'event_ended':
             case 'event_results_published':
@@ -393,7 +385,6 @@ export function useWebSocket({
             case 'deposit_confirmed':
               // Emit deposit event BEFORE cache invalidation so BalanceDisplay transitions immediately
               emitDepositEvent({ type: 'confirmed', txHash: String(parsed.data?.tx_hash ?? '') });
-              clearBalanceGracePeriod();
               pendingInvalidations.current.add('/api/v1/vault/balance');
               pendingInvalidations.current.add(WALLET_BALANCE_KEY);
               flushInvalidations();
@@ -404,15 +395,12 @@ export function useWebSocket({
                 txHash: String(parsed.data?.tx_hash ?? ''),
                 reason: String(parsed.data?.reason ?? ''),
               });
-              clearBalanceGracePeriod();
               pendingInvalidations.current.add('/api/v1/vault/balance');
               pendingInvalidations.current.add(WALLET_BALANCE_KEY);
               flushInvalidations();
               break;
             case 'withdraw_confirmed':
             case 'withdraw_failed':
-              // Critical balance events — clear grace period and refetch immediately (no debounce)
-              clearBalanceGracePeriod();
               pendingInvalidations.current.add('/api/v1/vault/balance');
               pendingInvalidations.current.add(WALLET_BALANCE_KEY);
               flushInvalidations();

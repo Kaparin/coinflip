@@ -15,9 +15,7 @@ import {
   LAUNCH_MULTIPLIER,
 } from '@coinflip/shared/constants';
 import { extractErrorPayload, isActionInProgress, isBetCanceled, isBetClaimed, isBetGone, getUserFriendlyError } from '@/lib/user-friendly-errors';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
-import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { GameTokenIcon } from '@/components/ui';
 import { InsufficientBalanceModal } from '@/components/features/vault/insufficient-balance-modal';
 import { Coins } from 'lucide-react';
@@ -85,22 +83,14 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     },
   );
   const vaultKey = ['/api/v1/vault/balance'];
-  const { pendingDeduction, addDeduction, removeDeduction, isFrozen } = usePendingBalance();
-  // Use WS-aware shared balance query (no dedicated polling — WS events + main balance handle it)
+  // Use WS-aware shared balance query — DB is single source of truth
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: () => {
-        if (isFrozen || isInBalanceGracePeriod()) return false;
-        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
-      },
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     },
   });
-  const rawAvailableMicro = BigInt(balanceData?.data?.available ?? '0');
-  const availableMicro = rawAvailableMicro - pendingDeduction < 0n ? 0n : rawAvailableMicro - pendingDeduction;
-
-  // Map betId → deductionId for accept deductions
-  const acceptDeductionRef = useRef<Map<string, string>>(new Map());
+  const availableMicro = BigInt(balanceData?.data?.available ?? '0');
 
   // Ref-based running total of amounts committed to pending accepts.
   // React state batches updates, so rapid clicks would all see the same stale
@@ -152,12 +142,6 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
         const betId = String(variables.betId);
         const betData = response?.data;
 
-        const deductionId = acceptDeductionRef.current.get(betId);
-        if (deductionId) {
-          removeDeduction(deductionId);
-          acceptDeductionRef.current.delete(betId);
-        }
-
         // Release this bet's amount from the ref-based running total
         const betAmount = BigInt(response?.data?.amount ?? 0);
         if (betAmount > 0n) {
@@ -166,7 +150,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
         }
 
         // Apply server balance from 202 response immediately via setQueryData.
-        // The server computed it from pre-lock snapshot minus this bet's amount.
+        // The server computed it from DB (single source of truth).
         const serverBalance = response?.balance;
         if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
@@ -177,9 +161,6 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
               locked: serverBalance.locked,
             },
           }));
-          // Protect this accurate balance from stale WS-triggered refetches.
-          // Chain cache may lag behind the DB state for a few seconds.
-          setBalanceGracePeriod(8_000);
         }
 
         // Update the bet status in open bets cache — keep it in the grid
@@ -230,15 +211,6 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
       onError: (err: unknown, variables) => {
         const betId = variables?.betId ? String(variables.betId) : null;
 
-        // Revert the pending deduction
-        if (betId) {
-          const deductionId = acceptDeductionRef.current.get(betId);
-          if (deductionId) {
-            removeDeduction(deductionId);
-            acceptDeductionRef.current.delete(betId);
-          }
-        }
-
         // Release this bet's amount from the ref-based running total
         if (betId) {
           const bet = bets.find(b => String(b.id) === betId);
@@ -263,7 +235,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
           const bet = betId ? bets.find(b => String(b.id) === betId) : null;
           setInsufficientInfo({
             required: bet?.amount ?? '0',
-            available: String(rawAvailableMicro),
+            available: String(availableMicro),
           });
           invalidateAll();
         } else if (isCanceled || isGone) {
@@ -372,10 +344,6 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     // Hide the card immediately (survives refetch race conditions)
     setRecentlyAcceptedIds(prev => new Set(prev).add(id));
 
-    // Optimistically deduct balance (not a bet-create, so isBetCreate=false)
-    const deductionId = addDeduction(String(bet.amount), false);
-    acceptDeductionRef.current.set(id, deductionId);
-
     // Fire API call immediately — relayer's broadcast mutex handles serialization.
     // No frontend queue needed.
     acceptBetAsync({
@@ -384,7 +352,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
     }).catch(() => {
       // Error already handled by mutation's onError callback
     });
-  }, [acceptTarget, bets, availableMicro, addDeduction, acceptBetAsync, acceptMessage]);
+  }, [acceptTarget, bets, availableMicro, acceptBetAsync, acceptMessage]);
 
   if (isLoading) {
     return (

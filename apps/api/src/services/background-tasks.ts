@@ -773,52 +773,18 @@ async function syncPlayersBalanceFromChain(
       acceptorUserId ? resolveAddress(acceptorUserId) : null,
     ]);
 
-    const chainQueries: Promise<{ available: string; locked: string }>[] = [];
-    if (makerAddr) chainQueries.push(getChainVaultBalance(makerAddr));
-    if (acceptorAddr) chainQueries.push(getChainVaultBalance(acceptorAddr));
+    // Sync chain → DB for both players, then send DB-derived balance via WS
+    const syncAndNotify = async (userId: string, addr: string) => {
+      const chainBal = await getChainVaultBalance(addr);
+      await vaultService.syncBalanceFromChain(userId, chainBal.available, chainBal.locked, 0n);
+      const dbBal = await vaultService.getBalance(userId);
+      wsService.emitBalanceUpdated(addr, { available: dbBal.available, locked: dbBal.locked });
+    };
 
-    const chainBalances = await Promise.all(chainQueries);
-    let idx = 0;
-
-    if (makerAddr) {
-      const cb = chainBalances[idx++]!;
-      // Adjust chain values by pending locks from OTHER in-flight bets.
-      // Without this, sync overwrites lockFunds decrements — enabling double-spend.
-      const makerPending = getTotalPendingLocks(makerAddr);
-      const makerAvail = BigInt(cb.available) - makerPending;
-      const makerLocked = BigInt(cb.locked) + makerPending;
-      await vaultService.syncBalanceFromChain(
-        makerUserId,
-        (makerAvail < 0n ? 0n : makerAvail).toString(),
-        makerLocked.toString(),
-        0n,
-      );
-      invalidateBalanceCache(makerAddr);
-      // Send adjusted values (not raw chain) so WS event doesn't flash stale data
-      wsService.emitBalanceUpdated(makerAddr, {
-        available: (makerAvail < 0n ? 0n : makerAvail).toString(),
-        locked: makerLocked.toString(),
-      });
-    }
-
-    if (acceptorAddr && acceptorUserId) {
-      const cb = chainBalances[idx]!;
-      const acceptorPending = getTotalPendingLocks(acceptorAddr);
-      const acceptorAvail = BigInt(cb.available) - acceptorPending;
-      const acceptorLocked = BigInt(cb.locked) + acceptorPending;
-      await vaultService.syncBalanceFromChain(
-        acceptorUserId,
-        (acceptorAvail < 0n ? 0n : acceptorAvail).toString(),
-        acceptorLocked.toString(),
-        0n,
-      );
-      invalidateBalanceCache(acceptorAddr);
-      // Send adjusted values (not raw chain) so WS event doesn't flash stale data
-      wsService.emitBalanceUpdated(acceptorAddr, {
-        available: (acceptorAvail < 0n ? 0n : acceptorAvail).toString(),
-        locked: acceptorLocked.toString(),
-      });
-    }
+    const tasks: Promise<void>[] = [];
+    if (makerAddr) tasks.push(syncAndNotify(makerUserId, makerAddr));
+    if (acceptorAddr && acceptorUserId) tasks.push(syncAndNotify(acceptorUserId, acceptorAddr));
+    await Promise.all(tasks);
 
     logger.debug({ betId }, 'Post-resolution balance sync completed for both players');
   } catch (err) {

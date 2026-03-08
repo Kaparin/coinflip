@@ -4,10 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Wallet } from 'lucide-react';
 import { useGetVaultBalance } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
-import { isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { GameTokenIcon } from '@/components/ui';
 import { BalanceDisplay } from './balance-display';
@@ -21,14 +19,10 @@ import { useTranslation } from '@/lib/i18n';
 export function MobileBalanceBar() {
   const { t } = useTranslation();
   const { isConnected, address } = useWalletContext();
-  const { pendingDeduction, isFrozen } = usePendingBalance();
   const { data, isLoading } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: () => {
-        if (isFrozen || isInBalanceGracePeriod()) return false;
-        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
-      },
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
@@ -62,10 +56,8 @@ export function MobileBalanceBar() {
   }
 
   const balance = data?.data;
-  const rawAvailable = BigInt(balance?.available ?? '0');
-  const rawLocked = BigInt(balance?.locked ?? '0');
-  const availableMicro = rawAvailable - pendingDeduction < 0n ? 0n : rawAvailable - pendingDeduction;
-  const lockedMicro = rawLocked + pendingDeduction;
+  const availableMicro = BigInt(balance?.available ?? '0');
+  const lockedMicro = BigInt(balance?.locked ?? '0');
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const availableHuman = fromMicroLaunch(availableMicro);
   const lockedHuman = fromMicroLaunch(lockedMicro);

@@ -20,6 +20,16 @@ import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 import { resolveGasGranter } from '../lib/gas-granter.js';
 import { vaultTransactions } from '@coinflip/db/schema';
 
+// ─── Legacy no-ops (kept as stubs so callers don't break during migration) ──
+// These are intentionally empty — the pendingLocks system is removed.
+// TODO: clean up callers and delete these stubs.
+export function addPendingLock(_address: string, _amount: string): string { return ''; }
+export function removePendingLock(_address: string, _lockId: string): void {}
+export function removePendingLockDelayed(_address: string, _lockId: string, _delayMs?: number): void {}
+export function clearPendingLocks(_address: string): void {}
+export function getTotalPendingLocks(_address: string): bigint { return 0n; }
+export function invalidateBalanceCache(address: string): void { invalidateChainCache('vault:' + address); }
+
 /** Throw an appropriate AppError for a failed relay result */
 function throwRelayError(relayResult: RelayResult): never {
   if (relayResult.timeout) {
@@ -52,147 +62,21 @@ export async function getChainVaultBalance(address: string): Promise<{ available
   );
 }
 
-// ─── Server-side pending locks ──────────────────────────────────
-// Tracks funds that have been locked in DB (lockFunds) but not yet
-// reflected on-chain. The balance endpoint subtracts these from chain
-// balance so clients always see the correct available amount.
-// Each entry auto-expires after 30s as a safety net.
-const PENDING_LOCK_TTL = 90_000;
-
-interface PendingLock {
-  id: string;
-  amount: bigint;
-  ts: number;
-}
-
-const pendingLocksMap = new Map<string, PendingLock[]>();
-
-export function addPendingLock(address: string, amount: string): string {
-  const id = `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const list = pendingLocksMap.get(address) ?? [];
-  list.push({ id, amount: BigInt(amount), ts: Date.now() });
-  pendingLocksMap.set(address, list);
-  // Auto-expire after TTL
-  setTimeout(() => removePendingLock(address, id), PENDING_LOCK_TTL);
-  return id;
-}
-
-export function removePendingLock(address: string, lockId: string): void {
-  const list = pendingLocksMap.get(address);
-  if (!list) return;
-  const filtered = list.filter(l => l.id !== lockId);
-  if (filtered.length === 0) {
-    pendingLocksMap.delete(address);
-  } else {
-    pendingLocksMap.set(address, filtered);
-  }
-}
-
-/**
- * Delay pending lock removal to let the chain REST API reflect the new state.
- * During this window the balance endpoint continues to subtract the pending lock
- * from chain-reported available, preventing a stale-data flash.
- *
- * Use this in SUCCESS paths only (bet confirmed on chain). Error paths should
- * call removePendingLock() immediately so funds appear unlocked right away.
- */
-export function removePendingLockDelayed(address: string, lockId: string, delayMs = 5_000): void {
-  setTimeout(() => {
-    removePendingLock(address, lockId);
-    invalidateBalanceCache(address);
-  }, delayMs);
-}
-
-export function clearPendingLocks(address: string): void {
-  pendingLocksMap.delete(address);
-}
-
-export function getTotalPendingLocks(address: string): bigint {
-  const list = pendingLocksMap.get(address);
-  if (!list || list.length === 0) return 0n;
-  // Filter expired entries
-  const now = Date.now();
-  let total = 0n;
-  for (const lock of list) {
-    if (now - lock.ts < PENDING_LOCK_TTL) {
-      total += lock.amount;
-    }
-  }
-  return total;
-}
-
-/** Invalidate balance cache for a user (call after lockFunds/unlockFunds) */
-export function invalidateBalanceCache(address: string): void {
-  invalidateChainCache('vault:' + address);
-}
-
 // GET /api/v1/vault/balance — Get balance (auth required)
-// Strategy:
-//   - When pending locks exist → use DB balance (lockFunds/unlockFunds are atomic and always correct)
-//   - When no pending locks  → use chain balance + sync to DB (source of truth for settled state)
-// This eliminates the TTL-expiry bug where in-memory pending locks expire
-// but chain hasn't confirmed yet, causing available to jump back up.
+// Simple: always read from DB. Chain syncs happen in background after tx confirmation.
+// lockFunds/unlockFunds atomically update DB — always correct, no timing heuristics.
 vaultRouter.get('/balance', authMiddleware, async (c) => {
   const user = c.get('user');
-  const address = c.get('address');
 
-  const pendingLockAmount = getTotalPendingLocks(address);
-  const pendingBets = getPendingBetCount(user.id);
-  const hasPending = pendingLockAmount > 0n || pendingBets > 0;
-
-  // Fetch COIN balance + open bet count always; chain balance only when no pending
-  const [coinBalance, dbOpenCount, dbBalance, chainBalance] = await Promise.all([
+  const [coinBalance, dbOpenCount, dbBalance, pendingBets] = await Promise.all([
     vaultService.getCoinBalance(user.id),
     betService.getOpenBetCountForUser(user.id),
-    // DB balance is always fetched — cheap single row read
     vaultService.getBalance(user.id),
-    // Chain balance fetched always for sync, but only used when no pending
-    getChainVaultBalance(address),
+    Promise.resolve(getPendingBetCount(user.id)),
   ]);
 
-  let available: bigint;
-  let locked: bigint;
-
-  if (hasPending) {
-    // ── Pending locks/bets exist → trust DB balance ──
-    // lockFunds atomically decrements available and increments locked in DB.
-    // This is always correct regardless of chain confirmation status.
-    available = BigInt(dbBalance.available);
-    locked = BigInt(dbBalance.locked);
-  } else {
-    // ── No pending → use chain balance (source of truth for settled state) ──
-    let chainAvailable = BigInt(chainBalance.available);
-    const chainLocked = BigInt(chainBalance.locked);
-
-    // Account for off-chain spending + bonus (same logic as vaultService.getBalance)
-    const offchain = await vaultService.getOffchainBalances(user.id);
-    const offchainSpent = BigInt(offchain.offchainSpent);
-    const bonus = BigInt(offchain.bonus);
-
-    let effectiveAvailable: bigint;
-    let effectiveBonus: bigint;
-
-    if (offchainSpent <= chainAvailable) {
-      effectiveAvailable = chainAvailable - offchainSpent;
-      effectiveBonus = bonus;
-    } else {
-      effectiveAvailable = 0n;
-      const overflowFromBonus = offchainSpent - chainAvailable;
-      effectiveBonus = bonus > overflowFromBonus ? bonus - overflowFromBonus : 0n;
-    }
-
-    available = effectiveAvailable + effectiveBonus;
-    locked = chainLocked;
-
-    // Sync chain balance to DB (safe — no pending locks can race)
-    vaultService.syncBalanceFromChain(
-      user.id,
-      chainBalance.available,
-      chainBalance.locked,
-      0n,
-    ).catch(err => logger.warn({ err }, 'Background vault sync failed'));
-  }
-
+  const available = BigInt(dbBalance.available);
+  const locked = BigInt(dbBalance.locked);
   const total = available + locked;
   const openBetsCount = dbOpenCount + pendingBets;
 
@@ -402,21 +286,23 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
           }
           // Small delay to let REST node catch up with the new block state
           await new Promise(r => setTimeout(r, 1_500));
-          invalidateBalanceCache(address);
-          const chainBalance = await getChainVaultBalance(address);
+          invalidateChainCache('vault:' + address);
+          const chainBal = await getChainVaultBalance(address);
           await vaultService.syncBalanceFromChain(
             user.id,
-            chainBalance.available,
-            chainBalance.locked,
+            chainBal.available,
+            chainBal.locked,
             BigInt(result.height),
           );
+          // Read back from DB (accounts for offchain_spent, bonus, etc.)
+          const dbBal = await vaultService.getBalance(user.id);
           wsService.sendToAddress(address, {
             type: 'deposit_confirmed',
             data: { tx_hash: txHash, height: result.height },
           });
           wsService.sendToAddress(address, {
             type: 'balance_updated',
-            data: { available: chainBalance.available, locked: chainBalance.locked },
+            data: { available: dbBal.available, locked: dbBal.locked },
           });
         } catch (err) {
           logger.error({ err, txHash, address }, 'Async deposit background poll error');
@@ -449,17 +335,18 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
           }
           if (result.code === 0) {
             logger.info({ txHash, address, height: result.height }, 'Deposit confirmed in background');
-            invalidateBalanceCache(address);
-            const chainBalance = await getChainVaultBalance(address);
+            invalidateChainCache('vault:' + address);
+            const chainBal = await getChainVaultBalance(address);
             await vaultService.syncBalanceFromChain(
               user.id,
-              chainBalance.available,
-              chainBalance.locked,
+              chainBal.available,
+              chainBal.locked,
               BigInt(result.height),
             );
+            const dbBal = await vaultService.getBalance(user.id);
             wsService.sendToAddress(address, {
               type: 'balance_updated',
-              data: { available: chainBalance.available, locked: chainBalance.locked },
+              data: { available: dbBal.available, locked: dbBal.locked },
             });
           }
         } catch (err) {
@@ -489,20 +376,20 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
         userId: user.id, type: 'deposit', amount: depositAmount, txHash, status: 'confirmed',
       }).catch(e => logger.warn({ e }, 'Failed to log deposit transaction'));
     }
-    invalidateBalanceCache(address);
+    invalidateChainCache('vault:' + address);
 
     // Sync balance from chain in background (don't block response)
-    getChainVaultBalance(address).then(chainBalance => {
-      vaultService.syncBalanceFromChain(
+    getChainVaultBalance(address).then(async chainBal => {
+      await vaultService.syncBalanceFromChain(
         user.id,
-        chainBalance.available,
-        chainBalance.locked,
+        chainBal.available,
+        chainBal.locked,
         BigInt(txResult!.height),
-      ).catch(err => logger.warn({ err }, 'Background vault sync failed after deposit'));
-
+      );
+      const dbBal = await vaultService.getBalance(user.id);
       wsService.sendToAddress(address, {
         type: 'balance_updated',
-        data: { available: chainBalance.available, locked: chainBalance.locked },
+        data: { available: dbBal.available, locked: dbBal.locked },
       });
     }).catch(err => logger.warn({ err }, 'Failed to sync balance after deposit'));
 
@@ -613,21 +500,22 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
         }).catch(e => logger.warn({ e }, 'Failed to log withdraw transaction'));
       }
       await new Promise(r => setTimeout(r, 1_500));
-      invalidateBalanceCache(address);
-      const newChainBalance = await getChainVaultBalance(address);
+      invalidateChainCache('vault:' + address);
+      const newChainBal = await getChainVaultBalance(address);
       await vaultService.syncBalanceFromChain(
         user.id,
-        newChainBalance.available,
-        newChainBalance.locked,
+        newChainBal.available,
+        newChainBal.locked,
         BigInt(result.height),
       );
+      const dbBal = await vaultService.getBalance(user.id);
       wsService.sendToAddress(address, {
         type: 'withdraw_confirmed',
         data: { tx_hash: txHash, height: result.height, amount },
       });
       wsService.sendToAddress(address, {
         type: 'balance_updated',
-        data: { available: newChainBalance.available, locked: newChainBalance.locked },
+        data: { available: dbBal.available, locked: dbBal.locked },
       });
 
       // Sweep offchain_spent in background

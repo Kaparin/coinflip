@@ -16,7 +16,6 @@ import { useVipStatus, useVipCustomization } from '@/hooks/use-vip';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { ADMIN_ADDRESS, EXPLORER_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { soundManager } from '@/lib/sounds';
@@ -43,7 +42,6 @@ export function Header() {
   const { data: nativeBalanceRaw } = useNativeBalance(wallet.address);
   // coin_balance from vault API (virtual COIN from DB, not on-chain CW20)
   const coinBalanceRaw = (balanceData as any)?.data?.coin_balance as string | undefined;
-  const { pendingDeduction } = usePendingBalance();
   const { data: vipStatus } = useVipStatus(wallet.isConnected);
   const isDiamond = vipStatus?.active && vipStatus.tier === 'diamond';
   const { data: vipCustom } = useVipCustomization(!!isDiamond);
@@ -97,9 +95,7 @@ export function Header() {
   }, [hapticsOn]);
 
   const balance = balanceData?.data;
-  const rawAvailable = BigInt(balance?.available ?? '0');
-  const adjusted = rawAvailable - pendingDeduction;
-  const availableHuman = fromMicroLaunch((adjusted < 0n ? 0n : adjusted).toString());
+  const availableHuman = fromMicroLaunch(balance?.available ?? '0');
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000; // uaxm → AXM
   const coinBalanceHuman = fromMicroLaunch(coinBalanceRaw ?? '0');

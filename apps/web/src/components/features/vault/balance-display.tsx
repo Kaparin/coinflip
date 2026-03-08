@@ -21,9 +21,7 @@ function extractTxHashFromError(err: unknown): string | null {
   const m = msg.match(/Transaction with ID ([A-F0-9a-f]+)/i);
   return m?.[1] ?? null;
 }
-import { usePendingBalance } from '@/contexts/pending-balance-context';
 import { useDepositTrigger } from '@/contexts/deposit-trigger-context';
-import { setBalanceGracePeriod, clearBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
@@ -320,14 +318,10 @@ export function BalanceDisplay() {
   const { t, locale } = useTranslation();
   const { addToast } = useToast();
   const { isConnected, isConnecting, address, getWallet, connect } = useWalletContext();
-  const { pendingDeduction, isFrozen } = usePendingBalance();
   const { data, isLoading } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: () => {
-        if (isFrozen || isInBalanceGracePeriod()) return false;
-        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
-      },
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
@@ -405,8 +399,7 @@ export function BalanceDisplay() {
           return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
         });
 
-        // Short grace period — WS withdraw_confirmed will clear it and trigger refetch
-        setBalanceGracePeriod(4_000);
+        // Cancel in-flight queries to protect optimistic update
         queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
 
         // Auto-close + toast
@@ -445,8 +438,7 @@ export function BalanceDisplay() {
           queryClient.setQueryData(walletBalanceQueryKey(address), (old: any) => {
             return (BigInt(old ?? '0') + BigInt(microAmount)).toString();
           });
-          // Protect optimistic update, refetch after grace period
-          setBalanceGracePeriod(8_000);
+          // Cancel in-flight queries to protect optimistic update, refetch after delay
           queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
           setTimeout(() => {
             queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
@@ -478,9 +470,8 @@ export function BalanceDisplay() {
   const rawAvailableMicro = BigInt(balance?.available ?? '0');
   const rawLockedMicro = BigInt(balance?.locked ?? '0');
 
-  // Apply pending deductions: subtract from available, add to locked
-  const availableMicro = rawAvailableMicro - pendingDeduction < 0n ? 0n : rawAvailableMicro - pendingDeduction;
-  const lockedMicro = rawLockedMicro + pendingDeduction;
+  const availableMicro = rawAvailableMicro;
+  const lockedMicro = rawLockedMicro;
   const totalMicro = availableMicro + lockedMicro;
 
   const availableHuman = fromMicroLaunch(availableMicro);
@@ -533,8 +524,6 @@ export function BalanceDisplay() {
       if (event.type === 'confirmed') {
         setDepositStatus('success');
         feedback('success');
-        // Now safe to release grace period and refetch
-        clearBalanceGracePeriod();
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
           queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
@@ -543,7 +532,6 @@ export function BalanceDisplay() {
         setDepositError(event.reason || t('balance.depositFailed'));
         setDepositStatus('error');
         // Revert optimistic balance update
-        clearBalanceGracePeriod();
         queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
         queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
       }
@@ -577,7 +565,6 @@ export function BalanceDisplay() {
     const failsafe = setTimeout(() => {
       setDepositStatus('success');
       feedback('success');
-      clearBalanceGracePeriod();
       preDepositBalanceRef.current = null;
       queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
       queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });
@@ -676,9 +663,7 @@ export function BalanceDisplay() {
         return (newBal < 0n ? 0n : newBal).toString();
       });
 
-      // Short grace period to protect optimistic update from stale refetches.
-      // WS deposit_confirmed event will clear it and trigger real refetch.
-      setBalanceGracePeriod(4_000);
+      // Cancel in-flight queries to protect optimistic update
       queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
 
       // Auto-close modal + toast — user can continue immediately
@@ -703,7 +688,6 @@ export function BalanceDisplay() {
           const newBal = BigInt(old ?? '0') - BigInt(depositMicro);
           return (newBal < 0n ? 0n : newBal).toString();
         });
-        setBalanceGracePeriod(8_000);
         queryClient.cancelQueries({ queryKey: ['/api/v1/vault/balance'] });
         setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
@@ -730,8 +714,6 @@ export function BalanceDisplay() {
     setDepositErrorTxHash(null);
     setDepositTxHash('');
     setDepositElapsed(0);
-    // Release grace period so subsequent operations (like withdrawals) aren't blocked
-    clearBalanceGracePeriod();
     // Force refetch to get accurate balances
     queryClient.refetchQueries({ queryKey: ['/api/v1/vault/balance'] });
     queryClient.refetchQueries({ queryKey: walletBalanceQueryKey(address) });

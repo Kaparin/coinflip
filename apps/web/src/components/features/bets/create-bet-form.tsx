@@ -5,8 +5,6 @@ import { useCreateBet, useGetVaultBalance, getGetVaultBalanceQueryKey, createBet
 import { customFetch } from '@coinflip/api-client/custom-fetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { usePendingBalance } from '@/contexts/pending-balance-context';
-import { setBalanceGracePeriod, isInBalanceGracePeriod } from '@/lib/balance-grace';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { useGrantStatus } from '@/hooks/use-grant-status';
 import { useToast } from '@/components/ui/toast';
@@ -55,18 +53,11 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
   const { t } = useTranslation();
 
   const queryClient = useQueryClient();
-  const { addDeduction, removeDeduction, pendingDeduction, pendingBetCount, isFrozen } = usePendingBalance();
 
   const { data: balanceData } = useGetVaultBalance({
     query: {
       enabled: isConnected,
-      refetchInterval: () => {
-        // Block polling while pending deductions are active (in-flight API calls)
-        // or during balance grace period (post-202 response protection).
-        // Without this, a stale refetch can overwrite the correct optimistic balance.
-        if (isFrozen || isInBalanceGracePeriod()) return false;
-        return isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED;
-      },
+      refetchInterval: () => isWsConnected() ? POLL_INTERVAL_WS_CONNECTED : POLL_INTERVAL_WS_DISCONNECTED,
     },
   });
 
@@ -88,17 +79,12 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
 
   // Compute effective count: server count (authoritative) + local offset (for gap between submit and refetch)
   const serverCount = serverOpenBetsCount ?? 0;
-  const myOpenBetsCount = serverCount + localSubmitted + pendingBetCount;
+  const myOpenBetsCount = serverCount + localSubmitted;
   const remainingSlots = Math.max(0, MAX_OPEN_BETS_PER_USER - myOpenBetsCount);
   const canCreateBet = remainingSlots > 0;
 
-  // Subtract pending deductions from available balance so user can't over-bet
-  const rawAvailableMicro = BigInt(balanceData?.data?.available ?? '0');
-  const effectiveAvailableMicro = rawAvailableMicro - pendingDeduction < 0n ? 0n : rawAvailableMicro - pendingDeduction;
-  const availableHuman = fromMicroLaunch(effectiveAvailableMicro);
-
-  // Track deduction ID for the current submission
-  const deductionIdRef = useRef<string | null>(null);
+  const availableMicro = BigInt(balanceData?.data?.available ?? '0');
+  const availableHuman = fromMicroLaunch(availableMicro);
 
   // Store the bet amount for use in onSuccess (closure over latest value)
   const betAmountRef = useRef('');
@@ -108,13 +94,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
       onSuccess: (response) => {
         const vaultKey = getGetVaultBalanceQueryKey();
 
-        if (deductionIdRef.current) {
-          removeDeduction(deductionIdRef.current);
-          deductionIdRef.current = null;
-        }
-
-        // Apply server balance from 202 response — computed from pre-lock
-        // snapshot minus this bet's amount, so it's always accurate.
+        // Apply server balance from 202 response — computed from DB (single source of truth).
         const serverBalance = (response as any)?.balance;
         if (serverBalance) {
           queryClient.setQueryData(vaultKey, (old: any) => ({
@@ -125,8 +105,6 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
               locked: serverBalance.locked,
             },
           }));
-          // Protect this accurate balance from stale WS-triggered refetches.
-          setBalanceGracePeriod(8_000);
         }
 
         // Increment local submitted counter (tracks bets between server refetches)
@@ -147,11 +125,6 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
         }, 2500);
       },
       onError: (err: unknown) => {
-        // Revert optimistic balance deduction
-        if (deductionIdRef.current) {
-          removeDeduction(deductionIdRef.current);
-          deductionIdRef.current = null;
-        }
         setSubmitted(false);
         const { message } = extractErrorPayload(err);
         if (isActionInProgress(message)) {
@@ -191,11 +164,9 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
     const microAmount = toMicroLaunch(parsedAmount);
     // Store amount for onSuccess handler (it needs it for cache update)
     betAmountRef.current = microAmount;
-    // Immediately deduct from displayed balance + increment pending bet count
-    deductionIdRef.current = addDeduction(microAmount, true);
     // Server generates side + secret + commitment — client just sends amount
     createBet.mutate({ data: { amount: microAmount } });
-  }, [isValidAmount, parsedAmount, createBet, submitted, addDeduction]);
+  }, [isValidAmount, parsedAmount, createBet, submitted]);
 
   // ─── Batch mode ───
   const [batchCount, setBatchCount] = useState('');
@@ -239,12 +210,6 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
     setBatchSubmitting(true);
 
     const count = parsedBatchCount;
-    const totalEstimate = batchMode === 'fixed'
-      ? toMicroLaunch(parsedAmount * count)
-      : toMicroLaunch(parsedBatchMax * count); // worst-case lock
-
-    // Add a single large deduction for the batch
-    const deductionId = addDeduction(totalEstimate, true);
 
     try {
       const data = batchMode === 'fixed'
@@ -261,9 +226,6 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
       const submitted = result?.data?.submitted ?? 0;
       const failed = result?.data?.failed ?? 0;
       const totalAmount = result?.data?.total_amount ?? '0';
-
-      // Remove optimistic deduction and replace with actual
-      removeDeduction(deductionId);
 
       // Update local submitted counter
       setLocalSubmitted(prev => prev + submitted);
@@ -287,13 +249,12 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
         }
       }
     } catch (err: unknown) {
-      removeDeduction(deductionId);
       addToast('error', getUserFriendlyError(err, t, 'create'));
     } finally {
       setBatchSubmitting(false);
       setBatchCount('');
     }
-  }, [isValidBatch, parsedBatchCount, parsedAmount, batchMode, parsedBatchMin, parsedBatchMax, batchSubmitting, addDeduction, removeDeduction, address, onBetSubmitted, queryClient, addToast, t]);
+  }, [isValidBatch, parsedBatchCount, parsedAmount, batchMode, parsedBatchMin, parsedBatchMax, batchSubmitting, address, onBetSubmitted, queryClient, addToast, t]);
 
   return (
     <div className={variant === 'card' ? 'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden' : ''}>
