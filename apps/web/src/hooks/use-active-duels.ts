@@ -89,8 +89,8 @@ function revealWinner(betId: string, winner: string) {
 
 const FADE_OUT_DELAY = 10_000; // 10s after winner reveal
 const REMOVE_DELAY = 500; // after fade-out animation
-const STALE_DUEL_MAX_AGE = 45_000; // 45s — tighter safety net (backend timeout is ~35s now)
-const STALE_CLEANUP_INTERVAL = 10_000; // check every 10s (was 30s — too slow for stuck cards)
+const STALE_DUEL_MAX_AGE = 120_000; // 120s — backend polls up to 60s + 90s deferred check
+const STALE_CLEANUP_INTERVAL = 15_000; // check every 15s
 
 /**
  * Hook to access and manage active duels.
