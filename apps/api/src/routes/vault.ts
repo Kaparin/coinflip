@@ -284,17 +284,11 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
               userId: user.id, type: 'deposit', amount: depositAmount, txHash, status: 'confirmed',
             }).catch(e => logger.warn({ e }, 'Failed to log deposit transaction'));
           }
-          // Small delay to let REST node catch up with the new block state
-          await new Promise(r => setTimeout(r, 1_500));
+          // Credit deposited amount atomically (never overwrites concurrent lockFunds)
+          if (depositAmount) {
+            await vaultService.creditWinnings(user.id, depositAmount);
+          }
           invalidateChainCache('vault:' + address);
-          const chainBal = await getChainVaultBalance(address);
-          await vaultService.syncBalanceFromChain(
-            user.id,
-            chainBal.available,
-            chainBal.locked,
-            BigInt(result.height),
-          );
-          // Read back from DB (accounts for offchain_spent, bonus, etc.)
           const dbBal = await vaultService.getBalance(user.id);
           wsService.sendToAddress(address, {
             type: 'deposit_confirmed',
@@ -335,14 +329,10 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
           }
           if (result.code === 0) {
             logger.info({ txHash, address, height: result.height }, 'Deposit confirmed in background');
+            if (depositAmount) {
+              await vaultService.creditWinnings(user.id, depositAmount);
+            }
             invalidateChainCache('vault:' + address);
-            const chainBal = await getChainVaultBalance(address);
-            await vaultService.syncBalanceFromChain(
-              user.id,
-              chainBal.available,
-              chainBal.locked,
-              BigInt(result.height),
-            );
             const dbBal = await vaultService.getBalance(user.id);
             wsService.sendToAddress(address, {
               type: 'balance_updated',
@@ -378,20 +368,22 @@ vaultRouter.post('/deposit/broadcast', authMiddleware, zValidator('json', Deposi
     }
     invalidateChainCache('vault:' + address);
 
-    // Sync balance from chain in background (don't block response)
-    getChainVaultBalance(address).then(async chainBal => {
-      await vaultService.syncBalanceFromChain(
-        user.id,
-        chainBal.available,
-        chainBal.locked,
-        BigInt(txResult!.height),
-      );
-      const dbBal = await vaultService.getBalance(user.id);
-      wsService.sendToAddress(address, {
-        type: 'balance_updated',
-        data: { available: dbBal.available, locked: dbBal.locked },
-      });
-    }).catch(err => logger.warn({ err }, 'Failed to sync balance after deposit'));
+    // Credit deposit atomically in background (don't block response)
+    (async () => {
+      try {
+        if (depositAmount) {
+          await vaultService.creditWinnings(user.id, depositAmount);
+        }
+        invalidateChainCache('vault:' + address);
+        const dbBal = await vaultService.getBalance(user.id);
+        wsService.sendToAddress(address, {
+          type: 'balance_updated',
+          data: { available: dbBal.available, locked: dbBal.locked },
+        });
+      } catch (err) {
+        logger.warn({ err }, 'Failed to credit deposit');
+      }
+    })();
 
     return c.json({
       data: {
@@ -427,9 +419,6 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     if (BigInt(chainBalance.available) < BigInt(amount)) {
       throw Errors.insufficientBalance(amount, chainBalance.available);
     }
-
-    // Sync DB from chain before locking (ensures DB reflects real chain state)
-    await vaultService.syncBalanceFromChain(user.id, chainBalance.available, chainBalance.locked, 0n);
 
     // Atomically lock funds in DB to prevent double-withdraw
     const locked = await vaultService.lockFunds(user.id, amount);
@@ -499,15 +488,9 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
           userId: user.id, type: 'withdraw', amount, txHash, status: 'confirmed',
         }).catch(e => logger.warn({ e }, 'Failed to log withdraw transaction'));
       }
-      await new Promise(r => setTimeout(r, 1_500));
+      // Forfeit locked funds (consumed by withdrawal — no restore to available)
+      await vaultService.forfeitLocked(user.id, amount);
       invalidateChainCache('vault:' + address);
-      const newChainBal = await getChainVaultBalance(address);
-      await vaultService.syncBalanceFromChain(
-        user.id,
-        newChainBal.available,
-        newChainBal.locked,
-        BigInt(result.height),
-      );
       const dbBal = await vaultService.getBalance(user.id);
       wsService.sendToAddress(address, {
         type: 'withdraw_confirmed',
