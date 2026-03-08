@@ -20,7 +20,6 @@ import {
 import { useTranslation } from '@/lib/i18n';
 
 type TabMode = 'stake' | 'unstake';
-type TxStatus = 'idle' | 'signing' | 'error';
 
 interface PendingTx {
   type: 'stake' | 'unstake' | 'claim';
@@ -43,7 +42,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
-  const [txStatus, setTxStatus] = useState<TxStatus>('idle');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [txError, setTxError] = useState('');
   const [pendingTxs, setPendingTxs] = useState<PendingTx[]>([]);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -69,6 +68,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     refresh();
   }, [open, isConnected, refresh]);
 
+  // Auto-refresh while there are pending txs; expire after 30s
   useEffect(() => {
     if (pendingTxs.length === 0) return;
     const interval = setInterval(() => {
@@ -82,64 +82,93 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
   }, []);
 
+  /** Apply optimistic state update after successful tx */
+  const applyOptimistic = (type: PendingTx['type'], amt?: number) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      if (type === 'claim') {
+        return { ...prev, pendingRewards: 0 };
+      }
+      if (type === 'stake' && amt) {
+        return {
+          ...prev,
+          launchBalance: Math.max(0, prev.launchBalance - amt),
+          staked: prev.staked + amt,
+        };
+      }
+      if (type === 'unstake' && amt) {
+        return {
+          ...prev,
+          staked: Math.max(0, prev.staked - amt),
+          launchBalance: prev.launchBalance + amt,
+        };
+      }
+      return prev;
+    });
+  };
+
   const handleSuccess = (type: PendingTx['type'], txHash: string, amt?: number) => {
     setPendingTxs(prev => [...prev, { type, amount: amt, txHash, ts: Date.now() }]);
     setAmount('');
-    setTxStatus('idle');
+    setIsProcessing(false);
+    setTxError('');
+    applyOptimistic(type, amt);
     const label = type === 'stake' ? t('staking.stake') : type === 'unstake' ? t('staking.unstake') : t('staking.claim');
     addToast('success', `${label} — ${t('staking.txSubmitted')}`);
-    setTimeout(onClose, 800);
-    refreshTimerRef.current = setTimeout(refresh, 4_000);
+    // Refresh from chain after a few seconds to get real values
+    refreshTimerRef.current = setTimeout(refresh, 5_000);
   };
 
   const handleStake = async () => {
     const wallet = getWallet();
-    if (!wallet || !address || !amount) return;
+    if (!wallet || !address || !amount || isProcessing) return;
     const num = parseFloat(amount);
     if (num <= 0 || (user && num > user.launchBalance)) return;
-    setTxStatus('signing');
+    setIsProcessing(true);
     setTxError('');
     try {
       const result = await signStake(wallet, address, num);
       handleSuccess('stake', result.txHash, num);
     } catch (err) {
-      setTxStatus('error');
+      setIsProcessing(false);
       setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
   const handleUnstake = async () => {
     const wallet = getWallet();
-    if (!wallet || !address || !amount) return;
+    if (!wallet || !address || !amount || isProcessing) return;
     const num = parseFloat(amount);
     if (num <= 0 || (user && num > user.staked)) return;
-    setTxStatus('signing');
+    setIsProcessing(true);
     setTxError('');
     try {
       const result = await signUnstake(wallet, address, num);
       handleSuccess('unstake', result.txHash, num);
     } catch (err) {
-      setTxStatus('error');
+      setIsProcessing(false);
       setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
   const handleClaim = async () => {
     const wallet = getWallet();
-    if (!wallet || !address) return;
-    setTxStatus('signing');
+    if (!wallet || !address || isProcessing) return;
+    if (!user || user.pendingRewards <= 0) return;
+    setIsProcessing(true);
     setTxError('');
     try {
       const result = await signClaim(wallet, address);
       handleSuccess('claim', result.txHash);
     } catch (err) {
-      setTxStatus('error');
+      setIsProcessing(false);
       setTxError(err instanceof Error ? err.message : 'Transaction failed');
     }
   };
 
   const maxAmount = activeTab === 'stake' ? user?.launchBalance ?? 0 : user?.staked ?? 0;
-  const canSubmit = amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount && txStatus !== 'signing';
+  const canSubmit = !isProcessing && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
+  const canClaim = !isProcessing && !!user && user.pendingRewards > 0;
 
   const setPercent = (pct: number) => {
     if (maxAmount <= 0) return;
@@ -148,7 +177,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={t('staking.title')} showCloseButton={txStatus !== 'signing'}>
+    <Modal open={open} onClose={onClose} title={t('staking.title')} showCloseButton={!isProcessing}>
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={28} className="animate-spin text-violet-400" />
@@ -181,7 +210,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     {tx.type === 'claim' && t('staking.claim')}
                     {' — '}{t('staking.confirming')}
                   </span>
-                  <a href={`${EXPLORER_URL}/tx/${tx.txHash}`} target="_blank" rel="noopener noreferrer"
+                  <a href={`${EXPLORER_URL}/transactions/${tx.txHash}`} target="_blank" rel="noopener noreferrer"
                     className="text-violet-400/40 hover:text-violet-400 shrink-0">
                     <ExternalLink size={11} />
                   </a>
@@ -206,10 +235,10 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                   <button
                     type="button"
                     onClick={handleClaim}
-                    disabled={txStatus === 'signing'}
-                    className="shrink-0 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
+                    disabled={!canClaim}
+                    className="shrink-0 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
                   >
-                    {txStatus === 'signing' ? (
+                    {isProcessing ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
                       t('staking.claimRewards')
@@ -259,7 +288,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
             <div className="flex gap-1 p-1.5 bg-[var(--color-surface)]">
               <button
                 type="button"
-                onClick={() => { setActiveTab('stake'); setAmount(''); setTxStatus('idle'); setTxError(''); }}
+                onClick={() => { setActiveTab('stake'); setAmount(''); setTxError(''); }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   activeTab === 'stake'
                     ? 'bg-violet-600 text-white shadow-md shadow-violet-500/25'
@@ -270,7 +299,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveTab('unstake'); setAmount(''); setTxStatus('idle'); setTxError(''); }}
+                onClick={() => { setActiveTab('unstake'); setAmount(''); setTxError(''); }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   activeTab === 'unstake'
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25'
@@ -299,12 +328,14 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5 pr-16 text-xl font-bold placeholder-[var(--color-text-secondary)]/20 focus:border-violet-500/50 focus:outline-none transition-colors tabular-nums"
+                  disabled={isProcessing}
+                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5 pr-16 text-xl font-bold placeholder-[var(--color-text-secondary)]/20 focus:border-violet-500/50 focus:outline-none transition-colors tabular-nums disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => setPercent(1)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-violet-500/15 px-2.5 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors"
+                  disabled={isProcessing}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-violet-500/15 px-2.5 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors disabled:opacity-50"
                 >
                   MAX
                 </button>
@@ -317,7 +348,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     key={pct}
                     type="button"
                     onClick={() => setPercent(pct)}
-                    className="flex-1 py-1.5 rounded-lg border border-[var(--color-border)] text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-violet-500/40 hover:text-violet-400 transition-colors"
+                    disabled={isProcessing}
+                    className="flex-1 py-1.5 rounded-lg border border-[var(--color-border)] text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-violet-500/40 hover:text-violet-400 transition-colors disabled:opacity-50"
                   >
                     {pct === 1 ? 'MAX' : `${pct * 100}%`}
                   </button>
@@ -335,7 +367,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-lg shadow-rose-500/20'
                 }`}
               >
-                {txStatus === 'signing' ? (
+                {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 size={16} className="animate-spin" />
                     {t('staking.signing')}
@@ -348,7 +380,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
               </button>
 
               {/* Error */}
-              {txStatus === 'error' && txError && (
+              {txError && (
                 <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2.5 text-[11px] text-red-400">
                   {txError}
                 </div>

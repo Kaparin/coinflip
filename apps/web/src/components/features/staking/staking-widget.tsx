@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Coins, ArrowDown, ArrowUp, Gift, RefreshCw, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Loader2, Coins, ArrowDown, ArrowUp, Gift, RefreshCw, ExternalLink, Check } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { EXPLORER_URL } from '@/lib/constants';
 import {
@@ -18,7 +18,6 @@ import {
 import { useTranslation } from '@/lib/i18n';
 
 type TabMode = 'stake' | 'unstake';
-type TxStatus = 'idle' | 'signing' | 'success' | 'error';
 
 export function StakingWidget() {
   const { t } = useTranslation();
@@ -28,8 +27,9 @@ export function StakingWidget() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
-  const [txStatus, setTxStatus] = useState<TxStatus>('idle');
-  const [txMessage, setTxMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lastTx, setLastTx] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const lastTxTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = useCallback(async () => {
     try {
@@ -52,6 +52,11 @@ export function StakingWidget() {
     return () => clearInterval(interval);
   }, [refresh]);
 
+  // Cleanup timer on unmount
+  useEffect(() => () => {
+    if (lastTxTimerRef.current) clearTimeout(lastTxTimerRef.current);
+  }, []);
+
   if (!isConnected) return null;
 
   if (isLoading) {
@@ -66,65 +71,103 @@ export function StakingWidget() {
 
   if (!stats) return null;
 
+  /** Apply optimistic state update to avoid stale UI */
+  const applyOptimistic = (type: 'stake' | 'unstake' | 'claim', amt?: number) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      if (type === 'claim') {
+        return { ...prev, pendingRewards: 0 };
+      }
+      if (type === 'stake' && amt) {
+        return {
+          ...prev,
+          launchBalance: Math.max(0, prev.launchBalance - amt),
+          staked: prev.staked + amt,
+        };
+      }
+      if (type === 'unstake' && amt) {
+        return {
+          ...prev,
+          staked: Math.max(0, prev.staked - amt),
+          launchBalance: prev.launchBalance + amt,
+        };
+      }
+      return prev;
+    });
+  };
+
+  const showTxResult = (type: 'success' | 'error', message: string) => {
+    setLastTx({ type, message });
+    // Auto-clear success messages after 6s
+    if (lastTxTimerRef.current) clearTimeout(lastTxTimerRef.current);
+    if (type === 'success') {
+      lastTxTimerRef.current = setTimeout(() => setLastTx(null), 6_000);
+    }
+  };
+
   const handleStake = async () => {
     const wallet = getWallet();
-    if (!wallet || !address || !amount) return;
+    if (!wallet || !address || !amount || isProcessing) return;
     const num = parseFloat(amount);
     if (num <= 0 || (user && num > user.launchBalance)) return;
 
-    setTxStatus('signing');
-    setTxMessage('');
+    setIsProcessing(true);
+    setLastTx(null);
     try {
       const result = await signStake(wallet, address, num);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
+      applyOptimistic('stake', num);
       setAmount('');
-      setTimeout(refresh, 3000);
+      showTxResult('success', `TX: ${result.txHash.slice(0, 16)}...`);
+      setTimeout(refresh, 5_000);
     } catch (err) {
-      setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      showTxResult('error', err instanceof Error ? err.message : 'Transaction failed');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleUnstake = async () => {
     const wallet = getWallet();
-    if (!wallet || !address || !amount) return;
+    if (!wallet || !address || !amount || isProcessing) return;
     const num = parseFloat(amount);
     if (num <= 0 || (user && num > user.staked)) return;
 
-    setTxStatus('signing');
-    setTxMessage('');
+    setIsProcessing(true);
+    setLastTx(null);
     try {
       const result = await signUnstake(wallet, address, num);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
+      applyOptimistic('unstake', num);
       setAmount('');
-      setTimeout(refresh, 3000);
+      showTxResult('success', `TX: ${result.txHash.slice(0, 16)}...`);
+      setTimeout(refresh, 5_000);
     } catch (err) {
-      setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      showTxResult('error', err instanceof Error ? err.message : 'Transaction failed');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleClaim = async () => {
     const wallet = getWallet();
-    if (!wallet || !address) return;
+    if (!wallet || !address || isProcessing) return;
+    if (!user || user.pendingRewards <= 0) return;
 
-    setTxStatus('signing');
-    setTxMessage('');
+    setIsProcessing(true);
+    setLastTx(null);
     try {
       const result = await signClaim(wallet, address);
-      setTxStatus('success');
-      setTxMessage(`TX: ${result.txHash.slice(0, 16)}...`);
-      setTimeout(refresh, 3000);
+      applyOptimistic('claim');
+      showTxResult('success', `TX: ${result.txHash.slice(0, 16)}...`);
+      setTimeout(refresh, 5_000);
     } catch (err) {
-      setTxStatus('error');
-      setTxMessage(err instanceof Error ? err.message : 'Transaction failed');
+      showTxResult('error', err instanceof Error ? err.message : 'Transaction failed');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleMax = () => {
-    if (!user) return;
+    if (!user || isProcessing) return;
     setAmount(
       activeTab === 'stake'
         ? user.launchBalance.toString()
@@ -133,7 +176,8 @@ export function StakingWidget() {
   };
 
   const maxAmount = activeTab === 'stake' ? user?.launchBalance ?? 0 : user?.staked ?? 0;
-  const canSubmit = amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount && txStatus !== 'signing';
+  const canSubmit = !isProcessing && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
+  const canClaim = !isProcessing && !!user && user.pendingRewards > 0;
 
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
@@ -151,7 +195,8 @@ export function StakingWidget() {
         <button
           type="button"
           onClick={() => { setIsLoading(true); refresh(); }}
-          className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30 transition-colors"
+          disabled={isProcessing}
+          className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30 transition-colors disabled:opacity-50"
           title={t('common.refresh')}
         >
           <RefreshCw size={14} />
@@ -181,10 +226,14 @@ export function StakingWidget() {
               <button
                 type="button"
                 onClick={handleClaim}
-                disabled={txStatus === 'signing'}
-                className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+                disabled={!canClaim}
+                className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Gift size={12} />
+                {isProcessing ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Gift size={12} />
+                )}
                 {t('staking.claim')} {formatNumber(user.pendingRewards, 4)} AXM
               </button>
             )}
@@ -214,7 +263,7 @@ export function StakingWidget() {
         <div className="flex">
           <button
             type="button"
-            onClick={() => { setActiveTab('stake'); setAmount(''); setTxStatus('idle'); setTxMessage(''); }}
+            onClick={() => { setActiveTab('stake'); setAmount(''); setLastTx(null); }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
               activeTab === 'stake'
                 ? 'text-violet-400 border-violet-400 bg-violet-500/5'
@@ -226,7 +275,7 @@ export function StakingWidget() {
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('unstake'); setAmount(''); setTxStatus('idle'); setTxMessage(''); }}
+            onClick={() => { setActiveTab('unstake'); setAmount(''); setLastTx(null); }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
               activeTab === 'unstake'
                 ? 'text-rose-400 border-rose-400 bg-rose-500/5'
@@ -258,12 +307,14 @@ export function StakingWidget() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
-              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-16 text-lg placeholder-[var(--color-text-secondary)]/30 focus:border-violet-500/50 focus:outline-none transition-colors"
+              disabled={isProcessing}
+              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 pr-16 text-lg placeholder-[var(--color-text-secondary)]/30 focus:border-violet-500/50 focus:outline-none transition-colors disabled:opacity-50"
             />
             <button
               type="button"
               onClick={handleMax}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-violet-500/15 px-2 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors"
+              disabled={isProcessing}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-violet-500/15 px-2 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors disabled:opacity-50"
             >
               MAX
             </button>
@@ -280,7 +331,7 @@ export function StakingWidget() {
                 : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white'
             }`}
           >
-            {txStatus === 'signing' ? (
+            {isProcessing ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 size={16} className="animate-spin" />
                 {t('staking.signing')}
@@ -293,14 +344,15 @@ export function StakingWidget() {
           </button>
 
           {/* TX Result */}
-          {txStatus === 'success' && txMessage && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-400">
-              {txMessage}
+          {lastTx?.type === 'success' && (
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-400">
+              <Check size={12} className="shrink-0" />
+              {lastTx.message}
             </div>
           )}
-          {txStatus === 'error' && txMessage && (
+          {lastTx?.type === 'error' && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-400">
-              {txMessage}
+              {lastTx.message}
             </div>
           )}
         </div>
