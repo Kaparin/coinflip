@@ -830,23 +830,19 @@ class EventsService {
 
     const isSponsored = !!event.userId;
 
+    // All event prizes are always in native AXM (sent on-chain from relayer wallet).
+    // For sponsored raffles, also forfeit the sponsor's locked AXM in vault accounting.
     if (isSponsored) {
-      // Sponsored raffle: credit COIN to winner's vault balance (virtual)
-      await vaultService.creditWinner(winner.userId, winner.prizeAmount);
-      await this.markPrizeDistributed(eventId, userId, `coin_credit_${eventId}_${userId}`);
-      logger.info(
-        { eventId, userId, amount: winner.prizeAmount },
-        'Sponsored prize credited as COIN to winner vault balance',
-      );
-    } else {
-      // Admin event: send native AXM from treasury wallet
-      const result = await treasuryService.sendPrize(winner.address, winner.prizeAmount);
-      await this.markPrizeDistributed(eventId, userId, result.txHash);
-      logger.info(
-        { eventId, userId, address: winner.address, amount: winner.prizeAmount, txHash: result.txHash },
-        'Prize distributed via native AXM transfer',
-      );
+      // Forfeit sponsor's locked AXM (consumed — sent to winner)
+      await vaultService.forfeitLocked(event.userId!, winner.prizeAmount);
     }
+
+    const result = await treasuryService.sendPrize(winner.address, winner.prizeAmount);
+    await this.markPrizeDistributed(eventId, userId, result.txHash);
+    logger.info(
+      { eventId, userId, address: winner.address, amount: winner.prizeAmount, txHash: result.txHash, isSponsored },
+      'Prize distributed via native AXM transfer',
+    );
   }
 
   async distributeAllPrizes(eventId: string): Promise<{ distributed: number; failed: number }> {
@@ -884,10 +880,15 @@ class EventsService {
       .delete(eventParticipants)
       .where(eq(eventParticipants.eventId, eventId));
 
-    // Refund sponsored raffle creator (service fee + prize pool)
-    if (event.userId && event.pricePaid) {
-      await vaultService.creditCoin(event.userId, event.pricePaid);
-      logger.info({ eventId, userId: event.userId, refund: event.pricePaid }, 'Sponsored raffle refunded on cancel');
+    // Refund sponsored raffle creator: COIN service fee + unlock AXM prize pool
+    if (event.userId) {
+      if (event.pricePaid) {
+        await vaultService.creditCoin(event.userId, event.pricePaid);
+      }
+      if (event.totalPrizePool) {
+        await vaultService.unlockFunds(event.userId, event.totalPrizePool);
+      }
+      logger.info({ eventId, userId: event.userId, feeRefund: event.pricePaid, prizeRefund: event.totalPrizePool }, 'Sponsored raffle refunded on cancel (COIN fee + AXM prize)');
     }
 
     const [deleted] = await db

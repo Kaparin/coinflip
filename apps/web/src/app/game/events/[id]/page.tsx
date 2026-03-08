@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ArrowLeft, Trophy, Target, Users, Clock, CheckCircle, Calendar, User, Lock, XCircle, Pencil, Loader2, BarChart3, Info, Megaphone } from 'lucide-react';
 import { useGetEventById, useGetEventResults } from '@coinflip/api-client';
 import { formatLaunch } from '@coinflip/shared/constants';
-import { AxmTokenIcon, LaunchTokenIcon } from '@/components/ui';
+import { AxmTokenIcon } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EventTimer } from '@/components/features/events/event-timer';
 import { PrizeDisplay } from '@/components/features/events/prize-display';
@@ -250,7 +250,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="flex items-center gap-1.5">
                 <Trophy size={12} className={theme.iconColor} />
                 <span className="font-bold text-[var(--color-success)]">{formatLaunch(event.totalPrizePool)}</span>
-                {isSponsored ? <LaunchTokenIcon size={16} /> : <AxmTokenIcon size={16} />}
+                <AxmTokenIcon size={16} />
               </div>
               <div className="flex items-center gap-1">
                 <Users size={12} />
@@ -518,7 +518,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           eventType={event.type}
           raffleSeed={hasResults ? raffleSeed : null}
           raffleSeedLabel={t('events.raffleSeed')}
-          isSponsored={isSponsored}
         />
       </section>
 

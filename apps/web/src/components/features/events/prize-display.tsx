@@ -29,8 +29,6 @@ interface PrizeDisplayProps {
   eventType?: string;
   raffleSeed?: string | null;
   raffleSeedLabel?: string;
-  /** If true, prizes are in COIN (sponsored raffle). Otherwise AXM (admin event). */
-  isSponsored?: boolean;
 }
 
 function shortAddr(addr: string): string {
@@ -79,7 +77,8 @@ const PODIUM = [
   },
 ] as const;
 
-export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedLabel, isSponsored }: PrizeDisplayProps) {
+export function PrizeDisplay({ prizes, winners, compact, raffleSeed, raffleSeedLabel }: PrizeDisplayProps) {
+  // All event prizes are always in native AXM (COIN is only used for sponsored raffle commission)
   const TokenIcon = AxmTokenIcon;
 
   if (compact) {
