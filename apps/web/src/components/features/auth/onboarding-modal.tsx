@@ -82,14 +82,15 @@ export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalP
       setAuthStep('confirming');
 
       // Poll grant status until chain confirms the grant (typically 1-2 blocks, ~6-10s)
-      const maxPollMs = 30_000;
-      const pollInterval = 2_000;
+      // ?fresh=true bypasses backend cache so we get real-time chain state
+      const maxPollMs = 60_000;
+      const pollInterval = 3_000;
       const pollStart = Date.now();
       let confirmed = false;
       while (Date.now() - pollStart < maxPollMs) {
         await new Promise((r) => setTimeout(r, pollInterval));
         try {
-          const grantRes = await fetch(`${API_URL}/api/v1/auth/grants`, {
+          const grantRes = await fetch(`${API_URL}/api/v1/auth/grants?fresh=true`, {
             headers: { 'x-wallet-address': address, ...getAuthHeaders() },
             credentials: 'include',
           });
@@ -104,8 +105,11 @@ export function OnboardingModal({ isOpen, onClose, onSuccess }: OnboardingModalP
       }
 
       if (!confirmed) {
-        // Tx was broadcast but grant not yet visible — still mark as done,
-        // it will appear on next page load
+        // Tx was broadcast but grant not visible after 60s — rare edge case.
+        // Show error so user retries instead of silently pretending it worked.
+        setError(t('onboarding.confirmTimeout'));
+        setStep('explain');
+        return;
       }
 
       setStep('done');

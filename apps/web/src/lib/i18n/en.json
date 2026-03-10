@@ -471,7 +471,8 @@
     "authEstimate": "This usually takes 10 seconds to 1 minute, please be patient",
     "allSet": "Account Activated!",
     "allSetDesc": "You can now place and accept bets. All game actions are instant.",
-    "startPlaying": "Start Playing"
+    "startPlaying": "Start Playing",
+    "confirmTimeout": "Transaction was sent but confirmation took too long. Please try again — no re-signing needed."
   },
   "statusChips": {
     "oneClick": "1-Click",

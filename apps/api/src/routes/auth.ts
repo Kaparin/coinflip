@@ -9,7 +9,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { env, getActiveContractAddr } from '../config/env.js';
-import { chainCached } from '../lib/chain-cache.js';
+import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
 import {
   generateChallenge,
   consumeChallenge,
@@ -302,10 +302,13 @@ authRouter.get('/grants', authMiddleware, async (c) => {
   // Query chain for authz grants: granter=user, grantee=relayer
   // IMPORTANT: Must verify the grant covers the ACTIVE contract, not just any contract.
   // After switching from CW20→AXM mode, old grants point to the wrong contract.
+  const fresh = c.req.query('fresh') === 'true';
   try {
     const activeContract = getActiveContractAddr();
+    const cacheKey = 'grants:' + address + ':' + activeContract;
+    if (fresh) invalidateChainCache(cacheKey);
     const authzResult = await chainCached(
-      'grants:' + address + ':' + activeContract,
+      cacheKey,
       async () => {
         const grantsRes = await chainRest(`/cosmos/authz/v1beta1/grants?granter=${address}&grantee=${env.RELAYER_ADDRESS}&msg_type_url=/cosmwasm.wasm.v1.MsgExecuteContract`);
         if (!grantsRes.ok) return { authzGranted: false, authzExpiresAt: null };
@@ -335,7 +338,7 @@ authRouter.get('/grants', authMiddleware, async (c) => {
           authzExpiresAt: expiresAt,
         };
       },
-      300_000,
+      30_000,
     );
     authzGranted = authzResult.authzGranted;
     authzExpiresAt = authzResult.authzExpiresAt;
