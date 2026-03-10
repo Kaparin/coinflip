@@ -134,8 +134,9 @@ export class TreasuryService {
   }
 
   /**
-   * Withdraw LAUNCH tokens from the contract vault to the treasury wallet.
-   * Since RELAYER_ADDRESS == TREASURY_ADDRESS, the relayer wallet signs directly.
+   * Withdraw tokens from the contract vault to the relayer/treasury wallet.
+   * TREASURY_ADDRESS == RELAYER_ADDRESS, so we use direct MsgExecuteContract
+   * (no authz wrapper needed — relayer signs as itself).
    */
   async withdrawFromVault(amount: string): Promise<{ txHash: string; amount: string }> {
     // Verify there's enough in the treasury vault
@@ -148,8 +149,13 @@ export class TreasuryService {
       throw Errors.relayerNotReady();
     }
 
-    // Use the relayer to withdraw (relayer IS treasury)
-    const result = await relayerService.relayWithdraw(env.TREASURY_ADDRESS, amount);
+    // Direct contract call — relayer IS treasury, so sender == treasury in contract
+    const result = await relayerService.relayContractExecute(
+      getActiveContractAddr(),
+      { withdraw: { amount } },
+      [],
+      'Treasury vault withdrawal',
+    );
 
     if (!result.success) {
       logger.error({ result, amount }, 'Treasury withdraw failed');

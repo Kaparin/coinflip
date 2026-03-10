@@ -867,6 +867,8 @@ export interface AdminPartner {
   bps: number;
   isActive: number;
   totalEarned: string;
+  unpaidAmount: string;
+  paidAmount: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -924,6 +926,30 @@ export function useAdminDeletePartner() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'commission'] });
+    },
+  });
+}
+
+export interface PartnerPayoutResult {
+  partnerId: string;
+  name: string;
+  address: string;
+  amount: string;
+  txHash?: string;
+  error?: string;
+}
+
+export function useAdminPartnerPayout() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      adminFetch<{ status: string; results: PartnerPayoutResult[] }>('/api/v1/admin/partners/payout', address!, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'economy'] });
     },
   });
 }

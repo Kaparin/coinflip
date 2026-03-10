@@ -10,7 +10,7 @@ import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
 import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, jackpotContributions, eventParticipants, events as eventsTable, stakingLedger } from '@coinflip/db/schema';
-import { env, getActiveContractAddr } from '../config/env.js';
+import { env, getActiveContractAddr, gameDenom } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
 import { getCoinFlipStats } from './bets.js';
@@ -1385,6 +1385,49 @@ adminRouter.get('/partners/:id/stats', async (c) => {
   const id = c.req.param('id');
   const stats = await partnerService.getPartnerStats(id);
   return c.json({ data: stats });
+});
+
+// POST /admin/partners/payout — pay all partners their accrued earnings via native AXM
+adminRouter.post('/partners/payout', async (c) => {
+  const unpaid = await partnerService.getUnpaidEarnings();
+  if (unpaid.length === 0) {
+    return c.json({ data: { status: 'nothing_to_pay', results: [] } });
+  }
+
+  const results: Array<{
+    partnerId: string;
+    name: string;
+    address: string;
+    amount: string;
+    txHash?: string;
+    error?: string;
+  }> = [];
+
+  for (const p of unpaid) {
+    try {
+      const result = await treasuryService.sendPrize(p.address, p.unpaid);
+      await partnerService.markAsPaid(p.partnerId, result.txHash);
+
+      // Record in treasury ledger
+      try {
+        await getDb().insert(treasuryLedgerTable).values({
+          txhash: result.txHash,
+          amount: p.unpaid,
+          denom: gameDenom(),
+          source: 'partner_payout',
+        });
+      } catch { /* non-critical */ }
+
+      results.push({ partnerId: p.partnerId, name: p.name, address: p.address, amount: p.unpaid, txHash: result.txHash });
+      logger.info({ partnerId: p.partnerId, name: p.name, amount: p.unpaid, txHash: result.txHash }, 'admin: partner payout sent');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      results.push({ partnerId: p.partnerId, name: p.name, address: p.address, amount: p.unpaid, error: msg });
+      logger.error({ err, partnerId: p.partnerId, name: p.name, amount: p.unpaid }, 'admin: partner payout failed');
+    }
+  }
+
+  return c.json({ data: { status: 'completed', results } });
 });
 
 // ═══════════════════════════════════════════

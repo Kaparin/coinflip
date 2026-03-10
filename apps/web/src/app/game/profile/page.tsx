@@ -655,9 +655,9 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
       >
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-3">
-            <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.treasuryVault')}</p>
+            <p className="text-[10px] text-[var(--color-text-secondary)] mb-0.5">{t('referral.treasuryWallet')}</p>
             <p className="text-lg font-extrabold text-[var(--color-primary)]">
-              {platformStats ? formatLaunch(BigInt(platformStats.treasuryVaultAvailable)) : '—'}
+              {platformStats ? formatLaunch(BigInt(platformStats.walletBalance)) : '—'}
             </p>
             <p className="text-[9px] text-[var(--color-text-secondary)]">{GAME_TOKEN}</p>
           </div>

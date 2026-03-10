@@ -23,15 +23,22 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string | un
 
 /** In AXM mode, replace "COIN" token references with "AXM" in translated strings */
 const _axmMode = isAxmMode();
-/** These keys reference COIN as a specific token, not the game currency — never rename */
+/** These keys reference COIN as a specific token (virtual currency), not the game currency — never rename */
 const COIN_LITERAL_KEYS = new Set([
   'shop.sectionCoin', 'shop.sectionCoinDesc', 'shop.subtitle',
   'social.sendCoin', 'social.transferTitle', 'social.sourceCoin',
   'social.transferSuccess', 'social.transferSuccessDesc', 'social.transferReceived',
-  'social.transferReceivedWithMsg',
+  'social.transferReceivedWithMsg', 'social.insufficientBalance',
+  'vip.confirm.deductionWarning',
+  'pin.outbidPrice', 'pin.minPrice',
+  'sponsoredRaffle.cancelConfirm',
+  'rules.faq.branchChangeBody',
 ]);
 /** Key prefixes where COIN always means the COIN token, not game currency */
-const COIN_LITERAL_PREFIXES = ['shop.', 'social.send', 'social.transfer', 'social.source'];
+const COIN_LITERAL_PREFIXES = [
+  'shop.', 'social.send', 'social.transfer', 'social.source',
+  'referral.changeBranch',
+];
 
 function postProcess(str: string, key?: string): string {
   if (!_axmMode) return str;

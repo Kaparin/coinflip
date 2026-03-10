@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PieChart, Plus, Trash2, Loader2, TrendingUp, TrendingDown, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { PieChart, Plus, Trash2, Loader2, TrendingUp, TrendingDown, Send, CheckCircle, AlertCircle, Wallet, Banknote } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import {
   useAdminCommissionBreakdown,
@@ -14,7 +14,10 @@ import {
   useAdminEconomyOverview,
   useAdminStakingStats,
   useAdminStakingFlush,
+  useAdminWithdraw,
+  useAdminPartnerPayout,
   type AdminPartner,
+  type PartnerPayoutResult,
 } from '@/hooks/use-admin';
 import { StatCard, TableWrapper, ActionButton, shortAddr } from '../_shared';
 
@@ -27,10 +30,16 @@ export function CommissionTab() {
 
   const { data: stakingStats } = useAdminStakingStats();
   const flush = useAdminStakingFlush();
+  const withdraw = useAdminWithdraw();
+  const partnerPayout = useAdminPartnerPayout();
   const [showAddForm, setShowAddForm] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [flushResult, setFlushResult] = useState<{ txHash: string; amount: string } | null>(null);
   const [flushError, setFlushError] = useState<string | null>(null);
+  const [withdrawResult, setWithdrawResult] = useState<{ txHash: string; amount: string } | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [payoutResults, setPayoutResults] = useState<PartnerPayoutResult[] | null>(null);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
 
   // Editable referral BPS
   const [editingReferral, setEditingReferral] = useState(false);
@@ -181,7 +190,35 @@ export function CommissionTab() {
                       <p className={`text-xl font-bold ${team >= 0n ? 'text-amber-400' : 'text-red-400'}`}>
                         {formatLaunch(team.toString())} AXM
                       </p>
-                      <p className="text-[10px] text-[var(--color-text-secondary)]">{pct(team).toFixed(1)}% от комиссии</p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-2">{pct(team).toFixed(1)}% от комиссии</p>
+                      {team > 0n && (
+                        <ActionButton
+                          onClick={async () => {
+                            setWithdrawError(null);
+                            setWithdrawResult(null);
+                            try {
+                              const result = await withdraw.mutateAsync(team.toString());
+                              setWithdrawResult(result);
+                            } catch (err) {
+                              setWithdrawError(err instanceof Error ? err.message : 'Withdraw failed');
+                            }
+                          }}
+                          disabled={withdraw.isPending}
+                          variant="success"
+                        >
+                          {withdraw.isPending ? (
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 size={12} className="animate-spin" />
+                              Вывод...
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5">
+                              <Wallet size={12} />
+                              Вывести на кошелёк
+                            </span>
+                          )}
+                        </ActionButton>
+                      )}
                     </div>
                     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
                       <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Treasury swept</p>
@@ -198,6 +235,23 @@ export function CommissionTab() {
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {/* Withdraw result/error */}
+      {withdrawResult && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+          <CheckCircle size={16} className="text-green-400 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <p className="text-green-400 font-medium">Выведено {formatLaunch(withdrawResult.amount)} AXM на кошелёк казны</p>
+            <p className="text-[var(--color-text-secondary)] font-mono mt-1">TX: {withdrawResult.txHash}</p>
+          </div>
+        </div>
+      )}
+      {withdrawError && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+          <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-red-400">{withdrawError}</p>
         </div>
       )}
 
@@ -429,13 +483,79 @@ export function CommissionTab() {
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">Партнёрская казна</h3>
-          <ActionButton onClick={() => setShowAddForm(!showAddForm)}>
-            <span className="flex items-center gap-1">
-              <Plus size={12} />
-              Добавить
-            </span>
-          </ActionButton>
+          <div className="flex gap-2">
+            {partners && partners.some(p => BigInt(p.unpaidAmount) > 0n) && (
+              <ActionButton
+                onClick={async () => {
+                  setPayoutError(null);
+                  setPayoutResults(null);
+                  try {
+                    const result = await partnerPayout.mutateAsync();
+                    setPayoutResults(result.results);
+                  } catch (err) {
+                    setPayoutError(err instanceof Error ? err.message : 'Payout failed');
+                  }
+                }}
+                disabled={partnerPayout.isPending}
+                variant="success"
+              >
+                {partnerPayout.isPending ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" />
+                    Выплата...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Banknote size={12} />
+                    Начислить зарплату
+                  </span>
+                )}
+              </ActionButton>
+            )}
+            <ActionButton onClick={() => setShowAddForm(!showAddForm)}>
+              <span className="flex items-center gap-1">
+                <Plus size={12} />
+                Добавить
+              </span>
+            </ActionButton>
+          </div>
         </div>
+
+        {/* Payout results */}
+        {payoutResults && payoutResults.length > 0 && (
+          <div className="space-y-2">
+            {payoutResults.map((r) => (
+              <div
+                key={r.partnerId}
+                className={`flex items-start gap-2 p-3 rounded-lg border ${
+                  r.txHash
+                    ? 'bg-green-500/10 border-green-500/20'
+                    : 'bg-red-500/10 border-red-500/20'
+                }`}
+              >
+                {r.txHash ? (
+                  <CheckCircle size={14} className="text-green-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                )}
+                <div className="text-xs min-w-0">
+                  <p className={r.txHash ? 'text-green-400' : 'text-red-400'}>
+                    <span className="font-medium">{r.name}</span> — {formatLaunch(r.amount)} AXM
+                    {r.txHash && <span className="text-[var(--color-text-secondary)]"> → {shortAddr(r.address)}</span>}
+                  </p>
+                  {r.txHash && <p className="text-[var(--color-text-secondary)] font-mono truncate">TX: {r.txHash}</p>}
+                  {r.error && <p className="text-red-400">{r.error}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {payoutError && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-400">{payoutError}</p>
+          </div>
+        )}
 
         {showAddForm && (
           <AddPartnerForm
@@ -453,7 +573,8 @@ export function CommissionTab() {
                   <th className="px-3 py-2 text-left font-medium text-[var(--color-text-secondary)]">Адрес</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">BPS</th>
                   <th className="px-3 py-2 text-center font-medium text-[var(--color-text-secondary)]">Статус</th>
-                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Заработано (AXM)</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Невыплачено</th>
+                  <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Всего (AXM)</th>
                   <th className="px-3 py-2 text-right font-medium text-[var(--color-text-secondary)]">Действия</th>
                 </tr>
               </thead>
@@ -575,6 +696,13 @@ function PartnerRow({ partner, onResult }: { partner: AdminPartner; onResult: (m
         }`}>
           {partner.isActive === 1 ? 'Активен' : 'Неактивен'}
         </span>
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {BigInt(partner.unpaidAmount) > 0n ? (
+          <span className="text-amber-400 font-bold">{formatLaunch(partner.unpaidAmount)}</span>
+        ) : (
+          <span className="text-[var(--color-text-secondary)]">0</span>
+        )}
       </td>
       <td className="px-3 py-2 text-right tabular-nums">{formatLaunch(partner.totalEarned)}</td>
       <td className="px-3 py-2 text-right">

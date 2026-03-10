@@ -32,6 +32,7 @@ referralRouter.get('/platform-stats', async (c) => {
       data: {
         treasuryVaultAvailable: balance.vaultAvailable,
         treasuryVaultLocked: balance.vaultLocked,
+        walletBalance: balance.walletBalance,
         totalReferralPaid,
       },
     });
@@ -41,6 +42,7 @@ referralRouter.get('/platform-stats', async (c) => {
       data: {
         treasuryVaultAvailable: '0',
         treasuryVaultLocked: '0',
+        walletBalance: '0',
         totalReferralPaid: '0',
       },
     }, 503);
@@ -308,8 +310,13 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
     logger.warn({ err, treasuryAddr }, 'Referral claim: failed to pre-check treasury balance — proceeding anyway');
   }
 
-  // Step 2b: Treasury withdraws tokens from coinflip contract vault
-  const withdrawResult = await relayerService.relayWithdraw(treasuryAddr, amount);
+  // Step 2b: Withdraw tokens from contract vault (relayer IS treasury — direct call, no authz)
+  const withdrawResult = await relayerService.relayContractExecute(
+    getActiveContractAddr(),
+    { withdraw: { amount } },
+    [],
+    'Referral claim: treasury withdraw',
+  );
   if (!withdrawResult.success) {
     // Withdraw failed — rollback DB claim
     await referralService.rollbackClaim(userId, amount);
@@ -354,15 +361,14 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
       'Referral claim: CW20 transfer to user FAILED — attempting to re-deposit to vault',
     );
 
-    // Best-effort: re-deposit tokens back to treasury vault via CW20 Send
+    // Best-effort: re-deposit tokens back to treasury vault (relayer IS treasury — direct call)
     try {
       const reDepositResult = isAxmMode()
-        ? await relayerService.submitExecOnContract(
-            treasuryAddr,
+        ? await relayerService.relayContractExecute(
             getActiveContractAddr(),
             { deposit: {} },
-            'CoinFlip referral claim refund',
             [{ denom: env.AXM_DENOM, amount }],
+            'CoinFlip referral claim refund',
           )
         : await relayerService.submitExecOnContract(
             treasuryAddr,

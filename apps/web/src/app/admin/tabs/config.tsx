@@ -26,6 +26,13 @@ const MICRO_LAUNCH_KEYS = new Set([
   'MINIMUM_CLAIM_AMOUNT_MICRO',
 ]);
 
+/** Micro-LAUNCH keys that represent COIN (virtual) operations, not game currency (AXM) */
+const MICRO_COIN_KEYS = new Set([
+  'PIN_MIN_PRICE',
+  'SPONSORED_PRICE',
+  'CHANGE_BRANCH_COST_MICRO',
+]);
+
 /** Convert micro string to human-readable LAUNCH number string */
 function microToHuman(micro: string): string {
   const n = Number(micro);
@@ -66,7 +73,7 @@ const KEY_LABELS: Record<string, string> = {
   BIG_WIN_THRESHOLD: `Порог большого выигрыша (${GAME_TOKEN})`,
   MAINTENANCE_MODE: 'Режим обслуживания',
   MAINTENANCE_MESSAGE: 'Сообщение обслуживания',
-  SPONSORED_PRICE: `Цена спонсорства (${GAME_TOKEN})`,
+  SPONSORED_PRICE: 'Цена спонсорства (COIN)',
   SPONSORED_IS_ACTIVE: 'Спонсорство активно',
   SPONSORED_MIN_DELAY_MIN: 'Мин. задержка (минуты)',
   SPONSORED_MAX_TITLE: 'Макс. длина заголовка',
@@ -76,7 +83,7 @@ const KEY_LABELS: Record<string, string> = {
   REFERRAL_BPS_LEVEL_2: 'Реферал L2 (BPS)',
   REFERRAL_BPS_LEVEL_3: 'Реферал L3 (BPS)',
   MAX_REFERRAL_BPS_PER_BET: 'Макс. кап рефералов (BPS)',
-  CHANGE_BRANCH_COST_MICRO: `Цена смены ветки (${GAME_TOKEN})`,
+  CHANGE_BRANCH_COST_MICRO: 'Цена смены ветки (COIN)',
   MINIMUM_CLAIM_AMOUNT_MICRO: `Мин. сумма клейма (${GAME_TOKEN})`,
   WASH_TRADE_PAIR_DAILY_LIMIT: 'Лимит пар/24ч (анти-абьюз)',
   JACKPOT_TOTAL_BPS: 'Джекпот (BPS)',
@@ -246,6 +253,7 @@ export function ConfigTab() {
                     onChange={(val) => setEdits((prev) => ({ ...prev, [cfg.key]: val }))}
                     isDirty={edits[cfg.key] !== getOriginalDisplay(cfg.key, cfg.value)}
                     isMicroLaunch={MICRO_LAUNCH_KEYS.has(cfg.key)}
+                    tokenLabel={MICRO_COIN_KEYS.has(cfg.key) ? 'COIN' : GAME_TOKEN}
                   />
                 ))}
               </div>
@@ -262,12 +270,14 @@ function ConfigField({
   onChange,
   isDirty,
   isMicroLaunch,
+  tokenLabel,
 }: {
   config: ConfigEntry;
   value: string;
   onChange: (v: string) => void;
   isDirty: boolean;
   isMicroLaunch: boolean;
+  tokenLabel: string;
 }) {
   const label = KEY_LABELS[config.key] ?? config.key.replace(/_/g, ' ');
 
@@ -322,7 +332,7 @@ function ConfigField({
     <div>
       <label className="flex items-baseline gap-1 text-[10px] font-medium text-[var(--color-text-secondary)] mb-1 uppercase tracking-wider">
         <span className="truncate">{label}</span>
-        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">{GAME_TOKEN}</span>}
+        {isMicroLaunch && <span className="text-[var(--color-primary)] normal-case tracking-normal shrink-0">{tokenLabel}</span>}
       </label>
       <input
         type={config.valueType === 'number' || isMicroLaunch ? 'number' : 'text'}

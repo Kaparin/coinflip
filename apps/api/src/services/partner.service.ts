@@ -83,15 +83,23 @@ class PartnerService {
     // Attach total earned per partner
     const partnerIds = rows.map((r) => r.id);
     const earningsMap = new Map<string, string>();
+    const unpaidMap = new Map<string, string>();
+    const paidMap = new Map<string, string>();
 
     if (partnerIds.length > 0) {
       const earningsRows = await db.execute(sql`
-        SELECT partner_id, COALESCE(SUM(amount::numeric), 0)::text AS total
+        SELECT
+          partner_id,
+          COALESCE(SUM(amount::numeric), 0)::text AS total,
+          COALESCE(SUM(CASE WHEN status = 'accrued' THEN amount::numeric ELSE 0 END), 0)::text AS unpaid,
+          COALESCE(SUM(CASE WHEN status = 'paid' THEN amount::numeric ELSE 0 END), 0)::text AS paid
         FROM partner_ledger
         GROUP BY partner_id
-      `) as unknown as Array<{ partner_id: string; total: string }>;
+      `) as unknown as Array<{ partner_id: string; total: string; unpaid: string; paid: string }>;
       for (const e of earningsRows) {
         earningsMap.set(e.partner_id, e.total);
+        unpaidMap.set(e.partner_id, e.unpaid);
+        paidMap.set(e.partner_id, e.paid);
       }
     }
 
@@ -102,6 +110,8 @@ class PartnerService {
       bps: r.bps,
       isActive: r.isActive,
       totalEarned: earningsMap.get(r.id) ?? '0',
+      unpaidAmount: unpaidMap.get(r.id) ?? '0',
+      paidAmount: paidMap.get(r.id) ?? '0',
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }));
@@ -176,6 +186,49 @@ class PartnerService {
     `) as unknown as Array<{ total_earned: string; total_bets: number; week_earned: string; day_earned: string }>;
 
     return stats ?? { total_earned: '0', total_bets: 0, week_earned: '0', day_earned: '0' };
+  }
+
+  /**
+   * Get unpaid (accrued) earnings per active partner.
+   * Returns only partners with unpaid > 0.
+   */
+  async getUnpaidEarnings(): Promise<Array<{ partnerId: string; name: string; address: string; unpaid: string }>> {
+    const db = getDb();
+    const rows = await db.execute(sql`
+      SELECT
+        pc.id AS partner_id,
+        pc.name,
+        pc.address,
+        COALESCE(SUM(pl.amount::numeric), 0)::text AS unpaid
+      FROM partner_config pc
+      JOIN partner_ledger pl ON pl.partner_id = pc.id AND pl.status = 'accrued'
+      WHERE pc.is_active = 1
+      GROUP BY pc.id, pc.name, pc.address
+      HAVING SUM(pl.amount::numeric) > 0
+    `) as unknown as Array<{ partner_id: string; name: string; address: string; unpaid: string }>;
+
+    return rows.map(r => ({
+      partnerId: r.partner_id,
+      name: r.name,
+      address: r.address,
+      unpaid: r.unpaid,
+    }));
+  }
+
+  /**
+   * Mark all accrued ledger entries for a partner as 'paid'.
+   * Called after successful on-chain transfer.
+   */
+  async markAsPaid(partnerId: string, txHash: string): Promise<number> {
+    const db = getDb();
+    const result = await db.execute(sql`
+      UPDATE partner_ledger
+      SET status = 'paid'
+      WHERE partner_id = ${partnerId} AND status = 'accrued'
+    `);
+    const count = (result as any).rowCount ?? 0;
+    logger.info({ partnerId, txHash, entriesMarked: count }, 'Partner ledger entries marked as paid');
+    return count;
   }
 
   private invalidateCache() {

@@ -173,7 +173,7 @@ export async function checkHasReferrerByAddress(address: string): Promise<boolea
 }
 
 /**
- * Change referral branch (paid: 1000 LAUNCH).
+ * Change referral branch (paid in COIN).
  */
 export async function changeBranch(address: string): Promise<{ ok: boolean; reason?: string }> {
   const walletAddress = getWalletAddress();
@@ -324,6 +324,7 @@ export async function fetchReferralConfig(): Promise<ReferralConfig | null> {
 export interface PlatformStats {
   treasuryVaultAvailable: string;
   treasuryVaultLocked: string;
+  walletBalance: string;
   totalReferralPaid: string;
 }
 
