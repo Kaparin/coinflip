@@ -6,6 +6,7 @@ import { useTranslation } from '@/lib/i18n';
 import { Modal } from '@/components/ui/modal';
 import { Lock, ShieldCheck, Shield, CheckCircle, ChevronDown, UserPlus, Wallet, Plus } from 'lucide-react';
 import { getCapturedRefCode, registerByAddress, checkHasReferrerByAddress } from '@/hooks/use-referral';
+import { getCachedNickname } from '@/lib/wallet-nicknames';
 
 interface ConnectWalletModalProps {
   open: boolean;
@@ -277,14 +278,33 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
                     <Wallet size={18} className="text-[var(--color-primary)]" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-mono truncate">
-                      {`${addr.slice(0, 14)}...${addr.slice(-8)}`}
-                      {isCurrent && (
-                        <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
-                          ({t('auth.current')})
-                        </span>
-                      )}
-                    </p>
+                    {(() => {
+                      const nick = getCachedNickname(addr);
+                      return nick ? (
+                        <>
+                          <p className="text-sm font-bold truncate">
+                            {nick}
+                            {isCurrent && (
+                              <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
+                                ({t('auth.current')})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] font-mono text-[var(--color-text-secondary)] truncate">
+                            {`${addr.slice(0, 14)}...${addr.slice(-8)}`}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-mono truncate">
+                          {`${addr.slice(0, 14)}...${addr.slice(-8)}`}
+                          {isCurrent && (
+                            <span className="ml-1.5 text-[10px] text-[var(--color-success)] font-normal">
+                              ({t('auth.current')})
+                            </span>
+                          )}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </button>
                 );
@@ -545,7 +565,10 @@ function ConnectWalletContent({ onClose }: { onClose: () => void }) {
 
                 <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] p-4 text-center">
                   <p className="text-xs text-[var(--color-text-secondary)] mb-1">{t('auth.savedWallet')}</p>
-                  <p className="text-sm font-mono font-bold">
+                  {walletToUnlock && getCachedNickname(walletToUnlock) && (
+                    <p className="text-sm font-bold mb-0.5">{getCachedNickname(walletToUnlock)}</p>
+                  )}
+                  <p className={`font-mono ${walletToUnlock && getCachedNickname(walletToUnlock) ? 'text-[11px] text-[var(--color-text-secondary)]' : 'text-sm font-bold'}`}>
                     {walletToUnlock && typeof walletToUnlock === 'string' ? `${walletToUnlock.slice(0, 12)}...${walletToUnlock.slice(-6)}` : '...'}
                   </p>
                 </div>

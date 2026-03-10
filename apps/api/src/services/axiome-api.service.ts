@@ -75,11 +75,11 @@ async function axiomeFetch(endpoint: string): Promise<unknown | null> {
 // ─── Exchange rates ─────────────────────────────────────────────
 
 export interface AxiomeRates {
-  /** AXM price in USD (from axmUsdt field) */
+  /** AXM price in USD (e.g. 0.00486 = 1 AXM costs $0.00486) */
   axm_usd: number | null;
-  /** How many AXM per 1 RUB (rubAxm) */
+  /** AXM price in RUB (e.g. 0.384 = 1 AXM costs 0.384₽) */
   axm_rub: number | null;
-  /** How many AXM per 1 EUR (eurAxm) */
+  /** AXM price in EUR (e.g. 0.00417 = 1 AXM costs €0.00417) */
   axm_eur: number | null;
   /** All raw rates from the indexer */
   raw: Record<string, number>;
@@ -125,18 +125,21 @@ export async function getAxiomeRates(): Promise<AxiomeRates> {
 
     const r = data.rates;
 
-    // axmUsdt = AXM price in USDT ≈ USD
-    // usdAxm = how many AXM per 1 USD (inverse of price)
-    // To get AXM price in USD: either use axmUsdt directly, or 1/usdAxm
-    const axmUsd = typeof r.axmUsdt === 'number'
-      ? r.axmUsdt
-      : (typeof r.usdAxm === 'number' && r.usdAxm > 0 ? 1 / r.usdAxm : null);
+    // Naming convention: `XY` = price of 1 Y in X.
+    // usdAxm = 0.00486 → 1 AXM costs $0.00486 (price of AXM in USD)
+    // rubAxm = 0.384   → 1 AXM costs 0.384 RUB
+    // eurAxm = 0.00417 → 1 AXM costs 0.00417 EUR
+    // axmUsdt = 0.00486 → 1 AXM costs 0.00486 USDT (same as usdAxm)
 
-    // For RUB: rubAxm = how many AXM per 1 RUB → AXM price in RUB = 1/rubAxm
-    const axmRub = typeof r.rubAxm === 'number' && r.rubAxm > 0 ? 1 / r.rubAxm : null;
+    // AXM price in USD: prefer usdAxm (direct), fallback to axmUsdt
+    const axmUsd = typeof r.usdAxm === 'number' ? r.usdAxm
+      : (typeof r.axmUsdt === 'number' ? r.axmUsdt : null);
 
-    // For EUR: eurAxm = how many AXM per 1 EUR → AXM price in EUR = 1/eurAxm
-    const axmEur = typeof r.eurAxm === 'number' && r.eurAxm > 0 ? 1 / r.eurAxm : null;
+    // AXM price in RUB: rubAxm is already the price of 1 AXM in RUB
+    const axmRub = typeof r.rubAxm === 'number' ? r.rubAxm : null;
+
+    // AXM price in EUR: eurAxm is already the price of 1 AXM in EUR
+    const axmEur = typeof r.eurAxm === 'number' ? r.eurAxm : null;
 
     const rates: AxiomeRates = {
       axm_usd: axmUsd,

@@ -23,6 +23,7 @@ import { haptics } from '@/lib/haptics';
 import { API_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useToast } from '@/components/ui/toast';
+import { getCachedNickname, setCachedNickname } from '@/lib/wallet-nicknames';
 
 export function Header() {
   const { t, locale, setLocale } = useTranslation();
@@ -47,6 +48,14 @@ export function Header() {
   const { data: vipCustom } = useVipCustomization(!!isDiamond);
   const { data: currentUserData } = useGetCurrentUser({ query: { enabled: wallet.isConnected, staleTime: 30_000 } });
   const userNickname = (currentUserData as any)?.data?.nickname as string | null;
+
+  // Persist nickname to local cache so it's available in wallet lists
+  useEffect(() => {
+    if (wallet.address && userNickname) {
+      setCachedNickname(wallet.address, userNickname);
+    }
+  }, [wallet.address, userNickname]);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [vipModalOpen, setVipModalOpen] = useState(false);
@@ -405,6 +414,7 @@ export function Header() {
                           {wallet.savedWallets.map((w) => {
                             const addr = typeof w.address === 'string' ? w.address : '';
                             const isCurrent = wallet.address === addr;
+                            const cachedNick = isCurrent ? userNickname : getCachedNickname(addr);
                             return (
                               <button
                                 key={addr || w.address}
@@ -420,12 +430,22 @@ export function Header() {
                                 className="flex w-full items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)] text-left"
                               >
                                 {addr && <UserAvatar address={addr} size={24} />}
-                                <span className="font-mono truncate flex-1 min-w-0">
-                                  {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
-                                  {isCurrent && (
-                                    <span className="ml-1 text-[var(--color-success)]">({t('auth.current')})</span>
+                                <div className="min-w-0 flex-1">
+                                  {cachedNick && (
+                                    <p className="text-xs font-bold truncate">
+                                      {cachedNick}
+                                      {isCurrent && (
+                                        <span className="ml-1 text-[10px] font-normal text-[var(--color-success)]">({t('auth.current')})</span>
+                                      )}
+                                    </p>
                                   )}
-                                </span>
+                                  <p className={`font-mono truncate ${cachedNick ? 'text-[10px] text-[var(--color-text-secondary)]' : ''}`}>
+                                    {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
+                                    {!cachedNick && isCurrent && (
+                                      <span className="ml-1 text-[var(--color-success)]">({t('auth.current')})</span>
+                                    )}
+                                  </p>
+                                </div>
                               </button>
                             );
                           })}
@@ -533,9 +553,14 @@ export function Header() {
             <div className="flex flex-col gap-2.5">
               {/* Compact address row */}
               <div className="flex items-center justify-between rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-success)]" />
-                  <span className="text-xs font-mono truncate">{wallet.address}</span>
+                  <div className="min-w-0">
+                    {userNickname && (
+                      <p className="text-xs font-bold truncate">{userNickname}</p>
+                    )}
+                    <p className={`font-mono truncate ${userNickname ? 'text-[10px] text-[var(--color-text-secondary)]' : 'text-xs'}`}>{wallet.address}</p>
+                  </div>
                 </div>
                 <button type="button" onClick={handleCopyAddress}
                   className="shrink-0 ml-2 text-[10px] font-medium text-[var(--color-primary)] hover:underline">
@@ -600,6 +625,7 @@ export function Header() {
                       {wallet.savedWallets.map((w) => {
                         const addr = typeof w.address === 'string' ? w.address : '';
                         const isCurrent = wallet.address === addr;
+                        const cachedNick = isCurrent ? userNickname : getCachedNickname(addr);
                         return (
                           <button
                             key={addr || w.address}
@@ -615,12 +641,22 @@ export function Header() {
                             className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-left"
                           >
                             {addr && <UserAvatar address={addr} size={28} />}
-                            <span className="text-xs font-mono truncate flex-1 min-w-0">
-                              {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
-                              {isCurrent && (
-                                <span className="ml-1 text-[var(--color-success)] text-[10px]">({t('auth.current')})</span>
+                            <div className="min-w-0 flex-1">
+                              {cachedNick && (
+                                <p className="text-xs font-bold truncate">
+                                  {cachedNick}
+                                  {isCurrent && (
+                                    <span className="ml-1 text-[10px] font-normal text-[var(--color-success)]">({t('auth.current')})</span>
+                                  )}
+                                </p>
                               )}
-                            </span>
+                              <p className={`font-mono truncate ${cachedNick ? 'text-[10px] text-[var(--color-text-secondary)]' : 'text-xs'}`}>
+                                {addr ? `${addr.slice(0, 10)}...${addr.slice(-6)}` : '...'}
+                                {!cachedNick && isCurrent && (
+                                  <span className="ml-1 text-[var(--color-success)] text-[10px]">({t('auth.current')})</span>
+                                )}
+                              </p>
+                            </div>
                           </button>
                         );
                       })}
