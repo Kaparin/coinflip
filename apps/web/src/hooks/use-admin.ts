@@ -493,6 +493,8 @@ export interface HealResult {
   transitionalReverted: number;
   fundsUnlocked: number;
   orphansImported: number;
+  balancesSynced?: number;
+  staleWithdrawsCleaned?: number;
   errors: string[];
   duration: string;
   message: string;

@@ -55,6 +55,8 @@ function HealSystemAction() {
     { label: 'Переходов откачено', key: 'transitionalReverted', color: 'text-purple-400' },
     { label: 'Средств разблокировано', key: 'fundsUnlocked', color: 'text-cyan-400' },
     { label: 'Сирот импортировано', key: 'orphansImported', color: 'text-pink-400' },
+    { label: 'Балансов синхронизировано', key: 'balancesSynced', color: 'text-emerald-400' },
+    { label: 'Зависших выводов очищено', key: 'staleWithdrawsCleaned', color: 'text-amber-400' },
   ];
 
   return (
@@ -62,7 +64,7 @@ function HealSystemAction() {
       <div>
         <h3 className="text-base font-bold">Исцеление системы</h3>
         <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-          Одним нажатием: восстановление секретов, синхронизация с чейном, запуск раскрытий, клейм таймаутов, откат зависших переходов, разблокировка средств, импорт недостающих ставок.
+          Одним нажатием: восстановление секретов, синхронизация с чейном, запуск раскрытий, клейм таймаутов, откат зависших переходов, разблокировка средств, импорт недостающих ставок, синхронизация балансов vault с чейном, очистка зависших выводов.
         </p>
       </div>
 

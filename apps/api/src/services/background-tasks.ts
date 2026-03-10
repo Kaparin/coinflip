@@ -1486,7 +1486,7 @@ async function recoverStuckLockedFunds(): Promise<void> {
   try {
     const db = (await import('../lib/db.js')).getDb();
 
-    // Find users with locked > 0 but no active bets
+    // Find users with locked > 0 but no active bets AND no pending withdrawals
     const stuck = await db.execute(sql`
       SELECT vb.user_id, vb.locked
       FROM vault_balances vb
@@ -1495,6 +1495,13 @@ async function recoverStuckLockedFunds(): Promise<void> {
           SELECT 1 FROM bets b
           WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
             AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM vault_transactions vt
+          WHERE vt.user_id = vb.user_id
+            AND vt.type = 'withdraw'
+            AND vt.status = 'pending'
+            AND vt.created_at > now() - interval '10 minutes'
         )
     `);
 
@@ -1526,6 +1533,8 @@ export interface HealResult {
   transitionalReverted: number;
   fundsUnlocked: number;
   orphansImported: number;
+  balancesSynced?: number;
+  staleWithdrawsCleaned?: number;
   errors: string[];
   duration: string;
   message: string;
@@ -1733,6 +1742,13 @@ export async function runHealSweep(): Promise<HealResult> {
           WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
             AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM vault_transactions vt
+          WHERE vt.user_id = vb.user_id
+            AND vt.type = 'withdraw'
+            AND vt.status = 'pending'
+            AND vt.created_at > now() - interval '10 minutes'
+        )
     `);
     const rows = stuckLocked as unknown as Array<{ user_id: string; locked: string }>;
     for (const row of rows) {
@@ -1803,8 +1819,73 @@ export async function runHealSweep(): Promise<HealResult> {
     result.errors.push(`Step 7 (import orphans): ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  // Step 8: Sync vault balances from chain for users with significant desync
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const contractAddr = getActiveContractAddr();
+
+    // Get all users with non-zero vault balance
+    const balanceRows = await db.execute(sql`
+      SELECT vb.user_id, vb.available, vb.locked, u.address
+      FROM vault_balances vb
+      JOIN users u ON u.id = vb.user_id
+      WHERE vb.available::numeric > 0 OR vb.locked::numeric > 0
+    `) as unknown as Array<{ user_id: string; available: string; locked: string; address: string }>;
+
+    for (const row of balanceRows) {
+      try {
+        const query = btoa(JSON.stringify({ vault_balance: { address: row.address } }));
+        const res = await chainRest(
+          `/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${query}`,
+        );
+        if (!res.ok) continue;
+        const data = (await res.json()) as { data: { available: string; locked: string } };
+        const chainAvailable = BigInt(data.data.available);
+        const dbAvailable = BigInt(row.available);
+
+        // Only fix if DB is HIGHER than chain (over-credited by recovery bug)
+        if (dbAvailable > chainAvailable && (dbAvailable - chainAvailable) > 1_000_000n) {
+          await db.execute(sql`
+            UPDATE vault_balances
+            SET available = ${data.data.available}, locked = ${data.data.locked}, updated_at = now()
+            WHERE user_id = ${row.user_id}
+          `);
+          result.balancesSynced = (result.balancesSynced ?? 0) + 1;
+          logger.info({
+            userId: row.user_id,
+            address: row.address,
+            dbAvailable: row.available,
+            chainAvailable: data.data.available,
+          }, `${tag} — fixed over-credited vault balance`);
+        }
+      } catch (err) {
+        // Skip individual user errors — don't block other syncs
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Step 8 (vault balance sync): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Step 9: Clean up stale pending withdraw transactions (>10 min)
+  try {
+    const db = (await import('../lib/db.js')).getDb();
+    const cleaned = await db.execute(sql`
+      UPDATE vault_transactions
+      SET status = 'failed'
+      WHERE type = 'withdraw' AND status = 'pending' AND created_at < now() - interval '10 minutes'
+    `);
+    const count = (cleaned as any)?.rowCount ?? 0;
+    if (count > 0) {
+      result.staleWithdrawsCleaned = count;
+      logger.info({ count }, `${tag} — cleaned stale pending withdrawals`);
+    }
+  } catch (err) {
+    result.errors.push(`Step 9 (clean stale withdrawals): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const totalFixed = result.secretsRecovered + result.syncedFromChain + result.revealsTriggered +
-    result.timeoutsClaimed + result.transitionalReverted + result.fundsUnlocked + result.orphansImported;
+    result.timeoutsClaimed + result.transitionalReverted + result.fundsUnlocked + result.orphansImported +
+    (result.balancesSynced ?? 0) + (result.staleWithdrawsCleaned ?? 0);
   const durationMs = Date.now() - start;
   result.duration = `${(durationMs / 1000).toFixed(1)}s`;
   result.message = result.errors.length > 0

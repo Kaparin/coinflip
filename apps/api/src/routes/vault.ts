@@ -18,6 +18,7 @@ import { chainCached, invalidateChainCache } from '../lib/chain-cache.js';
 import { chainRest, chainRestPost } from '../lib/chain-fetch.js';
 import { acquireInflight, releaseInflight } from '../lib/inflight-guard.js';
 import { resolveGasGranter } from '../lib/gas-granter.js';
+import { eq, and } from 'drizzle-orm';
 import { vaultTransactions } from '@coinflip/db/schema';
 
 // ─── Legacy no-ops (kept as stubs so callers don't break during migration) ──
@@ -455,6 +456,14 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
 
   const txHash = relayResult.txHash ?? '';
 
+  // Log pending withdrawal — prevents recoverStuckLockedFunds from unlocking during poll window
+  {
+    const db = (await import('../lib/db.js')).getDb();
+    await db.insert(vaultTransactions).values({
+      userId: user.id, type: 'withdraw', amount, txHash, status: 'pending',
+    }).catch(e => logger.warn({ e }, 'Failed to log pending withdraw transaction'));
+  }
+
   // Background: poll for confirmation, sync balance, notify via WS
   (async () => {
     try {
@@ -469,6 +478,13 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
             const delayedResult = await pollTxConfirmation(txHash, 30_000);
             if (delayedResult && delayedResult.code === 0) {
               logger.info({ txHash, address }, 'Withdraw confirmed on delayed check');
+              {
+                const db2 = (await import('../lib/db.js')).getDb();
+                await db2.update(vaultTransactions)
+                  .set({ status: 'confirmed' })
+                  .where(and(eq(vaultTransactions.txHash, txHash), eq(vaultTransactions.status, 'pending')))
+                  .catch(() => {});
+              }
               await vaultService.forfeitLocked(user.id, amount);
               invalidateChainCache('vault:' + address);
               const dbBal = await vaultService.getBalance(user.id);
@@ -478,6 +494,13 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
             }
             // Truly failed or still not found — safe to unlock now
             logger.warn({ txHash, address }, 'Withdraw tx not found after delayed check — unlocking');
+            {
+              const db2 = (await import('../lib/db.js')).getDb();
+              await db2.update(vaultTransactions)
+                .set({ status: 'failed' })
+                .where(and(eq(vaultTransactions.txHash, txHash), eq(vaultTransactions.status, 'pending')))
+                .catch(() => {});
+            }
             await vaultService.unlockFunds(user.id, amount).catch(() => {});
             wsService.sendToAddress(address, {
               type: 'withdraw_failed',
@@ -491,6 +514,14 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
       }
       if (result.code !== 0) {
         logger.error({ txHash, address, rawLog: result.rawLog }, 'Withdraw failed on chain');
+        // Mark as failed BEFORE unlocking — prevents recovery race
+        {
+          const db = (await import('../lib/db.js')).getDb();
+          await db.update(vaultTransactions)
+            .set({ status: 'failed' })
+            .where(and(eq(vaultTransactions.txHash, txHash), eq(vaultTransactions.status, 'pending')))
+            .catch(() => {});
+        }
         await vaultService.unlockFunds(user.id, amount).catch(() => {});
         wsService.sendToAddress(address, {
           type: 'withdraw_failed',
@@ -499,14 +530,14 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
         return;
       }
 
-      // Confirmed — log + sync balance
+      // Confirmed — update pending → confirmed in vault_transactions
       logger.info({ txHash, address, height: result.height }, 'Withdraw confirmed on chain');
-      // Log withdrawal to vault_transactions
       {
         const db = (await import('../lib/db.js')).getDb();
-        await db.insert(vaultTransactions).values({
-          userId: user.id, type: 'withdraw', amount, txHash, status: 'confirmed',
-        }).catch(e => logger.warn({ e }, 'Failed to log withdraw transaction'));
+        await db.update(vaultTransactions)
+          .set({ status: 'confirmed' })
+          .where(and(eq(vaultTransactions.txHash, txHash), eq(vaultTransactions.status, 'pending')))
+          .catch(e => logger.warn({ e }, 'Failed to update withdraw transaction status'));
       }
       // Forfeit locked funds (consumed by withdrawal — no restore to available)
       await vaultService.forfeitLocked(user.id, amount);
