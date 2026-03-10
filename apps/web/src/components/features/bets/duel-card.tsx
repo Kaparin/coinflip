@@ -206,9 +206,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
   return (
     <div
-      className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 ${
-        isMergingPhase ? 'overflow-visible' : 'overflow-hidden'
-      } ${
+      className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 overflow-visible ${
         isFading ? 'animate-duel-fade-out' : `animate-fade-up ${isWinnerReveal ? 'animate-duel-border-glow-winner' : 'animate-duel-border-glow'}`
       }`}
     >
@@ -251,18 +249,16 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
         {/* Center: spinning coin / flip / winner reveal */}
         <div className={`flex flex-col items-center justify-center py-1 ${isWinnerReveal ? '' : 'flex-1'}`}>
           {USE_3D_COIN ? (
-            /* ── Full 3D coin flow (Three.js) ── */
-            <Suspense fallback={<CssCoinFallback />}>
-              <Coin3DScene
-                duel={duel}
-                isWinnerMaker={isWinnerMaker}
-                isWinnerReveal={isWinnerReveal}
-                isMergingPhase={isMergingPhase}
-                winnerAddress={winnerAddress}
-                winnerDisplayName={winnerDisplayName}
-                winnerNameClass={winnerNameClass}
-              />
-            </Suspense>
+            /* ── 3D coin flow: CSS idle + Three.js for merge/reveal ── */
+            <Coin3DScene
+              duel={duel}
+              isWinnerMaker={isWinnerMaker}
+              isWinnerReveal={isWinnerReveal}
+              isMergingPhase={isMergingPhase}
+              winnerAddress={winnerAddress}
+              winnerDisplayName={winnerDisplayName}
+              winnerNameClass={winnerNameClass}
+            />
           ) : (
             /* ── CSS fallback flow ── */
             <CssCoinScene
@@ -378,15 +374,18 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
   );
 }
 
-/** Original CSS 3D spinning coin — used as Suspense fallback */
-function CssCoinFallback() {
+/** Lightweight CSS 3D spinning coin — used for idle phase & Suspense fallback */
+function CssCoinFallback({ size = 44 }: { size?: number }) {
   return (
-    <div className="duel-coin-3d animate-duel-coin-spin">
+    <div
+      className="animate-duel-coin-spin"
+      style={{ position: 'relative', width: size, height: size, transformStyle: 'preserve-3d' }}
+    >
       <div className="duel-coin-face duel-coin-front">
-        <Image src="/coin-token-logo.png" alt="COIN front" width={44} height={44} className="rounded-full" unoptimized />
+        <Image src="/coin-token-logo.png" alt="COIN front" width={size} height={size} className="rounded-full" unoptimized />
       </div>
       <div className="duel-coin-face duel-coin-back-face">
-        <Image src="/coin-token-logo.back.png" alt="COIN back" width={44} height={44} className="rounded-full" unoptimized />
+        <Image src="/coin-token-logo.back.png" alt="COIN back" width={size} height={size} className="rounded-full" unoptimized />
       </div>
     </div>
   );
@@ -412,8 +411,17 @@ function Coin3DScene({
   winnerDisplayName,
   winnerNameClass,
 }: CoinSceneProps) {
+  // Only mount Three.js Canvas for active animation phases (merge/reveal).
+  // Idle spinning uses lightweight CSS coin to avoid flooding the GPU
+  // with multiple WebGL contexts (browsers limit to ~8-16 concurrent contexts).
+  const use3D = isMergingPhase || isWinnerReveal;
+
+  // Preload Three.js bundle during idle so it's cached before merge starts
+  useEffect(() => {
+    import('@/components/ui/coin-3d');
+  }, []);
+
   // Map duel phases → CoinState
-  // idle spin during flipping/dueling/resolving, flip during avatar-merge, landed during winner-reveal
   const coinState = isMergingPhase ? 'flipping' as const
     : isWinnerReveal ? 'landed' as const
     : 'idle' as const;
@@ -427,18 +435,24 @@ function Coin3DScene({
       <div className={`${
         isMergingPhase ? 'animate-duel-3d-coin-toss' : ''
       } ${isWinnerReveal ? 'animate-duel-coin-winner-glow' : ''}`}>
-        <Coin3D
-          state={coinState}
-          result={coinResult}
-          size={isWinnerReveal ? 100 : 88}
-          spinSpeed={1.5}
-          cameraPosition={[0, 3, 4.2]}
-          flipDuration={8}
-          totalSpins={12}
-          verticalMotion={false}
-          makerAddress={duel.maker}
-          acceptorAddress={duel.acceptor}
-        />
+        {use3D ? (
+          <Suspense fallback={<CssCoinFallback size={88} />}>
+            <Coin3D
+              state={coinState}
+              result={coinResult}
+              size={isWinnerReveal ? 100 : 88}
+              spinSpeed={1.5}
+              cameraPosition={[0, 3, 4.2]}
+              flipDuration={8}
+              totalSpins={12}
+              verticalMotion={false}
+              makerAddress={duel.maker}
+              acceptorAddress={duel.acceptor}
+            />
+          </Suspense>
+        ) : (
+          <CssCoinFallback size={56} />
+        )}
       </div>
       {isWinnerReveal && duel.winner && (
         <div className="animate-duel-winner-name text-center mt-1">

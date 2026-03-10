@@ -1146,6 +1146,7 @@ body {
   animation: duel3dCoinToss 8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   z-index: 50;
   position: relative;
+  pointer-events: none;
 }
 
 /* Green pulsing glow around winner coin */
