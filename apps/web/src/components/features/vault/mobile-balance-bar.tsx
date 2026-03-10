@@ -11,6 +11,7 @@ import { GameTokenIcon } from '@/components/ui';
 import { BalanceDisplay } from './balance-display';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
+import { useAxmRates } from '@/hooks/use-axm-rates';
 
 /**
  * Compact balance bar for mobile — shows key balances in a clean single row.
@@ -26,6 +27,7 @@ export function MobileBalanceBar() {
     },
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
+  const { data: rates } = useAxmRates();
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +87,11 @@ export function MobileBalanceBar() {
                 {fmtNum(availableHuman)}
               </span>
               <GameTokenIcon size={16} />
+              {rates?.axm_usd && availableHuman > 0 && (
+                <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+                  ≈${(availableHuman * rates.axm_usd).toFixed(2)}
+                </span>
+              )}
             </div>
 
             {/* Secondary info pills */}

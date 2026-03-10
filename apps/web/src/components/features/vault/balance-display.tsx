@@ -28,6 +28,7 @@ import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { useToast } from '@/components/ui/toast';
 import { onDepositEvent } from '@/lib/deposit-status-events';
 import { feedback } from '@/lib/feedback';
+import { useAxmRates } from '@/hooks/use-axm-rates';
 import { TransferModal } from '@/components/features/social/transfer-modal';
 
 /** Deposit presets in human-readable LAUNCH */
@@ -326,6 +327,7 @@ export function BalanceDisplay() {
   });
   const { data: walletBalanceRaw } = useWalletBalance(address);
   const { data: nativeBalanceRaw } = useNativeBalance(address);
+  const { data: axmRates } = useAxmRates();
   const queryClient = useQueryClient();
 
   const [showDeposit, setShowDeposit] = useState(false);
@@ -778,6 +780,9 @@ export function BalanceDisplay() {
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.available')}</p>
                 <p className="text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)}</p>
+                {axmRates?.axm_usd && availableHuman > 0 && (
+                  <p className="text-[10px] text-[var(--color-text-secondary)] tabular-nums mt-0.5">≈${(availableHuman * axmRates.axm_usd).toFixed(2)}</p>
+                )}
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.inBets')}</p>

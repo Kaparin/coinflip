@@ -8,6 +8,7 @@ import { userService } from '../services/user.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { announcementService } from '../services/announcement.service.js';
 import { vipService } from '../services/vip.service.js';
+import { getAxiomeRates } from '../services/axiome-api.service.js';
 import { getDb } from '../lib/db.js';
 import { Errors } from '../lib/errors.js';
 import { verifyTelegramLogin } from '../lib/telegram-auth.js';
@@ -71,6 +72,12 @@ usersRouter.patch('/me', authMiddleware, zValidator('json', UpdateProfileSchema)
       nickname: updated.profileNickname,
     },
   });
+});
+
+// GET /api/v1/users/rates — AXM exchange rates from Axiome ecosystem
+usersRouter.get('/rates', async (c) => {
+  const rates = await getAxiomeRates();
+  return c.json({ data: rates });
 });
 
 // GET /api/v1/users/top-winner — Biggest single win ever (public, cached)

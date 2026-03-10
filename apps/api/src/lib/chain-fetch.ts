@@ -24,6 +24,11 @@ function getRestUrls(): string[] {
       if (trimmed) urls.push(trimmed);
     }
   }
+  // Always include the public REST endpoint as a last-resort fallback
+  const publicRest = 'https://api-chain.axiomechain.org';
+  if (!urls.includes(publicRest)) {
+    urls.push(publicRest);
+  }
   _restUrls = urls;
   return urls;
 }
