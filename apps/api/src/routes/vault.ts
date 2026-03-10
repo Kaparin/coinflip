@@ -460,13 +460,33 @@ vaultRouter.post('/withdraw', authMiddleware, walletTxRateLimit, zValidator('jso
     try {
       const result = await pollTxConfirmation(txHash, 60_000);
       if (!result) {
-        logger.warn({ txHash, address }, 'Withdraw poll timeout (60s)');
-        // Unlock funds since we can't confirm
-        await vaultService.unlockFunds(user.id, amount).catch(() => {});
-        wsService.sendToAddress(address, {
-          type: 'withdraw_failed',
-          data: { tx_hash: txHash, reason: 'Transaction confirmation timed out.' },
-        });
+        logger.warn({ txHash, address }, 'Withdraw poll timeout (60s) — deferring to delayed check');
+        // DO NOT unlock here — tx is likely in mempool and will land on chain.
+        // Unlocking would restore DB balance while chain balance is reduced = desync.
+        // Schedule a delayed chain check instead.
+        setTimeout(async () => {
+          try {
+            const delayedResult = await pollTxConfirmation(txHash, 30_000);
+            if (delayedResult && delayedResult.code === 0) {
+              logger.info({ txHash, address }, 'Withdraw confirmed on delayed check');
+              await vaultService.forfeitLocked(user.id, amount);
+              invalidateChainCache('vault:' + address);
+              const dbBal = await vaultService.getBalance(user.id);
+              wsService.sendToAddress(address, { type: 'withdraw_confirmed', data: { tx_hash: txHash, amount } });
+              wsService.sendToAddress(address, { type: 'balance_updated', data: { available: dbBal.available, locked: dbBal.locked } });
+              return;
+            }
+            // Truly failed or still not found — safe to unlock now
+            logger.warn({ txHash, address }, 'Withdraw tx not found after delayed check — unlocking');
+            await vaultService.unlockFunds(user.id, amount).catch(() => {});
+            wsService.sendToAddress(address, {
+              type: 'withdraw_failed',
+              data: { tx_hash: txHash, reason: 'Transaction not confirmed after extended wait.' },
+            });
+          } catch (err) {
+            logger.error({ err, txHash, address }, 'Withdraw delayed check error');
+          }
+        }, 90_000); // 90s delay after initial 60s = total 150s before giving up
         return;
       }
       if (result.code !== 0) {

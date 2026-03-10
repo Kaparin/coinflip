@@ -1,5 +1,5 @@
-import { desc, sql, count } from 'drizzle-orm';
-import { treasuryLedger, bets, users } from '@coinflip/db/schema';
+import { desc, sql, count, eq } from 'drizzle-orm';
+import { treasuryLedger, bets, users, vaultBalances } from '@coinflip/db/schema';
 import { getDb } from '../lib/db.js';
 import { env, getActiveContractAddr, isAxmMode } from '../config/env.js';
 import { logger } from '../lib/logger.js';
@@ -169,6 +169,25 @@ export class TreasuryService {
       { txHash: result.txHash, amount },
       'Treasury withdrawal confirmed',
     );
+
+    // Sync DB vault balance — deduct withdrawn amount from available
+    try {
+      const treasuryUser = await this.db.query.users.findFirst({
+        where: eq(users.address, env.TREASURY_ADDRESS),
+      });
+      if (treasuryUser) {
+        await this.db
+          .update(vaultBalances)
+          .set({
+            available: sql`GREATEST(0, ${vaultBalances.available}::numeric - ${amount}::numeric)::text`,
+            updatedAt: new Date(),
+          })
+          .where(eq(vaultBalances.userId, treasuryUser.id));
+        logger.info({ amount, userId: treasuryUser.id }, 'Treasury DB balance deducted');
+      }
+    } catch (err) {
+      logger.warn({ err, amount }, 'Failed to deduct treasury DB balance after withdrawal');
+    }
 
     return { txHash: result.txHash!, amount };
   }
