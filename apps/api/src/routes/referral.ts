@@ -370,10 +370,10 @@ referralRouter.post('/claim', authMiddleware, async (c) => {
             [{ denom: env.AXM_DENOM, amount }],
             'CoinFlip referral claim refund',
           )
-        : await relayerService.submitExecOnContract(
-            treasuryAddr,
+        : await relayerService.relayContractExecute(
             cw20Addr,
             { send: { contract: getActiveContractAddr(), amount, msg: btoa(JSON.stringify({ deposit: {} })) } },
+            [],
             'CoinFlip referral claim refund',
           );
       if (reDepositResult.success) {

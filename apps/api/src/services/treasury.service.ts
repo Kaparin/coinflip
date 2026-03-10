@@ -269,12 +269,11 @@ export class TreasuryService {
       );
     }
 
-    // CW20 transfer from treasury to recipient
-    const result = await relayerService.relayCw20Transfer(
-      env.TREASURY_ADDRESS,
+    // CW20 transfer from treasury/relayer to recipient (direct call, no authz)
+    const result = await relayerService.relayContractExecute(
       env.LAUNCH_CW20_ADDR,
-      recipientAddress,
-      amount,
+      { transfer: { recipient: recipientAddress, amount } },
+      [],
       'COIN Shop purchase',
     );
 
