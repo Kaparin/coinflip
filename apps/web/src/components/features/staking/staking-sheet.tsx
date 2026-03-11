@@ -29,7 +29,7 @@ import {
   type UserStakingInfo,
 } from '@/lib/staking';
 import { useTranslation } from '@/lib/i18n';
-import { useStakingStore, type OpType } from '@/stores/staking-store';
+import { useStakingStore, COOLDOWN_MS, type OpType } from '@/stores/staking-store';
 
 type TabMode = 'stake' | 'unstake';
 
@@ -79,6 +79,22 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
 
+  // ---- Cooldown tick (re-render every second during cooldown) ----
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!store.lastTxAt) return;
+    const remaining = COOLDOWN_MS - (Date.now() - store.lastTxAt);
+    if (remaining <= 0) return;
+    const interval = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(interval);
+  }, [store.lastTxAt]);
+
+  const cooldownLeft = store.lastTxAt
+    ? Math.max(0, Math.ceil((COOLDOWN_MS - (now - store.lastTxAt)) / 1000))
+    : 0;
+  const hasCooldown = !store.isLocked && cooldownLeft > 0;
+
   // ---- Data fetching ----
 
   const refresh = useCallback(async () => {
@@ -122,14 +138,15 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   // ---- Derived state ----
 
   const maxAmount = activeTab === 'stake' ? (user?.launchBalance ?? 0) : (user?.staked ?? 0);
-  const canSubmit = !store.isLocked && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
-  const canClaim = !store.isLocked && !!user && user.pendingRewards > 0;
+  const isBlocked = store.isLocked || hasCooldown;
+  const canSubmit = !isBlocked && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
+  const canClaim = !isBlocked && !!user && user.pendingRewards > 0;
 
   // ---- Execute staking operation ----
 
   const execute = async (type: OpType, amt?: number) => {
     const wallet = getWallet();
-    if (!wallet || !address || store.isLocked) return;
+    if (!wallet || !address || isBlocked) return;
 
     store.startOp(type, amt);
 
@@ -162,21 +179,21 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   };
 
   const handleStake = () => {
-    if (store.isLocked) return;
+    if (isBlocked) return;
     const num = parseFloat(amount);
     if (!num || num <= 0 || (user && num > user.launchBalance)) return;
     execute('stake', num);
   };
 
   const handleUnstake = () => {
-    if (store.isLocked) return;
+    if (isBlocked) return;
     const num = parseFloat(amount);
     if (!num || num <= 0 || (user && num > user.staked)) return;
     execute('unstake', num);
   };
 
   const handleClaim = () => {
-    if (store.isLocked) return;
+    if (isBlocked) return;
     if (!user || user.pendingRewards <= 0) return;
     execute('claim');
   };
@@ -216,6 +233,21 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
           {/* ═══ Operation Status Banner ═══ */}
           <OperationBanner store={store} t={t} />
 
+          {/* ═══ Cooldown Banner ═══ */}
+          {hasCooldown && (
+            <div className="flex items-center gap-3 rounded-2xl bg-amber-500/8 border border-amber-500/20 px-4 py-3">
+              <Loader2 size={16} className="animate-spin text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-amber-300">
+                  {t('staking.cooldownWait')}
+                </p>
+                <p className="text-[10px] text-amber-400/60 tabular-nums">
+                  {t('staking.cooldownSeconds').replace('{{seconds}}', String(cooldownLeft))}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ═══ Rewards Card ═══ */}
           {user && user.pendingRewards > 0 ? (
             <div className="relative overflow-hidden rounded-2xl p-[1px]">
@@ -237,6 +269,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                   >
                     {store.op?.type === 'claim' && opPhase !== 'error' ? (
                       <Loader2 size={16} className="animate-spin" />
+                    ) : hasCooldown ? (
+                      t('staking.cooldownSeconds').replace('{{seconds}}', String(cooldownLeft))
                     ) : (
                       t('staking.claimRewards')
                     )}
@@ -281,7 +315,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
           )}
 
           {/* ═══ Stake / Unstake ═══ */}
-          <div className={`rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden transition-opacity ${store.isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className={`rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden transition-opacity ${isBlocked ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Tab Pills */}
             <div className="flex gap-1 p-1.5 bg-[var(--color-surface)]">
               <button
@@ -362,7 +396,9 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-lg shadow-rose-500/20'
                 }`}
               >
-                {activeTab === 'stake' ? t('staking.stakeLaunch') : t('staking.unstakeLaunch')}
+                {hasCooldown
+                  ? t('staking.cooldownSeconds').replace('{{seconds}}', String(cooldownLeft))
+                  : activeTab === 'stake' ? t('staking.stakeLaunch') : t('staking.unstakeLaunch')}
               </button>
             </div>
           </div>

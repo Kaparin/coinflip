@@ -24,18 +24,36 @@ export interface StakingOp {
   startedAt: number;
 }
 
+// ---- Constants ----
+
+/** Cooldown after a successful tx broadcast — prevents nonce collisions */
+export const COOLDOWN_MS = 20_000;
+
 // ---- Module-level singleton state ----
 
+interface StakingSnapshot {
+  op: StakingOp | null;
+  lastTxAt: number;
+}
+
 let _op: StakingOp | null = null;
+let _lastTxAt = 0;
 let _clearTimer: ReturnType<typeof setTimeout> | undefined;
 const _listeners = new Set<() => void>();
 
+let _snapshot: StakingSnapshot = { op: null, lastTxAt: 0 };
+
+function updateSnapshot() {
+  _snapshot = { op: _op, lastTxAt: _lastTxAt };
+}
+
 function notify() {
+  updateSnapshot();
   _listeners.forEach((l) => l());
 }
 
-function getSnapshot(): StakingOp | null {
-  return _op;
+function getSnapshot(): StakingSnapshot {
+  return _snapshot;
 }
 
 function subscribe(listener: () => void) {
@@ -66,8 +84,9 @@ function setPhase(phase: OpPhase) {
 function setPending(txHash: string) {
   if (_op) {
     _op = { ..._op, txHash, phase: 'pending' };
+    _lastTxAt = Date.now();
     notify();
-    // Auto-clear after 8s — by then chain should have confirmed
+    // Auto-clear op after 8s (cooldown continues independently)
     _clearTimer = setTimeout(() => {
       _op = null;
       notify();
@@ -99,13 +118,14 @@ function clearOp() {
 // ---- React hook ----
 
 export function useStakingStore() {
-  const op = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const { op, lastTxAt } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   // ALL phases block new operations. Only null (idle) allows new ops.
   const isLocked = op !== null;
 
   return {
     op,
+    lastTxAt,
     isLocked,
     startOp,
     setPhase,

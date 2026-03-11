@@ -1318,6 +1318,8 @@
     "errorRejected": "Transaction was cancelled",
     "errorTimeout": "Request timed out. Try again",
     "errorSigningFailed": "Failed to sign transaction. Reconnect wallet",
-    "errorUnknown": "Something went wrong. Try again later"
+    "errorUnknown": "Something went wrong. Try again later",
+    "cooldownWait": "Previous transaction is still confirming...",
+    "cooldownSeconds": "Wait ~{{seconds}}s"
   }
 }
