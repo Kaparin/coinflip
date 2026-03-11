@@ -84,7 +84,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
 
   // ---- Data fetching ----
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const [s, u] = await Promise.all([
         fetchStakingStats(),
@@ -99,23 +100,21 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     }
   }, [address]);
 
-  // Initial load
+  // Initial load — only on open/connect changes, NOT on phase changes
   useEffect(() => {
     if (!open || !isConnected) return;
-    // Don't refresh if we have an active pending op — would overwrite optimistic data
-    if (store.op?.phase === 'pending') return;
-    setIsLoading(true);
     refresh();
-  }, [open, isConnected, refresh, store.op?.phase]);
+  }, [open, isConnected, refresh]);
 
-  // When op completes (transitions from pending/error → null), refresh from chain
+  // When op clears (pending/error → null), wait 2s for chain to confirm, then silent refresh
   useEffect(() => {
     const prevOp = prevOpRef.current;
     prevOpRef.current = store.op;
 
-    // Op just cleared (was something, now null)
     if (prevOp && !store.op && open) {
-      refresh();
+      // Chain needs time to include the tx in a block
+      const timer = setTimeout(() => refresh(true), 2_000);
+      return () => clearTimeout(timer);
     }
   }, [store.op, open, refresh]);
 
