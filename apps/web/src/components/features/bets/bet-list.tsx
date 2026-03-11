@@ -356,7 +356,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-32 rounded-xl" />
         ))}
@@ -403,7 +403,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
 
       {/* Pending bet cards (submitted but not yet confirmed on chain) */}
       {myPendingBets.length > 0 && (
-        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 mb-2">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 mb-2">
           {myPendingBets.map((bet) => (
             <div
               key={bet.txHash}
@@ -437,7 +437,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
         const orphanDuels = [...activeDuels.values()].filter(d => !gridBetIds.has(d.betId));
         if (orphanDuels.length === 0) return null;
         return (
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 mb-2">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 mb-2">
             {orphanDuels.map((duel) => (
               <DuelCard key={duel.betId} duel={duel} />
             ))}
@@ -447,7 +447,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
 
       {/* Bets grid */}
       {filteredBets.length > 0 ? (
-        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
           {filteredBets.map((bet, idx) => {
             const isMyBet = bet.maker === address;
             const betId = String(bet.id);

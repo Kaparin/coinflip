@@ -198,7 +198,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
   return (
     <div
-      className={`relative rounded-xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3 overflow-visible ${
+      className={`relative rounded-2xl border border-[var(--color-primary)]/30 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-surface)] p-3.5 overflow-visible ${
         isFading ? 'animate-duel-fade-out' : `animate-fade-up ${isWinnerReveal ? 'animate-duel-border-glow-winner' : 'animate-duel-border-glow'}`
       }`}
     >

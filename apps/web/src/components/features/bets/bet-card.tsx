@@ -260,23 +260,17 @@ export const BetCard = memo(function BetCard({
   return (
     <div
       className={`
-        group relative overflow-hidden rounded-xl border bg-gradient-to-br
+        group relative overflow-hidden rounded-2xl border bg-gradient-to-br
         ${tier.gradient} ${tier.border} ${tier.glow} ${tier.animGlowClass}
-        bg-[var(--color-surface)] p-3 card-hover animate-fade-up ${staggerClass}
+        bg-[var(--color-surface)] p-3.5 card-hover animate-fade-up ${staggerClass}
         transition-all duration-300
         ${tier.borderGlowClass}
       `}
     >
-      {/* Ambient glow on hover */}
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[var(--color-primary)]/0 to-[var(--color-primary)]/0 group-hover:from-[var(--color-primary)]/[0.03] group-hover:to-transparent transition-all duration-500 pointer-events-none" />
-
-      {/* Shimmer sweep for mythic+ tiers */}
-      {(tier.tier === 'mythic' || tier.tier === 'celestial') && (
+      {/* Shimmer sweep for celestial tier */}
+      {tier.tier === 'celestial' && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent animate-shimmer pointer-events-none" />
       )}
-
-      {/* Subtle noise texture overlay */}
-      <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
 
       <div className="relative z-10">
         {/* Top row: Role tag + Boost/Pin icons + Status */}
@@ -337,19 +331,19 @@ export const BetCard = memo(function BetCard({
         </div>
 
         {/* Amount row */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2.5 mb-2.5">
           <span className="flex items-center justify-center shrink-0">{tier.icon}</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
-            <GameTokenIcon size={18} />
+            <span className="text-2xl font-extrabold tabular-nums tracking-tight">{formatLaunch(amount)}</span>
+            <GameTokenIcon size={20} />
           </div>
         </div>
 
         {/* Middle: Maker + Timer */}
-        <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)] mb-2">
+        <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)] mb-2.5">
           <Link href={`/game/profile/${maker}`} className="flex items-center gap-1.5 min-w-0 group/maker" onClick={(e) => e.stopPropagation()}>
             <VipAvatarFrame tier={makerVipTier} frameStyle={makerVipCustomization?.frameStyle}>
-              <UserAvatar address={maker} size={16} />
+              <UserAvatar address={maker} size={18} />
             </VipAvatarFrame>
             <span className={`font-mono opacity-80 truncate group-hover/maker:opacity-100 group-hover/maker:text-[var(--color-primary)] transition-colors ${getVipNameClass(makerVipTier, makerVipCustomization?.nameGradient)}`}>{makerNickname || truncAddr(maker)}</span>
             <VipBadge tier={makerVipTier} badgeIcon={makerVipCustomization?.badgeIcon} onClick={makerVipTier ? (e) => { e.preventDefault(); e.stopPropagation(); setVipInfoOpen(true); } : undefined} />
@@ -374,10 +368,10 @@ export const BetCard = memo(function BetCard({
         </div>
 
         {/* Win info bar */}
-        <div className="relative rounded-lg bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10 px-2.5 py-1.5 mb-2">
+        <div className="relative rounded-xl bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10 px-3 py-2 mb-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
-            <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 tabular-nums">
+            <span className="text-[10px] text-[var(--color-text-secondary)]">{t('bets.potentialWin')}</span>
+            <span className="flex items-center gap-1 text-[13px] font-bold text-emerald-400 tabular-nums">
               +{winAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               <GameTokenIcon size={16} />
             </span>
@@ -414,7 +408,7 @@ export const BetCard = memo(function BetCard({
             <button
               type="button"
               onClick={() => { feedback('tap'); onAccept(id); }}
-              className="w-full rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.98] min-h-[40px]"
+              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-3 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.97] min-h-[44px]"
             >
               {t('bets.acceptFlip')}
             </button>
@@ -427,7 +421,7 @@ export const BetCard = memo(function BetCard({
             type="button"
             onClick={() => onCancel(id)}
             disabled={isAnyPending}
-            className="w-full rounded-lg border border-zinc-700/50 px-3 py-2 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[40px]"
+            className="w-full rounded-xl border border-zinc-700/50 px-3 py-2.5 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
           >
             {isCanceling ? (
               <span className="flex items-center justify-center gap-2">
