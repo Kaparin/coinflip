@@ -1132,18 +1132,21 @@ body {
   animation: duelWinnerNameReveal 0.4s ease-out 0.2s both;
 }
 
-/* 3D coin toss — CSS vertical motion (Three.js handles rotation) */
+/* 3D coin toss — vertical motion + scale (rotation handled by child CSS/Three.js) */
+/* CRITICAL: filter: brightness() MUST NOT be used here — it creates a flattening
+   context that kills transform-style:preserve-3d, breaking all child rotateY() */
 @keyframes duel3dCoinToss {
-  0%   { transform: translateY(0) scale(1); filter: brightness(1); }
+  0%   { transform: translateY(0) scale(1); }
   10%  { transform: translateY(-40px) scale(1.1); }
-  30%  { transform: translateY(-180px) scale(1.5); filter: brightness(1.2); }
+  30%  { transform: translateY(-180px) scale(1.5); }
   50%  { transform: translateY(-140px) scale(1.4); }
   70%  { transform: translateY(-60px) scale(1.2); }
   90%  { transform: translateY(-10px) scale(1.05); }
-  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+  100% { transform: translateY(0) scale(1); }
 }
 .animate-duel-3d-coin-toss {
   animation: duel3dCoinToss 8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-style: preserve-3d;
   z-index: 50;
   position: relative;
   pointer-events: none;

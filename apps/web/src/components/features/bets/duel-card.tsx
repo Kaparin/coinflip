@@ -461,7 +461,7 @@ function Coin3DScene({
     return (
       <div className="flex flex-col items-center">
         <div className="animate-duel-3d-coin-toss">
-          <div className="relative" style={{ width: 88, height: 88 }}>
+          <div className="relative" style={{ width: 88, height: 88, transformStyle: 'preserve-3d' as const }}>
             <div className="absolute inset-0 animate-duel-coin-logo-fade">
               <div className="w-full h-full animate-duel-coin-spin-3d">
                 <div className="duel-coin-face duel-coin-front">
