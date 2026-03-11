@@ -1308,6 +1308,7 @@
     "phaseSigning": "Signing transaction...",
     "phaseBroadcasting": "Sending to network...",
     "successSent": "Transaction sent",
+    "pendingOnChain": "Confirming on chain...",
     "errorLabel": "Error",
     "errorNetwork": "Network error. Try again in a few seconds",
     "errorInsufficientFunds": "Insufficient funds for this operation",

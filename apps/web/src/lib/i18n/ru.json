@@ -1308,6 +1308,7 @@
     "phaseSigning": "Подписание транзакции...",
     "phaseBroadcasting": "Отправка в сеть...",
     "successSent": "Транзакция отправлена",
+    "pendingOnChain": "Подтверждается в блокчейне...",
     "errorLabel": "Ошибка",
     "errorNetwork": "Ошибка сети. Попробуйте через несколько секунд",
     "errorInsufficientFunds": "Недостаточно средств для операции",

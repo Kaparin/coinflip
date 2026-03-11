@@ -78,7 +78,9 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Track previous op to detect op completion (op → null transition)
+  const prevOpRef = useRef(store.op);
 
   // ---- Data fetching ----
 
@@ -97,25 +99,25 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     }
   }, [address]);
 
+  // Initial load
   useEffect(() => {
     if (!open || !isConnected) return;
+    // Don't refresh if we have an active pending op — would overwrite optimistic data
+    if (store.op?.phase === 'pending') return;
     setIsLoading(true);
     refresh();
-  }, [open, isConnected, refresh]);
+  }, [open, isConnected, refresh, store.op?.phase]);
 
-  // Auto-refresh while there are pending txs; expire after 30s
+  // When op completes (transitions from pending/error → null), refresh from chain
   useEffect(() => {
-    if (store.pendingTxs.length === 0) return;
-    const interval = setInterval(() => {
-      refresh();
-      store.expirePendingTxs();
-    }, 5_000);
-    return () => clearInterval(interval);
-  }, [store.pendingTxs.length, refresh, store]);
+    const prevOp = prevOpRef.current;
+    prevOpRef.current = store.op;
 
-  useEffect(() => () => {
-    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-  }, []);
+    // Op just cleared (was something, now null)
+    if (prevOp && !store.op && open) {
+      refresh();
+    }
+  }, [store.op, open, refresh]);
 
   // ---- Optimistic update ----
 
@@ -136,10 +138,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   // ---- Derived state ----
 
   const maxAmount = activeTab === 'stake' ? (user?.launchBalance ?? 0) : (user?.staked ?? 0);
-  const opPhase = store.op?.phase;
-  const isBlocked = store.isLocked || opPhase === 'confirming';
-  const canSubmit = !isBlocked && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
-  const canClaim = !isBlocked && !!user && user.pendingRewards > 0;
+  const canSubmit = !store.isLocked && !!amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
+  const canClaim = !store.isLocked && !!user && user.pendingRewards > 0;
 
   // ---- Execute staking operation ----
 
@@ -161,8 +161,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
         result = await signClaim(wallet, address, onPhase);
       }
 
-      store.setTxHash(result.txHash);
-      store.setDone();
+      // Tx accepted by mempool — show pending state and apply optimistic update
+      store.setPending(result.txHash);
       setAmount('');
       applyOptimistic(type, amt);
 
@@ -171,36 +171,28 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
         type === 'unstake' ? t('staking.unstake') :
         t('staking.claim');
       addToast('success', `${label} — ${t('staking.txSubmitted')}`);
-
-      // Refresh from chain after a few seconds
-      refreshTimerRef.current = setTimeout(refresh, 5_000);
     } catch (err) {
       const { message, code } = getErrorMessage(err, t);
       store.setError(message, code);
-
-      // If user rejected, auto-clear quickly
-      if (code === 'rejected') {
-        setTimeout(() => store.clearOp(), 3_000);
-      }
     }
   };
 
   const handleStake = () => {
-    if (isBlocked) return;
+    if (store.isLocked) return;
     const num = parseFloat(amount);
     if (!num || num <= 0 || (user && num > user.launchBalance)) return;
     execute('stake', num);
   };
 
   const handleUnstake = () => {
-    if (isBlocked) return;
+    if (store.isLocked) return;
     const num = parseFloat(amount);
     if (!num || num <= 0 || (user && num > user.staked)) return;
     execute('unstake', num);
   };
 
   const handleClaim = () => {
-    if (isBlocked) return;
+    if (store.isLocked) return;
     if (!user || user.pendingRewards <= 0) return;
     execute('claim');
   };
@@ -211,8 +203,9 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     setAmount(pct === 1 ? maxAmount.toString() : Math.floor(val).toString());
   };
 
-  // Allow closing modal unless in signing/broadcasting phase
-  const canClose = !store.isLocked;
+  // Allow closing except during signing/broadcasting
+  const opPhase = store.op?.phase;
+  const canClose = opPhase !== 'signing' && opPhase !== 'broadcasting';
 
   return (
     <Modal open={open} onClose={onClose} title={t('staking.title')} showCloseButton={canClose}>
@@ -239,27 +232,6 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
           {/* ═══ Operation Status Banner ═══ */}
           <OperationBanner store={store} t={t} />
 
-          {/* ═══ Pending Txs (chain confirmation) ═══ */}
-          {store.pendingTxs.length > 0 && (
-            <div className="space-y-1.5">
-              {store.pendingTxs.map((tx) => (
-                <div key={tx.txHash} className="flex items-center gap-2 rounded-xl bg-violet-500/8 border border-violet-500/15 px-3 py-2">
-                  <Loader2 size={12} className="animate-spin text-violet-400 shrink-0" />
-                  <span className="text-[11px] text-violet-300 flex-1 truncate">
-                    {tx.type === 'stake' && `${t('staking.stake')} ${tx.amount} LAUNCH`}
-                    {tx.type === 'unstake' && `${t('staking.unstake')} ${tx.amount} LAUNCH`}
-                    {tx.type === 'claim' && t('staking.claim')}
-                    {' — '}{t('staking.confirming')}
-                  </span>
-                  <a href={`${EXPLORER_URL}/transactions/${tx.txHash}`} target="_blank" rel="noopener noreferrer"
-                    className="text-violet-400/40 hover:text-violet-400 shrink-0">
-                    <ExternalLink size={11} />
-                  </a>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* ═══ Rewards Card ═══ */}
           {user && user.pendingRewards > 0 ? (
             <div className="relative overflow-hidden rounded-2xl p-[1px]">
@@ -279,7 +251,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     disabled={!canClaim}
                     className="shrink-0 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
                   >
-                    {store.op?.type === 'claim' && store.isLocked ? (
+                    {store.op?.type === 'claim' && opPhase !== 'error' ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
                       t('staking.claimRewards')
@@ -301,8 +273,9 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
                   {t('staking.yourPosition')}
                 </p>
-                <button type="button" onClick={() => { setIsLoading(true); refresh(); }}
-                  className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30 transition-colors">
+                <button type="button" onClick={() => { if (!store.isLocked) { setIsLoading(true); refresh(); } }}
+                  disabled={store.isLocked}
+                  className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30 transition-colors disabled:opacity-30">
                   <RefreshCw size={12} />
                 </button>
               </div>
@@ -324,14 +297,13 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
           )}
 
           {/* ═══ Stake / Unstake ═══ */}
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden">
+          <div className={`rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden transition-opacity ${store.isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Tab Pills */}
             <div className="flex gap-1 p-1.5 bg-[var(--color-surface)]">
               <button
                 type="button"
                 onClick={() => { setActiveTab('stake'); setAmount(''); }}
-                disabled={isBlocked}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all disabled:opacity-50 ${
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   activeTab === 'stake'
                     ? 'bg-violet-600 text-white shadow-md shadow-violet-500/25'
                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
@@ -342,8 +314,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
               <button
                 type="button"
                 onClick={() => { setActiveTab('unstake'); setAmount(''); }}
-                disabled={isBlocked}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all disabled:opacity-50 ${
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   activeTab === 'unstake'
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25'
                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
@@ -371,14 +342,12 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
-                  disabled={isBlocked}
-                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5 pr-16 text-xl font-bold placeholder-[var(--color-text-secondary)]/20 focus:border-violet-500/50 focus:outline-none transition-colors tabular-nums disabled:opacity-50"
+                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5 pr-16 text-xl font-bold placeholder-[var(--color-text-secondary)]/20 focus:border-violet-500/50 focus:outline-none transition-colors tabular-nums"
                 />
                 <button
                   type="button"
                   onClick={() => setPercent(1)}
-                  disabled={isBlocked}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-violet-500/15 px-2.5 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors disabled:opacity-50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-violet-500/15 px-2.5 py-1 text-[10px] font-bold text-violet-400 hover:bg-violet-500/25 transition-colors"
                 >
                   MAX
                 </button>
@@ -391,8 +360,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     key={pct}
                     type="button"
                     onClick={() => setPercent(pct)}
-                    disabled={isBlocked}
-                    className="flex-1 py-1.5 rounded-lg border border-[var(--color-border)] text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-violet-500/40 hover:text-violet-400 transition-colors disabled:opacity-50"
+                    className="flex-1 py-1.5 rounded-lg border border-[var(--color-border)] text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-violet-500/40 hover:text-violet-400 transition-colors"
                   >
                     {pct === 1 ? 'MAX' : `${pct * 100}%`}
                   </button>
@@ -410,16 +378,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                     : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-lg shadow-rose-500/20'
                 }`}
               >
-                {store.op && store.isLocked && store.op.type === activeTab ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    {store.op.phase === 'signing' ? t('staking.phaseSigning') : t('staking.phaseBroadcasting')}
-                  </span>
-                ) : activeTab === 'stake' ? (
-                  t('staking.stakeLaunch')
-                ) : (
-                  t('staking.unstakeLaunch')
-                )}
+                {activeTab === 'stake' ? t('staking.stakeLaunch') : t('staking.unstakeLaunch')}
               </button>
             </div>
           </div>
@@ -476,6 +435,7 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
 }
 
 // ═══ Operation Status Banner ═══
+// Shows current operation phase with live elapsed timer
 
 function OperationBanner({
   store,
@@ -485,6 +445,15 @@ function OperationBanner({
   t: (key: string) => string;
 }) {
   const { op } = store;
+
+  // Force re-render every second while op is active (for elapsed timer)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!op) return;
+    const interval = setInterval(() => setTick((n) => n + 1), 1_000);
+    return () => clearInterval(interval);
+  }, [op]);
+
   if (!op) return null;
 
   const typeLabel =
@@ -492,11 +461,12 @@ function OperationBanner({
     op.type === 'unstake' ? t('staking.unstake') :
     t('staking.claim');
 
-  // Signing / Broadcasting — active operation
+  const elapsed = Math.floor((Date.now() - op.startedAt) / 1000);
+
+  // ── Signing / Broadcasting ──
   if (op.phase === 'signing' || op.phase === 'broadcasting') {
-    const elapsed = Math.floor((Date.now() - op.startedAt) / 1000);
     return (
-      <div className="flex items-center gap-3 rounded-2xl bg-violet-500/8 border border-violet-500/20 px-4 py-3 animate-pulse">
+      <div className="flex items-center gap-3 rounded-2xl bg-violet-500/8 border border-violet-500/20 px-4 py-3">
         <Loader2 size={18} className="animate-spin text-violet-400 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-semibold text-violet-300">
@@ -504,44 +474,40 @@ function OperationBanner({
           </p>
           <p className="text-[10px] text-violet-400/60">
             {op.phase === 'signing' ? t('staking.phaseSigning') : t('staking.phaseBroadcasting')}
-            {elapsed > 3 ? ` · ${elapsed}s` : ''}
+            {elapsed > 2 && <span className="ml-1 tabular-nums">{elapsed}s</span>}
           </p>
         </div>
       </div>
     );
   }
 
-  // Done — success
-  if (op.phase === 'done' && op.txHash) {
+  // ── Pending (tx in mempool, waiting for chain confirmation) ──
+  if (op.phase === 'pending') {
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/8 border border-emerald-500/20 px-4 py-3">
         <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-semibold text-emerald-300">
-            {typeLabel} — {t('staking.successSent')}
+            {typeLabel}{op.amount ? ` ${op.amount} LAUNCH` : ''} — {t('staking.pendingOnChain')}
           </p>
-          <a
-            href={`${EXPLORER_URL}/transactions/${op.txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] text-emerald-400/50 hover:text-emerald-400 flex items-center gap-1 transition-colors"
-          >
-            {op.txHash.slice(0, 12)}...
-            <ExternalLink size={9} />
-          </a>
+          {op.txHash && (
+            <a
+              href={`${EXPLORER_URL}/transactions/${op.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-emerald-400/50 hover:text-emerald-400 inline-flex items-center gap-1 transition-colors"
+            >
+              {op.txHash.slice(0, 12)}...
+              <ExternalLink size={9} />
+            </a>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={() => store.clearOp()}
-          className="rounded-lg p-1.5 text-emerald-400/40 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-        >
-          <X size={14} />
-        </button>
+        <Loader2 size={14} className="animate-spin text-emerald-400/40 shrink-0" />
       </div>
     );
   }
 
-  // Error
+  // ── Error ──
   if (op.phase === 'error') {
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-red-500/8 border border-red-500/20 px-4 py-3">
@@ -555,9 +521,10 @@ function OperationBanner({
         <button
           type="button"
           onClick={() => store.clearOp()}
-          className="rounded-lg p-1.5 text-red-400/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          className="rounded-lg p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+          aria-label={t('common.close')}
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       </div>
     );
