@@ -1688,23 +1688,58 @@ adminRouter.put('/ai-bot/config', zValidator('json', z.object({
   commentaryEnabled: z.boolean().optional(),
   chatBotEnabled: z.boolean().optional(),
   botName: z.string().min(1).max(30).optional(),
-  systemPrompt: z.string().max(5000).optional(),
+  systemPrompt: z.string().max(10000).optional(),
   model: z.string().optional(),
   chatCooldownSec: z.number().int().min(5).max(300).optional(),
   bigBetThreshold: z.number().int().min(1).optional(),
   streakThreshold: z.number().int().min(2).max(20).optional(),
-  silenceMinutes: z.number().int().min(5).max(120).optional(),
+  silenceMinutes: z.number().int().min(5).max(1440).optional(),
   respondToMentions: z.boolean().optional(),
   reactToBigBets: z.boolean().optional(),
   reactToStreaks: z.boolean().optional(),
   postOnSilence: z.boolean().optional(),
-  extraContext: z.string().max(2000).optional(),
+  extraContext: z.string().max(5000).optional(),
   activePersonaId: z.string().nullable().optional(),
   personas: z.array(z.object({
     id: z.string(),
     name: z.string(),
+    slug: z.string().optional(),
+    description: z.string().optional(),
     prompt: z.string(),
+    enabled: z.boolean().optional(),
+    priority: z.number().optional(),
+    color: z.string().optional(),
+    avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
+    displayName: z.string().max(50).optional(),
+    nameColor: z.string().optional(),
+    schedule: z.object({
+      days: z.array(z.number().int().min(0).max(6)).optional(),
+      startHour: z.number().int().min(0).max(23).optional(),
+      endHour: z.number().int().min(0).max(23).optional(),
+      timezone: z.string().optional(),
+    }).optional(),
   })).optional(),
+  triggerMappings: z.array(z.object({
+    eventType: z.string(),
+    personaId: z.string().nullable(),
+    enabled: z.boolean(),
+    cooldownSec: z.number().int().min(0).optional(),
+    minBetThreshold: z.number().int().min(0).optional(),
+    probability: z.number().min(0).max(100).optional(),
+  })).optional(),
+  antiRepeatCount: z.number().int().min(0).max(100).optional(),
+  safetyStrict: z.boolean().optional(),
+  temperature: z.number().min(0.1).max(2.0).optional(),
+  emojiIntensity: z.number().int().min(0).max(3).optional(),
+  humorLevel: z.number().int().min(0).max(5).optional(),
+  dramaLevel: z.number().int().min(0).max(5).optional(),
+  sarcasmLevel: z.number().int().min(0).max(5).optional(),
+  premiumLevel: z.number().int().min(0).max(5).optional(),
+  fairnessMentions: z.boolean().optional(),
+  profanityFilter: z.boolean().optional(),
+  safetyMode: z.enum(['strict', 'playful', 'safe_chat', 'event_only', 'chat_read_only']).optional(),
+  bannedPhrases: z.array(z.string()).optional(),
+  softBannedPatterns: z.array(z.string()).optional(),
 }).strict()), async (c) => {
   const body = c.req.valid('json');
   await aiBotService.updateConfig(body);
@@ -1744,4 +1779,88 @@ adminRouter.delete('/ai-bot/chat-messages', async (c) => {
   const deleted = await aiBotService.clearBotChatMessages();
   logger.info({ deleted, admin: c.get('address') }, 'Admin cleared bot chat messages');
   return c.json({ data: { deleted } });
+});
+
+/** Get message log (chat + commentary combined log) */
+adminRouter.get('/ai-bot/message-log', async (c) => {
+  const limit = Number(c.req.query('limit') ?? 30);
+  const log = await aiBotService.getMessageLog(Math.min(limit, 100));
+  return c.json({ data: log });
+});
+
+/** Generate preview (test a persona/event without saving) */
+adminRouter.post('/ai-bot/preview', zValidator('json', z.object({
+  eventType: z.string(),
+  personaId: z.string().optional(),
+  player: z.string().optional(),
+  opponent: z.string().optional(),
+  side: z.string().optional(),
+  amount: z.number().optional(),
+  streak: z.number().optional(),
+  result: z.string().optional(),
+  chatMessage: z.string().optional(),
+})), async (c) => {
+  const body = c.req.valid('json');
+  const result = await aiBotService.generatePreview(
+    body.eventType as any,
+    {
+      player: body.player,
+      opponent: body.opponent,
+      side: body.side,
+      amount: body.amount,
+      streak: body.streak,
+      result: body.result,
+      chatMessage: body.chatMessage,
+    },
+    body.personaId,
+  );
+  if (!result) {
+    return c.json({ error: { code: 'GENERATION_FAILED', message: 'Failed to generate preview' } }, 500);
+  }
+  return c.json({ data: result });
+});
+
+/** Get defaults (for reset buttons) */
+adminRouter.get('/ai-bot/defaults', async (c) => {
+  return c.json({
+    data: {
+      systemPrompt: aiBotService.getDefaultSystemPrompt(),
+      personas: aiBotService.getDefaultPersonas(),
+      triggerMappings: aiBotService.getDefaultTriggerMappings(),
+    },
+  });
+});
+
+// ─── Phrase Rules CRUD ───────────────────────────────
+
+adminRouter.get('/ai-bot/phrase-rules', async (c) => {
+  const rules = await aiBotService.getPhraseRules();
+  return c.json({ data: rules });
+});
+
+adminRouter.post('/ai-bot/phrase-rules', zValidator('json', z.object({
+  type: z.enum(['blacklist', 'cooldown', 'preferred', 'forbidden_opening']),
+  value: z.string().min(1).max(200),
+  cooldownSec: z.number().int().min(0).optional(),
+})), async (c) => {
+  const { type, value, cooldownSec } = c.req.valid('json');
+  const rule = await aiBotService.createPhraseRule(type, value, cooldownSec);
+  return c.json({ data: rule });
+});
+
+adminRouter.put('/ai-bot/phrase-rules/:id', zValidator('json', z.object({
+  value: z.string().min(1).max(200).optional(),
+  isEnabled: z.boolean().optional(),
+  cooldownSec: z.number().int().min(0).optional(),
+})), async (c) => {
+  const id = c.req.param('id');
+  const body = c.req.valid('json');
+  await aiBotService.updatePhraseRule(id, body);
+  return c.json({ data: { ok: true } });
+});
+
+adminRouter.delete('/ai-bot/phrase-rules/:id', async (c) => {
+  const id = c.req.param('id');
+  await aiBotService.deletePhraseRule(id);
+  return c.json({ data: { ok: true } });
 });

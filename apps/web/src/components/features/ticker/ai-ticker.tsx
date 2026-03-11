@@ -178,8 +178,11 @@ export function AiTicker() {
       const data = event.data as { betId?: string; textRu?: string; textEn?: string; createdAt?: string };
       if (!data.textRu || !data.textEn) return;
       setItems(prev => {
+        const newBetId = String(data.betId ?? '');
+        // Dedup: skip if already have commentary for this betId
+        if (newBetId && prev.some(item => item.betId === newBetId)) return prev;
         const next = [...prev, {
-          betId: String(data.betId ?? ''),
+          betId: newBetId,
           textRu: data.textRu!,
           textEn: data.textEn!,
           createdAt: data.createdAt ?? new Date().toISOString(),

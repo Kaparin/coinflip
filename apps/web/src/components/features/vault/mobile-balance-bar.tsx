@@ -9,6 +9,7 @@ import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { GameTokenIcon } from '@/components/ui';
 import { BalanceDisplay } from './balance-display';
+import { StakingRevenueBanner } from '@/components/features/staking/staking-revenue-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 import { useAxmRates } from '@/hooks/use-axm-rates';
@@ -116,10 +117,11 @@ export function MobileBalanceBar() {
         )}
       </button>
 
-      {/* Expanded: full BalanceDisplay */}
+      {/* Expanded: full BalanceDisplay + staking banner */}
       {expanded && (
-        <div className="mt-2 animate-fade-up">
+        <div className="mt-2 animate-fade-up space-y-2">
           <BalanceDisplay />
+          <StakingRevenueBanner />
         </div>
       )}
     </div>

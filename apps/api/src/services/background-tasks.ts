@@ -23,6 +23,7 @@ import { CHAIN_OPEN_BETS_LIMIT } from '@coinflip/shared/constants';
 import { jackpotService } from './jackpot.service.js';
 import { stakingService } from './staking.service.js';
 import { partnerService } from './partner.service.js';
+import { aiBotService } from './ai-bot.service.js';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -271,6 +272,11 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       // Step 5: Notify all clients
       const addressMap = await betService.buildAddressMap([bet]);
       wsService.emitBetConfirmed(formatBetResponse(bet, addressMap) as unknown as Record<string, unknown>);
+
+      // Step 6: AI bot — react to big bets in chat
+      const makerInfo = addressMap.get(makerUserId);
+      const nickname = makerInfo?.nickname ?? address.slice(0, 10);
+      aiBotService.onBigBetCreated(nickname, amount).catch(() => {});
     } catch (err) {
       logger.error({ err, txHash }, `${tag} — unexpected error`);
       decrementPendingBetCount(makerUserId);

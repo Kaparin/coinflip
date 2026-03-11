@@ -24,7 +24,6 @@ import { useToast } from '@/components/ui/toast';
 import { useTranslation } from '@/lib/i18n';
 import { getUserFriendlyError } from '@/lib/user-friendly-errors';
 import { JackpotWinnerReveal } from '@/components/features/jackpot/jackpot-winner-reveal';
-import { StakingRevenueBanner } from '@/components/features/staking/staking-revenue-banner';
 import { X } from 'lucide-react';
 import { formatLaunch } from '@coinflip/shared/constants';
 import type { WsEvent } from '@coinflip/shared/types';
@@ -228,7 +227,6 @@ export default function GamePage() {
           </div>
           <TopWinnerBanner />
           <JackpotBanner />
-          <StakingRevenueBanner />
         </div>
 
         <div id="create-bet-form" className="hidden md:block">

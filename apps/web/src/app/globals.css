@@ -1233,10 +1233,14 @@ body {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   transition: opacity 0.4s ease;
+  display: inline-block;
+  animation: ai-ticker-scroll 12s linear infinite;
+}
+@keyframes ai-ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }
 .ai-ticker-fade-out {
   opacity: 0;
@@ -1262,6 +1266,8 @@ body {
     font-size: 18px;
     white-space: normal;
     text-wrap: balance;
+    animation: none;
+    transform: none;
   }
 }
 

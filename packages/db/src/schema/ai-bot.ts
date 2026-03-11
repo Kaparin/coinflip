@@ -1,40 +1,40 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, index, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, index, jsonb, real } from 'drizzle-orm/pg-core';
 
 /** AI bot configuration — single row, updated via admin panel */
 export const aiBotConfig = pgTable('ai_bot_config', {
   id: uuid('id').primaryKey().defaultRandom(),
-  /** Whether commentary generation is enabled */
   commentaryEnabled: boolean('commentary_enabled').notNull().default(true),
-  /** Whether chat bot responses are enabled */
   chatBotEnabled: boolean('chat_bot_enabled').notNull().default(true),
-  /** Bot display name */
   botName: text('bot_name').notNull().default('Oracle'),
-  /** Bot personality / system prompt (defines tone, style, behavior) */
   systemPrompt: text('system_prompt').notNull().default(''),
-  /** Persona presets: JSON array of { id, name, prompt } — admin can switch between them */
   personas: jsonb('personas').notNull().default('[]'),
-  /** Active persona ID (matches one from personas array) */
   activePersonaId: text('active_persona_id'),
-  /** GPT model to use */
   model: text('model').notNull().default('gpt-4o-mini'),
-  /** Min seconds between bot chat messages (global cooldown) */
   chatCooldownSec: integer('chat_cooldown_sec').notNull().default(30),
-  /** Min bet amount (in display units, e.g. 500) to trigger "big bet" commentary */
   bigBetThreshold: integer('big_bet_threshold').notNull().default(500),
-  /** Win streak count to trigger streak commentary */
   streakThreshold: integer('streak_threshold').notNull().default(3),
-  /** Minutes of chat silence before bot posts a conversation starter */
-  silenceMinutes: integer('silence_minutes').notNull().default(15),
-  /** Whether bot responds to @mention in chat */
+  silenceMinutes: integer('silence_minutes').notNull().default(120),
   respondToMentions: boolean('respond_to_mentions').notNull().default(true),
-  /** Whether bot reacts to big bets in chat */
   reactToBigBets: boolean('react_to_big_bets').notNull().default(true),
-  /** Whether bot reacts to win streaks */
   reactToStreaks: boolean('react_to_streaks').notNull().default(true),
-  /** Whether bot posts conversation starters on silence */
   postOnSilence: boolean('post_on_silence').notNull().default(true),
-  /** Additional context/instructions that admin can edit freely */
   extraContext: text('extra_context').notNull().default(''),
+  triggerMappings: jsonb('trigger_mappings').notNull().default('[]'),
+  antiRepeatCount: integer('anti_repeat_count').notNull().default(30),
+  safetyStrict: boolean('safety_strict').notNull().default(false),
+  /** Style controls */
+  temperature: real('temperature').notNull().default(0.95),
+  emojiIntensity: integer('emoji_intensity').notNull().default(1),
+  humorLevel: integer('humor_level').notNull().default(3),
+  dramaLevel: integer('drama_level').notNull().default(3),
+  sarcasmLevel: integer('sarcasm_level').notNull().default(2),
+  premiumLevel: integer('premium_level').notNull().default(3),
+  fairnessMentions: boolean('fairness_mentions').notNull().default(true),
+  profanityFilter: boolean('profanity_filter').notNull().default(true),
+  /** Safety mode: strict | playful | safe_chat | event_only | chat_read_only */
+  safetyMode: text('safety_mode').notNull().default('safe_chat'),
+  bannedPhrases: jsonb('banned_phrases').notNull().default('[]'),
+  softBannedPatterns: jsonb('soft_banned_patterns').notNull().default('[]'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -43,15 +43,45 @@ export const aiCommentary = pgTable(
   'ai_commentary',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    /** Reference to the resolved bet */
     betId: text('bet_id').notNull(),
-    /** Commentary text in Russian */
     textRu: text('text_ru').notNull(),
-    /** Commentary text in English */
     textEn: text('text_en').notNull(),
+    eventType: text('event_type'),
+    personaId: text('persona_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('idx_ai_commentary_created').on(t.createdAt),
   ],
 );
+
+/** Log of all AI bot chat messages — for analytics and debugging */
+export const aiBotMessageLog = pgTable(
+  'ai_bot_message_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventType: text('event_type').notNull().default('unknown'),
+    personaId: text('persona_id'),
+    outputRu: text('output_ru').notNull().default(''),
+    outputEn: text('output_en').notNull().default(''),
+    inputContext: jsonb('input_context'),
+    wasRegenerated: boolean('was_regenerated').notNull().default(false),
+    wasDelivered: boolean('was_delivered').notNull().default(true),
+    similarityScore: real('similarity_score'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_ai_bot_message_log_created').on(t.createdAt),
+  ],
+);
+
+/** Phrase rules for quality control — blacklist, cooldown, preferred, forbidden openings */
+export const phraseRules = pgTable('phrase_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /** Rule type: blacklist | cooldown | preferred | forbidden_opening */
+  type: text('type').notNull(),
+  value: text('value').notNull(),
+  cooldownSec: integer('cooldown_sec'),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

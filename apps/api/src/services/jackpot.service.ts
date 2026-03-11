@@ -13,6 +13,7 @@ import { JACKPOT_PER_TIER_BPS, VIP_JACKPOT_TIERS } from '@coinflip/shared/consta
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { wsService } from './ws.service.js';
+import { aiBotService } from './ai-bot.service.js';
 import { vaultService } from './vault.service.js';
 
 class JackpotService {
@@ -281,6 +282,9 @@ class JackpotService {
           isPersonal: true,
         },
       });
+
+      // AI bot — celebrate jackpot in chat
+      aiBotService.onJackpotWon(winner.nickname ?? winner.address.slice(0, 10), prizeAmount).catch(() => {});
 
       logger.info(
         {

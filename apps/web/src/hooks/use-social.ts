@@ -39,6 +39,9 @@ export interface ChatMessage {
   /** For AI bot messages — localized text */
   textRu?: string;
   textEn?: string;
+  /** AI bot persona identity */
+  avatarUrl?: string;
+  nameColor?: string;
   effect: 'confetti' | 'coins' | 'fire' | null;
   createdAt: string;
   coinDrop?: CoinDropInfo;

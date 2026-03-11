@@ -413,9 +413,13 @@ function ChatBubble({ msg, locale }: { msg: ChatMessage; locale?: string }) {
         </div>
       )}
       {isAiBot ? (
-        <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px]">
-          &#x2728;
-        </div>
+        msg.avatarUrl ? (
+          <img src={msg.avatarUrl} alt="" className="shrink-0 mt-0.5 h-5 w-5 rounded-full object-cover" />
+        ) : (
+          <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px]">
+            &#x2728;
+          </div>
+        )
       ) : (
         <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
           <UserAvatar address={msg.address} size={20} />
@@ -424,7 +428,9 @@ function ChatBubble({ msg, locale }: { msg: ChatMessage; locale?: string }) {
       <div className="min-w-0 flex-1 text-[11px] leading-relaxed">
         {isAiBot ? (
           <>
-            <span className="font-semibold text-indigo-400">{msg.nickname || 'Oracle'}</span>
+            <span className="font-semibold" style={msg.nameColor ? { color: msg.nameColor } : undefined}>
+              {msg.nickname || 'Oracle'}
+            </span>
             {' '}<span className="chat-ai-badge">AI</span>
           </>
         ) : (
