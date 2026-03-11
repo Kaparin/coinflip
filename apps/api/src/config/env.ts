@@ -20,7 +20,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5433/coinflip'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   AXIOME_RPC_URL: z.string().default('http://49.13.3.227:26657'),
-  AXIOME_REST_URL: z.string().default('https://api-idx.axiomechain.pro'),
+  AXIOME_REST_URL: z.string().default('http://49.13.3.227:1317'),
   /** Comma-separated fallback REST URLs for chain queries (tried in order after primary) */
   AXIOME_REST_URLS_FALLBACK: z.string().default(''),
   AXIOME_CHAIN_ID: z.string().default('axiome-1'),

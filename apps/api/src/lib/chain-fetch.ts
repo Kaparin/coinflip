@@ -24,10 +24,10 @@ function getRestUrls(): string[] {
       if (trimmed) urls.push(trimmed);
     }
   }
-  // Always include the validator node as a last-resort fallback
-  const validatorRest = 'http://49.13.3.227:1317';
-  if (!urls.includes(validatorRest)) {
-    urls.push(validatorRest);
+  // Include indexed WASM nodes as fallbacks (faster for contract queries, but no bank/tx endpoints)
+  const wasmFallbacks = ['https://api-idx.axiomechain.pro', 'https://idx.ambdmn.com'];
+  for (const fb of wasmFallbacks) {
+    if (!urls.includes(fb)) urls.push(fb);
   }
   _restUrls = urls;
   return urls;

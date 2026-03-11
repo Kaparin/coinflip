@@ -39,13 +39,13 @@ export const DEFAULT_CHAIN_ID = 'axiome-1';
 export const DEFAULT_RPC_URL = 'http://49.13.3.227:26657';
 
 /**
- * Default REST (LCD) endpoint (Cosmos REST API).
+ * Default REST (LCD) endpoint (Cosmos REST API, port 1317).
  * Used by the indexer for block/tx queries.
  *
- * Primary (indexed, faster): https://api-idx.axiomechain.pro
- * Validator node REST (fallback): http://49.13.3.227:1317
+ * Validator node REST (full API): http://49.13.3.227:1317
+ * Indexed WASM-only nodes: api-idx.axiomechain.pro, idx.ambdmn.com
  */
-export const DEFAULT_REST_URL = 'https://api-idx.axiomechain.pro';
+export const DEFAULT_REST_URL = 'http://49.13.3.227:1317';
 
 /**
  * Swagger docs for the node REST API.
