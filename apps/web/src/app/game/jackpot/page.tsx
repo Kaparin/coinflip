@@ -26,7 +26,7 @@ export default function JackpotPage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
+    <div className="h-full overflow-y-auto mx-auto max-w-4xl px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

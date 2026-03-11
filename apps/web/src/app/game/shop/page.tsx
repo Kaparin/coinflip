@@ -113,7 +113,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 lg:px-6 py-6 space-y-6 pb-24 md:pb-6">
+    <div className="h-full overflow-y-auto mx-auto max-w-4xl px-4 lg:px-6 py-6 space-y-6 pb-24 md:pb-6">
       {/* Page Header */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-2">

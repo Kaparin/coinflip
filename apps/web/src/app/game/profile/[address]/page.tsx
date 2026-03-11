@@ -620,7 +620,7 @@ export default function PlayerProfilePage() {
   const selectedCategory = selectedAch ? ACHIEVEMENT_CATEGORIES.find((c) => c.id === selectedAch) : null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-3 pb-24 md:pb-6">
+    <div className="h-full overflow-y-auto max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-3 pb-24 md:pb-6">
       {/* Back button */}
       <button
         type="button"
