@@ -795,6 +795,12 @@ adminRouter.get('/economy/overview', async (c) => {
       winnersCount: sql<number>`count(*) filter (where ep.prize_amount::numeric > 0)::int`,
     }).from(sql`event_participants ep`);
 
+    // Team withdrawals (already taken from treasury)
+    const [teamWithdrawals] = await db.select({
+      totalWithdrawn: sql<string>`coalesce(sum(amount::numeric), 0)::text`,
+      count: sql<number>`count(*)::int`,
+    }).from(treasuryLedgerTable).where(sql`source = 'team_withdrawal'`);
+
     // --- COIN Economy ---
     // Total COIN in circulation (sum of all user coin_balances)
     const [coinCirculation] = await db.select({
@@ -872,15 +878,18 @@ adminRouter.get('/economy/overview', async (c) => {
           stakingCount: stakingStats!.count,
           eventPrizes: eventStats!.totalPrizes,
           eventWinners: eventStats!.winnersCount,
-          // Team share = total 10% commission - referrals - jackpot contributions - staking - partners
+          // Team share = total 10% commission - referrals - jackpot - staking - partners - already withdrawn
           teamShare: (() => {
             const totalComm = BigInt(betTotals!.totalCommission);
             const spent = BigInt(refStats!.totalPaid)
               + BigInt(jackpotContribStats!.totalContributed)
               + BigInt(stakingStats!.totalAccrued)
-              + BigInt(partnerStats!.totalPaid);
+              + BigInt(partnerStats!.totalPaid)
+              + BigInt(teamWithdrawals!.totalWithdrawn);
             return (totalComm - spent).toString();
           })(),
+          teamWithdrawn: teamWithdrawals!.totalWithdrawn,
+          teamWithdrawnCount: teamWithdrawals!.count,
         },
         // COIN Economy
         coin: {

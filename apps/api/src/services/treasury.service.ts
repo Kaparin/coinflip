@@ -170,6 +170,19 @@ export class TreasuryService {
       'Treasury withdrawal confirmed',
     );
 
+    // Record withdrawal in treasury_ledger so teamShare calculation subtracts it
+    try {
+      await this.db.insert(treasuryLedger).values({
+        txhash: result.txHash!,
+        amount,
+        denom: isAxmMode() ? env.AXM_DENOM : 'COIN',
+        source: 'team_withdrawal',
+      });
+      logger.info({ txHash: result.txHash, amount }, 'Treasury withdrawal recorded in ledger');
+    } catch (err) {
+      logger.warn({ err, amount }, 'Failed to record treasury withdrawal in ledger');
+    }
+
     // Sync DB vault balance — deduct withdrawn amount from available
     try {
       const treasuryUser = await this.db.query.users.findFirst({

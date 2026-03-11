@@ -190,7 +190,12 @@ export function CommissionTab() {
                       <p className={`text-xl font-bold ${team >= 0n ? 'text-amber-400' : 'text-red-400'}`}>
                         {formatLaunch(team.toString())} AXM
                       </p>
-                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-2">{pct(team).toFixed(1)}% от комиссии</p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)] mb-1">{pct(team).toFixed(1)}% от комиссии</p>
+                      {BigInt(eco.axm.teamWithdrawn ?? '0') > 0n && (
+                        <p className="text-[10px] text-[var(--color-text-secondary)] mb-1">
+                          Выведено ранее: {formatLaunch(eco.axm.teamWithdrawn ?? '0')} AXM ({eco.axm.teamWithdrawnCount ?? 0} оп.)
+                        </p>
+                      )}
                       {team > 0n && (
                         <ActionButton
                           onClick={async () => {

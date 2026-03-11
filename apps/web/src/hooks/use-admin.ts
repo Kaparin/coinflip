@@ -233,6 +233,8 @@ export interface EconomyOverview {
     eventPrizes: string;
     eventWinners: number;
     teamShare: string;
+    teamWithdrawn?: string;
+    teamWithdrawnCount?: number;
   };
   coin: {
     totalCirculating: string;
@@ -336,6 +338,7 @@ export function useAdminWithdraw() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'treasury'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'economy'] });
     },
   });
 }
