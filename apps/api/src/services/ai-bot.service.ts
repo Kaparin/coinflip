@@ -71,7 +71,9 @@ Game context:
 - The game uses commit-reveal for fairness (provably fair)
 
 IMPORTANT: Always respond with a JSON object containing both languages:
-{"ru": "Russian text here", "en": "English text here"}`;
+{"ru": "Russian text here", "en": "English text here"}
+
+CRITICAL: NEVER translate player nicknames. Always keep nicknames exactly as they are — if a player is called "CryptoKing", write "CryptoKing" in both ru and en versions. Nicknames are proper names, not translatable words.`;
 
 // ─── Service ────────────────────────────────────────────
 
@@ -266,7 +268,8 @@ class AiBotService {
     const systemPrompt = this.buildSystemPrompt(config) + `
 
 TASK: Generate a short, dramatic commentary for a just-resolved coin flip bet.
-Keep it to 1-2 sentences. Be entertaining and varied — don't repeat the same patterns.`;
+Keep it to 1-2 sentences. Be entertaining and varied — don't repeat the same patterns.
+CRITICAL: NEVER translate player nicknames — keep them exactly as provided.`;
 
     const userPrompt = `Bet resolved:
 - ${context.makerNickname} vs ${context.acceptorNickname}
@@ -294,6 +297,7 @@ Generate commentary as JSON: {"ru": "...", "en": "..."}`;
           betId: context.betId,
           textRu: result.ru,
           textEn: result.en,
+          createdAt: new Date().toISOString(),
         },
       });
 
@@ -431,6 +435,7 @@ Generate commentary as JSON: {"ru": "...", "en": "..."}`;
 
 TASK: You are posting in the global chat of CoinFlip game.
 Keep responses short (1-2 sentences), witty, and in-character.
+CRITICAL: NEVER translate player nicknames — keep them exactly as provided.
 Response format: {"ru": "...", "en": "..."}`;
 
     let userPrompt = '';

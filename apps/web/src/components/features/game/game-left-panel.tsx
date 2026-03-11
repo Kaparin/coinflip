@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Crown, ChevronRight, TrendingUp, Trophy, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useGetVaultBalance } from '@coinflip/api-client';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useWalletBalance } from '@/hooks/use-wallet-balance';
@@ -88,31 +89,55 @@ function JackpotWidget() {
 
   return (
     <Link href="/game/jackpot" className="group block">
-      <div className="rounded-xl border border-rose-500/20 bg-[var(--color-surface)] p-3 hover:border-rose-500/40 transition-colors">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-400/70">
-            {t('jackpot.bannerTitle')}
-          </span>
-          <ChevronRight size={12} className="text-[var(--color-text-secondary)] group-hover:text-rose-400 transition-colors" />
-        </div>
-        <div className="text-lg font-black tabular-nums text-rose-400 leading-tight">
-          {totalFormatted}
-        </div>
-        <div className="flex items-center gap-1.5 mt-1.5">
-          <GameTokenIcon size={10} />
-          <span className="text-[10px] text-[var(--color-text-secondary)]">
-            {pools.length} {t('jackpot.bannerPools', { count: pools.length })}
-          </span>
-          <span className="text-[9px] text-rose-400/80 font-medium ml-auto">
-            {t(`jackpot.tiers.${closest.tierName}`)} {closest.progress}%
-          </span>
-        </div>
-        {/* Mini progress */}
-        <div className="mt-2 h-1 rounded-full bg-rose-500/10 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-rose-500 to-violet-400 transition-all duration-700"
-            style={{ width: `${Math.min(100, closest.progress)}%` }}
+      <div className="relative overflow-hidden rounded-xl border border-rose-500/20 bg-[var(--color-surface)] hover:border-rose-500/40 transition-colors">
+        {/* Top accent line */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-rose-400/60 to-transparent" />
+        {/* Shimmer sweep */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-rose-400/[0.04] to-transparent animate-shimmer pointer-events-none" />
+
+        {/* Jackpot image — prominent */}
+        <div className="relative flex justify-center pt-3 pb-1">
+          <div className="absolute inset-0 flex justify-center items-center">
+            <div className="w-24 h-24 rounded-full bg-rose-400/10 blur-2xl" />
+          </div>
+          <Image
+            src="/jackpot.png"
+            alt="Jackpot"
+            width={96}
+            height={96}
+            className="relative drop-shadow-[0_0_12px_rgba(251,113,133,0.5)]"
+            sizes="96px"
           />
+        </div>
+
+        <div className="relative px-3 pb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400/70">
+              {t('jackpot.bannerTitle')}
+            </span>
+            <ChevronRight size={12} className="text-[var(--color-text-secondary)] group-hover:text-rose-400 transition-colors" />
+          </div>
+          <div className="text-xl font-black tabular-nums text-rose-400 leading-tight text-center">
+            {totalFormatted}
+          </div>
+          <div className="flex items-center justify-center gap-1 mt-1">
+            <GameTokenIcon size={10} />
+            <span className="text-[10px] text-[var(--color-text-secondary)]">
+              {pools.length} {t('jackpot.bannerPools', { count: pools.length })}
+            </span>
+          </div>
+          <div className="text-center mt-1">
+            <span className="text-[9px] text-rose-400/80 font-medium">
+              {t(`jackpot.tiers.${closest.tierName}`)} {closest.progress}%
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-2 h-1 rounded-full bg-rose-500/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-rose-500 to-violet-400 transition-all duration-700"
+              style={{ width: `${Math.min(100, closest.progress)}%` }}
+            />
+          </div>
         </div>
       </div>
     </Link>
@@ -217,8 +242,8 @@ function MiniLeaderboard() {
   } as const;
 
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-col min-h-0 flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+      <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="flex items-center gap-1">
           <Trophy size={11} className="text-[var(--color-primary)]" />
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
@@ -228,7 +253,7 @@ function MiniLeaderboard() {
       </div>
 
       {/* Sort pills */}
-      <div className="flex gap-1 mb-2">
+      <div className="flex gap-1 mb-2 shrink-0">
         {(['wins', 'wagered', 'win_rate'] as const).map(id => (
           <button key={id} type="button" onClick={() => setSortBy(id)}
             className={`px-2 py-0.5 text-[9px] font-medium rounded-md transition-colors ${
@@ -248,7 +273,7 @@ function MiniLeaderboard() {
       ) : top5.length === 0 ? (
         <p className="text-[10px] text-[var(--color-text-secondary)] text-center py-3">{t('leaderboard.noPlayers')}</p>
       ) : (
-        <div className="space-y-0.5">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide space-y-0.5">
           {top5.map((entry) => {
             const isMe = !!address && entry.address.toLowerCase() === address.toLowerCase();
             const rankEmoji = entry.rank === 1 ? '\u{1F947}' : entry.rank === 2 ? '\u{1F948}' : entry.rank === 3 ? '\u{1F949}' : null;
@@ -282,12 +307,18 @@ function MiniLeaderboard() {
 
 export function GameLeftPanel() {
   return (
-    <aside className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-y-auto overflow-x-hidden py-4 pl-4 pr-3 space-y-3 scrollbar-hide border-r border-[var(--color-border)]/50">
-      <BalanceWidget />
-      <JackpotWidget />
-      <TopWinnerWidget />
-      <StakingWidget />
-      <MiniLeaderboard />
+    <aside className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-hidden py-4 pl-4 pr-3 border-r border-[var(--color-border)]/50">
+      {/* Top widgets — fixed, don't scroll */}
+      <div className="shrink-0 space-y-3 overflow-y-auto overflow-x-hidden scrollbar-hide max-h-[55%]">
+        <BalanceWidget />
+        <JackpotWidget />
+        <TopWinnerWidget />
+        <StakingWidget />
+      </div>
+      {/* Leaderboard — fills remaining space, scrolls internally */}
+      <div className="flex-1 min-h-0 mt-3">
+        <MiniLeaderboard />
+      </div>
     </aside>
   );
 }

@@ -936,6 +936,7 @@
     }
   },
   "walletPage": {
+    "title": "Wallet",
     "connectTitle": "Connect your wallet",
     "connectDesc": "Connect a wallet to view your balance, deposit, and withdraw tokens."
   },
@@ -1321,5 +1322,9 @@
     "errorUnknown": "Something went wrong. Try again later",
     "cooldownWait": "Previous transaction is still confirming...",
     "cooldownSeconds": "Wait ~{{seconds}}s"
+  },
+  "ticker": {
+    "historyTitle": "Today's Commentary",
+    "noHistory": "No commentary yet"
   }
 }

@@ -1198,25 +1198,34 @@ body {
   background: linear-gradient(90deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.08));
   border-bottom: 1px solid rgba(99, 102, 241, 0.15);
   position: relative;
+  cursor: pointer;
+  border: none;
+  text-align: center;
+  transition: background 0.2s;
+}
+.ai-ticker:hover {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.12));
 }
 .ai-ticker-inner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 6px 12px;
-  min-height: 32px;
+  padding: 8px 16px;
+  min-height: 40px;
 }
 .ai-ticker-icon {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 .ai-ticker-text {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-text-secondary);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   transition: opacity 0.4s ease;
 }
 .ai-ticker-fade-out {
@@ -1226,8 +1235,29 @@ body {
   opacity: 1;
 }
 @media (min-width: 640px) {
+  .ai-ticker-inner {
+    padding: 10px 24px;
+    min-height: 44px;
+  }
+  .ai-ticker-icon {
+    font-size: 18px;
+  }
   .ai-ticker-text {
-    font-size: 13px;
+    font-size: 16px;
+  }
+}
+@media (min-width: 1024px) {
+  .ai-ticker-inner {
+    padding: 10px 32px;
+    min-height: 48px;
+  }
+  .ai-ticker-icon {
+    font-size: 20px;
+  }
+  .ai-ticker-text {
+    font-size: 18px;
+    white-space: normal;
+    text-wrap: balance;
   }
 }
 
