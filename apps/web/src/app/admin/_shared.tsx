@@ -119,3 +119,29 @@ export function ActionButton({ children, onClick, disabled, variant = 'default' 
     </button>
   );
 }
+
+export function SubNav<T extends string>({ items, active, onChange }: {
+  items: ReadonlyArray<{ id: T; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }>;
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap mb-4">
+      {items.map(({ id, icon: Icon, label }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+            active === id
+              ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30'
+              : 'border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
+          }`}
+        >
+          <Icon size={14} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}

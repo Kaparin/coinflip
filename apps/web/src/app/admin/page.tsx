@@ -5,110 +5,116 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Users,
-  Dices,
-  AlertTriangle,
-  Wrench,
-  Trophy,
-  ArrowLeftRight,
-  Gem,
-  Megaphone,
-  Crown,
+  Gamepad2,
+  Wallet,
+  FileText,
   Settings,
-  PieChart,
-  Newspaper,
-  Store,
-  Coins,
+  Wrench,
 } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n';
-import { DashboardTab } from './tabs/dashboard';
+import { OverviewTab } from './tabs/overview';
 import { UsersTab } from './tabs/users';
-import { BetsTab } from './tabs/bets';
-import { DiagnosticsTab } from './tabs/diagnostics';
-import { ActionsTab } from './tabs/actions';
-import { EventsTab } from './tabs/events';
-import { TransactionsTab } from './tabs/transactions';
-import { JackpotTab } from './tabs/jackpot';
-import { AnnouncementsTab } from './tabs/announcements';
-import { VipTab } from './tabs/vip';
-import { ConfigTab } from './tabs/config';
-import { CommissionTab } from './tabs/commission';
-import { NewsTab } from './tabs/news';
-import { ShopTab } from './tabs/shop';
-import { StakingTab } from './tabs/staking';
+import { GameTab } from './tabs/game';
+import { FinanceTab } from './tabs/finance';
+import { ContentTab } from './tabs/content';
+import { SettingsTab } from './tabs/settings-tab';
+import { SystemTab } from './tabs/system';
 
-type Tab = 'dashboard' | 'users' | 'bets' | 'events' | 'jackpot' | 'vip' | 'transactions' | 'diagnostics' | 'actions' | 'announcements' | 'config' | 'commission' | 'staking' | 'news' | 'shop';
+type Tab = 'overview' | 'users' | 'game' | 'finance' | 'content' | 'settings' | 'system';
 
-const TABS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string }> = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд' },
-  { id: 'users', icon: Users, label: 'Юзеры' },
-  { id: 'bets', icon: Dices, label: 'Ставки' },
-  { id: 'events', icon: Trophy, label: 'Ивенты' },
-  { id: 'jackpot', icon: Gem, label: 'Джекпот' },
-  { id: 'vip', icon: Crown, label: 'VIP' },
-  { id: 'commission', icon: PieChart, label: 'Комиссия' },
-  { id: 'staking', icon: Coins, label: 'Стейкинг' },
-  { id: 'transactions', icon: ArrowLeftRight, label: 'Транзакции' },
-  { id: 'announcements', icon: Megaphone, label: 'Анонсы' },
-  { id: 'news', icon: Newspaper, label: 'Новости' },
-  { id: 'shop', icon: Store, label: 'Магазин' },
-  { id: 'config', icon: Settings, label: 'Конфиг' },
-  { id: 'diagnostics', icon: AlertTriangle, label: 'Диагн.' },
-  { id: 'actions', icon: Wrench, label: 'Действия' },
+const NAV_ITEMS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string; description: string }> = [
+  { id: 'overview', icon: LayoutDashboard, label: 'Обзор', description: 'Аналитика и P&L' },
+  { id: 'users', icon: Users, label: 'Пользователи', description: 'Управление юзерами' },
+  { id: 'game', icon: Gamepad2, label: 'Игра', description: 'Ставки, ивенты, джекпот' },
+  { id: 'finance', icon: Wallet, label: 'Финансы', description: 'Казна, стейкинг, магазин' },
+  { id: 'content', icon: FileText, label: 'Контент', description: 'Анонсы и новости' },
+  { id: 'settings', icon: Settings, label: 'Настройки', description: 'Конфиг, VIP, рефералы' },
+  { id: 'system', icon: Wrench, label: 'Система', description: 'Диагностика и действия' },
 ];
 
 export default function AdminPage() {
-  const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+
+  const activeItem = NAV_ITEMS.find(n => n.id === activeTab)!;
 
   return (
-    <div className="mx-auto max-w-6xl px-2 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)]/15">
-          <ShieldCheck size={18} className="text-[var(--color-primary)]" />
+    <div className="mx-auto max-w-[1400px] flex min-h-[calc(100dvh-80px)]">
+      {/* ═══ Sidebar — Desktop ═══ */}
+      <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface)]/30">
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-4 py-5 border-b border-[var(--color-border)]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)]/15">
+            <ShieldCheck size={18} className="text-[var(--color-primary)]" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold leading-tight">Admin Panel</h1>
+            <p className="text-[9px] text-[var(--color-text-secondary)] leading-tight">CoinFlip Platform</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-lg font-bold">{t('admin.title')}</h1>
-          <p className="text-[10px] text-[var(--color-text-secondary)]">{t('admin.subtitle')}</p>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-3 space-y-0.5">
+          {NAV_ITEMS.map(({ id, icon: Icon, label, description }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
+                activeTab === id
+                  ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/20 hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              <Icon size={18} className={activeTab === id ? 'text-[var(--color-primary)]' : 'opacity-60'} />
+              <div className="min-w-0">
+                <span className={`text-[13px] block leading-tight ${activeTab === id ? 'font-semibold' : ''}`}>{label}</span>
+                <span className="text-[9px] text-[var(--color-text-secondary)] block leading-tight truncate">{description}</span>
+              </div>
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* ═══ Mobile Navigation ═══ */}
+      <div className="lg:hidden fixed top-[60px] left-0 right-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur-sm">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar px-2 py-1.5">
+          {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors ${
+                activeTab === id
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
+              }`}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Tab Navigation — scrollable, no-scrollbar, compact */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
-        {TABS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors ${
-              activeTab === id
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
-            }`}
-            title={label}
-          >
-            <Icon size={14} />
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* ═══ Main Content ═══ */}
+      <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 lg:py-6 mt-12 lg:mt-0">
+        {/* Page header */}
+        <div className="mb-6 flex items-center gap-3">
+          <activeItem.icon size={20} className="text-[var(--color-primary)] hidden sm:block" />
+          <div>
+            <h2 className="text-lg font-bold">{activeItem.label}</h2>
+            <p className="text-[11px] text-[var(--color-text-secondary)]">{activeItem.description}</p>
+          </div>
+        </div>
 
-      {/* Tab Content */}
-      {activeTab === 'dashboard' && <DashboardTab />}
-      {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'bets' && <BetsTab />}
-      {activeTab === 'events' && <EventsTab />}
-      {activeTab === 'jackpot' && <JackpotTab />}
-      {activeTab === 'vip' && <VipTab />}
-      {activeTab === 'transactions' && <TransactionsTab />}
-      {activeTab === 'diagnostics' && <DiagnosticsTab />}
-      {activeTab === 'actions' && <ActionsTab />}
-      {activeTab === 'announcements' && <AnnouncementsTab />}
-      {activeTab === 'config' && <ConfigTab />}
-      {activeTab === 'commission' && <CommissionTab />}
-      {activeTab === 'staking' && <StakingTab />}
-      {activeTab === 'news' && <NewsTab />}
-      {activeTab === 'shop' && <ShopTab />}
+        {/* Tab Content */}
+        {activeTab === 'overview' && <OverviewTab />}
+        {activeTab === 'users' && <UsersTab />}
+        {activeTab === 'game' && <GameTab />}
+        {activeTab === 'finance' && <FinanceTab />}
+        {activeTab === 'content' && <ContentTab />}
+        {activeTab === 'settings' && <SettingsTab />}
+        {activeTab === 'system' && <SystemTab />}
+      </main>
     </div>
   );
 }
