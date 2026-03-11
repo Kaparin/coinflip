@@ -1214,10 +1214,20 @@ body {
   padding: 8px 16px;
   min-height: 40px;
 }
-.ai-ticker-icon {
-  flex-shrink: 0;
-  font-size: 16px;
-  line-height: 1;
+.ai-ticker-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 0;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.04), rgba(139, 92, 246, 0.06), rgba(99, 102, 241, 0.04));
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.ai-ticker-collapsed:hover {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.1), rgba(99, 102, 241, 0.08));
 }
 .ai-ticker-text {
   font-size: 14px;
@@ -1239,9 +1249,6 @@ body {
     padding: 10px 24px;
     min-height: 44px;
   }
-  .ai-ticker-icon {
-    font-size: 18px;
-  }
   .ai-ticker-text {
     font-size: 16px;
   }
@@ -1250,9 +1257,6 @@ body {
   .ai-ticker-inner {
     padding: 10px 32px;
     min-height: 48px;
-  }
-  .ai-ticker-icon {
-    font-size: 20px;
   }
   .ai-ticker-text {
     font-size: 18px;

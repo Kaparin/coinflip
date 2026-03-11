@@ -1718,3 +1718,30 @@ adminRouter.get('/ai-bot/commentary', async (c) => {
   const commentary = await aiBotService.getRecentCommentary(Math.min(limit, 50));
   return c.json({ data: commentary });
 });
+
+/** Get AI bot stats */
+adminRouter.get('/ai-bot/stats', async (c) => {
+  const stats = await aiBotService.getStats();
+  return c.json({ data: stats });
+});
+
+/** Get recent bot chat messages */
+adminRouter.get('/ai-bot/chat-messages', async (c) => {
+  const limit = Number(c.req.query('limit') ?? 20);
+  const messages = await aiBotService.getRecentBotChatMessages(Math.min(limit, 50));
+  return c.json({ data: messages });
+});
+
+/** Clear all AI commentary */
+adminRouter.delete('/ai-bot/commentary', async (c) => {
+  const deleted = await aiBotService.clearCommentary();
+  logger.info({ deleted, admin: c.get('address') }, 'Admin cleared AI commentary');
+  return c.json({ data: { deleted } });
+});
+
+/** Clear all bot chat messages */
+adminRouter.delete('/ai-bot/chat-messages', async (c) => {
+  const deleted = await aiBotService.clearBotChatMessages();
+  logger.info({ deleted, admin: c.get('address') }, 'Admin cleared bot chat messages');
+  return c.json({ data: { deleted } });
+});

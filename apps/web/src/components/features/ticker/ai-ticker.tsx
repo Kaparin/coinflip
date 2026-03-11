@@ -117,13 +117,13 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
               return (
                 <div
                   key={`${item.betId}-${i}`}
-                  className="flex items-start gap-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3"
+                  className="flex flex-col items-center gap-1 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3"
                 >
-                  <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] shrink-0 pt-0.5 min-w-[50px]">
+                  <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
                     <Clock size={10} />
                     <span className="tabular-nums">{formatTime(item.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-[var(--color-text)] leading-relaxed">{text}</p>
+                  <p className="text-sm text-[var(--color-text)] leading-relaxed text-center">{text}</p>
                 </div>
               );
             })
@@ -140,9 +140,11 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
 export function AiTicker() {
   const { locale, t } = useTranslation();
   const [items, setItems] = useState<CommentaryItem[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayIndex, setDisplayIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const shownCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Fetch initial commentary on mount
@@ -155,7 +157,11 @@ export function AiTicker() {
         if (res.ok) {
           const json = await res.json() as { data: CommentaryItem[] };
           if (json.data?.length > 0) {
-            setItems(json.data.reverse()); // oldest first
+            const reversed = json.data.reverse(); // oldest first
+            setItems(reversed);
+            // Start from the last (newest) item
+            setDisplayIndex(reversed.length - 1);
+            shownCountRef.current = 0;
           }
         }
       } catch {
@@ -165,7 +171,7 @@ export function AiTicker() {
     fetchInitial();
   }, []);
 
-  // Subscribe to new commentary via WS
+  // Subscribe to new commentary via WS — show new items, uncollapse
   useEffect(() => {
     return subscribeToTickerEvents((event) => {
       if (event.type !== 'ai_commentary') return;
@@ -180,28 +186,88 @@ export function AiTicker() {
         }];
         return next.slice(-50);
       });
+      // New item arrived — uncollapse & show it
+      setCollapsed(false);
+      shownCountRef.current = 0;
+      setDisplayIndex(prev => prev); // trigger re-render; actual index updated below
     });
   }, []);
 
-  // Rotate through items
+  // When new items arrive via WS, jump to the latest
+  const prevLenRef = useRef(0);
   useEffect(() => {
-    if (items.length <= 1) return;
-    timerRef.current = setInterval(() => {
+    if (items.length > prevLenRef.current && prevLenRef.current > 0) {
+      // New item was appended
+      setDisplayIndex(items.length - 1);
+      shownCountRef.current = 0;
+      setCollapsed(false);
+    }
+    prevLenRef.current = items.length;
+  }, [items.length]);
+
+  // Show last few items sequentially, then collapse
+  useEffect(() => {
+    if (collapsed || items.length === 0) return;
+
+    // Show each item for 6s, walk backwards from newest showing up to 3 recent items
+    const maxToShow = Math.min(3, items.length);
+
+    timerRef.current = setTimeout(() => {
+      shownCountRef.current++;
+
+      if (shownCountRef.current >= maxToShow) {
+        // Done showing — fade out and collapse
+        setIsAnimating(true);
+        setTimeout(() => {
+          setCollapsed(true);
+          setIsAnimating(false);
+        }, 500);
+        return;
+      }
+
+      // Show next (older) item
       setIsAnimating(true);
       setTimeout(() => {
-        setCurrentIndex(prev => (prev + 1) % items.length);
+        setDisplayIndex(prev => {
+          const next = prev - 1;
+          return next >= 0 ? next : prev;
+        });
         setIsAnimating(false);
       }, 500);
     }, 6000);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [items.length]);
+  }, [collapsed, items.length, displayIndex]);
 
   if (items.length === 0) return null;
 
-  const current = items[currentIndex % items.length];
+  // Collapsed — show just a small clickable indicator
+  if (collapsed) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setShowHistory(true)}
+          className="ai-ticker-collapsed group"
+          title={t('ticker.historyTitle')}
+        >
+          <Sparkles size={14} className="text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+        </button>
+
+        {showHistory && (
+          <HistorySheet
+            items={items}
+            locale={locale}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
+      </>
+    );
+  }
+
+  const current = items[displayIndex % items.length];
   if (!current) return null;
 
   const text = locale === 'ru' ? current.textRu : current.textEn;
@@ -214,7 +280,7 @@ export function AiTicker() {
         className="ai-ticker group"
       >
         <div className="ai-ticker-inner">
-          <span className="ai-ticker-icon">&#x1F3B0;</span>
+          <Sparkles size={14} className="text-indigo-400 shrink-0" />
           <span
             className={`ai-ticker-text ${isAnimating ? 'ai-ticker-fade-out' : 'ai-ticker-fade-in'}`}
           >

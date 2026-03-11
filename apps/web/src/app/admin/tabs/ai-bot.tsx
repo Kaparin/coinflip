@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Save, Plus, Trash2, Sparkles, MessageSquare, Zap } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, Sparkles, MessageSquare, Zap, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
 import { API_URL } from '@/lib/constants';
 import { ActionButton } from '../_shared';
 
@@ -37,6 +37,19 @@ interface Commentary {
   createdAt: string;
 }
 
+interface ChatMessage {
+  id: string;
+  message: string;
+  createdAt: string;
+}
+
+interface BotStats {
+  totalCommentary: number;
+  totalChatMessages: number;
+  lastCommentaryAt: string | null;
+  lastChatMessageAt: string | null;
+}
+
 async function fetchConfig(): Promise<BotConfig> {
   const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/config`, { credentials: 'include' });
   const json = await res.json();
@@ -55,9 +68,39 @@ async function saveConfig(updates: Partial<BotConfig>): Promise<BotConfig> {
 }
 
 async function fetchCommentary(): Promise<Commentary[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/commentary?limit=20`, { credentials: 'include' });
+  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/commentary?limit=50`, { credentials: 'include' });
   const json = await res.json();
   return json.data ?? [];
+}
+
+async function fetchChatMessages(): Promise<ChatMessage[]> {
+  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/chat-messages?limit=50`, { credentials: 'include' });
+  const json = await res.json();
+  return json.data ?? [];
+}
+
+async function fetchStats(): Promise<BotStats> {
+  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/stats`, { credentials: 'include' });
+  const json = await res.json();
+  return json.data;
+}
+
+async function clearCommentaryApi(): Promise<number> {
+  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/commentary`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  return json.data?.deleted ?? 0;
+}
+
+async function clearChatMessagesApi(): Promise<number> {
+  const res = await fetch(`${API_URL}/api/v1/admin/ai-bot/chat-messages`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  return json.data?.deleted ?? 0;
 }
 
 const inputClass = 'w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]';
@@ -67,22 +110,65 @@ const toggleClass = (on: boolean) =>
 const toggleDot = (on: boolean) =>
   `pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'} mt-0.5`;
 
+type SubTab = 'general' | 'personas' | 'triggers' | 'history' | 'actions';
+
+const SUB_TAB_LABELS: Record<SubTab, string> = {
+  general: 'General',
+  personas: 'Personas',
+  triggers: 'Triggers',
+  history: 'History',
+  actions: 'Actions',
+};
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'never';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60_000) return 'just now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  return `${Math.floor(ms / 86_400_000)}d ago`;
+}
+
 export function AiBotTab() {
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [commentary, setCommentary] = useState<Commentary[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [stats, setStats] = useState<BotStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [subTab, setSubTab] = useState<'general' | 'personas' | 'triggers' | 'preview'>('general');
+  const [subTab, setSubTab] = useState<SubTab>('general');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([fetchConfig(), fetchCommentary()])
-      .then(([cfg, cmts]) => {
-        setConfig(cfg);
-        setCommentary(cmts);
-      })
-      .finally(() => setLoading(false));
+  const loadData = useCallback(async () => {
+    try {
+      const [cfg, cmts, msgs, st] = await Promise.all([
+        fetchConfig(),
+        fetchCommentary(),
+        fetchChatMessages(),
+        fetchStats(),
+      ]);
+      setConfig(cfg);
+      setCommentary(cmts);
+      setChatMessages(msgs);
+      setStats(st);
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const update = useCallback((partial: Partial<BotConfig>) => {
     setConfig(prev => prev ? { ...prev, ...partial } : prev);
@@ -124,6 +210,46 @@ export function AiBotTab() {
     });
   };
 
+  const handleClearCommentary = async () => {
+    if (!confirm('Delete ALL AI commentary? This cannot be undone.')) return;
+    setActionLoading('commentary');
+    setActionResult(null);
+    try {
+      const deleted = await clearCommentaryApi();
+      setActionResult(`Deleted ${deleted} commentary entries`);
+      setCommentary([]);
+      const st = await fetchStats();
+      setStats(st);
+    } catch {
+      setActionResult('Error clearing commentary');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (!confirm('Delete ALL bot chat messages? This cannot be undone.')) return;
+    setActionLoading('chat');
+    setActionResult(null);
+    try {
+      const deleted = await clearChatMessagesApi();
+      setActionResult(`Deleted ${deleted} bot chat messages`);
+      setChatMessages([]);
+      const st = await fetchStats();
+      setStats(st);
+    } catch {
+      setActionResult('Error clearing chat messages');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setActionLoading('refresh');
+    await loadData();
+    setActionLoading(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -143,27 +269,61 @@ export function AiBotTab() {
         <div className="flex items-center gap-2">
           <Sparkles size={18} className="text-indigo-400" />
           <h3 className="text-base font-bold">AI Bot (Oracle)</h3>
+          {stats && (
+            <span className="text-[10px] text-[var(--color-text-secondary)] bg-[var(--color-surface)] px-2 py-0.5 rounded-full">
+              {stats.totalCommentary} comments / {stats.totalChatMessages} chat msgs
+            </span>
+          )}
         </div>
-        <ActionButton onClick={handleSave} disabled={!dirty || saving}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          {saving ? 'Saving...' : 'Save'}
-        </ActionButton>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={handleRefresh}
+            className="p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            title="Refresh data">
+            <RefreshCw size={14} className={actionLoading === 'refresh' ? 'animate-spin' : ''} />
+          </button>
+          <ActionButton onClick={handleSave} disabled={!dirty || saving}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? 'Saving...' : 'Save'}
+          </ActionButton>
+        </div>
       </div>
 
+      {/* Stats bar */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-2 text-center">
+            <div className="text-lg font-bold tabular-nums text-indigo-400">{stats.totalCommentary}</div>
+            <div className="text-[9px] text-[var(--color-text-secondary)] uppercase">Commentary</div>
+          </div>
+          <div className="rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-2 text-center">
+            <div className="text-lg font-bold tabular-nums text-violet-400">{stats.totalChatMessages}</div>
+            <div className="text-[9px] text-[var(--color-text-secondary)] uppercase">Chat Messages</div>
+          </div>
+          <div className="rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-2 text-center">
+            <div className="text-sm font-medium tabular-nums text-[var(--color-text)]">{timeAgo(stats.lastCommentaryAt)}</div>
+            <div className="text-[9px] text-[var(--color-text-secondary)] uppercase">Last Comment</div>
+          </div>
+          <div className="rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] p-2 text-center">
+            <div className="text-sm font-medium tabular-nums text-[var(--color-text)]">{timeAgo(stats.lastChatMessageAt)}</div>
+            <div className="text-[9px] text-[var(--color-text-secondary)] uppercase">Last Chat Msg</div>
+          </div>
+        </div>
+      )}
+
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-[var(--color-border)] pb-0">
-        {(['general', 'personas', 'triggers', 'preview'] as const).map(tab => (
+      <div className="flex gap-1 border-b border-[var(--color-border)] pb-0 overflow-x-auto">
+        {(['general', 'personas', 'triggers', 'history', 'actions'] as const).map(tab => (
           <button
             key={tab}
             type="button"
             onClick={() => setSubTab(tab)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap ${
               subTab === tab
                 ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            {tab === 'general' ? 'General' : tab === 'personas' ? 'Personas' : tab === 'triggers' ? 'Triggers' : 'Preview'}
+            {SUB_TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -323,36 +483,162 @@ export function AiBotTab() {
             <div>
               <label className={labelClass}>Silence (min)</label>
               <input type="number" className={inputClass} value={config.silenceMinutes}
-                onChange={e => update({ silenceMinutes: Number(e.target.value) })} min={5} max={120} />
+                onChange={e => update({ silenceMinutes: Number(e.target.value) })} min={5} max={1440} />
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ Preview ═══ */}
-      {subTab === 'preview' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Recent Commentary (Ticker)</h4>
-          {commentary.length === 0 ? (
-            <p className="text-xs text-[var(--color-text-secondary)] py-4 text-center">No commentary yet</p>
-          ) : (
-            <div className="space-y-2 max-h-[400px] overflow-y-auto">
-              {commentary.map((c) => (
-                <div key={c.betId + c.createdAt} className="p-2.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] text-[var(--color-text-secondary)]">
-                      Bet #{c.betId}
-                    </span>
-                    <span className="text-[10px] text-[var(--color-text-secondary)]">
-                      {new Date(c.createdAt).toLocaleString()}
-                    </span>
+      {/* ═══ History ═══ */}
+      {subTab === 'history' && (
+        <div className="space-y-4">
+          {/* Commentary section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                <Zap size={13} className="text-amber-400" />
+                Commentary (Ticker) — {commentary.length} entries
+              </h4>
+            </div>
+            {commentary.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-secondary)] py-4 text-center bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)]">
+                No commentary yet
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-[300px] overflow-y-auto rounded-xl border border-[var(--color-border)] p-2 bg-[var(--color-surface)]">
+                {commentary.map((c) => (
+                  <div key={c.betId + c.createdAt} className="p-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)]">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-medium text-indigo-400">Bet #{c.betId}</span>
+                      <span className="text-[10px] text-[var(--color-text-secondary)]">{formatDate(c.createdAt)}</span>
+                    </div>
+                    <p className="text-xs mb-0.5"><span className="text-[10px] font-semibold text-blue-400">RU:</span> {c.textRu}</p>
+                    <p className="text-xs"><span className="text-[10px] font-semibold text-red-400">EN:</span> {c.textEn}</p>
                   </div>
-                  <p className="text-xs mb-0.5"><span className="text-[10px] font-semibold text-blue-400">RU:</span> {c.textRu}</p>
-                  <p className="text-xs"><span className="text-[10px] font-semibold text-red-400">EN:</span> {c.textEn}</p>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chat messages section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                <MessageSquare size={13} className="text-violet-400" />
+                Bot Chat Messages — {chatMessages.length} entries
+              </h4>
+            </div>
+            {chatMessages.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-secondary)] py-4 text-center bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)]">
+                No bot chat messages yet
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-[300px] overflow-y-auto rounded-xl border border-[var(--color-border)] p-2 bg-[var(--color-surface)]">
+                {chatMessages.map((m) => (
+                  <div key={m.id} className="p-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)]">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] text-[var(--color-text-secondary)]">{formatDate(m.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-[var(--color-text)] whitespace-pre-wrap">{m.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Actions ═══ */}
+      {subTab === 'actions' && (
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Dangerous actions. Deletions cannot be undone.
+          </p>
+
+          {actionResult && (
+            <div className="text-sm font-medium text-emerald-400 bg-emerald-500/10 rounded-lg px-3 py-2">
+              {actionResult}
             </div>
           )}
+
+          {/* Clear commentary */}
+          <div className="p-4 rounded-xl bg-[var(--color-surface)] border border-red-500/20 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} className="text-red-400" />
+              <h4 className="text-sm font-semibold text-red-400">Clear All Commentary</h4>
+            </div>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Permanently deletes all AI-generated ticker commentary from the database.
+              Users will no longer see history in the ticker sheet.
+              {stats && stats.totalCommentary > 0 && (
+                <span className="font-medium text-[var(--color-text)]"> Currently: {stats.totalCommentary} entries.</span>
+              )}
+            </p>
+            <button type="button" onClick={handleClearCommentary}
+              disabled={actionLoading !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-colors">
+              {actionLoading === 'commentary' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Delete All Commentary
+            </button>
+          </div>
+
+          {/* Clear chat messages */}
+          <div className="p-4 rounded-xl bg-[var(--color-surface)] border border-red-500/20 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} className="text-red-400" />
+              <h4 className="text-sm font-semibold text-red-400">Clear All Bot Chat Messages</h4>
+            </div>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Permanently deletes all messages posted by the AI bot in the global chat.
+              Removes silence fillers, mention replies, big bet reactions, and streak comments.
+              {stats && stats.totalChatMessages > 0 && (
+                <span className="font-medium text-[var(--color-text)]"> Currently: {stats.totalChatMessages} messages.</span>
+              )}
+            </p>
+            <button type="button" onClick={handleClearChat}
+              disabled={actionLoading !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-colors">
+              {actionLoading === 'chat' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Delete All Bot Chat Messages
+            </button>
+          </div>
+
+          {/* Clear both */}
+          <div className="p-4 rounded-xl bg-[var(--color-surface)] border border-red-500/30 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} className="text-red-500" />
+              <h4 className="text-sm font-semibold text-red-500">Nuclear: Clear Everything</h4>
+            </div>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Deletes ALL bot-generated content: commentary + chat messages.
+            </p>
+            <button type="button"
+              disabled={actionLoading !== null}
+              onClick={async () => {
+                if (!confirm('Delete ALL bot content (commentary + chat messages)? Cannot be undone!')) return;
+                setActionLoading('nuclear');
+                setActionResult(null);
+                try {
+                  const [commDeleted, chatDeleted] = await Promise.all([
+                    clearCommentaryApi(),
+                    clearChatMessagesApi(),
+                  ]);
+                  setActionResult(`Deleted ${commDeleted} commentary + ${chatDeleted} chat messages`);
+                  setCommentary([]);
+                  setChatMessages([]);
+                  const st = await fetchStats();
+                  setStats(st);
+                } catch {
+                  setActionResult('Error during nuclear clear');
+                } finally {
+                  setActionLoading(null);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/20 text-red-500 hover:bg-red-500/30 disabled:opacity-50 transition-colors">
+              {actionLoading === 'nuclear' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Delete Everything
+            </button>
+          </div>
         </div>
       )}
     </div>

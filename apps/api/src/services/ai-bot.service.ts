@@ -66,7 +66,7 @@ Personality:
 - You can use 1-2 relevant emojis per message, but don't overdo it.
 
 Game context:
-- Players bet COIN tokens on heads or tails
+- Players bet AXM tokens on heads or tails
 - Winner gets 2x stake minus 10% commission
 - The game uses commit-reveal for fairness (provably fair)
 
@@ -118,7 +118,7 @@ class AiBotService {
         chatCooldownSec: 30,
         bigBetThreshold: 500,
         streakThreshold: 3,
-        silenceMinutes: 15,
+        silenceMinutes: 120,
         respondToMentions: true,
         reactToBigBets: true,
         reactToStreaks: true,
@@ -138,7 +138,7 @@ class AiBotService {
         chatCooldownSec: Number(r.chat_cooldown_sec ?? 30),
         bigBetThreshold: Number(r.big_bet_threshold ?? 500),
         streakThreshold: Number(r.streak_threshold ?? 3),
-        silenceMinutes: Number(r.silence_minutes ?? 15),
+        silenceMinutes: Number(r.silence_minutes ?? 120),
         respondToMentions: r.respond_to_mentions === true,
         reactToBigBets: r.react_to_big_bets === true,
         reactToStreaks: r.react_to_streaks === true,
@@ -273,9 +273,9 @@ CRITICAL: NEVER translate player nicknames — keep them exactly as provided.`;
 
     const userPrompt = `Bet resolved:
 - ${context.makerNickname} vs ${context.acceptorNickname}
-- Stake: ${context.amount} COIN each
+- Stake: ${context.amount} AXM each
 - Result: ${context.winnerSide} (${context.side === 'heads' ? 'орёл' : 'решка'})
-- Winner: ${context.winnerNickname} takes ${context.payoutAmount} COIN
+- Winner: ${context.winnerNickname} takes ${context.payoutAmount} AXM
 - Loser: ${context.loserNickname}
 
 Generate commentary as JSON: {"ru": "...", "en": "..."}`;
@@ -445,7 +445,7 @@ Response format: {"ru": "...", "en": "..."}`;
 Reply naturally and in-character. Be helpful but playful.`;
         break;
       case 'big_bet':
-        userPrompt = `Player "${context.userNickname}" just created a big bet: ${context.betAmount} COIN!
+        userPrompt = `Player "${context.userNickname}" just created a big bet: ${context.betAmount} AXM!
 React to this high-stakes action in the chat. Build hype!`;
         break;
       case 'streak':
@@ -453,7 +453,7 @@ React to this high-stakes action in the chat. Build hype!`;
 Comment on their hot streak. Be impressed but add a hint of "can it last?"`;
         break;
       case 'jackpot':
-        userPrompt = `JACKPOT HIT! Player "${context.jackpotWinner}" won ${context.jackpotAmount} COIN from the jackpot!
+        userPrompt = `JACKPOT HIT! Player "${context.jackpotWinner}" won ${context.jackpotAmount} AXM from the jackpot!
 Celebrate this epic moment! Go big!`;
         break;
       case 'silence':
@@ -506,11 +506,11 @@ Be natural — don't say "the chat is quiet" literally.`;
   /** Start periodic silence check */
   startSilenceWatcher() {
     if (this.silenceTimer) return;
-    // Check every 5 minutes
+    // Check every 30 minutes
     this.silenceTimer = setInterval(() => {
       this.postSilenceMessage().catch(err =>
         logger.error({ err }, 'Silence watcher error'));
-    }, 5 * 60 * 1000);
+    }, 30 * 60 * 1000);
     logger.info('AI bot silence watcher started');
   }
 
@@ -605,6 +605,77 @@ Be natural — don't say "the chat is quiet" literally.`;
 
     await this.db.execute(sql`UPDATE ai_bot_config SET updated_at = NOW()`);
     this.invalidateConfig();
+  }
+
+  /** Delete all AI commentary (ticker history) */
+  async clearCommentary(): Promise<number> {
+    const result = await this.db.execute(sql`
+      WITH deleted AS (DELETE FROM ai_commentary RETURNING 1)
+      SELECT count(*)::int AS cnt FROM deleted
+    `);
+    const rawRows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    return Number(rawRows[0]?.cnt ?? 0);
+  }
+
+  /** Delete all bot chat messages from global_chat_messages */
+  async clearBotChatMessages(): Promise<number> {
+    const botUserId = await this.getBotUserId();
+    const result = await this.db.execute(sql`
+      WITH deleted AS (
+        DELETE FROM global_chat_messages WHERE user_id = ${botUserId}::uuid
+        RETURNING 1
+      )
+      SELECT count(*)::int AS cnt FROM deleted
+    `);
+    const rawRows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    return Number(rawRows[0]?.cnt ?? 0);
+  }
+
+  /** Get recent bot chat messages for admin preview */
+  async getRecentBotChatMessages(limit: number): Promise<Array<{ id: string; message: string; createdAt: string }>> {
+    const botUserId = await this.getBotUserId();
+    const rows = await this.db.execute(sql`
+      SELECT id::text, message, created_at
+      FROM global_chat_messages
+      WHERE user_id = ${botUserId}::uuid
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    return rawRows.map(r => ({
+      id: String(r.id),
+      message: String(r.message),
+      createdAt: String(r.created_at),
+    }));
+  }
+
+  /** Get stats for admin dashboard */
+  async getStats(): Promise<{
+    totalCommentary: number;
+    totalChatMessages: number;
+    lastCommentaryAt: string | null;
+    lastChatMessageAt: string | null;
+  }> {
+    const botUserId = await this.getBotUserId();
+    const [commResult, chatResult] = await Promise.all([
+      this.db.execute(sql`
+        SELECT count(*)::int AS cnt, max(created_at)::text AS last_at
+        FROM ai_commentary
+      `),
+      this.db.execute(sql`
+        SELECT count(*)::int AS cnt, max(created_at)::text AS last_at
+        FROM global_chat_messages
+        WHERE user_id = ${botUserId}::uuid
+      `),
+    ]);
+    const commRows = (Array.isArray(commResult) ? commResult : (commResult as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    const chatRows = (Array.isArray(chatResult) ? chatResult : (chatResult as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    return {
+      totalCommentary: Number(commRows[0]?.cnt ?? 0),
+      totalChatMessages: Number(chatRows[0]?.cnt ?? 0),
+      lastCommentaryAt: commRows[0]?.last_at ? String(commRows[0].last_at) : null,
+      lastChatMessageAt: chatRows[0]?.last_at ? String(chatRows[0].last_at) : null,
+    };
   }
 }
 
