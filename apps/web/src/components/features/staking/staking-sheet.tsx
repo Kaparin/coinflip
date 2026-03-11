@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2,
   ExternalLink,
@@ -79,13 +79,10 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
   const [activeTab, setActiveTab] = useState<TabMode>('stake');
   const [amount, setAmount] = useState('');
 
-  // Track previous op to detect op completion (op → null transition)
-  const prevOpRef = useRef(store.op);
-
   // ---- Data fetching ----
 
-  const refresh = useCallback(async (silent = false) => {
-    if (!silent) setIsLoading(true);
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [s, u] = await Promise.all([
         fetchStakingStats(),
@@ -100,23 +97,11 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
     }
   }, [address]);
 
-  // Initial load — only on open/connect changes, NOT on phase changes
+  // Fetch on modal open. No auto-refresh after ops — optimistic data is correct.
   useEffect(() => {
     if (!open || !isConnected) return;
     refresh();
   }, [open, isConnected, refresh]);
-
-  // When op clears (pending/error → null), wait 2s for chain to confirm, then silent refresh
-  useEffect(() => {
-    const prevOp = prevOpRef.current;
-    prevOpRef.current = store.op;
-
-    if (prevOp && !store.op && open) {
-      // Chain needs time to include the tx in a block
-      const timer = setTimeout(() => refresh(true), 2_000);
-      return () => clearTimeout(timer);
-    }
-  }, [store.op, open, refresh]);
 
   // ---- Optimistic update ----
 
@@ -272,8 +257,8 @@ export function StakingSheet({ open, onClose }: StakingSheetProps) {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
                   {t('staking.yourPosition')}
                 </p>
-                <button type="button" onClick={() => { if (!store.isLocked) { setIsLoading(true); refresh(); } }}
-                  disabled={store.isLocked}
+                <button type="button" onClick={() => { refresh(); }}
+                  disabled={opPhase === 'signing' || opPhase === 'broadcasting'}
                   className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30 transition-colors disabled:opacity-30">
                   <RefreshCw size={12} />
                 </button>
