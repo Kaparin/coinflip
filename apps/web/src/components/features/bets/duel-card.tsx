@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Send, Smile } from 'lucide-react';
@@ -11,14 +11,6 @@ import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { API_URL } from '@/lib/constants';
 import type { ActiveDuel, DuelMessage } from '@/hooks/use-active-duels';
-
-// Lazy-load 3D coin (code-split Three.js bundle)
-const Coin3D = lazy(() =>
-  import('@/components/ui/coin-3d').then((m) => ({ default: m.Coin3D }))
-);
-
-// Toggle: set to false to revert to CSS coin animation
-const USE_3D_COIN = true;
 
 interface DuelCardProps {
   duel: ActiveDuel;
@@ -248,19 +240,6 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
 
         {/* Center: spinning coin / flip / winner reveal */}
         <div className={`flex flex-col items-center justify-center py-1 ${isWinnerReveal ? '' : 'flex-1'}`}>
-          {USE_3D_COIN ? (
-            /* ── 3D coin flow: CSS idle + Three.js for merge/reveal ── */
-            <Coin3DScene
-              duel={duel}
-              isWinnerMaker={isWinnerMaker}
-              isWinnerReveal={isWinnerReveal}
-              isMergingPhase={isMergingPhase}
-              winnerAddress={winnerAddress}
-              winnerDisplayName={winnerDisplayName}
-              winnerNameClass={winnerNameClass}
-            />
-          ) : (
-            /* ── CSS fallback flow ── */
             <CssCoinScene
               duel={duel}
               isWinnerMaker={isWinnerMaker}
@@ -269,9 +248,7 @@ export function DuelCard({ duel, onSendMessage }: DuelCardProps) {
               winnerAddress={winnerAddress}
               winnerDisplayName={winnerDisplayName}
               winnerNameClass={winnerNameClass}
-              t={t}
             />
-          )}
           {duel.phase === 'resolving' && (
             <span className="text-[9px] text-[var(--color-text-secondary)] mt-1 animate-live-pulse">
               {t('duel.determining')}
@@ -391,7 +368,6 @@ function CssCoinFallback({ size = 44 }: { size?: number }) {
   );
 }
 
-/** ── Full 3D coin scene — all phases handled by Three.js ── */
 interface CoinSceneProps {
   duel: ActiveDuel;
   isWinnerMaker: boolean;
@@ -402,7 +378,8 @@ interface CoinSceneProps {
   winnerNameClass: string;
 }
 
-function Coin3DScene({
+/** CSS-only coin scene — all duel phases (idle → merge → winner reveal) */
+function CssCoinScene({
   duel,
   isWinnerMaker,
   isWinnerReveal,
@@ -411,38 +388,24 @@ function Coin3DScene({
   winnerDisplayName,
   winnerNameClass,
 }: CoinSceneProps) {
-  // Three.js only for winner-reveal (static landed coin, 1-2 at a time).
-  // Merge phase uses CSS 3D animation — reliable, no WebGL mount delay.
-  // Idle uses lightweight CSS coin to avoid flooding GPU with contexts.
-
-  // Preload Three.js bundle during idle so it's cached before reveal
-  useEffect(() => {
-    import('@/components/ui/coin-3d');
-  }, []);
-
-  const coinResult = isWinnerMaker ? 'heads' as const : 'tails' as const;
-
-  // ── Winner reveal: Three.js landed coin ──
+  // ── Winner reveal: static coin showing winner's avatar ──
   if (isWinnerReveal && duel.winner) {
     return (
       <div className="flex flex-col items-center">
-        <div className="animate-duel-coin-winner-glow">
-          <Suspense fallback={<CssCoinFallback size={100} />}>
-            <Coin3D
-              state={'landed' as const}
-              result={coinResult}
-              size={100}
-              spinSpeed={1.5}
-              cameraPosition={[0, 3, 4.2]}
-              flipDuration={8}
-              totalSpins={12}
-              verticalMotion={false}
-              makerAddress={duel.maker}
-              acceptorAddress={duel.acceptor}
-            />
-          </Suspense>
+        <div className="animate-duel-coin-winner-glow animate-scale-in">
+          <div
+            className="duel-coin-3d-large"
+            style={{ transform: `rotateY(${isWinnerMaker ? 0 : 180}deg)` }}
+          >
+            <div className="duel-coin-face duel-coin-front">
+              <UserAvatar address={duel.maker} size={88} flat />
+            </div>
+            <div className="duel-coin-face duel-coin-back-face">
+              <UserAvatar address={duel.acceptor} size={88} flat />
+            </div>
+          </div>
         </div>
-        <div className="animate-duel-winner-name text-center mt-1">
+        <div className="animate-duel-winner-name text-center mt-2">
           <Link href={`/game/profile/${winnerAddress}`} className="hover:underline">
             <span className={`text-xs font-bold ${winnerNameClass || 'text-emerald-400'}`}>
               {winnerDisplayName}
@@ -456,12 +419,12 @@ function Coin3DScene({
     );
   }
 
-  // ── Merge phase: CSS 3D animation (logo → avatar spin) ──
+  // ── Merge phase: coin logo → avatar spin with vertical toss arc ──
   if (isMergingPhase) {
     return (
       <div className="flex flex-col items-center">
         <div className="animate-duel-3d-coin-toss">
-          <div className="relative" style={{ width: 88, height: 88, transformStyle: 'preserve-3d' as const }}>
+          <div className="relative" style={{ width: 88, height: 88, transformStyle: 'preserve-3d' }}>
             <div className="absolute inset-0 animate-duel-coin-logo-fade">
               <div className="w-full h-full animate-duel-coin-spin-3d">
                 <div className="duel-coin-face duel-coin-front">
@@ -491,80 +454,9 @@ function Coin3DScene({
   // ── Idle: lightweight CSS coin ──
   return (
     <div className="flex flex-col items-center">
-      <CssCoinFallback size={56} />
+      <CssCoinFallback />
     </div>
   );
-}
-
-/** ── Original CSS coin scene — full flow preserved ── */
-function CssCoinScene({
-  duel,
-  isWinnerMaker,
-  isWinnerReveal,
-  isMergingPhase,
-  winnerAddress,
-  winnerDisplayName,
-  winnerNameClass,
-  t,
-}: CoinSceneProps & { t: (key: string) => string }) {
-  if (isWinnerReveal && duel.winner) {
-    return (
-      <div className="flex flex-col items-center">
-        <div className="animate-duel-coin-winner-glow">
-          <div
-            className="duel-coin-3d-large"
-            style={{ transform: `rotateY(${isWinnerMaker ? 0 : 180}deg)` }}
-          >
-            <div className="duel-coin-face duel-coin-front">
-              <UserAvatar address={duel.maker} size={88} flat />
-            </div>
-            <div className="duel-coin-face duel-coin-back-face">
-              <UserAvatar address={duel.acceptor} size={88} flat />
-            </div>
-          </div>
-        </div>
-        <div className="animate-duel-winner-name text-center mt-2">
-          <Link href={`/game/profile/${winnerAddress}`} className="hover:underline">
-            <span className={`text-xs font-bold ${winnerNameClass || 'text-emerald-400'}`}>
-              {winnerDisplayName}
-            </span>
-          </Link>
-          <div className="text-[11px] text-emerald-400/80 font-medium">
-            +{formatLaunch(String(BigInt(duel.amount) * 2n * 9n / 10n))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isMergingPhase) {
-    return (
-      <div className="relative" style={{ width: 88, height: 88 }}>
-        <div className="absolute inset-0 animate-duel-coin-logo-fade">
-          <div className="w-full h-full animate-duel-coin-spin-3d">
-            <div className="duel-coin-face duel-coin-front">
-              <Image src="/coin-token-logo.png" alt="COIN front" width={88} height={88} className="rounded-full" unoptimized />
-            </div>
-            <div className="duel-coin-face duel-coin-back-face">
-              <Image src="/coin-token-logo.back.png" alt="COIN back" width={88} height={88} className="rounded-full" unoptimized />
-            </div>
-          </div>
-        </div>
-        <div className="absolute inset-0 animate-duel-avatar-coin-fade-in">
-          <div className={`w-full h-full ${isWinnerMaker ? 'animate-duel-avatar-coin-spin-to-front' : 'animate-duel-avatar-coin-spin-to-back'}`}>
-            <div className="duel-coin-face duel-coin-front">
-              <UserAvatar address={duel.maker} size={88} flat />
-            </div>
-            <div className="duel-coin-face duel-coin-back-face">
-              <UserAvatar address={duel.acceptor} size={88} flat />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return <CssCoinFallback />;
 }
 
 function ChatBubble({ msg, isMaker }: { msg: DuelMessage; isMaker: boolean }) {

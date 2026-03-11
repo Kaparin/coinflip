@@ -1,14 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import Image from 'next/image';
 import { useTranslation } from '@/lib/i18n';
 import { feedback } from '@/lib/feedback';
-import type { CoinState } from '@/components/ui/coin-3d';
-
-// Lazy-load 3D coin (SSR-safe, code-split)
-const Coin3D = lazy(() =>
-  import('@/components/ui/coin-3d').then((m) => ({ default: m.Coin3D }))
-);
 
 interface CoinFlipAnimationProps {
   result?: 'heads' | 'tails';
@@ -33,6 +28,8 @@ function useConfetti(count: number, trigger: boolean) {
   }, [count, trigger]);
 }
 
+const FLIP_DURATION = 2200; // ms — matches CSS animation
+
 export function CoinFlipAnimation({
   result,
   isWin,
@@ -41,39 +38,31 @@ export function CoinFlipAnimation({
 }: CoinFlipAnimationProps) {
   const { t } = useTranslation();
   const [showResult, setShowResult] = useState(false);
-  const [coinState, setCoinState] = useState<CoinState>('idle');
   const confetti = useConfetti(20, showResult && isWin === true);
   const flipSoundPlayed = useRef(false);
-  const [canRender3D, setCanRender3D] = useState(false);
-
-  // Only render 3D on client after mount (SSR-safe)
-  useEffect(() => {
-    setCanRender3D(true);
-  }, []);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Drive coin state from props
   useEffect(() => {
     if (isFlipping) {
       setShowResult(false);
-      setCoinState('flipping');
       if (!flipSoundPlayed.current) {
         feedback('coinFlip');
         flipSoundPlayed.current = true;
       }
+      timerRef.current = setTimeout(() => {
+        setShowResult(true);
+        onComplete?.();
+      }, FLIP_DURATION);
     } else {
       flipSoundPlayed.current = false;
-      if (!showResult) {
-        setCoinState('idle');
-      }
+      setShowResult(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
     }
-  }, [isFlipping, showResult]);
-
-  // When 3D flip completes
-  const handleFlipComplete = () => {
-    setCoinState('landed');
-    setShowResult(true);
-    onComplete?.();
-  };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [isFlipping, onComplete]);
 
   // Play win/lose feedback when result is shown
   useEffect(() => {
@@ -81,6 +70,17 @@ export function CoinFlipAnimation({
       feedback(isWin ? 'win' : 'lose');
     }
   }, [showResult, isWin]);
+
+  const coinSize = 128;
+  const isLanded = showResult && result;
+
+  // Choose animation class: lands on correct face based on result
+  const flipClass =
+    isFlipping && !showResult
+      ? result === 'tails'
+        ? 'animate-coin-flip-to-tails'
+        : 'animate-coin-flip-to-heads'
+      : '';
 
   return (
     <div className="relative flex flex-col items-center gap-2 py-4 overflow-hidden">
@@ -101,36 +101,64 @@ export function CoinFlipAnimation({
         />
       ))}
 
-      {/* 3D Coin */}
-      <div className={`relative transition-all duration-500 ${
-        showResult && result
-          ? isWin
-            ? 'win-glow rounded-full'
-            : 'loss-glow rounded-full'
-          : ''
-      }`}>
-        {canRender3D ? (
-          <Suspense fallback={<CoinFallback isFlipping={isFlipping} />}>
-            <Coin3D
-              state={coinState}
-              result={result ?? 'heads'}
-              onFlipComplete={handleFlipComplete}
-              size={160}
-            />
-          </Suspense>
-        ) : (
-          <CoinFallback isFlipping={isFlipping} />
-        )}
+      {/* CSS 3D Coin */}
+      <div
+        className={`relative transition-all duration-500 ${
+          isLanded
+            ? isWin
+              ? 'win-glow rounded-full'
+              : 'loss-glow rounded-full'
+            : ''
+        }`}
+      >
+        <div style={{ perspective: 800 }}>
+          <div
+            className={flipClass}
+            style={{
+              width: coinSize,
+              height: coinSize,
+              transformStyle: 'preserve-3d',
+              ...(isLanded
+                ? { transform: `rotateY(${result === 'heads' ? 0 : 180}deg)` }
+                : {}),
+            }}
+          >
+            <div className="duel-coin-face duel-coin-front">
+              <Image
+                src="/coin-token-logo.png"
+                alt="Heads"
+                width={coinSize}
+                height={coinSize}
+                className="rounded-full"
+                unoptimized
+              />
+            </div>
+            <div className="duel-coin-face duel-coin-back-face">
+              <Image
+                src="/coin-token-logo.back.png"
+                alt="Tails"
+                width={coinSize}
+                height={coinSize}
+                className="rounded-full"
+                unoptimized
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Result text */}
       {showResult && result && (
         <div className="animate-fade-up text-center">
-          <p className={`text-xl font-bold ${isWin ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+          <p
+            className={`text-xl font-bold ${isWin ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}
+          >
             {isWin ? t('coinFlip.youWin') : t('coinFlip.youLose')}
           </p>
           <p className="text-sm text-[var(--color-text-secondary)] capitalize mt-1">
-            {result === 'heads' ? t('coinFlip.resultHeads') : t('coinFlip.resultTails')}
+            {result === 'heads'
+              ? t('coinFlip.resultHeads')
+              : t('coinFlip.resultTails')}
           </p>
         </div>
       )}
@@ -140,19 +168,6 @@ export function CoinFlipAnimation({
           {t('coinFlip.flipping')}
         </p>
       )}
-    </div>
-  );
-}
-
-/** CSS fallback while 3D loads or for reduced-motion */
-function CoinFallback({ isFlipping }: { isFlipping: boolean }) {
-  return (
-    <div
-      className={`flex h-24 w-24 items-center justify-center rounded-full border-4 text-4xl ${
-        isFlipping ? 'animate-coin-flip border-[var(--color-primary)]' : 'border-[var(--color-border)]'
-      }`}
-    >
-      🪙
     </div>
   );
 }
