@@ -100,7 +100,7 @@ export type PhaseCallback = (phase: 'signing' | 'broadcasting') => void;
 // Use Next.js proxy to avoid CORS issues (direct chain REST blocks browser requests)
 function getRestUrl(): string {
   if (typeof window !== 'undefined') return '/chain-rest';
-  return process.env.NEXT_PUBLIC_AXIOME_REST || 'https://api-chain.axiomechain.org';
+  return process.env.NEXT_PUBLIC_CHAIN_REST_URL || 'https://api-idx.axiomechain.pro';
 }
 
 async function queryContract<T>(query: Record<string, unknown>): Promise<T> {

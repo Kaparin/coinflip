@@ -24,10 +24,10 @@ function getRestUrls(): string[] {
       if (trimmed) urls.push(trimmed);
     }
   }
-  // Always include the public REST endpoint as a last-resort fallback
-  const publicRest = 'https://api-chain.axiomechain.org';
-  if (!urls.includes(publicRest)) {
-    urls.push(publicRest);
+  // Always include the validator node as a last-resort fallback
+  const validatorRest = 'http://49.13.3.227:1317';
+  if (!urls.includes(validatorRest)) {
+    urls.push(validatorRest);
   }
   _restUrls = urls;
   return urls;
