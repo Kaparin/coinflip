@@ -82,7 +82,8 @@ export type WsEventType =
   | 'chat_message'
   | 'coin_drop_claimed'
   | 'coin_transfer'
-  | 'online_count';
+  | 'online_count'
+  | 'ai_commentary';
 
 export type WsEvent = {
   type: WsEventType;

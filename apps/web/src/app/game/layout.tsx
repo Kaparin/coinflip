@@ -6,6 +6,7 @@ import { WebSocketProvider } from '@/contexts/websocket-context';
 import { SocialFab } from '@/components/features/social/social-fab';
 import { SocialSidebar } from '@/components/features/social/social-sidebar';
 import { TransferNotificationListener } from '@/components/features/social/transfer-notification-listener';
+import { AiTicker } from '@/components/features/ticker/ai-ticker';
 
 export default function GameLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
         <div className="h-dvh flex flex-col overflow-hidden">
           <MaintenanceBanner />
           <Header />
+          <AiTicker />
           <div className="flex-1 min-h-0 overflow-hidden">
             <div className="h-full mx-auto max-w-[1440px] flex">
               <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>

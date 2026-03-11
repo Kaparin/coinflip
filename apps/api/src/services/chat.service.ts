@@ -2,6 +2,8 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { vaultService } from './vault.service.js';
+import { aiBotService } from './ai-bot.service.js';
+import { shortAddress as shortAddr } from '../lib/format.js';
 
 /** Regex to catch URLs, domains, and common spam patterns */
 const LINK_PATTERNS = [
@@ -118,7 +120,7 @@ class ChatService {
 
     const user = await this.getUserInfo(userId);
 
-    return {
+    const chatMsg: ChatMsg = {
       id: String(row.id),
       userId,
       address: String(user.address),
@@ -129,6 +131,15 @@ class ChatService {
       effect: effectVal,
       createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     };
+
+    // Fire-and-forget: check if AI bot should respond
+    aiBotService.onChatMessage(
+      message,
+      chatMsg.nickname ?? shortAddr(chatMsg.address),
+      chatMsg.address,
+    ).catch(err => logger.error({ err }, 'AI bot chat response failed'));
+
+    return chatMsg;
   }
 
   /** Send a COIN drop message — deducts from sender, creates claimable drop */

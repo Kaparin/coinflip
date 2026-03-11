@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WS_URL, isAxmMode } from '@/lib/constants';
 import { emitDepositEvent } from '@/lib/deposit-status-events';
+import { emitTickerEvent } from '@/components/features/ticker/ai-ticker';
 
 /** Query key prefix for wallet game-token balance (CW20 or native depending on mode) */
 const WALLET_BALANCE_KEY = isAxmMode() ? 'wallet-game-balance' : 'wallet-cw20-balance';
@@ -414,6 +415,10 @@ export function useWebSocket({
             case 'chat_message':
             case 'online_count':
               // No cache invalidation needed — handled by subscribers via onEvent callback
+              break;
+            case 'ai_commentary':
+              // Forward to ticker component
+              emitTickerEvent(parsed);
               break;
           }
 

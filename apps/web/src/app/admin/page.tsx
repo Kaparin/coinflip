@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
   Wrench,
+  Sparkles,
 } from 'lucide-react';
 import { OverviewTab } from './tabs/overview';
 import { UsersTab } from './tabs/users';
@@ -18,8 +19,9 @@ import { FinanceTab } from './tabs/finance';
 import { ContentTab } from './tabs/content';
 import { SettingsTab } from './tabs/settings-tab';
 import { SystemTab } from './tabs/system';
+import { AiBotTab } from './tabs/ai-bot';
 
-type Tab = 'overview' | 'users' | 'game' | 'finance' | 'content' | 'settings' | 'system';
+type Tab = 'overview' | 'users' | 'game' | 'finance' | 'content' | 'ai-bot' | 'settings' | 'system';
 
 const NAV_ITEMS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string; description: string }> = [
   { id: 'overview', icon: LayoutDashboard, label: 'Обзор', description: 'Аналитика и P&L' },
@@ -27,6 +29,7 @@ const NAV_ITEMS: Array<{ id: Tab; icon: typeof LayoutDashboard; label: string; d
   { id: 'game', icon: Gamepad2, label: 'Игра', description: 'Ставки, ивенты, джекпот' },
   { id: 'finance', icon: Wallet, label: 'Финансы', description: 'Казна, стейкинг, магазин' },
   { id: 'content', icon: FileText, label: 'Контент', description: 'Анонсы и новости' },
+  { id: 'ai-bot', icon: Sparkles, label: 'AI Bot', description: 'Оракул, тикер, персоны' },
   { id: 'settings', icon: Settings, label: 'Настройки', description: 'Конфиг, VIP, рефералы' },
   { id: 'system', icon: Wrench, label: 'Система', description: 'Диагностика и действия' },
 ];
@@ -112,6 +115,7 @@ export default function AdminPage() {
         {activeTab === 'game' && <GameTab />}
         {activeTab === 'finance' && <FinanceTab />}
         {activeTab === 'content' && <ContentTab />}
+        {activeTab === 'ai-bot' && <AiBotTab />}
         {activeTab === 'settings' && <SettingsTab />}
         {activeTab === 'system' && <SystemTab />}
       </main>

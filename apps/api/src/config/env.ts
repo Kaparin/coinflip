@@ -50,6 +50,8 @@ const envSchema = z.object({
   DEEPL_API_KEY: z.string().default(''),
   /** LAUNCH staking contract address for distribute() calls */
   STAKING_CONTRACT_ADDR: z.string().default(''),
+  /** OpenAI API key for AI bot commentary and chat responses */
+  OPENAI_API_KEY: z.string().default(''),
 });
 
 export const env = envSchema.parse(process.env);

@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth.js';
 import { userService } from '../services/user.service.js';
 import { chatService } from '../services/chat.service.js';
+import { aiBotService } from '../services/ai-bot.service.js';
 import { vaultService } from '../services/vault.service.js';
 import { wsService } from '../services/ws.service.js';
 import { getDb } from '../lib/db.js';
@@ -435,4 +436,12 @@ socialRouter.get('/transfers', authMiddleware, async (c) => {
 
 socialRouter.get('/online-count', async (c) => {
   return c.json({ data: { count: wsService.getOnlineAddresses().length } });
+});
+
+// ─── AI Commentary (public, for ticker) ──────────────────
+
+socialRouter.get('/ai-commentary', async (c) => {
+  const limit = Math.min(Number(c.req.query('limit') ?? 10), 20);
+  const commentary = await aiBotService.getRecentCommentary(limit);
+  return c.json({ data: commentary });
 });

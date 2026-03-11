@@ -9,6 +9,7 @@ import { startBackgroundSweep, stopBackgroundSweep } from './services/background
 import { jackpotService } from './services/jackpot.service.js';
 import { stakingService } from './services/staking.service.js';
 import { treasurySweepService } from './services/treasury-sweep.service.js';
+import { aiBotService } from './services/ai-bot.service.js';
 import { getDb } from './lib/db.js';
 
 // ─── Startup validation ──────────────────────────────────────────
@@ -69,6 +70,13 @@ async function initServices() {
     startBackgroundSweep();
   } else {
     logger.info('Background sweep disabled (ENABLE_BACKGROUND_SWEEP != "true"). Set ENABLE_BACKGROUND_SWEEP=true to enable.');
+  }
+
+  // Start AI bot silence watcher (checks every 5 min if chat is quiet)
+  if (env.OPENAI_API_KEY) {
+    aiBotService.startSilenceWatcher();
+  } else {
+    logger.info('AI bot disabled (OPENAI_API_KEY not set).');
   }
 
   // Periodic backfill every 60 seconds — catches any contributions

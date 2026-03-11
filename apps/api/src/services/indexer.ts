@@ -24,6 +24,8 @@ import { vaultService } from './vault.service.js';
 import { jackpotService } from './jackpot.service.js';
 import { partnerService } from './partner.service.js';
 import { stakingService } from './staking.service.js';
+import { aiBotService } from './ai-bot.service.js';
+import { shortAddress } from '../lib/format.js';
 import { ChainWebSocketClient, rpcUrlToWsUrl } from '../lib/chain-ws.js';
 import type { CometBFTTxEvent } from '../lib/chain-ws.js';
 import type { Database } from '@coinflip/db';
@@ -561,6 +563,10 @@ export class IndexerService {
           await this.processStakingContribution(BigInt(betId))
             .catch(err => logger.error({ err, betId }, 'bet_revealed: staking contribution failed'));
 
+          // AI commentary + win streak check (fire-and-forget, non-blocking)
+          this.generateAiCommentary(betId, winnerUserId).catch(err =>
+            logger.error({ err, betId }, 'bet_revealed: AI commentary failed'));
+
           logger.info({ betId, winnerAddress, winnerUserId }, 'Bet revealed — DB synced');
           break;
         }
@@ -911,6 +917,57 @@ export class IndexerService {
       logger.info({ total: pendingBets.length, synced }, 'Full bet sync complete');
     } catch (err) {
       logger.error({ err }, 'Failed to run full bet sync');
+    }
+  }
+
+  /** Generate AI commentary for a resolved bet + check win streaks */
+  private async generateAiCommentary(betId: string, winnerUserId: string | null): Promise<void> {
+    if (!this.db) return;
+
+    const { sql } = await import('drizzle-orm');
+
+    const MICRO = 1_000_000;
+    const betRows = await this.db.execute(sql`
+      SELECT b.bet_id, b.amount, b.maker_side, b.payout_amount, b.commission_amount,
+        b.maker_user_id, b.acceptor_user_id, b.winner_user_id,
+        um.profile_nickname as maker_nickname, um.address as maker_address,
+        ua.profile_nickname as acceptor_nickname, ua.address as acceptor_address
+      FROM bets b
+      LEFT JOIN users um ON um.id = b.maker_user_id
+      LEFT JOIN users ua ON ua.id = b.acceptor_user_id
+      WHERE b.bet_id = ${BigInt(betId)}
+      LIMIT 1
+    `);
+    const rawRows = (Array.isArray(betRows) ? betRows : (betRows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+    if (rawRows.length === 0) return;
+
+    const bet = rawRows[0]!;
+    const amount = Number(BigInt(String(bet.amount))) / MICRO;
+    const payout = bet.payout_amount ? Number(BigInt(String(bet.payout_amount))) / MICRO : amount * 1.8;
+    const isWinnerMaker = String(bet.winner_user_id) === String(bet.maker_user_id);
+    const makerNick = String(bet.maker_nickname ?? shortAddress(String(bet.maker_address ?? '')));
+    const acceptorNick = String(bet.acceptor_nickname ?? shortAddress(String(bet.acceptor_address ?? '')));
+    const winnerSide = bet.maker_side ? (isWinnerMaker ? String(bet.maker_side) : (String(bet.maker_side) === 'heads' ? 'tails' : 'heads')) : 'heads';
+
+    await aiBotService.onBetResolved({
+      betId,
+      makerNickname: makerNick,
+      acceptorNickname: acceptorNick,
+      amount: String(amount),
+      winnerNickname: isWinnerMaker ? makerNick : acceptorNick,
+      loserNickname: isWinnerMaker ? acceptorNick : makerNick,
+      side: winnerSide,
+      winnerSide: winnerSide === 'heads' ? 'heads (орёл)' : 'tails (решка)',
+      payoutAmount: String(payout),
+    });
+
+    // Check win streak for bot chat reaction
+    if (winnerUserId) {
+      const streak = await aiBotService.getWinStreak(winnerUserId);
+      if (streak >= 3) {
+        const winnerNick = isWinnerMaker ? makerNick : acceptorNick;
+        await aiBotService.onWinStreak(winnerNick, streak);
+      }
     }
   }
 

@@ -35,7 +35,10 @@ export interface ChatMessage {
   nickname: string | null;
   vipTier: string | null;
   message: string;
-  style: 'highlighted' | 'pinned' | 'coin_drop' | null;
+  style: 'highlighted' | 'pinned' | 'coin_drop' | 'ai_bot' | null;
+  /** For AI bot messages — localized text */
+  textRu?: string;
+  textEn?: string;
   effect: 'confetti' | 'coins' | 'fire' | null;
   createdAt: string;
   coinDrop?: CoinDropInfo;

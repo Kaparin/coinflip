@@ -176,6 +176,11 @@ class WsService {
     this.broadcast({ type: 'chat_message', data });
   }
 
+  /** Emit AI commentary for ticker */
+  emitAiCommentary(data: Record<string, unknown>) {
+    this.broadcast({ type: 'ai_commentary', data });
+  }
+
   /** Emit online count update */
   emitOnlineCount() {
     this.broadcast({ type: 'online_count', data: { count: this.addressIndex.size } });

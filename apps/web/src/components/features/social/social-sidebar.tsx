@@ -380,15 +380,29 @@ function CoinDropBubble({
 
 // ─── Chat Bubble ──────────────────────────────────────────
 
-function ChatBubble({ msg }: { msg: ChatMessage }) {
+function ChatBubble({ msg, locale }: { msg: ChatMessage; locale?: string }) {
   const isHighlighted = msg.style === 'highlighted';
   const isPinned = msg.style === 'pinned';
+  const isAiBot = msg.style === 'ai_bot' || msg.address === 'system_oracle';
 
-  const wrapperClass = isPinned
-    ? 'relative flex items-start gap-1.5 py-2 px-2 rounded-lg bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/25'
-    : isHighlighted
-      ? 'relative flex items-start gap-1.5 py-1 px-2 rounded-md bg-gradient-to-r from-amber-500/8 to-transparent border-l-2 border-amber-400/40'
-      : 'relative flex items-start gap-1.5 py-0.5';
+  const wrapperClass = isAiBot
+    ? 'relative flex items-start gap-1.5 py-1.5 px-2 chat-bubble-ai'
+    : isPinned
+      ? 'relative flex items-start gap-1.5 py-2 px-2 rounded-lg bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/25'
+      : isHighlighted
+        ? 'relative flex items-start gap-1.5 py-1 px-2 rounded-md bg-gradient-to-r from-amber-500/8 to-transparent border-l-2 border-amber-400/40'
+        : 'relative flex items-start gap-1.5 py-0.5';
+
+  // For AI bot messages: show localized text
+  let displayMessage = msg.message;
+  if (isAiBot) {
+    if (msg.textRu && msg.textEn) {
+      displayMessage = locale === 'ru' ? msg.textRu : msg.textEn;
+    } else if (msg.message.includes('\n---\n')) {
+      const [ru, en] = msg.message.split('\n---\n');
+      displayMessage = locale === 'ru' ? (ru ?? msg.message) : (en ?? msg.message);
+    }
+  }
 
   return (
     <div className={wrapperClass}>
@@ -398,15 +412,30 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
           <span className="text-[6px] font-black tracking-wider text-black uppercase">SUPER CHAT</span>
         </div>
       )}
-      <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
-        <UserAvatar address={msg.address} size={20} />
-      </Link>
-      <div className="min-w-0 flex-1 text-[11px] leading-relaxed">
-        <Link href={`/game/profile/${msg.address}`}
-          className={`font-semibold hover:underline ${isPinned ? 'text-amber-300' : getVipNameClass(msg.vipTier, null)}`}>
-          {msg.nickname || shortAddr(msg.address)}
+      {isAiBot ? (
+        <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px]">
+          &#x2728;
+        </div>
+      ) : (
+        <Link href={`/game/profile/${msg.address}`} className="shrink-0 mt-0.5">
+          <UserAvatar address={msg.address} size={20} />
         </Link>
-        {msg.vipTier && <>{' '}<VipBadge tier={msg.vipTier} /></>}
+      )}
+      <div className="min-w-0 flex-1 text-[11px] leading-relaxed">
+        {isAiBot ? (
+          <>
+            <span className="font-semibold text-indigo-400">{msg.nickname || 'Oracle'}</span>
+            {' '}<span className="chat-ai-badge">AI</span>
+          </>
+        ) : (
+          <>
+            <Link href={`/game/profile/${msg.address}`}
+              className={`font-semibold hover:underline ${isPinned ? 'text-amber-300' : getVipNameClass(msg.vipTier, null)}`}>
+              {msg.nickname || shortAddr(msg.address)}
+            </Link>
+            {msg.vipTier && <>{' '}<VipBadge tier={msg.vipTier} /></>}
+          </>
+        )}
         <span className="text-[8px] text-[var(--color-text-secondary)] ml-0.5">{formatTime(msg.createdAt)}</span>
         {msg.effect && (
           <span className="ml-0.5 text-[8px]">
@@ -414,7 +443,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
           </span>
         )}
         <span className="text-[var(--color-text-secondary)] mx-0.5">&middot;</span>
-        <span className={`break-words ${isPinned ? 'font-medium text-amber-100/90' : ''}`}>{msg.message}</span>
+        <span className={`break-words ${isPinned ? 'font-medium text-amber-100/90' : isAiBot ? 'text-indigo-200/80' : ''}`}>{displayMessage}</span>
       </div>
     </div>
   );
@@ -423,7 +452,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
 // ─── Chat Panel ───────────────────────────────────────────
 
 function ChatPanel() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { isConnected, address: currentAddress } = useWalletContext();
   const { messages, loading, sendMessage, sendCoinDrop, claimCoinDrop, messagesEndRef } = useChat(true);
   const prices = useChatPrices();
@@ -595,7 +624,7 @@ function ChatPanel() {
               msg.style === 'coin_drop' ? (
                 <CoinDropBubble key={msg.id} msg={msg} onClaim={handleClaim} claiming={claimingId} currentAddress={currentAddress ?? null} />
               ) : (
-                <ChatBubble key={msg.id} msg={msg} />
+                <ChatBubble key={msg.id} msg={msg} locale={locale} />
               ),
             )}
           </div>
