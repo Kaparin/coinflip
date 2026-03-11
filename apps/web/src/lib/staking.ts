@@ -24,6 +24,42 @@ export const LAUNCH_CW20 =
 export const LAUNCH_DECIMALS = 6;
 export const AXM_DECIMALS = 6;
 
+// ---- Error types ----
+
+export type StakingErrorCode =
+  | 'network'
+  | 'insufficient_funds'
+  | 'insufficient_gas'
+  | 'not_staked'
+  | 'no_rewards'
+  | 'rejected'
+  | 'timeout'
+  | 'signing_failed'
+  | 'unknown';
+
+export class StakingError extends Error {
+  code: StakingErrorCode;
+  rawLog: string;
+
+  constructor(code: StakingErrorCode, rawLog: string, message?: string) {
+    super(message ?? rawLog);
+    this.name = 'StakingError';
+    this.code = code;
+    this.rawLog = rawLog;
+  }
+}
+
+function parseChainError(log: string): StakingErrorCode {
+  const l = log.toLowerCase();
+  if (l.includes('insufficient funds') || l.includes('overflow: cannot sub')) return 'insufficient_funds';
+  if (l.includes('out of gas') || l.includes('insufficient fee')) return 'insufficient_gas';
+  if (l.includes('nothing staked') || l.includes('no stake found')) return 'not_staked';
+  if (l.includes('no rewards') || l.includes('nothing to claim') || l.includes('no pending rewards')) return 'no_rewards';
+  if (l.includes('request rejected') || l.includes('user rejected') || l.includes('rejected')) return 'rejected';
+  if (l.includes('timeout') || l.includes('timed out')) return 'timeout';
+  return 'unknown';
+}
+
 // ---- Types ----
 
 export interface StakingState {
@@ -55,6 +91,9 @@ export interface UserStakingInfo {
   totalClaimed: number;
   launchBalance: number;
 }
+
+/** Callback fired during sign/broadcast phases */
+export type PhaseCallback = (phase: 'signing' | 'broadcasting') => void;
 
 // ---- Queries ----
 
@@ -147,18 +186,29 @@ async function broadcastSync(txRaw: TxRaw): Promise<string> {
   const txBytes = TxRaw.encode(txRaw).finish();
   const rpcUrl = getRpcUrl();
   const hexTx = Array.from(txBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  const res = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${hexTx}`);
 
-  if (!res.ok) throw new Error(`Staking broadcast failed: HTTP ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${rpcUrl}/broadcast_tx_sync?tx=0x${hexTx}`);
+  } catch {
+    throw new StakingError('network', 'fetch failed');
+  }
+
+  if (!res.ok) {
+    throw new StakingError('network', `HTTP ${res.status}`);
+  }
 
   const data = await res.json() as {
     result?: { hash?: string; code?: number; log?: string };
   };
 
-  if (!data.result?.hash) throw new Error('Staking broadcast: no hash in response');
+  if (!data.result?.hash) {
+    throw new StakingError('network', 'no hash in response');
+  }
 
   if (data.result.code !== 0) {
-    throw new Error(data.result.log || `Staking tx rejected: code ${data.result.code}`);
+    const log = data.result.log || `code ${data.result.code}`;
+    throw new StakingError(parseChainError(log), log);
   }
 
   return data.result.hash;
@@ -169,8 +219,17 @@ export async function signStake(
   wallet: DirectSecp256k1HdWallet,
   address: string,
   humanAmount: number,
+  onPhase?: PhaseCallback,
 ): Promise<{ txHash: string }> {
-  const client = await getClient(wallet);
+  onPhase?.('signing');
+
+  let client: SigningCosmWasmClient;
+  try {
+    client = await getClient(wallet);
+  } catch {
+    throw new StakingError('signing_failed', 'Failed to connect wallet');
+  }
+
   const microAmount = Math.floor(humanAmount * 10 ** LAUNCH_DECIMALS).toString();
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
@@ -190,8 +249,20 @@ export async function signStake(
     },
   };
 
-  const txRaw = await client.sign(address, [msg], fee, 'Stake LAUNCH');
+  let txRaw: TxRaw;
+  try {
+    txRaw = await client.sign(address, [msg], fee, 'Stake LAUNCH');
+  } catch (err) {
+    client.disconnect();
+    const msg = err instanceof Error ? err.message : 'sign failed';
+    if (msg.toLowerCase().includes('rejected')) {
+      throw new StakingError('rejected', msg);
+    }
+    throw new StakingError('signing_failed', msg);
+  }
   client.disconnect();
+
+  onPhase?.('broadcasting');
   const txHash = await broadcastSync(txRaw);
   return { txHash };
 }
@@ -201,8 +272,17 @@ export async function signUnstake(
   wallet: DirectSecp256k1HdWallet,
   address: string,
   humanAmount: number,
+  onPhase?: PhaseCallback,
 ): Promise<{ txHash: string }> {
-  const client = await getClient(wallet);
+  onPhase?.('signing');
+
+  let client: SigningCosmWasmClient;
+  try {
+    client = await getClient(wallet);
+  } catch {
+    throw new StakingError('signing_failed', 'Failed to connect wallet');
+  }
+
   const microAmount = Math.floor(humanAmount * 10 ** LAUNCH_DECIMALS).toString();
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
@@ -216,8 +296,20 @@ export async function signUnstake(
     },
   };
 
-  const txRaw = await client.sign(address, [msg], fee, 'Unstake LAUNCH');
+  let txRaw: TxRaw;
+  try {
+    txRaw = await client.sign(address, [msg], fee, 'Unstake LAUNCH');
+  } catch (err) {
+    client.disconnect();
+    const msg = err instanceof Error ? err.message : 'sign failed';
+    if (msg.toLowerCase().includes('rejected')) {
+      throw new StakingError('rejected', msg);
+    }
+    throw new StakingError('signing_failed', msg);
+  }
   client.disconnect();
+
+  onPhase?.('broadcasting');
   const txHash = await broadcastSync(txRaw);
   return { txHash };
 }
@@ -226,8 +318,17 @@ export async function signUnstake(
 export async function signClaim(
   wallet: DirectSecp256k1HdWallet,
   address: string,
+  onPhase?: PhaseCallback,
 ): Promise<{ txHash: string }> {
-  const client = await getClient(wallet);
+  onPhase?.('signing');
+
+  let client: SigningCosmWasmClient;
+  try {
+    client = await getClient(wallet);
+  } catch {
+    throw new StakingError('signing_failed', 'Failed to connect wallet');
+  }
+
   const fee = calculateFee(STAKING_GAS_LIMIT, GasPrice.fromString(DEFAULT_GAS_PRICE));
 
   const msg = {
@@ -240,8 +341,20 @@ export async function signClaim(
     },
   };
 
-  const txRaw = await client.sign(address, [msg], fee, 'Claim staking rewards');
+  let txRaw: TxRaw;
+  try {
+    txRaw = await client.sign(address, [msg], fee, 'Claim staking rewards');
+  } catch (err) {
+    client.disconnect();
+    const msg = err instanceof Error ? err.message : 'sign failed';
+    if (msg.toLowerCase().includes('rejected')) {
+      throw new StakingError('rejected', msg);
+    }
+    throw new StakingError('signing_failed', msg);
+  }
   client.disconnect();
+
+  onPhase?.('broadcasting');
   const txHash = await broadcastSync(txRaw);
   return { txHash };
 }

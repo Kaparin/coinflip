@@ -1304,6 +1304,19 @@
     "confirming": "подтверждается...",
     "noRewards": "Нет доступных наград",
     "availableToStake": "Доступно",
-    "stakedAmount": "Застейкано"
+    "stakedAmount": "Застейкано",
+    "phaseSigning": "Подписание транзакции...",
+    "phaseBroadcasting": "Отправка в сеть...",
+    "successSent": "Транзакция отправлена",
+    "errorLabel": "Ошибка",
+    "errorNetwork": "Ошибка сети. Попробуйте через несколько секунд",
+    "errorInsufficientFunds": "Недостаточно средств для операции",
+    "errorInsufficientGas": "Недостаточно газа. Попробуйте меньшую сумму",
+    "errorNotStaked": "Нет застейканных токенов",
+    "errorNoRewards": "Нет наград для получения",
+    "errorRejected": "Транзакция отменена",
+    "errorTimeout": "Время ожидания истекло. Попробуйте снова",
+    "errorSigningFailed": "Ошибка подписания. Переподключите кошелёк",
+    "errorUnknown": "Что-то пошло не так. Попробуйте позже"
   }
 }

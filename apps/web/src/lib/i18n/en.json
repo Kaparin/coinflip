@@ -1304,6 +1304,19 @@
     "confirming": "confirming...",
     "noRewards": "No pending rewards",
     "availableToStake": "Available",
-    "stakedAmount": "Staked"
+    "stakedAmount": "Staked",
+    "phaseSigning": "Signing transaction...",
+    "phaseBroadcasting": "Sending to network...",
+    "successSent": "Transaction sent",
+    "errorLabel": "Error",
+    "errorNetwork": "Network error. Try again in a few seconds",
+    "errorInsufficientFunds": "Insufficient funds for this operation",
+    "errorInsufficientGas": "Insufficient gas. Try a smaller amount",
+    "errorNotStaked": "No staked tokens found",
+    "errorNoRewards": "No rewards available to claim",
+    "errorRejected": "Transaction was cancelled",
+    "errorTimeout": "Request timed out. Try again",
+    "errorSigningFailed": "Failed to sign transaction. Reconnect wallet",
+    "errorUnknown": "Something went wrong. Try again later"
   }
 }
