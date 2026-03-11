@@ -9,7 +9,7 @@ import { vaultService } from '../services/vault.service.js';
 import { betService } from '../services/bet.service.js';
 import { pendingSecretsService } from '../services/pending-secrets.service.js';
 import { getDb } from '../lib/db.js';
-import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, jackpotContributions, eventParticipants, events as eventsTable, stakingLedger } from '@coinflip/db/schema';
+import { users, bets, vaultBalances, pendingBetSecrets, announcements, userNotifications, shopPurchases, referralRewards, achievementClaims, treasuryLedger as treasuryLedgerTable, partnerLedger, jackpotPools, jackpotContributions, eventParticipants, events as eventsTable, stakingLedger, sessions, referrals, referralBalances, txEvents, relayerTransactions, globalChatMessages, betMessages, coinTransfers, profileReactions, userFavorites, boostUsage, betPins, vaultTransactions, vipSubscriptions, vipCustomization } from '@coinflip/db/schema';
 import { env, getActiveContractAddr, gameDenom } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { chainRest } from '../lib/chain-fetch.js';
@@ -1553,4 +1553,121 @@ adminRouter.post('/staking/flush', async (c) => {
   }
   logger.info({ txHash: result.txHash, amount: result.amount, admin: c.get('address') }, 'admin: staking flush executed');
   return c.json({ data: { status: 'flushed', ...result } });
+});
+
+// ═══════════════════════════════════════════
+// Production Reset
+// ═══════════════════════════════════════════
+
+const ProductionResetSchema = z.object({
+  confirmation: z.literal('RESET_TO_PRODUCTION'),
+  archiveFinancials: z.boolean().default(true),
+});
+
+adminRouter.post('/system/production-reset', zValidator('json', ProductionResetSchema), async (c) => {
+  const { archiveFinancials } = c.req.valid('json');
+  const adminAddr = c.get('address') as string;
+  const db = getDb();
+
+  logger.warn({ admin: adminAddr }, '🚨 PRODUCTION RESET INITIATED');
+
+  const counts: Record<string, number> = {};
+
+  try {
+    // Phase 1: Archive financial tables (optional — copy to *_archive suffix)
+    if (archiveFinancials) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      for (const tbl of ['treasury_ledger', 'vault_transactions', 'shop_purchases', 'vip_subscriptions']) {
+        const archiveName = `${tbl}_archive_${timestamp}`;
+        await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS "${archiveName}" AS SELECT * FROM "${tbl}"`));
+        logger.info({ table: tbl, archive: archiveName }, 'Archived table');
+      }
+      counts.archived = 4;
+    }
+
+    // Phase 2: Zero out balances (keep records, reset amounts)
+    const [vbResult] = await db.execute(sql`
+      UPDATE vault_balances SET available = '0', locked = '0', bonus = '0',
+        offchain_spent = '0', coin_balance = '0', updated_at = now()
+    `);
+    counts.vaultBalancesZeroed = Number((vbResult as any)?.rowCount ?? 0);
+
+    const [rbResult] = await db.execute(sql`
+      UPDATE referral_balances SET unclaimed = '0', total_earned = '0', updated_at = now()
+    `);
+    counts.referralBalancesZeroed = Number((rbResult as any)?.rowCount ?? 0);
+
+    // Phase 3: Delete game data (order matters — FK constraints)
+    // bet_messages references bets
+    const [r1] = await db.delete(betMessages).returning({ id: betMessages.id });
+    counts.betMessages = r1 ? 1 : 0;
+    await db.execute(sql`DELETE FROM bet_messages`).then(r => counts.betMessages = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // jackpot_contributions references jackpot_pools
+    await db.execute(sql`DELETE FROM jackpot_contributions`).then(r => counts.jackpotContributions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM jackpot_pools`).then(r => counts.jackpotPools = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // event_participants references events
+    await db.execute(sql`DELETE FROM event_participants`).then(r => counts.eventParticipants = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // partner_ledger references bets
+    await db.execute(sql`DELETE FROM partner_ledger`).then(r => counts.partnerLedger = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // staking_ledger references bets
+    await db.execute(sql`DELETE FROM staking_ledger`).then(r => counts.stakingLedger = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // referral_rewards references bets
+    await db.execute(sql`DELETE FROM referral_rewards`).then(r => counts.referralRewards = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // achievement_claims references bets (achievementId)
+    await db.execute(sql`DELETE FROM achievement_claims`).then(r => counts.achievementClaims = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // bets (main game table)
+    await db.execute(sql`DELETE FROM bets`).then(r => counts.bets = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // pending_bet_secrets
+    await db.execute(sql`DELETE FROM pending_bet_secrets`).then(r => counts.pendingBetSecrets = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // referrals (relationships — codes kept)
+    await db.execute(sql`DELETE FROM referrals`).then(r => counts.referrals = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // Phase 4: Financial ledgers (cleared after archiving)
+    await db.execute(sql`DELETE FROM treasury_ledger`).then(r => counts.treasuryLedger = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM vault_transactions`).then(r => counts.vaultTransactions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM shop_purchases`).then(r => counts.shopPurchases = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM vip_subscriptions`).then(r => counts.vipSubscriptions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM coin_transfers`).then(r => counts.coinTransfers = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // Phase 5: Social & chat
+    await db.execute(sql`DELETE FROM global_chat_messages`).then(r => counts.chatMessages = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM profile_reactions`).then(r => counts.profileReactions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM user_favorites`).then(r => counts.userFavorites = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM user_notifications`).then(r => counts.notifications = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // Phase 6: VIP cosmetics & boosts (keep configs)
+    await db.execute(sql`DELETE FROM bet_pins`).then(r => counts.betPins = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM boost_usage`).then(r => counts.boostUsage = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM vip_customization`).then(r => counts.vipCustomization = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // Phase 7: Audit logs
+    await db.execute(sql`DELETE FROM tx_events`).then(r => counts.txEvents = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+    await db.execute(sql`DELETE FROM relayer_transactions`).then(r => counts.relayerTransactions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    // Phase 8: Sessions (force re-auth)
+    await db.execute(sql`DELETE FROM sessions`).then(r => counts.sessions = Number((r as any)[0]?.rowCount ?? 0)).catch(() => {});
+
+    logger.warn({ admin: adminAddr, counts }, '🚨 PRODUCTION RESET COMPLETED');
+
+    return c.json({
+      data: {
+        status: 'completed',
+        message: 'Production reset completed. All game data cleared, user accounts preserved.',
+        counts,
+        preserved: ['users', 'referral_codes', 'platform_config', 'partner_config', 'vip_config', 'jackpot_tiers', 'news_posts', 'events (structure)'],
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err, admin: adminAddr }, 'PRODUCTION RESET FAILED');
+    return c.json({ error: { code: 'RESET_FAILED', message: err.message } }, 500);
+  }
 });

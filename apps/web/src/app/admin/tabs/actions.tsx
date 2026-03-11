@@ -8,8 +8,9 @@ import {
   useAdminRecoverSecret,
   useAdminImportOrphaned,
   useAdminHealSystem,
+  useAdminProductionReset,
 } from '@/hooks/use-admin';
-import type { HealResult } from '@/hooks/use-admin';
+import type { HealResult, ProductionResetResult } from '@/hooks/use-admin';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { signCoinflipAdminSweep } from '@/lib/wallet-signer';
 import { ACTIVE_CONTRACT } from '@/lib/constants';
@@ -21,12 +22,102 @@ export function ActionsTab() {
         Ручные действия админа для исправления зависших состояний. Используйте осторожно — операции напрямую изменяют БД.
       </p>
 
+      <ProductionResetAction />
       <HealSystemAction />
       <ContractSweepAction />
       <UnlockFundsAction />
       <ForceCancelAction />
       <RecoverSecretAction />
       <ImportOrphanedAction />
+    </div>
+  );
+}
+
+function ProductionResetAction() {
+  const reset = useAdminProductionReset();
+  const [confirmText, setConfirmText] = useState('');
+  const [archiveFinancials, setArchiveFinancials] = useState(true);
+  const [result, setResult] = useState<ProductionResetResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const isConfirmed = confirmText === 'СБРОС';
+
+  const handleReset = async () => {
+    if (!isConfirmed) return;
+    setResult(null);
+    setError(null);
+    try {
+      const res = await reset.mutateAsync(archiveFinancials);
+      setResult(res);
+      setConfirmText('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    }
+  };
+
+  return (
+    <div className="rounded-xl border-2 border-red-500/50 bg-red-500/5 p-5 space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-red-400">Сброс к продакшену</h3>
+        <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
+          Полный сброс тестовых данных. Обнуляет: все ставки, балансы, статистику, рейтинги, стрики, реферальные награды, чат, джекпоты, достижения, историю транзакций, сессии.
+        </p>
+        <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
+          <span className="text-green-400 font-medium">Сохраняет:</span> аккаунты пользователей, реферальные коды, конфигурацию платформы, партнёров, тарифы VIP, тиры джекпота, новости.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 text-xs cursor-pointer">
+        <input
+          type="checkbox"
+          checked={archiveFinancials}
+          onChange={(e) => setArchiveFinancials(e.target.checked)}
+          className="rounded border-[var(--color-border)]"
+        />
+        Архивировать финансовые таблицы перед удалением
+      </label>
+
+      <div className="flex gap-3 items-end flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">
+            Введите СБРОС для подтверждения
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="СБРОС"
+            className="w-full rounded-xl border border-red-500/30 bg-[var(--color-bg)] px-3 py-2 text-xs focus:border-red-500 focus:outline-none font-mono"
+          />
+        </div>
+        <button
+          type="button"
+          disabled={!isConfirmed || reset.isPending}
+          onClick={handleReset}
+          className="rounded-xl bg-red-600 px-6 py-2.5 text-xs font-bold disabled:opacity-40 transition-opacity whitespace-nowrap"
+        >
+          {reset.isPending ? 'Сброс...' : 'Сбросить всё'}
+        </button>
+      </div>
+
+      {result && (
+        <div className="space-y-2 text-xs">
+          <p className="font-bold text-green-400">{result.message}</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {Object.entries(result.counts).map(([key, val]) => (
+              <div key={key} className="flex justify-between">
+                <span className="text-[var(--color-text-secondary)]">{key}</span>
+                <span className={val > 0 ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'}>{val}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2">
+            <p className="text-green-400/70 text-[10px]">Сохранено: {result.preserved.join(', ')}</p>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
     </div>
   );
 }

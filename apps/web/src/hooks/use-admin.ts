@@ -1270,3 +1270,27 @@ export function useAdminStakingFlush() {
     },
   });
 }
+
+// ─── Production Reset ──────────────────────────────────────
+
+export interface ProductionResetResult {
+  status: string;
+  message: string;
+  counts: Record<string, number>;
+  preserved: string[];
+}
+
+export function useAdminProductionReset() {
+  const { address } = useWalletContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (archiveFinancials: boolean = true) =>
+      adminFetch<ProductionResetResult>('/api/v1/admin/system/production-reset', address!, {
+        method: 'POST',
+        body: JSON.stringify({ confirmation: 'RESET_TO_PRODUCTION', archiveFinancials }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+}
