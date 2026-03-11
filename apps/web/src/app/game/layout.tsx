@@ -18,7 +18,7 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
           <AiTicker />
           <div className="flex-1 min-h-0 overflow-hidden">
             <div className="h-full mx-auto max-w-[1440px] flex">
-              <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
+              <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
               <SocialSidebar />
             </div>
           </div>

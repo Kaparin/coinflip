@@ -14,6 +14,7 @@ import { TopWinnerBanner } from '@/components/features/top-winner-banner';
 import { JackpotBanner } from '@/components/features/jackpot/jackpot-banner';
 import { TgWelcomeBanner } from '@/components/features/telegram/tg-welcome-banner';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
+import { GameLeftPanel } from '@/components/features/game/game-left-panel';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useWebSocketContext } from '@/contexts/websocket-context';
 import { useNotifications } from '@/components/features/notifications/notification-provider';
@@ -212,59 +213,66 @@ export default function GamePage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-4 lg:px-6 py-4 space-y-4 pb-24 md:pb-6">
-      <TgWelcomeBanner />
+    <div className="h-full flex">
+      {/* ═══ Left Panel — xl+ only ═══ */}
+      <GameLeftPanel />
 
-      <div className="hidden md:block">
-        <BalanceDisplay />
-      </div>
+      {/* ═══ Center Game Area ═══ */}
+      <div className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 py-4 pb-24 md:pb-6 space-y-4">
+        <TgWelcomeBanner />
 
-      <TopWinnerBanner />
-      <JackpotBanner />
-      <StakingRevenueBanner />
-
-      <div id="create-bet-form" className="hidden md:block">
-        <CreateBetForm onBetSubmitted={(bet) => { addPending(bet); handleTabChange('mybets'); }} />
-      </div>
-
-      {/* Tabs — all always mounted, hidden via CSS to preserve state & scroll */}
-      <div>
-        <div className="flex gap-1 border-b border-[var(--color-border)] mb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px active:scale-[0.98] ${
-                activeTab === tab.id
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Banners — hidden on xl+ (shown in left panel instead) */}
+        <div className="xl:hidden space-y-3">
+          <div className="hidden md:block">
+            <BalanceDisplay />
+          </div>
+          <TopWinnerBanner />
+          <JackpotBanner />
+          <StakingRevenueBanner />
         </div>
 
-        <div {...swipeHandlers} className="min-h-[200px]">
-          {/* Lazy-mount: tabs mount on first visit, stay mounted for scroll preservation */}
-          <div style={{ display: activeTab === 'bets' ? 'block' : 'none' }}>
-            <BetList pendingBets={pendingBets} activeDuels={duels} />
+        <div id="create-bet-form" className="hidden md:block">
+          <CreateBetForm onBetSubmitted={(bet) => { addPending(bet); handleTabChange('mybets'); }} />
+        </div>
+
+        {/* Tabs */}
+        <div>
+          <div className="flex gap-1 border-b border-[var(--color-border)] mb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px active:scale-[0.98] ${
+                  activeTab === tab.id
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          {visitedTabs.has('mybets') && (
-            <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>
-              <MyBets pendingBets={pendingBets} />
+
+          <div {...swipeHandlers} className="min-h-[200px]">
+            <div style={{ display: activeTab === 'bets' ? 'block' : 'none' }}>
+              <BetList pendingBets={pendingBets} activeDuels={duels} />
             </div>
-          )}
-          {visitedTabs.has('history') && (
-            <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
-              <HistoryList />
-            </div>
-          )}
-          {visitedTabs.has('leaderboard') && (
-            <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
-              <Leaderboard />
-            </div>
-          )}
+            {visitedTabs.has('mybets') && (
+              <div style={{ display: activeTab === 'mybets' ? 'block' : 'none' }}>
+                <MyBets pendingBets={pendingBets} />
+              </div>
+            )}
+            {visitedTabs.has('history') && (
+              <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
+                <HistoryList />
+              </div>
+            )}
+            {visitedTabs.has('leaderboard') && (
+              <div style={{ display: activeTab === 'leaderboard' ? 'block' : 'none' }}>
+                <Leaderboard />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
