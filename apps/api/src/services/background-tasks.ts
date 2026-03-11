@@ -276,7 +276,8 @@ export function resolveCreateBetInBackground(task: CreateBetTask): void {
       // Step 6: AI bot — react to big bets in chat
       const makerInfo = addressMap.get(makerUserId);
       const nickname = makerInfo?.nickname ?? address.slice(0, 10);
-      aiBotService.onBigBetCreated(nickname, amount).catch(() => {});
+      const humanAmount = String(Number(amount) / 1_000_000);
+      aiBotService.onBigBetCreated(nickname, humanAmount).catch(() => {});
     } catch (err) {
       logger.error({ err, txHash }, `${tag} — unexpected error`);
       decrementPendingBetCount(makerUserId);
