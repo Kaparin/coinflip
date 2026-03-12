@@ -628,19 +628,16 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
   const l2Bps = refConfig?.level2Bps ?? 150;
   const l3Bps = refConfig?.level3Bps ?? 50;
   const totalRefBps = l1Bps + l2Bps + l3Bps;
-  const bpsToPercent = (bps: number) => {
-    const p = bps / 100;
-    return p % 1 === 0 ? `${p}%` : `${p}%`;
-  };
-  const bpsToCommPercent = (bps: number) => {
+  // Display percentages relative to commission (10% = 100% treasury)
+  const bpsToTreasuryPercent = (bps: number) => {
     const p = (bps / COMMISSION_BPS) * 100;
-    return `${Math.round(p * 10) / 10}%`;
+    return p % 1 === 0 ? `${p}%` : `${Math.round(p * 10) / 10}%`;
   };
 
   const LEVELS = [
-    { level: 1, pct: bpsToPercent(l1Bps), commPct: bpsToCommPercent(l1Bps), color: 'from-violet-500 to-indigo-500', bgColor: 'bg-violet-500/10', textColor: 'text-violet-400', borderColor: 'border-violet-500/30' },
-    { level: 2, pct: bpsToPercent(l2Bps), commPct: bpsToCommPercent(l2Bps), color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-500/10', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
-    { level: 3, pct: bpsToPercent(l3Bps), commPct: bpsToCommPercent(l3Bps), color: 'from-teal-500 to-emerald-500', bgColor: 'bg-teal-500/10', textColor: 'text-teal-400', borderColor: 'border-teal-500/30' },
+    { level: 1, pct: bpsToTreasuryPercent(l1Bps), color: 'from-violet-500 to-indigo-500', bgColor: 'bg-violet-500/10', textColor: 'text-violet-400', borderColor: 'border-violet-500/30' },
+    { level: 2, pct: bpsToTreasuryPercent(l2Bps), color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-500/10', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
+    { level: 3, pct: bpsToTreasuryPercent(l3Bps), color: 'from-teal-500 to-emerald-500', bgColor: 'bg-teal-500/10', textColor: 'text-teal-400', borderColor: 'border-teal-500/30' },
   ];
 
   return (
@@ -704,7 +701,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
             </p>
 
             <div className="relative space-y-2">
-              {LEVELS.map(({ level, pct, commPct, color, bgColor, textColor, borderColor }) => (
+              {LEVELS.map(({ level, pct, color, bgColor, textColor, borderColor }) => (
                 <div key={level} className={`relative rounded-xl border ${borderColor} ${bgColor} p-3`} style={{ marginLeft: `${(level - 1) * 12}px` }}>
                   {level > 1 && (
                     <div className="absolute -top-2 left-3 w-px h-2 bg-[var(--color-border)]" />
@@ -724,7 +721,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     <div className="text-right">
                       <p className={`text-lg font-extrabold ${textColor}`}>{pct}</p>
                       <p className="text-[9px] text-[var(--color-text-secondary)]">
-                        {t('referral.ofPot')} ({commPct} {t('referral.ofCommission')})
+                        {t('referral.ofTreasury')}
                       </p>
                     </div>
                   </div>
@@ -742,9 +739,9 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">{bpsToPercent(COMMISSION_BPS - totalRefBps)}</p>
+                    <p className="text-lg font-extrabold text-[var(--color-text-secondary)]">{bpsToTreasuryPercent(COMMISSION_BPS - totalRefBps)}</p>
                     <p className="text-[9px] text-[var(--color-text-secondary)]">
-                      {t('referral.ofPot')} ({bpsToCommPercent(COMMISSION_BPS - totalRefBps)} {t('referral.ofCommission')})
+                      {t('referral.ofTreasury')}
                     </p>
                   </div>
                 </div>
@@ -759,7 +756,7 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                 {t('referral.exampleDesc')}
               </p>
               {(() => {
-                // Example: 100 COIN bet → 200 COIN pot, 10% commission = 20 COIN
+                // Example: 100 COIN bet → 200 COIN pot, 10% commission = 20 COIN (= 100% treasury)
                 const pot = 200;
                 const commission = pot * COMMISSION_BPS / 10000;
                 const winnerPayout = pot - commission;
@@ -775,26 +772,27 @@ function ReferralSection({ isConnected }: { isConnected: boolean }) {
                       <span className="font-bold">{fmt(winnerPayout)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({fmt(100 - COMMISSION_BPS / 100)}%)</span></span>
                     </div>
                     <div className="h-px bg-[var(--color-border)]" />
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-amber-400/70">{t('referral.treasuryNote')} = {fmt(commission)} {GAME_TOKEN}</p>
                     <p className="text-[9px] font-bold uppercase tracking-wide text-violet-400/70">{t('referral.exampleYourChain')}</p>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-violet-400">{t('referral.exampleL1')}</span>
-                      <span className="font-bold text-violet-400">{fmt(exL1)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l1Bps)})</span></span>
+                      <span className="font-bold text-violet-400">{fmt(exL1)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToTreasuryPercent(l1Bps)} {t('referral.ofTreasury')})</span></span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-blue-400">{t('referral.exampleL2')}</span>
-                      <span className="font-bold text-blue-400">{fmt(exL2)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l2Bps)})</span></span>
+                      <span className="font-bold text-blue-400">{fmt(exL2)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToTreasuryPercent(l2Bps)} {t('referral.ofTreasury')})</span></span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-teal-400">{t('referral.exampleL3')}</span>
-                      <span className="font-bold text-teal-400">{fmt(exL3)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToPercent(l3Bps)})</span></span>
+                      <span className="font-bold text-teal-400">{fmt(exL3)} {GAME_TOKEN} <span className="text-[var(--color-text-secondary)] font-normal">({bpsToTreasuryPercent(l3Bps)} {t('referral.ofTreasury')})</span></span>
                     </div>
                     <div className="h-px bg-[var(--color-border)]" />
                     <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--color-text-secondary)]">{t('referral.platform')}</span>
-                      <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} {GAME_TOKEN} <span className="font-normal">({bpsToPercent(COMMISSION_BPS - totalRefBps)})</span></span>
+                      <span className="font-bold text-[var(--color-text-secondary)]">{fmt(exPlatform)} {GAME_TOKEN} <span className="font-normal">({bpsToTreasuryPercent(COMMISSION_BPS - totalRefBps)} {t('referral.ofTreasury')})</span></span>
                     </div>
                     <p className="text-[9px] text-[var(--color-text-secondary)]/60 mt-1 leading-relaxed">
-                      {t('referral.examplePlatformNote', { pct: bpsToPercent(totalRefBps) })}
+                      {t('referral.examplePlatformNote')}
                     </p>
                   </div>
                 );
