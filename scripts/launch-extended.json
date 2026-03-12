@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "name": "LAUNCH",
+  "symbol": "LAUNCH",
+  "website": "https://www.axiome-launch.com/",
+  "description": {
+    "format": "markdown",
+    "content": [
+      {
+        "language": "en",
+        "text": "**🚀 LAUNCH — Ecosystem Revenue Token**\n\n**LAUNCH** _is the core utility token of the Axiome Launch Suite — a multi-project startup ecosystem on the Axiome blockchain._\n\n_We build independent Web3 products inside the Axiome ecosystem — each with its own token and economy. LAUNCH token holders earn revenue from every project we create._\n\n**💰 Stake & Earn**\n\n• Stake LAUNCH → earn AXM from every ecosystem project\n• 20% of the treasury is distributed to stakers\n• No lock period — unstake anytime, claim instantly\n• Synthetix reward model — fair, proportional distribution\n\n**🎮 Live Ecosystem Projects**\n\n_🪙 Heads or Tails_ — PvP coin flip game on AXM. Provably fair, 50/50, winner takes 90%.\n_♟️ Checkers_ — PvP checkers on Axiome blockchain (in development)\n_🎟️ Events & Raffles_ — contests with real AXM prizes for active players\n_🧩 Community Projects_ — new ideas proposed and voted by holders\n\n**🛡️ Token Utility**\n\n• Revenue share from all ecosystem projects\n• Governance — propose & vote on ecosystem decisions\n• Access tiers & premium features\n• The more projects launch, the more you earn\n\n**📊 Tokenomics**\n\nTotal Supply: **100,000,000 LAUNCH**\n\n• 40% — Community & Rewards\n• 20% — Liquidity Pool\n• 20% — Treasury\n• 15% — Team\n• 5% — Advisors & Marketing\n\n**🔎 Development Plans**\n\n• New PvP games with AXM wagers\n• Governance DAO for community proposals\n• AI Token Studio — create tokens, generate tokenomics\n• Token Explorer with trust scores and verification\n• Expanding the ecosystem with more revenue-generating products"
+      },
+      {
+        "language": "ru",
+        "text": "**🚀 LAUNCH — Токен дохода экосистемы**\n\n**LAUNCH** — _утилити-токен экосистемы Axiome Launch Suite — стартап-экосистемы на блокчейне Axiome._\n\n_Мы создаём независимые Web3-продукты внутри экосистемы Axiome — каждый со своим токеном и экономикой. Держатели LAUNCH получают доход от каждого проекта._\n\n**💰 Стейкинг**\n\n• Стейкайте LAUNCH → получайте AXM от каждого проекта\n• 20% казны распределяется стейкерам\n• Без блокировки — анстейк в любой момент\n• Мгновенный вывод наград\n• Модель Synthetix — честное пропорциональное распределение\n\n**🎮 Проекты экосистемы**\n\n_🪙 Орёл и Решка_ — PvP-игра на AXM. Доказуемо честная, 50/50, победитель забирает 90%.\n_♟️ Шашки_ — PvP-шашки на блокчейне Axiome (в разработке)\n_🎟️ Ивенты и розыгрыши_ — конкурсы с реальными призами в AXM\n_🧩 Проекты сообщества_ — новые идеи от холдеров\n\n**🛡️ Утилити токена**\n\n• Доля дохода от всех проектов экосистемы\n• Управление — предлагайте и голосуйте за решения\n• Уровни доступа и премиум-функции\n• Чем больше проектов — тем больше ваш доход\n\n**📊 Токеномика**\n\nОбщий выпуск: **100,000,000 LAUNCH**\n\n• 40% — Сообщество и награды\n• 20% — Пул ликвидности\n• 20% — Казна\n• 15% — Команда\n• 5% — Маркетинг\n\n**🔎 Планы развития**\n\n• Новые PvP-игры с ставками в AXM\n• DAO для голосований сообщества\n• AI Token Studio — создание токенов, генерация токеномики\n• Токен-эксплорер с рейтингами доверия и верификацией\n• Расширение экосистемы новыми продуктами"
+      }
+    ]
+  },
+  "socials": {
+    "Website": "https://www.axiome-launch.com/",
+    "Heads or Tails": "https://coinflip.axiome-launch.com/",
+    "Telegram": "https://t.me/axiome_launch",
+    "Explorer": "https://axiomechain.org"
+  }
+}
