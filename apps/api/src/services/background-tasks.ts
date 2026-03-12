@@ -1493,11 +1493,16 @@ async function recoverStuckLockedFunds(): Promise<void> {
   try {
     const db = (await import('../lib/db.js')).getDb();
 
-    // Find users with locked > 0 but no active bets AND no pending withdrawals
+    // Find users with locked > 0 but no active bets AND no pending withdrawals.
+    // Grace period: skip if balance was updated within last 3 minutes — lockFunds updates
+    // updated_at, and the background task needs up to ~90s to confirm tx and create the bet
+    // record. Without this grace period, we'd unlock funds for in-flight bets whose DB
+    // record hasn't been created yet (tx is in mempool / being confirmed).
     const stuck = await db.execute(sql`
       SELECT vb.user_id, vb.locked
       FROM vault_balances vb
       WHERE vb.locked::numeric > 0
+        AND vb.updated_at < now() - interval '3 minutes'
         AND NOT EXISTS (
           SELECT 1 FROM bets b
           WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
