@@ -9,6 +9,7 @@ export const globalChatMessages = pgTable(
     message: text('message').notNull(),
     style: text('style'), // null = normal, 'highlighted' = golden border, 'pinned' = super chat
     effect: text('effect'), // null = none, 'confetti' | 'coins' | 'fire'
+    personaId: text('persona_id'), // AI bot persona id (for resolving display name / avatar)
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

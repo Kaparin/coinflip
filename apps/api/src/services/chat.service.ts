@@ -41,6 +41,11 @@ interface ChatMsg {
   style: string | null;
   effect: string | null;
   createdAt: string;
+  /** AI bot persona fields (populated for style='ai_bot') */
+  textRu?: string;
+  textEn?: string;
+  avatarUrl?: string;
+  nameColor?: string;
   coinDrop?: {
     dropId: string;
     amount: string;
@@ -251,6 +256,7 @@ class ChatService {
   async getTodayMessages(): Promise<ChatMsg[]> {
     const rows = await this.db.execute(sql`
       SELECT m.id::text, m.user_id::text as user_id, m.message, m.style, m.effect, m.created_at,
+        m.persona_id,
         u.address, u.profile_nickname as nickname,
         (SELECT vs.tier FROM vip_subscriptions vs WHERE vs.user_id = u.id AND vs.expires_at > NOW() AND vs.canceled_at IS NULL ORDER BY vs.expires_at DESC LIMIT 1) AS vip_tier,
         cd.id::text as drop_id, cd.amount::text as drop_amount,
@@ -265,17 +271,56 @@ class ChatService {
       LIMIT 200
     `);
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+
+    // For AI bot messages, resolve persona info from config
+    let personaMap: Map<string, { displayName?: string; avatarUrl?: string; nameColor?: string }> | null = null;
+    const hasAiBotMessages = rawRows.some(r => r.style === 'ai_bot' && r.persona_id);
+    if (hasAiBotMessages) {
+      try {
+        const config = await aiBotService.getConfig();
+        personaMap = new Map();
+        for (const p of config.personas) {
+          personaMap.set(p.id, { displayName: p.displayName, avatarUrl: p.avatarUrl, nameColor: p.nameColor });
+        }
+      } catch { /* config unavailable, skip */ }
+    }
+
     return rawRows.map((r) => {
+      const isAiBot = r.style === 'ai_bot';
+      const personaId = r.persona_id ? String(r.persona_id) : null;
+      const persona = personaId && personaMap ? personaMap.get(personaId) : null;
+
+      // For AI bot: split message into ru/en and use persona displayName as nickname
+      let textRu: string | undefined;
+      let textEn: string | undefined;
+      let nickname = r.nickname ? String(r.nickname) : null;
+
+      if (isAiBot) {
+        const msgStr = String(r.message);
+        if (msgStr.includes('\n---\n')) {
+          const [ru, en] = msgStr.split('\n---\n');
+          textRu = ru;
+          textEn = en;
+        }
+        if (persona?.displayName) {
+          nickname = persona.displayName;
+        }
+      }
+
       const msg: ChatMsg = {
         id: String(r.id),
         userId: String(r.user_id),
         address: String(r.address),
-        nickname: r.nickname ? String(r.nickname) : null,
-        vipTier: r.vip_tier ? String(r.vip_tier) : null,
+        nickname,
+        vipTier: isAiBot ? 'ai' : (r.vip_tier ? String(r.vip_tier) : null),
         message: String(r.message),
         style: r.style ? String(r.style) : null,
         effect: r.effect ? String(r.effect) : null,
         createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+        ...(isAiBot && textRu ? { textRu } : {}),
+        ...(isAiBot && textEn ? { textEn } : {}),
+        ...(persona?.avatarUrl ? { avatarUrl: persona.avatarUrl } : {}),
+        ...(persona?.nameColor ? { nameColor: persona.nameColor } : {}),
       };
       if (r.drop_id) {
         msg.coinDrop = {

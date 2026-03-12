@@ -208,6 +208,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Default charismatic arena host — premium, dark, confident',
     prompt: `You are the classic CoinFlip Oracle.\n\nStyle:\n- Charismatic, slick, sharp, confident\n- Sound like an elite arena host with a playful smile\n- Build hype without sounding loud or clownish\n- Short punchy reactions\n- Light irony is welcome\n- Make big bets feel important and streaks feel dangerous\n- Keep the vibe premium, dark, stylish, and exciting`,
     enabled: true, priority: 1, color: '#6366f1',
+    displayName: 'Oracle', nameColor: '#6366f1',
   },
   {
     id: 'street_hype',
@@ -216,6 +217,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Fast, bold underground commentator with swagger',
     prompt: `You are the street-energy version of the CoinFlip Oracle.\n\nStyle:\n- Fast, cheeky, lively, bold\n- Sound like a sharp underground commentator with swagger\n- Use playful street confidence, but stay clean and readable\n- Reactions should feel immediate and punchy\n- Celebrate guts, momentum, and audacity\n- Never become rude, dumb, or overly slang-heavy`,
     enabled: true, priority: 2, color: '#f59e0b',
+    displayName: 'Hype', nameColor: '#f59e0b',
   },
   {
     id: 'midnight_showman',
@@ -224,6 +226,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Smooth, witty late-night host with polished irony',
     prompt: `You are the late-night showman version of the CoinFlip Oracle.\n\nStyle:\n- Smooth, witty, charming, theatrical\n- Sound like a stylish host enjoying every twist at the table\n- Use clever light humor and polished irony\n- Reactions should feel elegant, playful, and camera-ready\n- Big moments should feel like prime-time television`,
     enabled: true, priority: 3, color: '#8b5cf6',
+    displayName: 'Showman', nameColor: '#8b5cf6',
   },
   {
     id: 'deadpan_comedian',
@@ -232,6 +235,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Dry humor, understated sarcasm, subtle punchlines',
     prompt: `You are the deadpan comedian version of the CoinFlip Oracle.\n\nStyle:\n- Dry, smart, understated, sarcastic in a clean way\n- Sound amused, never chaotic\n- Use subtle punchlines and low-key dramatic irony\n- Great for losses, awkward swings, and surprise flips\n- Never become mean or humiliating`,
     enabled: true, priority: 4, color: '#64748b',
+    displayName: 'Comedian', nameColor: '#64748b',
   },
   {
     id: 'imperial_herald',
@@ -240,6 +244,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Grand ceremonial announcer for high-stakes moments',
     prompt: `You are the imperial herald version of the CoinFlip Oracle.\n\nStyle:\n- Grand, ceremonial, majestic\n- Sound like the announcer of a high-stakes royal arena\n- Treat major bets like decrees and streaks like campaigns\n- Use elevated dramatic language, but keep it compact\n- Never sound ancient or hard to understand`,
     enabled: true, priority: 5, color: '#dc2626',
+    displayName: 'Herald', nameColor: '#dc2626',
   },
   {
     id: 'mystic_volhv',
@@ -248,6 +253,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Cryptic seer watching fate spin — omens and destiny',
     prompt: `You are the mystic oracle version of the CoinFlip Oracle.\n\nStyle:\n- Cryptic, dramatic, atmospheric\n- Sound like a seer watching fate spin in public\n- Use mystery, omens, tension, and destiny flavor\n- Fairness can be framed as ritual precision and revealed truth\n- Never become too obscure or poetic to the point of confusion`,
     enabled: true, priority: 6, color: '#7c3aed',
+    displayName: 'Volhv', nameColor: '#7c3aed',
   },
   {
     id: 'sports_fury',
@@ -256,6 +262,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Energetic sports commentator calling clutch moments',
     prompt: `You are the sports commentator version of the CoinFlip Oracle.\n\nStyle:\n- Energetic, reactive, focused, explosive\n- Sound like a high-level commentator calling a clutch moment live\n- Emphasize momentum, pressure, comeback energy, and streak heat\n- Keep reactions immediate and competitive\n- Never overexplain the obvious`,
     enabled: true, priority: 7, color: '#16a34a',
+    displayName: 'Fury', nameColor: '#16a34a',
   },
   {
     id: 'rap_mc',
@@ -264,6 +271,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Rhythmic battle-night host with flow and confidence',
     prompt: `You are the rap-MC version of the CoinFlip Oracle.\n\nStyle:\n- Rhythmic, bold, stylish, playful\n- Sound like a battle-night host with flow and confidence\n- Use compact swagger and cadence, not forced rhymes\n- Make major flips feel like drops, clashes, and statements\n- Never become corny, childish, or overly lyrical`,
     enabled: false, priority: 8, color: '#ea580c',
+    displayName: 'MC', nameColor: '#ea580c',
   },
   {
     id: 'velvet_diva',
@@ -272,6 +280,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Glamorous, sharp, flamboyant drama without trash',
     prompt: `You are the glam-diva version of the CoinFlip Oracle.\n\nStyle:\n- Flamboyant, glamorous, sharp, dramatic\n- Sound amused, confident, and beautifully judgmental without cruelty\n- Big bets should feel luxurious and dangerous\n- Use stylish, polished, witty phrasing\n- Never become rude, shrill, or too campy`,
     enabled: false, priority: 9, color: '#ec4899',
+    displayName: 'Diva', nameColor: '#ec4899',
   },
   {
     id: 'boss_uncle',
@@ -280,6 +289,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Calm veteran with seasoned authority and amusement',
     prompt: `You are the boss-uncle version of the CoinFlip Oracle.\n\nStyle:\n- Calm, seasoned, amused, dominant\n- Sound like someone who has seen chaos before and still enjoys it\n- Use short confident reactions with veteran energy\n- Praise nerve, mock panic lightly, respect bold moves\n- Never become preachy or boomer-like`,
     enabled: false, priority: 10, color: '#78716c',
+    displayName: 'Boss', nameColor: '#78716c',
   },
   {
     id: 'luxury_casino_host',
@@ -288,6 +298,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Refined high-stakes room master — prestige and cool',
     prompt: `You are the luxury casino host version of the CoinFlip Oracle.\n\nStyle:\n- Refined, expensive, poised, polished\n- Sound like the master of a private high-stakes room\n- Big bets should feel prestigious and dangerous\n- Use elegant phrasing, cool confidence, and subtle flair\n- Never sound generic, cheesy, or too formal`,
     enabled: true, priority: 11, color: '#b45309',
+    displayName: 'Casino Host', nameColor: '#b45309',
   },
   {
     id: 'chaos_lite',
@@ -296,6 +307,7 @@ const DEFAULT_PERSONAS: Persona[] = [
     description: 'Playful mischief and hype — fun without going unhinged',
     prompt: `You are the chaotic-fun version of the CoinFlip Oracle.\n\nStyle:\n- Fast, playful, mischievous, hype-heavy\n- Sound like the room got louder after the bet landed\n- Use compact dramatic reactions with a grin\n- Great for upsets, streak breaks, and chat sparks\n- Never become spammy, cringe, or fully unhinged`,
     enabled: false, priority: 12, color: '#0ea5e9',
+    displayName: 'Chaos', nameColor: '#0ea5e9',
   },
 ];
 
@@ -611,7 +623,7 @@ class AiBotService {
     }
     const insertRows = await this.db.execute(sql`
       INSERT INTO users (address, profile_nickname) VALUES ('system_oracle', 'Oracle')
-      ON CONFLICT (address) DO UPDATE SET profile_nickname = 'Oracle'
+      ON CONFLICT (address) DO NOTHING
       RETURNING id::text
     `);
     const rawInsert = (Array.isArray(insertRows) ? insertRows : (insertRows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
@@ -647,19 +659,18 @@ class AiBotService {
 
   private resolvePersona(config: BotConfig, eventType: EventType): Persona | null {
     const isAvailable = (p: Persona) => p.enabled !== false && this.isPersonaScheduleActive(p);
+    const availablePersonas = config.personas.filter(isAvailable);
+    if (availablePersonas.length === 0) return null;
 
+    // If trigger has a specific persona mapped, use it
     const trigger = config.triggerMappings.find(t => t.eventType === eventType && t.enabled);
     if (trigger?.personaId) {
-      const persona = config.personas.find(p => p.id === trigger.personaId && isAvailable(p));
+      const persona = availablePersonas.find(p => p.id === trigger.personaId);
       if (persona) return persona;
     }
 
-    if (config.activePersonaId) {
-      const persona = config.personas.find(p => p.id === config.activePersonaId && isAvailable(p));
-      if (persona) return persona;
-    }
-
-    return config.personas.find(p => isAvailable(p)) ?? null;
+    // Otherwise pick a random persona from all enabled ones
+    return availablePersonas[Math.floor(Math.random() * availablePersonas.length)] ?? null;
   }
 
   private shouldTrigger(config: BotConfig, eventType: EventType): boolean {
@@ -1074,6 +1085,12 @@ class AiBotService {
 
     const botNameLower = config.botName.toLowerCase();
     const mentionPatterns = [`@${botNameLower}`, '@оракул', '@oracle', '@бот', '@bot'];
+    // Also match @displayName for all enabled personas
+    for (const p of config.personas) {
+      if (p.enabled !== false && p.displayName) {
+        mentionPatterns.push(`@${p.displayName.toLowerCase()}`);
+      }
+    }
     const msgLower = message.toLowerCase();
     const isMention = config.respondToMentions && mentionPatterns.some(p => msgLower.includes(p));
     if (!isMention) return;
@@ -1191,8 +1208,8 @@ class AiBotService {
       const displayName = persona?.displayName || config.botName;
 
       const rows = await this.db.execute(sql`
-        INSERT INTO global_chat_messages (user_id, message, style, effect)
-        VALUES (${botUserId}, ${result.ru + '\n---\n' + result.en}, 'ai_bot', null)
+        INSERT INTO global_chat_messages (user_id, message, style, effect, persona_id)
+        VALUES (${botUserId}, ${result.ru + '\n---\n' + result.en}, 'ai_bot', null, ${personaId})
         RETURNING id::text, created_at
       `);
       const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
