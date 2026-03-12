@@ -93,7 +93,7 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
       {/* Sheet — slides from top */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute top-0 left-0 right-0 max-h-[70vh] overflow-hidden flex flex-col bg-[var(--color-bg)] border-b border-[var(--color-border)] shadow-2xl rounded-b-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`absolute top-0 left-0 right-0 max-h-[70vh] flex flex-col bg-[var(--color-bg)] border-b border-[var(--color-border)] shadow-2xl rounded-b-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-[var(--color-border)] shrink-0">
@@ -111,7 +111,7 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
         </div>
 
         {/* Scrollable list */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3 space-y-2">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3 space-y-2">
           {sorted.length === 0 ? (
             <p className="text-sm text-[var(--color-text-secondary)] text-center py-8">{t('ticker.noHistory')}</p>
           ) : (
