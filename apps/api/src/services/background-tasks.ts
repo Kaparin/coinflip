@@ -1365,12 +1365,12 @@ async function reconcileOrphanedChainBets(): Promise<void> {
 
       if (processingBets.has(betKey)) continue;
 
-      // Grace period: skip bets created less than 2 minutes ago
-      // (background task may still be saving them to DB)
+      // Grace period: skip bets created less than 30 seconds ago
+      // (background task may still be saving them to DB — poll + DB write takes ~10-20s)
       if (chainBet.created_at_time) {
         const createdAtMs = chainBet.created_at_time > 1e12 ? chainBet.created_at_time : chainBet.created_at_time * 1000;
         const ageMs = Date.now() - createdAtMs;
-        if (ageMs < 2 * 60 * 1000) continue;
+        if (ageMs < 30 * 1000) continue;
       }
 
       const dbBet = await betService.getBetById(betId);
@@ -1493,21 +1493,27 @@ async function recoverStuckLockedFunds(): Promise<void> {
   try {
     const db = (await import('../lib/db.js')).getDb();
 
-    // Find users with locked > 0 but no active bets AND no pending withdrawals.
-    // Grace period: skip if balance was updated within last 3 minutes — lockFunds updates
-    // updated_at, and the background task needs up to ~90s to confirm tx and create the bet
-    // record. Without this grace period, we'd unlock funds for in-flight bets whose DB
-    // record hasn't been created yet (tx is in mempool / being confirmed).
+    // Reconciliation approach: compare DB locked vs SUM of active bet amounts.
+    // If locked > sum, unlock the excess. This is precise — handles partial stuck funds
+    // (e.g. 3 bets resolved but locked only decremented for 2).
+    // Grace period: skip users whose balance was updated in the last 3 minutes
+    // (in-flight bets may not yet have DB records).
     const stuck = await db.execute(sql`
-      SELECT vb.user_id, vb.locked
+      SELECT
+        vb.user_id,
+        vb.locked::text as db_locked,
+        COALESCE(active.total_amount, '0')::text as should_be_locked,
+        (vb.locked::numeric - COALESCE(active.total_amount, 0))::text as excess
       FROM vault_balances vb
+      LEFT JOIN LATERAL (
+        SELECT SUM(b.amount) as total_amount
+        FROM bets b
+        WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
+          AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
+      ) active ON true
       WHERE vb.locked::numeric > 0
         AND vb.updated_at < now() - interval '3 minutes'
-        AND NOT EXISTS (
-          SELECT 1 FROM bets b
-          WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
-            AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
-        )
+        AND (vb.locked::numeric - COALESCE(active.total_amount, 0)) > 0
         AND NOT EXISTS (
           SELECT 1 FROM vault_transactions vt
           WHERE vt.user_id = vb.user_id
@@ -1517,15 +1523,20 @@ async function recoverStuckLockedFunds(): Promise<void> {
         )
     `);
 
-    const rows = stuck as unknown as Array<{ user_id: string; locked: string }>;
+    const rows = stuck as unknown as Array<{ user_id: string; db_locked: string; should_be_locked: string; excess: string }>;
     if (rows.length === 0) return;
 
-    logger.info({ count: rows.length }, `${tag} — found users with stuck locked funds`);
+    logger.info({ count: rows.length }, `${tag} — found users with excess locked funds`);
 
     for (const row of rows) {
       try {
-        await vaultService.unlockFunds(row.user_id, row.locked);
-        logger.info({ userId: row.user_id, amount: row.locked }, `${tag} — unlocked stuck funds`);
+        await vaultService.unlockFunds(row.user_id, row.excess);
+        logger.info({
+          userId: row.user_id,
+          dbLocked: row.db_locked,
+          shouldBeLocked: row.should_be_locked,
+          unlocked: row.excess,
+        }, `${tag} — reconciled locked funds (unlocked excess)`);
       } catch (err) {
         logger.warn({ err, userId: row.user_id }, `${tag} — unlock failed`);
       }
@@ -1742,18 +1753,24 @@ export async function runHealSweep(): Promise<HealResult> {
     result.errors.push(`Step 5 (revert transitional): ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // Step 6: Unlock orphaned funds (users with locked > 0 but no active bets)
+  // Step 6: Reconcile locked funds — unlock excess (locked > SUM of active bet amounts)
   try {
     const db = (await import('../lib/db.js')).getDb();
     const stuckLocked = await db.execute(sql`
-      SELECT vb.user_id, vb.locked
+      SELECT
+        vb.user_id,
+        vb.locked::text as db_locked,
+        COALESCE(active.total_amount, '0')::text as should_be_locked,
+        (vb.locked::numeric - COALESCE(active.total_amount, 0))::text as excess
       FROM vault_balances vb
+      LEFT JOIN LATERAL (
+        SELECT SUM(b.amount) as total_amount
+        FROM bets b
+        WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
+          AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
+      ) active ON true
       WHERE vb.locked::numeric > 0
-        AND NOT EXISTS (
-          SELECT 1 FROM bets b
-          WHERE (b.maker_user_id = vb.user_id OR b.acceptor_user_id = vb.user_id)
-            AND b.status IN ('open', 'accepted', 'accepting', 'canceling')
-        )
+        AND (vb.locked::numeric - COALESCE(active.total_amount, 0)) > 0
         AND NOT EXISTS (
           SELECT 1 FROM vault_transactions vt
           WHERE vt.user_id = vb.user_id
@@ -1762,11 +1779,12 @@ export async function runHealSweep(): Promise<HealResult> {
             AND vt.created_at > now() - interval '10 minutes'
         )
     `);
-    const rows = stuckLocked as unknown as Array<{ user_id: string; locked: string }>;
+    const rows = stuckLocked as unknown as Array<{ user_id: string; db_locked: string; should_be_locked: string; excess: string }>;
     for (const row of rows) {
       try {
-        await vaultService.unlockFunds(row.user_id, row.locked);
+        await vaultService.unlockFunds(row.user_id, row.excess);
         result.fundsUnlocked++;
+        logger.info({ userId: row.user_id, dbLocked: row.db_locked, shouldBe: row.should_be_locked, unlocked: row.excess }, 'heal — reconciled locked funds');
       } catch (err) {
         result.errors.push(`user ${row.user_id}: unlock failed — ${err instanceof Error ? err.message : String(err)}`);
       }

@@ -471,9 +471,8 @@ export function BalanceDisplay() {
   const coinBalanceHuman = fromMicroLaunch(coinBalanceMicro);
   const rawAvailableMicro = BigInt(balance?.available ?? '0');
   const rawLockedMicro = BigInt(balance?.locked ?? '0');
-  const bonusMicro = BigInt((balance as any)?.bonus ?? '0');
 
-  const availableMicro = rawAvailableMicro + bonusMicro;
+  const availableMicro = rawAvailableMicro;
   const lockedMicro = rawLockedMicro;
   const totalMicro = availableMicro + lockedMicro;
 
