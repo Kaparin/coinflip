@@ -286,7 +286,7 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
   let relayResult: RelayResult;
   let lockId: string | undefined;
   // Hoist balance so it's accessible for the response after the try/finally block
-  let balance: { available: string; locked: string; total: string };
+  let balance: { available: string; locked: string; total: string; bonus: string };
   try {
     // Check balance + open bets in parallel (both are DB reads, safe to run concurrently)
     const pendingCount = getPendingBetCount(user.id);
@@ -390,6 +390,7 @@ betsRouter.post('/', authMiddleware, walletTxRateLimit, zValidator('json', Creat
     balance: {
       available: (dbAvailable < 0n ? 0n : dbAvailable).toString(),
       locked: (dbLocked < 0n ? 0n : dbLocked).toString(),
+      bonus: balance.bonus,
     },
     message: 'Bet submitted to blockchain. You will be notified when confirmed.',
   }, 202);
@@ -656,7 +657,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, zValidator(
   let acceptingBet: Awaited<ReturnType<typeof betService.markAccepting>> | null = null;
   let acceptLockId: string | undefined;
   // Hoist balance so it's accessible for the response after the try/finally block
-  let acceptBalance: { available: string; locked: string; total: string };
+  let acceptBalance: { available: string; locked: string; total: string; bonus: string };
 
   acceptBalance = await vaultService.getBalance(user.id);
   if (BigInt(acceptBalance.available) < BigInt(existing.amount)) {
@@ -787,6 +788,7 @@ betsRouter.post('/:betId/accept', authMiddleware, walletTxRateLimit, zValidator(
     balance: {
       available: (acceptAvail < 0n ? 0n : acceptAvail).toString(),
       locked: (acceptLocked < 0n ? 0n : acceptLocked).toString(),
+      bonus: acceptBalance.bonus,
     },
     message: 'Accept submitted to blockchain. Confirming...',
   }, 202);

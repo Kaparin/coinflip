@@ -41,7 +41,7 @@ function BalanceWidget() {
   if (isLoading) return <Skeleton className="h-16 rounded-xl" />;
 
   const balance = data?.data;
-  const available = fromMicroLaunch(BigInt(balance?.available ?? '0'));
+  const available = fromMicroLaunch(BigInt(balance?.available ?? '0') + BigInt((balance as any)?.bonus ?? '0'));
   const locked = fromMicroLaunch(BigInt(balance?.locked ?? '0'));
   const wallet = fromMicroLaunch(walletBalanceRaw ?? '0');
   const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });

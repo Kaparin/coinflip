@@ -159,6 +159,7 @@ export function BetList({ pendingBets = [], activeDuels }: BetListProps) {
               ...(old?.data ?? {}),
               available: serverBalance.available,
               locked: serverBalance.locked,
+              bonus: serverBalance.bonus ?? old?.data?.bonus ?? '0',
             },
           }));
         }

@@ -104,7 +104,7 @@ export function Header() {
   }, [hapticsOn]);
 
   const balance = balanceData?.data;
-  const availableHuman = fromMicroLaunch(balance?.available ?? '0');
+  const availableHuman = fromMicroLaunch(BigInt(balance?.available ?? '0') + BigInt((balance as any)?.bonus ?? '0'));
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const nativeBalanceHuman = Number(nativeBalanceRaw ?? '0') / 1_000_000; // uaxm → AXM
   const coinBalanceHuman = fromMicroLaunch(coinBalanceRaw ?? '0');

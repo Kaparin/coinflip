@@ -59,7 +59,7 @@ export function MobileBalanceBar() {
   }
 
   const balance = data?.data;
-  const availableMicro = BigInt(balance?.available ?? '0');
+  const availableMicro = BigInt(balance?.available ?? '0') + BigInt((balance as any)?.bonus ?? '0');
   const lockedMicro = BigInt(balance?.locked ?? '0');
   const walletBalanceHuman = fromMicroLaunch(walletBalanceRaw ?? '0');
   const availableHuman = fromMicroLaunch(availableMicro);

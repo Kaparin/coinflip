@@ -345,9 +345,8 @@ socialRouter.post('/transfer', authMiddleware, zValidator('json', TransferSchema
     await vaultService.creditCoin(recipient.id, microAmount);
   } else {
     // AXM: deduct from vault available (offchainSpent), credit to recipient (bonus)
-    try {
-      await vaultService.deductBalance(user.id, totalDeduct);
-    } catch {
+    const deducted = await vaultService.deductBalance(user.id, totalDeduct);
+    if (!deducted) {
       return c.json({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient AXM balance' } }, 400);
     }
     await vaultService.creditWinner(recipient.id, microAmount);

@@ -76,16 +76,14 @@ vaultRouter.get('/balance', authMiddleware, async (c) => {
     Promise.resolve(getPendingBetCount(user.id)),
   ]);
 
-  const available = BigInt(dbBalance.available);
-  const locked = BigInt(dbBalance.locked);
-  const total = available + locked;
   const openBetsCount = dbOpenCount + pendingBets;
 
   return c.json({
     data: {
-      available: available.toString(),
-      locked: locked.toString(),
-      total: total.toString(),
+      available: dbBalance.available,
+      locked: dbBalance.locked,
+      bonus: dbBalance.bonus,
+      total: dbBalance.total,
       coin_balance: coinBalance,
       pending_bets: pendingBets,
       open_bets_count: openBetsCount,

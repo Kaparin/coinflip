@@ -452,7 +452,7 @@ export function TransferModal({
   // Balances
   const { data: vaultData } = useGetVaultBalance({ query: { enabled: !!address } });
   const vaultBalance = vaultData?.data;
-  const axmBalance = fromMicroLaunch(vaultBalance?.available ?? '0');
+  const axmBalance = fromMicroLaunch(BigInt(vaultBalance?.available ?? '0') + BigInt((vaultBalance as any)?.bonus ?? '0'));
   const coinBalance = fromMicroLaunch((vaultBalance as any)?.coin_balance ?? '0');
 
   // State

@@ -103,6 +103,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
               ...(old?.data ?? {}),
               available: serverBalance.available,
               locked: serverBalance.locked,
+              bonus: serverBalance.bonus ?? old?.data?.bonus ?? '0',
             },
           }));
         }
