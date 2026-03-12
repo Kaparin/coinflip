@@ -995,7 +995,13 @@ class AiBotService {
 
       wsService.broadcast({
         type: 'ai_commentary',
-        data: { betId: context.betId, textRu: result.ru, textEn: result.en, createdAt: new Date().toISOString() },
+        data: {
+          betId: context.betId, textRu: result.ru, textEn: result.en, createdAt: new Date().toISOString(),
+          personaId: persona?.id ?? null,
+          personaName: persona?.displayName ?? null,
+          personaAvatar: persona?.avatarUrl ?? null,
+          personaColor: persona?.nameColor ?? null,
+        },
       });
 
       logger.info({ betId: context.betId, persona: persona?.id, event: eventType }, 'AI commentary generated');
@@ -1058,6 +1064,7 @@ class AiBotService {
   async getRecentCommentary(limit = 10): Promise<Array<{
     betId: string; textRu: string; textEn: string; createdAt: string;
     eventType?: string; personaId?: string;
+    personaName?: string; personaAvatar?: string; personaColor?: string;
   }>> {
     const rows = await this.db.execute(sql`
       SELECT bet_id, text_ru, text_en, created_at,
@@ -1065,12 +1072,30 @@ class AiBotService {
       FROM ai_commentary ORDER BY created_at DESC LIMIT ${limit}
     `);
     const rawRows = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
-    return rawRows.map(r => ({
-      betId: String(r.bet_id), textRu: String(r.text_ru), textEn: String(r.text_en),
-      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
-      eventType: r.event_type ? String(r.event_type) : undefined,
-      personaId: r.persona_id ? String(r.persona_id) : undefined,
-    }));
+
+    // Build persona lookup map
+    let personaMap: Map<string, { displayName?: string; avatarUrl?: string; nameColor?: string }> | null = null;
+    try {
+      const config = await this.getConfig();
+      personaMap = new Map();
+      for (const p of config.personas) {
+        personaMap.set(p.id, { displayName: p.displayName, avatarUrl: p.avatarUrl, nameColor: p.nameColor });
+      }
+    } catch { /* skip */ }
+
+    return rawRows.map(r => {
+      const pId = r.persona_id ? String(r.persona_id) : undefined;
+      const persona = pId && personaMap ? personaMap.get(pId) : undefined;
+      return {
+        betId: String(r.bet_id), textRu: String(r.text_ru), textEn: String(r.text_en),
+        createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+        eventType: r.event_type ? String(r.event_type) : undefined,
+        personaId: pId,
+        personaName: persona?.displayName ?? undefined,
+        personaAvatar: persona?.avatarUrl ?? undefined,
+        personaColor: persona?.nameColor ?? undefined,
+      };
+    });
   }
 
   // ─── Chat Bot ────────────────────────────────────────

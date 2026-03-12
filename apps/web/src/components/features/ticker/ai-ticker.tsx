@@ -12,6 +12,9 @@ interface CommentaryItem {
   textRu: string;
   textEn: string;
   createdAt: string;
+  personaName?: string;
+  personaAvatar?: string;
+  personaColor?: string;
 }
 
 /** Subscribe to WS events via the global onEvent callback pattern */
@@ -90,7 +93,7 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
       {/* Sheet — slides from top */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute top-0 left-0 right-0 max-h-[70vh] flex flex-col bg-[var(--color-bg)] border-b border-[var(--color-border)] shadow-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`absolute top-0 left-0 right-0 max-h-[70vh] overflow-hidden flex flex-col bg-[var(--color-bg)] border-b border-[var(--color-border)] shadow-2xl rounded-b-2xl transition-transform duration-200 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-[var(--color-border)] shrink-0">
@@ -117,13 +120,31 @@ function HistorySheet({ items, locale, onClose }: { items: CommentaryItem[]; loc
               return (
                 <div
                   key={`${item.betId}-${i}`}
-                  className="flex flex-col items-center gap-1 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3"
+                  className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3"
                 >
-                  <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
-                    <Clock size={10} />
-                    <span className="tabular-nums">{formatTime(item.createdAt)}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {item.personaAvatar ? (
+                        <img src={item.personaAvatar} alt="" className="h-6 w-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600">
+                          <Sparkles size={12} className="text-white" />
+                        </div>
+                      )}
+                      <span
+                        className="text-xs font-bold"
+                        style={item.personaColor ? { color: item.personaColor } : undefined}
+                      >
+                        {item.personaName || 'Oracle'}
+                      </span>
+                      <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-400">AI</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)]">
+                      <Clock size={10} />
+                      <span className="tabular-nums">{formatTime(item.createdAt)}</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-[var(--color-text)] leading-relaxed text-center">{text}</p>
+                  <p className="text-sm text-[var(--color-text)] leading-relaxed">{text}</p>
                 </div>
               );
             })
@@ -156,7 +177,7 @@ export function AiTicker() {
           credentials: 'include',
         });
         if (res.ok) {
-          const json = await res.json() as { data: CommentaryItem[] };
+          const json = await res.json() as { data: Array<CommentaryItem & { personaName?: string; personaAvatar?: string; personaColor?: string }> };
           if (json.data?.length > 0) {
             const reversed = json.data.reverse(); // oldest first
             setItems(reversed);
@@ -177,7 +198,7 @@ export function AiTicker() {
   useEffect(() => {
     return subscribeToTickerEvents((event) => {
       if (event.type !== 'ai_commentary') return;
-      const data = event.data as { betId?: string; textRu?: string; textEn?: string; createdAt?: string };
+      const data = event.data as { betId?: string; textRu?: string; textEn?: string; createdAt?: string; personaName?: string; personaAvatar?: string; personaColor?: string };
       if (!data.textRu || !data.textEn) return;
 
       const newBetId = String(data.betId ?? '');
@@ -189,6 +210,9 @@ export function AiTicker() {
           textRu: data.textRu!,
           textEn: data.textEn!,
           createdAt: data.createdAt ?? new Date().toISOString(),
+          personaName: data.personaName ?? undefined,
+          personaAvatar: data.personaAvatar ?? undefined,
+          personaColor: data.personaColor ?? undefined,
         }];
         return next.slice(-50);
       });
@@ -282,7 +306,19 @@ export function AiTicker() {
         className="ai-ticker group"
       >
         <div className="ai-ticker-inner">
-          <Sparkles size={14} className="text-indigo-400 shrink-0" />
+          {current.personaAvatar ? (
+            <img src={current.personaAvatar} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
+          ) : (
+            <Sparkles size={14} className="text-indigo-400 shrink-0" />
+          )}
+          {current.personaName && (
+            <span
+              className="text-xs font-bold shrink-0"
+              style={current.personaColor ? { color: current.personaColor } : undefined}
+            >
+              {current.personaName}
+            </span>
+          )}
           <span
             className={`ai-ticker-text ${isAnimating ? 'ai-ticker-fade-out' : 'ai-ticker-fade-in'}`}
           >
