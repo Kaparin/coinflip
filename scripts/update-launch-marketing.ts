@@ -48,7 +48,7 @@ const ONCHAIN_DESCRIPTION = [
 
 const WASM_PATH = resolve(
   import.meta.dirname!,
-  "../contracts/cw20-migrate-fix/target/wasm32-unknown-unknown/release/cw20_migrate_fix.wasm",
+  "../contracts/cw20-migrate-fix/target/wasm32-unknown-unknown/release/cw20_migrate_fix_opt.wasm",
 );
 
 async function main() {
