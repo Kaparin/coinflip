@@ -210,7 +210,7 @@ export function AiTicker() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const newItemsToShowRef = useRef(0);
 
   // Fetch initial
