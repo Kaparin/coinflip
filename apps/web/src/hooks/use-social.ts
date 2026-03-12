@@ -59,7 +59,7 @@ export interface CoinTransfer {
   type: 'sent' | 'received';
   amount: string;
   fee: string;
-  currency: 'coin' | 'axm';
+  currency: 'coin';
   message: string | null;
   counterparty: {
     address: string;
@@ -73,7 +73,7 @@ export interface TransferNotification {
   fromNickname: string | null;
   amount: string;
   fee: string;
-  currency: 'coin' | 'axm';
+  currency: 'coin';
   message: string | null;
 }
 
@@ -378,7 +378,6 @@ export function useTransfer() {
   const transfer = useCallback(async (
     recipientAddress: string,
     amount: number,
-    currency: 'coin' | 'axm' = 'coin',
     message?: string,
   ): Promise<{ success: boolean; error?: string; fee?: string }> => {
     setLoading(true);
@@ -387,7 +386,7 @@ export function useTransfer() {
         method: 'POST',
         credentials: 'include',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientAddress, amount, currency, message }),
+        body: JSON.stringify({ recipientAddress, amount, message }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

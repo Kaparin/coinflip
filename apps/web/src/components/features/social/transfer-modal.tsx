@@ -19,10 +19,10 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Modal } from '@/components/ui/modal';
-import { UserAvatar, GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
-import { formatLaunch, fromMicroLaunch } from '@coinflip/shared/constants';
+import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetVaultBalance } from '@coinflip/api-client';
@@ -35,7 +35,6 @@ import {
 
 // ─── Types ────────────────────────────────────────────────
 
-type Currency = 'coin' | 'axm';
 type Step = 'recipient' | 'amount' | 'confirm' | 'result';
 
 interface TransferModalProps {
@@ -43,8 +42,6 @@ interface TransferModalProps {
   onClose: () => void;
   /** Pre-selected recipient (from user card click) */
   initialRecipient?: SocialUser | null;
-  /** Pre-selected currency */
-  initialCurrency?: Currency;
 }
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -54,8 +51,7 @@ function shortAddr(addr: string): string {
   return `${addr.slice(0, 8)}...${addr.slice(-4)}`;
 }
 
-const AMOUNT_PRESETS_COIN = [10, 50, 100, 500];
-const AMOUNT_PRESETS_AXM = [1, 5, 10, 50];
+const AMOUNT_PRESETS = [10, 50, 100, 500];
 const FEE_BPS = 500; // 5%
 
 // ─── Recipient Search ─────────────────────────────────────
@@ -177,8 +173,6 @@ function RecipientRow({ user, onSelect }: { user: SocialUser; onSelect: (u: Soci
 
 function AmountStep({
   recipient,
-  currency,
-  setCurrency,
   amount,
   setAmount,
   message,
@@ -186,11 +180,8 @@ function AmountStep({
   onConfirm,
   onBack,
   coinBalance,
-  axmBalance,
 }: {
   recipient: SocialUser;
-  currency: Currency;
-  setCurrency: (c: Currency) => void;
   amount: string;
   setAmount: (v: string) => void;
   message: string;
@@ -198,15 +189,12 @@ function AmountStep({
   onConfirm: () => void;
   onBack: () => void;
   coinBalance: number;
-  axmBalance: number;
 }) {
   const { t } = useTranslation();
-  const presets = currency === 'coin' ? AMOUNT_PRESETS_COIN : AMOUNT_PRESETS_AXM;
   const numAmount = Number(amount) || 0;
   const fee = Math.ceil(numAmount * FEE_BPS / 10000 * 100) / 100;
   const total = numAmount + fee;
-  const available = currency === 'coin' ? coinBalance : axmBalance;
-  const canConfirm = numAmount >= 1 && total <= available;
+  const canConfirm = numAmount >= 1 && total <= coinBalance;
 
   return (
     <div className="space-y-4">
@@ -225,43 +213,15 @@ function AmountStep({
         </div>
       </div>
 
-      {/* Currency toggle */}
-      <div className="flex rounded-xl bg-[var(--color-bg)] p-1 border border-[var(--color-border)]">
-        <button
-          type="button"
-          onClick={() => { setCurrency('coin'); setAmount(''); }}
-          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
-            currency === 'coin'
-              ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-400 shadow-sm'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-          }`}
-        >
-          <LaunchTokenIcon size={20} />
-          COIN
-        </button>
-        <button
-          type="button"
-          onClick={() => { setCurrency('axm'); setAmount(''); }}
-          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
-            currency === 'axm'
-              ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-indigo-400 shadow-sm'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-          }`}
-        >
-          <GameTokenIcon size={20} />
-          AXM
-        </button>
-      </div>
-
       {/* Available balance */}
       <div className="flex items-center justify-between text-xs px-1">
         <span className="text-[var(--color-text-secondary)]">
-          {t('social.availableBalance', { amount: available.toLocaleString('en-US', { maximumFractionDigits: 2 }) })}
+          {t('social.availableBalance', { amount: coinBalance.toLocaleString('en-US', { maximumFractionDigits: 2 }) })}
         </span>
         <button
           type="button"
           onClick={() => {
-            const maxSendable = Math.floor(available / (1 + FEE_BPS / 10000) * 100) / 100;
+            const maxSendable = Math.floor(coinBalance / (1 + FEE_BPS / 10000) * 100) / 100;
             setAmount(String(Math.max(0, maxSendable)));
           }}
           className="text-[var(--color-primary)] font-semibold hover:underline"
@@ -272,16 +232,14 @@ function AmountStep({
 
       {/* Amount presets */}
       <div className="flex gap-2">
-        {presets.map((v) => (
+        {AMOUNT_PRESETS.map((v) => (
           <button
             key={v}
             type="button"
             onClick={() => setAmount(String(v))}
             className={`flex-1 rounded-xl py-2 text-sm font-bold transition-all border ${
               amount === String(v)
-                ? currency === 'coin'
-                  ? 'bg-amber-500/15 border-amber-500/50 text-amber-400'
-                  : 'bg-indigo-500/15 border-indigo-500/50 text-indigo-400'
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-400'
                 : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)]'
             }`}
           >
@@ -302,7 +260,7 @@ function AmountStep({
           className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] py-3 px-4 text-lg font-bold text-center placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          {currency === 'coin' ? <LaunchTokenIcon size={22} /> : <GameTokenIcon size={22} />}
+          <LaunchTokenIcon size={22} />
         </div>
       </div>
 
@@ -321,15 +279,15 @@ function AmountStep({
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 space-y-1.5 text-xs">
           <div className="flex justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('social.youWillSend')}</span>
-            <span className="font-semibold">{numAmount} {currency.toUpperCase()}</span>
+            <span className="font-semibold">{numAmount} COIN</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[var(--color-text-secondary)]">{t('social.fee')}</span>
-            <span className="text-[var(--color-warning)] font-medium">-{fee.toFixed(2)} {currency.toUpperCase()}</span>
+            <span className="text-[var(--color-warning)] font-medium">-{fee.toFixed(2)} COIN</span>
           </div>
           <div className="border-t border-[var(--color-border)] pt-1.5 flex justify-between">
             <span className="text-[var(--color-text-secondary)] font-semibold">{t('social.totalDeducted')}</span>
-            <span className="font-bold">{total.toFixed(2)} {currency.toUpperCase()}</span>
+            <span className="font-bold">{total.toFixed(2)} COIN</span>
           </div>
         </div>
       )}
@@ -337,7 +295,7 @@ function AmountStep({
       {/* Source info */}
       <div className="flex items-start gap-2 text-[10px] text-[var(--color-text-secondary)] px-1">
         <Info size={12} className="shrink-0 mt-0.5" />
-        <span>{currency === 'axm' ? t('social.sourceVault') : t('social.sourceCoin')}</span>
+        <span>{t('social.sourceCoin')}</span>
       </div>
 
       {/* Confirm button */}
@@ -345,14 +303,10 @@ function AmountStep({
         type="button"
         onClick={onConfirm}
         disabled={!canConfirm}
-        className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed ${
-          currency === 'coin'
-            ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-400'
-            : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-400 hover:to-violet-400'
-        }`}
+        className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-400"
       >
         <Send size={16} />
-        {t('social.confirm')} — {numAmount || 0} {currency.toUpperCase()}
+        {t('social.confirm')} — {numAmount || 0} COIN
       </button>
     </div>
   );
@@ -364,14 +318,12 @@ function ResultStep({
   success,
   recipient,
   amount,
-  currency,
   errorMsg,
   onClose,
 }: {
   success: boolean;
   recipient: SocialUser;
   amount: string;
-  currency: Currency;
   errorMsg?: string;
   onClose: () => void;
 }) {
@@ -391,7 +343,7 @@ function ResultStep({
             <p className="text-sm text-[var(--color-text-secondary)] mt-1">
               {t('social.transferSuccessDesc', {
                 amount,
-                currency: currency.toUpperCase(),
+                currency: 'COIN',
                 recipient: recipient.nickname || shortAddr(recipient.address),
               })}
             </p>
@@ -403,10 +355,10 @@ function ResultStep({
                 {recipient.nickname || shortAddr(recipient.address)}
               </span>
               <div className="flex items-center gap-1.5 text-lg font-black">
-                <span className={currency === 'coin' ? 'text-amber-400' : 'text-indigo-400'}>
-                  +{amount} {currency.toUpperCase()}
+                <span className="text-amber-400">
+                  +{amount} COIN
                 </span>
-                {currency === 'coin' ? <LaunchTokenIcon size={20} /> : <GameTokenIcon size={20} />}
+                <LaunchTokenIcon size={20} />
               </div>
             </div>
           </div>
@@ -420,7 +372,7 @@ function ResultStep({
             <h3 className="text-lg font-bold text-[var(--color-danger)]">{t('social.transferError')}</h3>
             <p className="text-sm text-[var(--color-text-secondary)] mt-1">
               {errorMsg === 'INSUFFICIENT_BALANCE'
-                ? (currency === 'axm' ? t('social.insufficientAxm') : t('social.insufficientBalance'))
+                ? t('social.insufficientBalance')
                 : errorMsg || t('social.transferError')}
             </p>
           </div>
@@ -443,7 +395,6 @@ export function TransferModal({
   open,
   onClose,
   initialRecipient,
-  initialCurrency = 'coin',
 }: TransferModalProps) {
   const { t } = useTranslation();
   const { address } = useWalletContext();
@@ -452,13 +403,11 @@ export function TransferModal({
   // Balances
   const { data: vaultData } = useGetVaultBalance({ query: { enabled: !!address } });
   const vaultBalance = vaultData?.data;
-  const axmBalance = fromMicroLaunch(BigInt(vaultBalance?.available ?? '0') + BigInt((vaultBalance as any)?.bonus ?? '0'));
   const coinBalance = fromMicroLaunch((vaultBalance as any)?.coin_balance ?? '0');
 
   // State
   const [step, setStep] = useState<Step>('recipient');
   const [recipient, setRecipient] = useState<SocialUser | null>(null);
-  const [currency, setCurrency] = useState<Currency>(initialCurrency);
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
@@ -473,12 +422,11 @@ export function TransferModal({
         setRecipient(null);
         setStep('recipient');
       }
-      setCurrency(initialCurrency);
       setAmount('');
       setMessage('');
       setResult(null);
     }
-  }, [open, initialRecipient, initialCurrency]);
+  }, [open, initialRecipient]);
 
   const handleSelectRecipient = useCallback((user: SocialUser) => {
     setRecipient(user);
@@ -491,9 +439,9 @@ export function TransferModal({
     if (numAmount < 1) return;
 
     setStep('result');
-    const res = await transfer(recipient.address, numAmount, currency, message || undefined);
+    const res = await transfer(recipient.address, numAmount, message || undefined);
     setResult(res);
-  }, [recipient, amount, currency, message, transfer, transferLoading]);
+  }, [recipient, amount, message, transfer, transferLoading]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -513,8 +461,6 @@ export function TransferModal({
       {step === 'amount' && recipient && (
         <AmountStep
           recipient={recipient}
-          currency={currency}
-          setCurrency={setCurrency}
           amount={amount}
           setAmount={setAmount}
           message={message}
@@ -528,7 +474,6 @@ export function TransferModal({
             }
           }}
           coinBalance={coinBalance}
-          axmBalance={axmBalance}
         />
       )}
       {step === 'result' && recipient && (
@@ -537,7 +482,6 @@ export function TransferModal({
             success={result.success}
             recipient={recipient}
             amount={amount}
-            currency={currency}
             errorMsg={result.error}
             onClose={handleClose}
           />

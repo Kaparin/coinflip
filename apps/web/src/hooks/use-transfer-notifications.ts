@@ -24,12 +24,12 @@ export function useTransferNotifications() {
           fromNickname: string | null;
           amount: string;
           fee: string;
-          currency: 'coin' | 'axm';
+          currency: 'coin';
           message: string | null;
         };
         const sender = data.fromNickname || `${data.fromAddress.slice(0, 8)}...${data.fromAddress.slice(-4)}`;
         const formattedAmount = formatLaunch(data.amount);
-        const curr = data.currency?.toUpperCase() || 'COIN';
+        const curr = 'COIN';
 
         if (data.message) {
           addToast(

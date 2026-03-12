@@ -6,7 +6,7 @@ import { usePlayerProfile } from '@/hooks/use-player-profile';
 import { useUserAnnouncements } from '@/hooks/use-news';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useTranslation } from '@/lib/i18n';
-import { UserAvatar, GameTokenIcon, LaunchTokenIcon, AxmIcon } from '@/components/ui';
+import { UserAvatar, GameTokenIcon, LaunchTokenIcon } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -450,7 +450,6 @@ export default function PlayerProfilePage() {
   const [refStats, setRefStats] = useState<PublicReferralStats | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [transferCurrency, setTransferCurrency] = useState<'coin' | 'axm'>('coin');
 
   const isOwnProfile = myAddress?.toLowerCase() === rawAddress?.toLowerCase();
 
@@ -680,24 +679,16 @@ export default function PlayerProfilePage() {
           </a>
         )}
 
-        {/* Send COIN / AXM buttons */}
+        {/* Send COIN button */}
         {!isOwnProfile && myAddress && (
-          <div className="flex gap-2 mt-3">
+          <div className="mt-3">
             <button
               type="button"
-              onClick={() => { setTransferCurrency('coin'); setTransferOpen(true); }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-sm font-bold text-amber-400 transition-colors hover:bg-amber-500/20 active:scale-[0.98]"
+              onClick={() => setTransferOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-sm font-bold text-amber-400 transition-colors hover:bg-amber-500/20 active:scale-[0.98]"
             >
               <LaunchTokenIcon size={16} />
               {t('social.sendCoin')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTransferCurrency('axm'); setTransferOpen(true); }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 px-4 py-2.5 text-sm font-bold text-indigo-400 transition-colors hover:bg-indigo-500/20 active:scale-[0.98]"
-            >
-              <AxmIcon size={16} />
-              {t('social.sendAxm')}
             </button>
           </div>
         )}
@@ -1174,7 +1165,6 @@ export default function PlayerProfilePage() {
             total_bets: profile.stats.total_bets,
             is_online: false,
           } satisfies SocialUser}
-          initialCurrency={transferCurrency}
         />
       )}
     </div>

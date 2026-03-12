@@ -13,7 +13,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { useWalletContext } from '@/contexts/wallet-context';
-import { UserAvatar, LaunchTokenIcon, AxmIcon } from '@/components/ui';
+import { UserAvatar, LaunchTokenIcon } from '@/components/ui';
 import { VipBadge } from '@/components/ui/vip-badge';
 import { getVipNameClass } from '@/components/ui/vip-avatar-frame';
 import { formatLaunch } from '@coinflip/shared/constants';
@@ -70,7 +70,7 @@ function UserActionMenu({
 }: {
   user: SocialUser;
   onClose: () => void;
-  onTransfer: (currency: 'coin' | 'axm') => void;
+  onTransfer: () => void;
   onNavigate: () => void;
   t: (k: string) => string;
 }) {
@@ -105,21 +105,11 @@ function UserActionMenu({
       {isConnected && !isSelf && (
         <button
           type="button"
-          onClick={() => { onTransfer('coin'); onClose(); }}
+          onClick={() => { onTransfer(); onClose(); }}
           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-amber-300 text-amber-400"
         >
           <LaunchTokenIcon size={16} />
           {t('social.sendCoin')}
-        </button>
-      )}
-      {isConnected && !isSelf && (
-        <button
-          type="button"
-          onClick={() => { onTransfer('axm'); onClose(); }}
-          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--color-primary)]/10 hover:text-indigo-300 text-indigo-400"
-        >
-          <AxmIcon size={16} />
-          {t('social.sendAxm')}
         </button>
       )}
       {isConnected && !isSelf && (
@@ -157,7 +147,7 @@ function UserCard({
 }: {
   user: SocialUser;
   t: (k: string, v?: Record<string, string | number>) => string;
-  onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+  onTransfer: (user: SocialUser) => void;
   onNavigate: () => void;
   menuOpen: boolean;
   onToggleMenu: (address: string) => void;
@@ -192,7 +182,7 @@ function UserCard({
         <UserActionMenu
           user={user}
           onClose={() => onToggleMenu(user.address)}
-          onTransfer={(currency) => { onTransfer(user, currency); }}
+          onTransfer={() => { onTransfer(user); }}
           onNavigate={onNavigate}
           t={t}
         />
@@ -208,7 +198,7 @@ function UsersTab({
   onTransfer,
 }: {
   onNavigate: () => void;
-  onTransfer: (user: SocialUser, currency: 'coin' | 'axm') => void;
+  onTransfer: (user: SocialUser) => void;
 }) {
   const { t } = useTranslation();
   const { isConnected } = useWalletContext();
@@ -976,11 +966,9 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
   // Transfer modal state
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferRecipient, setTransferRecipient] = useState<SocialUser | null>(null);
-  const [transferCurrency, setTransferCurrency] = useState<'coin' | 'axm'>('coin');
 
-  const handleTransfer = useCallback((user: SocialUser, currency: 'coin' | 'axm') => {
+  const handleTransfer = useCallback((user: SocialUser) => {
     setTransferRecipient(user);
-    setTransferCurrency(currency);
     setTransferOpen(true);
   }, []);
 
@@ -1090,7 +1078,6 @@ export function SocialSheet({ open, onClose }: SocialSheetProps) {
         open={transferOpen}
         onClose={() => setTransferOpen(false)}
         initialRecipient={transferRecipient}
-        initialCurrency={transferCurrency}
       />
     </>,
     document.body,
