@@ -144,10 +144,11 @@ export function AiTicker() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const shownCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Track how many new (unseen) items remain to show
+  const newItemsToShowRef = useRef(0);
 
-  // Fetch initial commentary on mount
+  // Fetch initial commentary on mount — start collapsed (all items are "old")
   useEffect(() => {
     const fetchInitial = async () => {
       try {
@@ -159,9 +160,10 @@ export function AiTicker() {
           if (json.data?.length > 0) {
             const reversed = json.data.reverse(); // oldest first
             setItems(reversed);
-            // Start from the last (newest) item
             setDisplayIndex(reversed.length - 1);
-            shownCountRef.current = 0;
+            // All fetched items are already "seen" — start collapsed
+            newItemsToShowRef.current = 0;
+            setCollapsed(true);
           }
         }
       } catch {
@@ -171,15 +173,16 @@ export function AiTicker() {
     fetchInitial();
   }, []);
 
-  // Subscribe to new commentary via WS — show new items, uncollapse
+  // Subscribe to new commentary via WS — only show genuinely new items
   useEffect(() => {
     return subscribeToTickerEvents((event) => {
       if (event.type !== 'ai_commentary') return;
       const data = event.data as { betId?: string; textRu?: string; textEn?: string; createdAt?: string };
       if (!data.textRu || !data.textEn) return;
+
+      const newBetId = String(data.betId ?? '');
+
       setItems(prev => {
-        const newBetId = String(data.betId ?? '');
-        // Dedup: skip if already have commentary for this betId
         if (newBetId && prev.some(item => item.betId === newBetId)) return prev;
         const next = [...prev, {
           betId: newBetId,
@@ -189,10 +192,10 @@ export function AiTicker() {
         }];
         return next.slice(-50);
       });
-      // New item arrived — uncollapse & show it
+
+      // Queue this as a new item to display
+      newItemsToShowRef.current++;
       setCollapsed(false);
-      shownCountRef.current = 0;
-      setDisplayIndex(prev => prev); // trigger re-render; actual index updated below
     });
   }, []);
 
@@ -200,26 +203,22 @@ export function AiTicker() {
   const prevLenRef = useRef(0);
   useEffect(() => {
     if (items.length > prevLenRef.current && prevLenRef.current > 0) {
-      // New item was appended
       setDisplayIndex(items.length - 1);
-      shownCountRef.current = 0;
       setCollapsed(false);
     }
     prevLenRef.current = items.length;
   }, [items.length]);
 
-  // Show last few items sequentially, then collapse
+  // Show only new items sequentially, then collapse
   useEffect(() => {
     if (collapsed || items.length === 0) return;
 
-    // Show each item for 6s, walk backwards from newest showing up to 3 recent items
-    const maxToShow = Math.min(3, items.length);
-
     timerRef.current = setTimeout(() => {
-      shownCountRef.current++;
+      newItemsToShowRef.current--;
 
-      if (shownCountRef.current >= maxToShow) {
-        // Done showing — fade out and collapse
+      if (newItemsToShowRef.current <= 0) {
+        // All new items shown — fade out and collapse
+        newItemsToShowRef.current = 0;
         setIsAnimating(true);
         setTimeout(() => {
           setCollapsed(true);
@@ -228,7 +227,7 @@ export function AiTicker() {
         return;
       }
 
-      // Show next (older) item
+      // Show next new (older unseen) item
       setIsAnimating(true);
       setTimeout(() => {
         setDisplayIndex(prev => {
