@@ -82,7 +82,6 @@ const KEY_LABELS: Record<string, string> = {
   REFERRAL_BPS_LEVEL_1: 'Реферал L1 (BPS)',
   REFERRAL_BPS_LEVEL_2: 'Реферал L2 (BPS)',
   REFERRAL_BPS_LEVEL_3: 'Реферал L3 (BPS)',
-  MAX_REFERRAL_BPS_PER_BET: 'Макс. кап рефералов (BPS)',
   CHANGE_BRANCH_COST_MICRO: 'Цена смены ветки (COIN)',
   MINIMUM_CLAIM_AMOUNT_MICRO: `Мин. сумма клейма (${GAME_TOKEN})`,
   WASH_TRADE_PAIR_DAILY_LIMIT: 'Лимит пар/24ч (анти-абьюз)',

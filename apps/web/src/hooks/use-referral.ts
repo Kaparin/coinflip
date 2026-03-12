@@ -304,7 +304,6 @@ export interface ReferralConfig {
   level1Bps: number;
   level2Bps: number;
   level3Bps: number;
-  maxBps: number;
   changeBranchCostMicro: string;
   minimumClaimMicro: string;
 }

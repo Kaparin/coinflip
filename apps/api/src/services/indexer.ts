@@ -988,6 +988,7 @@ export class IndexerService {
           amount: bets.amount,
           makerUserId: bets.makerUserId,
           acceptorUserId: bets.acceptorUserId,
+          winnerUserId: bets.winnerUserId,
         })
         .from(bets)
         .where(eq(bets.betId, betId))
@@ -1031,10 +1032,10 @@ export class IndexerService {
         }
       }
 
-      if (!acceptorUserId) return;
+      if (!acceptorUserId || !bet.winnerUserId) return;
 
       const totalPot = BigInt(bet.amount) * 2n;
-      await referralService.distributeRewards(betId, totalPot, bet.makerUserId, acceptorUserId);
+      await referralService.distributeRewards(betId, totalPot, bet.winnerUserId, bet.makerUserId, acceptorUserId);
     } catch (err) {
       logger.warn({ err, betId: betId.toString() }, 'Indexer: referral reward distribution failed');
     }

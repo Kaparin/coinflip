@@ -212,9 +212,9 @@ export function CommissionBreakdownSection() {
 
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
             <div className="flex h-6 overflow-hidden rounded-full">
-              {bd.referralMaxBps > 0 && (
-                <div className="bg-blue-500 flex items-center justify-center text-[9px] font-bold text-white" style={{ width: `${(bd.referralMaxBps / bd.commissionBps) * 100}%` }}>
-                  Реф {bd.referralMaxBps / 100}%
+              {bd.referralBps > 0 && (
+                <div className="bg-blue-500 flex items-center justify-center text-[9px] font-bold text-white" style={{ width: `${(bd.referralBps / bd.commissionBps) * 100}%` }}>
+                  Реф {bd.referralBps / 100}%
                 </div>
               )}
               {bd.jackpotBps > 0 && (
@@ -240,7 +240,7 @@ export function CommissionBreakdownSection() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <StatCard label="Рефералы (макс)" value={`${bd.referralMaxBps} BPS`} sub={`${bd.referralMaxBps / 100}% от банка`} />
+              <StatCard label="Рефералы (L1+L2+L3)" value={`${bd.referralBps} BPS`} sub={`${bd.referralBps / 100}% от банка`} />
               <StatCard label="Джекпот" value={`${bd.jackpotBps} BPS`} sub={`${bd.jackpotBps / 100}% от банка`} />
               <StatCard label="Стейкинг LAUNCH" value={`${bd.stakingBps} BPS`} sub={`${bd.stakingBps / 100}% от банка`} />
               <StatCard label="Партнёры" value={`${bd.partnerBps} BPS`} sub={`${bd.partnerBps / 100}% от банка`} />
@@ -353,7 +353,6 @@ export function ReferralConfigSection() {
   const [refL1, setRefL1] = useState('');
   const [refL2, setRefL2] = useState('');
   const [refL3, setRefL3] = useState('');
-  const [refMax, setRefMax] = useState('');
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   const bd = breakdown?.breakdown;
@@ -364,7 +363,6 @@ export function ReferralConfigSection() {
     setRefL1(get('REFERRAL_BPS_LEVEL_1', '300'));
     setRefL2(get('REFERRAL_BPS_LEVEL_2', '150'));
     setRefL3(get('REFERRAL_BPS_LEVEL_3', '50'));
-    setRefMax(get('MAX_REFERRAL_BPS_PER_BET', '500'));
     setEditingReferral(true);
   };
 
@@ -375,7 +373,6 @@ export function ReferralConfigSection() {
         ['REFERRAL_BPS_LEVEL_1', refL1],
         ['REFERRAL_BPS_LEVEL_2', refL2],
         ['REFERRAL_BPS_LEVEL_3', refL3],
-        ['MAX_REFERRAL_BPS_PER_BET', refMax],
       ] as const) {
         await updateConfig.mutateAsync({ key, value: val });
       }
@@ -409,7 +406,7 @@ export function ReferralConfigSection() {
         </div>
 
         {editingReferral ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Уровень 1 BPS</label>
               <input type="number" value={refL1} onChange={(e) => setRefL1(e.target.value)} className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
@@ -422,13 +419,9 @@ export function ReferralConfigSection() {
               <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Уровень 3 BPS</label>
               <input type="number" value={refL3} onChange={(e) => setRefL3(e.target.value)} className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
             </div>
-            <div>
-              <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Макс. кап BPS</label>
-              <input type="number" value={refMax} onChange={(e) => setRefMax(e.target.value)} className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-xs" />
-            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-3">
             {bd && (
               <>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
@@ -442,10 +435,6 @@ export function ReferralConfigSection() {
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
                   <p className="text-[10px] text-[var(--color-text-secondary)]">Уровень 3</p>
                   <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'REFERRAL_BPS_LEVEL_3')?.value ?? '50'} BPS</p>
-                </div>
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Макс. кап</p>
-                  <p className="text-sm font-bold">{allConfig?.find((c) => c.key === 'MAX_REFERRAL_BPS_PER_BET')?.value ?? '500'} BPS</p>
                 </div>
               </>
             )}

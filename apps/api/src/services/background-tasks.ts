@@ -918,9 +918,9 @@ async function syncBetFromChain(betId: bigint): Promise<boolean> {
             logger.info({ betId: betId.toString(), acceptor: chainState.acceptor }, `${tag} — backfilled acceptorUserId from chain`);
           }
         }
-        if (acceptorId) {
+        if (acceptorId && winnerUserId) {
           const totalPot = BigInt(currentBet.amount) * 2n;
-          referralService.distributeRewards(betId, totalPot, currentBet.makerUserId, acceptorId)
+          referralService.distributeRewards(betId, totalPot, winnerUserId, currentBet.makerUserId, acceptorId)
             .catch(err => logger.warn({ err, betId: betId.toString() }, `${tag} — referral reward distribution failed`));
         }
 

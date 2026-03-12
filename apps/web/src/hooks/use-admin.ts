@@ -845,7 +845,7 @@ export interface CommissionBreakdown {
   valid: boolean;
   breakdown: {
     commissionBps: number;
-    referralMaxBps: number;
+    referralBps: number;
     jackpotBps: number;
     stakingBps: number;
     partnerBps: number;

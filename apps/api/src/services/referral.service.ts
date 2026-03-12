@@ -21,27 +21,26 @@ const DEFAULT_CHANGE_BRANCH_COST_MICRO = '1000000000';
  * Referral reward percentages from the TOTAL POT (2 × bet amount).
  * These come out of the 10% platform commission (1000 bps).
  * Now configurable via platform_config table. Fallbacks below.
+ *
+ * Rewards are distributed ONLY to the WINNER's referral chain (3 levels).
  */
 const DEFAULT_REWARD_BPS_BY_LEVEL: Record<number, bigint> = {
   1: 300n,
   2: 150n,
   3: 50n,
 };
-const DEFAULT_MAX_REFERRAL_BPS = 500n;
 
 const MAX_REFERRAL_DEPTH = 3;
 
 /** Load referral config from configService (cached 60s) */
-async function getRewardConfig(): Promise<{ bpsByLevel: Record<number, bigint>; maxBps: bigint }> {
-  const [l1, l2, l3, maxBps] = await Promise.all([
+async function getRewardConfig(): Promise<{ bpsByLevel: Record<number, bigint> }> {
+  const [l1, l2, l3] = await Promise.all([
     configService.getNumber('REFERRAL_BPS_LEVEL_1', 300),
     configService.getNumber('REFERRAL_BPS_LEVEL_2', 150),
     configService.getNumber('REFERRAL_BPS_LEVEL_3', 50),
-    configService.getNumber('MAX_REFERRAL_BPS_PER_BET', 500),
   ]);
   return {
     bpsByLevel: { 1: BigInt(l1), 2: BigInt(l2), 3: BigInt(l3) },
-    maxBps: BigInt(maxBps),
   };
 }
 
@@ -66,7 +65,6 @@ export class ReferralService {
       level1Bps: Number(config.bpsByLevel[1]),
       level2Bps: Number(config.bpsByLevel[2]),
       level3Bps: Number(config.bpsByLevel[3]),
-      maxBps: Number(config.maxBps),
       changeBranchCostMicro: branchCost,
       minimumClaimMicro: minimumClaim,
     };
@@ -462,19 +460,21 @@ export class ReferralService {
 
   /**
    * Distribute referral rewards for a resolved bet.
-   * Called once per bet resolution, processes BOTH players (maker + acceptor).
+   * Called once per bet resolution, processes ONLY the winner's referral chain (3 levels).
    *
    * IDEMPOTENT: checks if rewards already exist for this betId before inserting.
    * Safe to call multiple times (from both indexer and background tasks).
    *
    * @param betId - The resolved bet ID
    * @param totalPot - Total pot in micro LAUNCH (2 × bet amount)
-   * @param makerUserId - Maker's user ID
-   * @param acceptorUserId - Acceptor's user ID
+   * @param winnerUserId - Winner's user ID (only their chain gets rewards)
+   * @param makerUserId - Maker's user ID (for wash-trading check)
+   * @param acceptorUserId - Acceptor's user ID (for wash-trading check)
    */
   async distributeRewards(
     betId: bigint,
     totalPot: bigint,
+    winnerUserId: string,
     makerUserId: string,
     acceptorUserId: string,
   ): Promise<void> {
@@ -504,52 +504,24 @@ export class ReferralService {
       return;
     }
 
-    const players = [makerUserId, acceptorUserId];
-
     // Load reward config from DB (cached 60s)
     const rewardConfig = await getRewardConfig();
 
-    // Deduplicate referrers — a referrer who invited both players should only earn once per bet per level
-    const rewardMap = new Map<string, { amount: bigint; level: number; fromPlayer: string }>();
+    // Walk ONLY the winner's referral chain (up to 3 levels)
+    const chain = await this.getReferralChain(winnerUserId);
+    const rewards: Array<{ referrerId: string; amount: bigint; level: number }> = [];
 
-    for (const playerId of players) {
-      const chain = await this.getReferralChain(playerId);
-      for (const { userId: referrerId, level } of chain) {
-        const bps = rewardConfig.bpsByLevel[level];
-        if (!bps) continue;
+    for (const { userId: referrerId, level } of chain) {
+      const bps = rewardConfig.bpsByLevel[level];
+      if (!bps) continue;
 
-        const reward = (totalPot * bps) / 10000n;
-        if (reward <= 0n) continue;
+      const reward = (totalPot * bps) / 10000n;
+      if (reward <= 0n) continue;
 
-        const key = `${referrerId}:${level}`;
-        const existing = rewardMap.get(key);
-        if (!existing || reward > existing.amount) {
-          rewardMap.set(key, { amount: reward, level, fromPlayer: playerId });
-        }
-      }
+      rewards.push({ referrerId, amount: reward, level });
     }
 
-    if (rewardMap.size === 0) return;
-
-    // Enforce per-bet cap: total referral payout ≤ configurable MAX BPS of pot
-    // Sort by level (ascending) before cap-trimming so both players' L1 referrers
-    // are processed first, then L2, then L3. This prevents insertion-order bias
-    // where maker's chain always gets priority over acceptor's chain.
-    const maxReward = (totalPot * rewardConfig.maxBps) / 10000n;
-    let totalAllocated = 0n;
-    const cappedRewards: Array<{ key: string; referrerId: string; amount: bigint; level: number; fromPlayer: string }> = [];
-
-    const sortedEntries = [...rewardMap.entries()].sort((a, b) => a[1].level - b[1].level);
-    for (const [key, { amount, level, fromPlayer }] of sortedEntries) {
-      const referrerId = key.split(':')[0]!;
-      const remaining = maxReward - totalAllocated;
-      if (remaining <= 0n) break;
-      const capped = amount > remaining ? remaining : amount;
-      cappedRewards.push({ key, referrerId, amount: capped, level, fromPlayer });
-      totalAllocated += capped;
-    }
-
-    if (cappedRewards.length === 0) return;
+    if (rewards.length === 0) return;
 
     // Write rewards + update balances in a single transaction (all-or-nothing).
     // Use RETURNING on the reward insert to detect if it was actually inserted
@@ -557,12 +529,12 @@ export class ReferralService {
     // This prevents double-crediting when both indexer and background task call this concurrently.
     try {
       await this.db.transaction(async (tx) => {
-        for (const { referrerId, amount, level, fromPlayer } of cappedRewards) {
+        for (const { referrerId, amount, level } of rewards) {
 
           // Record the reward event — RETURNING tells us if it was actually inserted
           const inserted = await tx.insert(referralRewards).values({
             recipientUserId: referrerId,
-            fromPlayerUserId: fromPlayer,
+            fromPlayerUserId: winnerUserId,
             betId: betIdStr,
             amount: amount.toString(),
             level,
@@ -592,7 +564,7 @@ export class ReferralService {
             });
 
           logger.info(
-            { referrerId, amount: amount.toString(), level, betId: betIdStr, fromPlayer },
+            { referrerId, amount: amount.toString(), level, betId: betIdStr, winnerUserId },
             `${tag} — reward credited`,
           );
         }
