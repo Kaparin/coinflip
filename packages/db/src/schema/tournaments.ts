@@ -105,7 +105,7 @@ export const tournamentParticipants = pgTable(
       .references(() => tournaments.id, { onDelete: 'cascade' }),
     /** null = paid entry fee but not yet in a team */
     teamId: uuid('team_id')
-      .references(() => tournamentTeams.id, { onDelete: 'cascade' }),
+      .references(() => tournamentTeams.id, { onDelete: 'set null' }),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),

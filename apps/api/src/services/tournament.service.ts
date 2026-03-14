@@ -730,9 +730,9 @@ class TournamentService {
     const now = new Date();
     if (now > t.registrationEndsAt) throw new AppError('REGISTRATION_CLOSED', 'Registration has ended', 400);
 
-    // Already in tournament
-    const alreadyIn = await this.hasPaid(tournamentId, userId);
-    if (alreadyIn) throw new AppError('ALREADY_IN_TEAM', 'You are already in a team', 400);
+    // Check if already in a team (paid but no team is OK — they can still request)
+    const existingParticipant = await this.getParticipant(tournamentId, userId);
+    if (existingParticipant?.teamId) throw new AppError('ALREADY_IN_TEAM', 'You are already in a team', 400);
 
     const team = await this.getTeamById(teamId);
     if (!team || team.tournamentId !== tournamentId) throw new AppError('NOT_FOUND', 'Team not found', 404);
@@ -798,22 +798,32 @@ class TournamentService {
     if (!t || t.status !== 'registration') throw new AppError('INVALID_STATE', 'Tournament not in registration', 400);
 
     if (approve) {
-      // Check team size
       const teamConfig = t.teamConfig as TeamConfig;
       const memberCount = await this.getTeamMemberCount(team.id);
       if (memberCount >= teamConfig.maxSize) throw new AppError('TEAM_FULL', 'Team is full', 400);
 
-      // Check user not already in another team
-      const alreadyIn = await this.hasPaid(team.tournamentId, request.userId);
-      if (alreadyIn) throw new AppError('ALREADY_IN_TEAM', 'Player is already in a team', 400);
+      const existingParticipant = await this.getParticipant(team.tournamentId, request.userId);
 
-      // Pay entry fee and add to team
-      await this.payEntryFee(team.tournamentId, request.userId);
-      await this.db.insert(tournamentParticipants).values({
-        tournamentId: team.tournamentId,
-        teamId: team.id,
-        userId: request.userId,
-      });
+      if (existingParticipant) {
+        if (existingParticipant.teamId) throw new AppError('ALREADY_IN_TEAM', 'Player is already in a team', 400);
+        // Already paid — just assign team
+        await this.db
+          .update(tournamentParticipants)
+          .set({ teamId: team.id })
+          .where(eq(tournamentParticipants.id, existingParticipant.id));
+      } else {
+        // Not paid — pay + create participant + assign team
+        await this.payEntryFee(team.tournamentId, request.userId);
+        await this.db
+          .update(tournamentParticipants)
+          .set({ teamId: team.id })
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, team.tournamentId),
+              eq(tournamentParticipants.userId, request.userId),
+            ),
+          );
+      }
     }
 
     await this.db
@@ -899,6 +909,19 @@ class TournamentService {
     if (activeTournaments.length === 0) return;
 
     for (const tournament of activeTournaments) {
+      // Idempotency check: skip if this bet was already scored for this tournament
+      const existingLog = await this.db
+        .select({ id: tournamentPointLogs.id })
+        .from(tournamentPointLogs)
+        .where(
+          and(
+            eq(tournamentPointLogs.tournamentId, tournament.id),
+            eq(tournamentPointLogs.betId, bet.betId),
+          ),
+        )
+        .limit(1);
+      if (existingLog.length > 0) continue;
+
       const scoringConfig = tournament.scoringConfig as ScoringConfig;
 
       // Find matching tier for this bet amount
@@ -981,9 +1004,10 @@ class TournamentService {
         data: { tournamentId: tournament.id, action: 'score_changed' },
       });
 
-      // Invalidate leaderboard cache
-      leaderboardCache.delete(`team_${tournament.id}`);
-      leaderboardCache.delete(`individual_${tournament.id}`);
+      // Invalidate leaderboard cache (clear all keys matching this tournament)
+      for (const key of leaderboardCache.keys()) {
+        if (key.includes(tournament.id)) leaderboardCache.delete(key);
+      }
     }
   }
 
@@ -1217,13 +1241,13 @@ class TournamentService {
 
       // Calculate recommended shares
       const teamTotalPoints = members.reduce((s, m) => s + BigInt(m.totalPoints), 0n);
-      const membersWithShares = members.map((m, idx) => {
+      const membersWithShares = await Promise.all(members.map(async (m, idx) => {
         let recommendedShare = '0';
         if (teamTotalPoints > 0n && BigInt(prizeAmount) > 0n) {
           recommendedShare = ((BigInt(prizeAmount) * BigInt(m.totalPoints)) / teamTotalPoints).toString();
         }
         // Update individual rank
-        this.db
+        await this.db
           .update(tournamentParticipants)
           .set({ finalRank: idx + 1 })
           .where(
@@ -1243,7 +1267,7 @@ class TournamentService {
           gamesWon: m.gamesWon,
           recommendedShare,
         };
-      });
+      }));
 
       teamRankings.push({
         rank: place,
@@ -1514,20 +1538,34 @@ class TournamentService {
       const t = await this.getTournamentById(invite.tournamentId);
       if (!t || t.status !== 'registration') throw new AppError('INVALID_STATE', 'Tournament not in registration', 400);
 
-      const alreadyIn = await this.hasPaid(invite.tournamentId, userId);
-      if (alreadyIn) throw new AppError('ALREADY_IN_TEAM', 'Already in a team', 400);
-
       const teamConfig = t.teamConfig as TeamConfig;
       const memberCount = await this.getTeamMemberCount(invite.teamId);
       if (memberCount >= teamConfig.maxSize) throw new AppError('TEAM_FULL', 'Team is full', 400);
 
-      // Pay entry fee and join
-      await this.payEntryFee(invite.tournamentId, userId);
-      await this.db.insert(tournamentParticipants).values({
-        tournamentId: invite.tournamentId,
-        teamId: invite.teamId,
-        userId,
-      });
+      const existingParticipant = await this.getParticipant(invite.tournamentId, userId);
+
+      if (existingParticipant) {
+        // Already paid — check they're not in another team
+        if (existingParticipant.teamId) throw new AppError('ALREADY_IN_TEAM', 'Already in a team', 400);
+        // Just assign team
+        await this.db
+          .update(tournamentParticipants)
+          .set({ teamId: invite.teamId })
+          .where(eq(tournamentParticipants.id, existingParticipant.id));
+      } else {
+        // Not paid yet — pay entry fee and create participant
+        await this.payEntryFee(invite.tournamentId, userId);
+        // payEntryFee creates participant with teamId=null, now update teamId
+        await this.db
+          .update(tournamentParticipants)
+          .set({ teamId: invite.teamId })
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, invite.tournamentId),
+              eq(tournamentParticipants.userId, userId),
+            ),
+          );
+      }
 
       wsService.broadcast({
         type: 'tournament_team_update',
@@ -1718,11 +1756,16 @@ class TournamentService {
 
     let hasPaid: boolean | undefined;
     let myTeamId: string | null | undefined;
+    let isCaptain: boolean | undefined;
 
     if (userId) {
       const participant = await this.getParticipant(tournament.id, userId);
       hasPaid = !!participant;
       myTeamId = participant?.teamId ?? null;
+      if (myTeamId) {
+        const team = await this.getTeamById(myTeamId);
+        isCaptain = team?.captainUserId === userId;
+      }
     }
 
     const totalPrizePool = (BigInt(tournament.prizePool) + BigInt(tournament.bonusPool)).toString();
@@ -1753,6 +1796,7 @@ class TournamentService {
       endsAt: tournament.endsAt.toISOString(),
       hasPaid,
       myTeamId,
+      isCaptain,
       createdAt: tournament.createdAt.toISOString(),
     };
   }

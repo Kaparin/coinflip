@@ -11,7 +11,6 @@ import type { AppEnv } from '../types.js';
 
 const tournamentsRouter = new Hono<AppEnv>();
 
-// Helper to extract userId from context
 function getUserId(c: { get: (key: string) => unknown }): string {
   const user = c.get('user') as { id: string } | undefined;
   if (!user) throw new Error('User not found in context');
@@ -23,7 +22,19 @@ function tryGetUserId(c: { get: (key: string) => unknown }): string | undefined 
   return user?.id;
 }
 
-// ==================== Public routes ====================
+// ==================== STATIC routes FIRST (before /:id) ====================
+
+/** User search for invites — MUST be before /:id to avoid route conflict */
+tournamentsRouter.get(
+  '/search/users',
+  authMiddleware,
+  zValidator('query', z.object({ q: z.string().min(2) })),
+  async (c) => {
+    const { q } = c.req.valid('query');
+    const data = await tournamentService.searchUsers(q);
+    return c.json({ data });
+  },
+);
 
 /** List active & registration tournaments */
 tournamentsRouter.get('/active', optionalAuthMiddleware, async (c) => {
@@ -48,6 +59,8 @@ tournamentsRouter.get(
   },
 );
 
+// ==================== DYNAMIC /:id routes ====================
+
 /** Get tournament details */
 tournamentsRouter.get('/:id', optionalAuthMiddleware, async (c) => {
   const id = c.req.param('id');
@@ -66,24 +79,24 @@ tournamentsRouter.post('/:id/pay', authMiddleware, async (c) => {
   return c.json({ data: result });
 });
 
-// ==================== Team routes ====================
+// ---- Teams ----
 
-/** List teams for a tournament */
 tournamentsRouter.get('/:id/teams', optionalAuthMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const teams = await tournamentService.getTeamsForTournament(tournamentId);
   return c.json({ data: teams });
 });
 
-/** Get single team with members */
 tournamentsRouter.get('/:id/teams/:teamId', optionalAuthMiddleware, async (c) => {
   const teamId = c.req.param('teamId');
   const team = await tournamentService.getTeamWithMembers(teamId);
   if (!team) return c.json({ error: { code: 'NOT_FOUND', message: 'Team not found' } }, 404);
-  return c.json({ data: team });
+  // Strip invite code for non-captains
+  const userId = tryGetUserId(c);
+  const sanitized = { ...team, inviteCode: team.captainUserId === userId ? team.inviteCode : null };
+  return c.json({ data: sanitized });
 });
 
-/** Create team */
 tournamentsRouter.post(
   '/:id/teams',
   authMiddleware,
@@ -97,7 +110,6 @@ tournamentsRouter.post(
   },
 );
 
-/** Update team (captain only) */
 tournamentsRouter.put(
   '/:id/teams/my',
   authMiddleware,
@@ -111,7 +123,6 @@ tournamentsRouter.put(
   },
 );
 
-/** Delete team (captain only) */
 tournamentsRouter.delete('/:id/teams/my', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const userId = getUserId(c);
@@ -119,7 +130,6 @@ tournamentsRouter.delete('/:id/teams/my', authMiddleware, async (c) => {
   return c.json({ data: { deleted: true } });
 });
 
-/** Join open team */
 tournamentsRouter.post('/:id/teams/:teamId/join', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const teamId = c.req.param('teamId');
@@ -128,7 +138,6 @@ tournamentsRouter.post('/:id/teams/:teamId/join', authMiddleware, async (c) => {
   return c.json({ data: { joined: true } });
 });
 
-/** Join team by invite code */
 tournamentsRouter.post(
   '/:id/join-by-code',
   authMiddleware,
@@ -142,7 +151,6 @@ tournamentsRouter.post(
   },
 );
 
-/** Leave team */
 tournamentsRouter.post('/:id/leave', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const userId = getUserId(c);
@@ -150,7 +158,6 @@ tournamentsRouter.post('/:id/leave', authMiddleware, async (c) => {
   return c.json({ data: { left: true } });
 });
 
-/** Kick member (captain only) */
 tournamentsRouter.post(
   '/:id/kick',
   authMiddleware,
@@ -164,9 +171,8 @@ tournamentsRouter.post(
   },
 );
 
-// ==================== Join requests ====================
+// ---- Join requests ----
 
-/** Send join request to closed team */
 tournamentsRouter.post('/:id/teams/:teamId/request', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const teamId = c.req.param('teamId');
@@ -175,7 +181,6 @@ tournamentsRouter.post('/:id/teams/:teamId/request', authMiddleware, async (c) =
   return c.json({ data: request }, 201);
 });
 
-/** Get pending requests for captain's team */
 tournamentsRouter.get('/:id/my-requests', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const userId = getUserId(c);
@@ -185,7 +190,6 @@ tournamentsRouter.get('/:id/my-requests', authMiddleware, async (c) => {
   return c.json({ data: requests });
 });
 
-/** Approve/reject join request (captain) */
 tournamentsRouter.post(
   '/:id/requests/:requestId',
   authMiddleware,
@@ -199,9 +203,43 @@ tournamentsRouter.post(
   },
 );
 
-// ==================== Leaderboard ====================
+// ---- Invite system ----
 
-/** Team leaderboard */
+tournamentsRouter.post(
+  '/:id/invite',
+  authMiddleware,
+  zValidator('json', z.object({ targetUserId: z.string().uuid() })),
+  async (c) => {
+    const tournamentId = c.req.param('id');
+    const captainUserId = getUserId(c);
+    const { targetUserId } = c.req.valid('json');
+    const result = await tournamentService.invitePlayer(tournamentId, captainUserId, targetUserId);
+    return c.json({ data: result });
+  },
+);
+
+tournamentsRouter.get('/:id/my-invites', authMiddleware, async (c) => {
+  const tournamentId = c.req.param('id');
+  const userId = getUserId(c);
+  const data = await tournamentService.getPendingInvites(tournamentId, userId);
+  return c.json({ data });
+});
+
+tournamentsRouter.post(
+  '/:id/invites/:inviteId',
+  authMiddleware,
+  zValidator('json', z.object({ accept: z.boolean() })),
+  async (c) => {
+    const inviteId = c.req.param('inviteId');
+    const userId = getUserId(c);
+    const { accept } = c.req.valid('json');
+    const result = await tournamentService.resolveInvite(inviteId, userId, accept);
+    return c.json({ data: result });
+  },
+);
+
+// ---- Leaderboard ----
+
 tournamentsRouter.get(
   '/:id/leaderboard/teams',
   zValidator('query', z.object({
@@ -216,7 +254,6 @@ tournamentsRouter.get(
   },
 );
 
-/** Individual leaderboard */
 tournamentsRouter.get(
   '/:id/leaderboard/individual',
   zValidator('query', z.object({
@@ -231,18 +268,14 @@ tournamentsRouter.get(
   },
 );
 
-// ==================== Notifications ====================
+// ---- Notifications, results, points, captain transfer ----
 
-/** Tournament news/notifications */
 tournamentsRouter.get('/:id/notifications', async (c) => {
   const tournamentId = c.req.param('id');
   const data = await tournamentService.getNotifications(tournamentId);
   return c.json({ data });
 });
 
-// ==================== Results ====================
-
-/** Tournament results */
 tournamentsRouter.get('/:id/results', async (c) => {
   const tournamentId = c.req.param('id');
   const tournament = await tournamentService.getTournamentById(tournamentId);
@@ -250,9 +283,6 @@ tournamentsRouter.get('/:id/results', async (c) => {
   return c.json({ data: tournament.results ?? null });
 });
 
-// ==================== Point history ====================
-
-/** Get point log for a participant */
 tournamentsRouter.get('/:id/my-points', authMiddleware, async (c) => {
   const tournamentId = c.req.param('id');
   const userId = getUserId(c);
@@ -260,9 +290,6 @@ tournamentsRouter.get('/:id/my-points', authMiddleware, async (c) => {
   return c.json({ data });
 });
 
-// ==================== Captain transfer ====================
-
-/** Transfer captainship to another member */
 tournamentsRouter.post(
   '/:id/transfer-captain',
   authMiddleware,
@@ -273,56 +300,6 @@ tournamentsRouter.post(
     const { newCaptainUserId } = c.req.valid('json');
     await tournamentService.transferCaptain(tournamentId, userId, newCaptainUserId);
     return c.json({ data: { transferred: true } });
-  },
-);
-
-// ==================== User search & invite ====================
-
-tournamentsRouter.get(
-  '/search/users',
-  authMiddleware,
-  zValidator('query', z.object({ q: z.string().min(2) })),
-  async (c) => {
-    const { q } = c.req.valid('query');
-    const data = await tournamentService.searchUsers(q);
-    return c.json({ data });
-  },
-);
-
-/** Invite a user to team (captain sends invite) */
-tournamentsRouter.post(
-  '/:id/invite',
-  authMiddleware,
-  zValidator('json', z.object({ targetUserId: z.string().uuid() })),
-  async (c) => {
-    const tournamentId = c.req.param('id');
-    const captainUserId = getUserId(c);
-    const { targetUserId } = c.req.valid('json');
-    const result = await tournamentService.invitePlayer(tournamentId, captainUserId, targetUserId);
-    return c.json({ data: result });
-  },
-);
-
-/** Get pending invites for the current user */
-tournamentsRouter.get('/:id/my-invites', authMiddleware, async (c) => {
-  const tournamentId = c.req.param('id');
-  const userId = getUserId(c);
-  const data = await tournamentService.getPendingInvites(tournamentId, userId);
-  return c.json({ data });
-});
-
-/** Accept/reject an invite */
-tournamentsRouter.post(
-  '/:id/invites/:inviteId',
-  authMiddleware,
-  zValidator('json', z.object({ accept: z.boolean() })),
-  async (c) => {
-    const tournamentId = c.req.param('id');
-    const inviteId = c.req.param('inviteId');
-    const userId = getUserId(c);
-    const { accept } = c.req.valid('json');
-    const result = await tournamentService.resolveInvite(inviteId, userId, accept);
-    return c.json({ data: result });
   },
 );
 

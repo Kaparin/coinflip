@@ -13,7 +13,6 @@ import { TournamentLeaderboardTab } from '@/components/features/tournaments/tabs
 import { TournamentMyTeamTab } from '@/components/features/tournaments/tabs/my-team-tab';
 import { TournamentPaywall } from '@/components/features/tournaments/tournament-paywall';
 import { TournamentResultsTab } from '@/components/features/tournaments/tabs/results-tab';
-import { AxmIcon } from '@/components/ui/axm-icon';
 
 type Tab = 'info' | 'news' | 'teams' | 'leaderboard' | 'myteam' | 'results';
 
@@ -53,17 +52,19 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-6 space-y-4">
-        <div className="h-8 w-48 rounded-lg bg-[var(--color-surface)] animate-pulse" />
-        <div className="h-40 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
-        <div className="h-64 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
+      <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div className="h-8 w-48 rounded-lg bg-[var(--color-surface)] animate-pulse" />
+          <div className="h-40 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
+          <div className="h-64 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
+        </div>
       </div>
     );
   }
 
   if (!tournament) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-12 text-center">
+      <div className="h-full overflow-y-auto px-4 py-12 text-center">
         <p className="text-[var(--color-text-secondary)]">{t('events.notFound')}</p>
         <button onClick={() => router.push('/game/events')} className="mt-4 text-indigo-400 text-sm">
           {t('events.backToEvents')}
@@ -75,94 +76,100 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const title = pickLocalized(locale, tournament.title, tournament.titleEn, tournament.titleRu);
   const hasPaid = tournament.hasPaid;
 
-  // Build dynamic tabs list — add Results tab for completed/calculating tournaments
+  // Build dynamic tabs list
   const isFinished = tournament.status === 'completed' || tournament.status === 'calculating' || tournament.status === 'archived';
   const TABS = isFinished
     ? [{ id: 'results' as Tab, icon: Trophy, labelKey: 'tournament.results' }, ...BASE_TABS]
     : BASE_TABS;
 
-  // Show paywall if not paid
+  // Show paywall if not paid during registration
   if (!hasPaid && tournament.status === 'registration') {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-6">
-        <button
-          onClick={() => router.push('/game/events')}
-          className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-4 transition-colors"
-        >
-          <ArrowLeft size={16} />
-          {t('events.backToEvents')}
-        </button>
-        <TournamentPaywall tournament={tournament} />
+      <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
+        <div className="mx-auto max-w-2xl">
+          <button
+            onClick={() => router.push('/game/events')}
+            className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-4 transition-colors"
+          >
+            <ArrowLeft size={16} />
+            {t('events.backToEvents')}
+          </button>
+          <TournamentPaywall tournament={tournament} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 space-y-4">
-      {/* Back button */}
-      <button
-        onClick={() => router.push('/game/events')}
-        className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-      >
-        <ArrowLeft size={16} />
-        {t('tournament.backToTournament')}
-      </button>
+    <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
+      <div className="mx-auto max-w-2xl space-y-4">
+        {/* Back button */}
+        <button
+          onClick={() => router.push('/game/events')}
+          className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+        >
+          <ArrowLeft size={16} />
+          {t('tournament.backToTournament')}
+        </button>
 
-      {/* Header */}
-      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Swords size={18} className="text-indigo-400" />
-          <h1 className="text-lg font-bold text-[var(--color-text)]">{title}</h1>
-        </div>
+        {/* Header */}
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Swords size={18} className="text-indigo-400" />
+            <h1 className="text-lg font-bold text-[var(--color-text)]">{title}</h1>
+          </div>
 
-        <TournamentProgressBar tournament={tournament} />
+          <TournamentProgressBar tournament={tournament} />
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-            <div className="text-lg font-bold text-[var(--color-warning)] flex items-center justify-center gap-1">
-              <Trophy size={16} />
-              {formatAXM(tournament.totalPrizePool)}
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-lg font-bold text-[var(--color-warning)] flex items-center justify-center gap-1">
+                <Trophy size={16} />
+                {formatAXM(tournament.totalPrizePool)}
+              </div>
+              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.prizePool')}</div>
             </div>
-            <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.prizePool')}</div>
-          </div>
-          <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-            <div className="text-lg font-bold text-[var(--color-text)]">{tournament.participantCount}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.participants')}</div>
-          </div>
-          <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-            <div className="text-lg font-bold text-[var(--color-text)]">{tournament.teamCount}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.teams')}</div>
+            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-lg font-bold text-[var(--color-text)]">{tournament.participantCount}</div>
+              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.participants')}</div>
+            </div>
+            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-lg font-bold text-[var(--color-text)]">{tournament.teamCount}</div>
+              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.teams')}</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-        {TABS.map(({ id: tabId, icon: Icon, labelKey }) => (
-          <button
-            key={tabId}
-            onClick={() => setActiveTab(tabId)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-              activeTab === tabId
-                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] border border-transparent'
-            }`}
-          >
-            <Icon size={14} />
-            {t(labelKey)}
-          </button>
-        ))}
-      </div>
+        {/* Tab bar — sticky */}
+        <div className="sticky top-0 z-10 bg-[var(--color-bg)]/95 backdrop-blur-sm py-1 -mx-1 px-1">
+          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+            {TABS.map(({ id: tabId, icon: Icon, labelKey }) => (
+              <button
+                key={tabId}
+                onClick={() => setActiveTab(tabId)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                  activeTab === tabId
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] border border-transparent'
+                }`}
+              >
+                <Icon size={14} />
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {/* Tab content */}
-      <div className="min-h-[300px]">
-        {activeTab === 'info' && <TournamentInfoTab tournament={tournament} />}
-        {activeTab === 'news' && <TournamentNewsTab tournamentId={tournament.id} />}
-        {activeTab === 'teams' && <TournamentTeamsTab tournament={tournament} />}
-        {activeTab === 'leaderboard' && <TournamentLeaderboardTab tournament={tournament} />}
-        {activeTab === 'myteam' && <TournamentMyTeamTab tournament={tournament} />}
-        {activeTab === 'results' && <TournamentResultsTab tournament={tournament} />}
+        {/* Tab content */}
+        <div className="min-h-[300px] pb-4">
+          {activeTab === 'info' && <TournamentInfoTab tournament={tournament} />}
+          {activeTab === 'news' && <TournamentNewsTab tournamentId={tournament.id} />}
+          {activeTab === 'teams' && <TournamentTeamsTab tournament={tournament} />}
+          {activeTab === 'leaderboard' && <TournamentLeaderboardTab tournament={tournament} />}
+          {activeTab === 'myteam' && <TournamentMyTeamTab tournament={tournament} />}
+          {activeTab === 'results' && <TournamentResultsTab tournament={tournament} />}
+        </div>
       </div>
     </div>
   );

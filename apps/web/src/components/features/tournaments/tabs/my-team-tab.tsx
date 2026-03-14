@@ -19,10 +19,12 @@ import {
   usePointHistory,
   useMyInvites,
   useResolveInvite,
+  useUpdateTeam,
 } from '@/hooks/use-tournaments';
 import type { Tournament } from '@/hooks/use-tournaments';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { AxmIcon } from '@/components/ui/axm-icon';
+import { TeamAvatarPicker } from '@/components/features/tournaments/team-avatar-picker';
 
 function shortAddr(addr: string): string {
   return addr.length > 12 ? `${addr.slice(0, 8)}...${addr.slice(-4)}` : addr;
@@ -106,6 +108,7 @@ function MyTeamContent({ tournament, teamId }: { tournament: Tournament; teamId:
   const resolveRequest = useResolveJoinRequest();
   const transferCaptain = useTransferCaptain();
   const invitePlayer = useInvitePlayer();
+  const updateTeam = useUpdateTeam();
 
   const [codeCopied, setCodeCopied] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -123,8 +126,8 @@ function MyTeamContent({ tournament, teamId }: { tournament: Tournament; teamId:
     return <div className="h-40 rounded-xl bg-[var(--color-surface)] animate-pulse" />;
   }
 
-  const amCaptain = team.captainUserId === (team.members?.find(m => m.isCaptain)?.userId ?? team.captainUserId);
-  const isCaptainCheck = team.members?.some(m => m.isCaptain) ? team.captainUserId : null;
+  // isCaptain comes from the server (tournament response) — reliable
+  const amCaptain = tournament.isCaptain ?? false;
 
   const copyCode = () => {
     if (team.inviteCode) {
@@ -144,7 +147,13 @@ function MyTeamContent({ tournament, teamId }: { tournament: Tournament; teamId:
       <div className="rounded-xl border border-indigo-500/30 bg-[var(--color-surface)] p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {team.avatarUrl ? (
+            {isRegistration && amCaptain ? (
+              <TeamAvatarPicker
+                currentUrl={team.avatarUrl}
+                onUrlChange={(url) => updateTeam.mutate({ tournamentId: tournament.id, avatarUrl: url ?? '' })}
+                size={44}
+              />
+            ) : team.avatarUrl ? (
               <img src={team.avatarUrl} alt="" className="w-10 h-10 rounded-xl object-cover" />
             ) : (
               <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-lg font-bold text-indigo-400">

@@ -12,6 +12,7 @@ import {
 } from '@/hooks/use-tournaments';
 import type { Tournament, TournamentTeam } from '@/hooks/use-tournaments';
 import { UserAvatar } from '@/components/ui/user-avatar';
+import { TeamAvatarPicker } from '@/components/features/tournaments/team-avatar-picker';
 
 function shortAddr(addr: string): string {
   return addr.length > 12 ? `${addr.slice(0, 8)}...${addr.slice(-4)}` : addr;
@@ -183,6 +184,7 @@ function CreateTeamForm({ tournamentId, onClose }: { tournamentId: string; onClo
   const createTeam = useCreateTeam();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,6 +196,7 @@ function CreateTeamForm({ tournamentId, onClose }: { tournamentId: string; onClo
         tournamentId,
         name: name.trim(),
         description: description.trim() || undefined,
+        avatarUrl: avatarUrl ?? undefined,
         isOpen,
       });
       onClose();
@@ -206,13 +209,19 @@ function CreateTeamForm({ tournamentId, onClose }: { tournamentId: string; onClo
     <div className="rounded-xl border border-indigo-500/30 bg-[var(--color-surface)] p-4 space-y-3 animate-fade-up">
       <h4 className="text-sm font-semibold text-[var(--color-text)]">{t('tournament.createTeam')}</h4>
 
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder={t('tournament.teamName')}
-        maxLength={50}
-        className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-indigo-500/50"
-      />
+      {/* Avatar picker */}
+      <div className="flex items-center gap-3">
+        <TeamAvatarPicker currentUrl={avatarUrl} onUrlChange={setAvatarUrl} size={56} />
+        <div className="flex-1">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('tournament.teamName')}
+            maxLength={50}
+            className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-indigo-500/50"
+          />
+        </div>
+      </div>
 
       <textarea
         value={description}

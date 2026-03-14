@@ -50,6 +50,7 @@ export interface Tournament {
   endsAt: string;
   hasPaid?: boolean;
   myTeamId?: string | null;
+  isCaptain?: boolean;
   createdAt: string;
 }
 

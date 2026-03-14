@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight, PartyPopper } from 'lucide-react';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
-import { usePayEntryFee } from '@/hooks/use-tournaments';
+import { usePayEntryFee, tournamentKeys } from '@/hooks/use-tournaments';
 import { AxmIcon } from '@/components/ui/axm-icon';
 import { TournamentProgressBar } from './tournament-progress-bar';
 import type { Tournament } from '@/hooks/use-tournaments';
@@ -22,7 +22,7 @@ interface Props {
 
 export function TournamentPaywall({ tournament: t }: Props) {
   const { t: tr, locale } = useTranslation();
-  const router = useRouter();
+  const qc = useQueryClient();
   const payMutation = usePayEntryFee();
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
@@ -41,28 +41,59 @@ export function TournamentPaywall({ tournament: t }: Props) {
     }
   };
 
-  // Already paid (from server or just now)
+  const handleEnterTournament = () => {
+    // Force refetch tournament data so hasPaid updates, then page will re-render without paywall
+    qc.invalidateQueries({ queryKey: tournamentKeys.detail(t.id) });
+    qc.invalidateQueries({ queryKey: tournamentKeys.teams(t.id) });
+  };
+
+  // ==================== SUCCESS STATE ====================
   if (t.hasPaid || paid) {
     return (
       <div className="rounded-2xl border border-emerald-500/30 bg-[var(--color-surface)] overflow-hidden animate-fade-up">
-        <div className="bg-gradient-to-br from-emerald-600/20 to-green-600/10 p-8 text-center">
-          <CheckCircle size={56} className="text-emerald-400 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-emerald-400 mb-1">{tr('tournament.alreadyPaid')}</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">{title}</p>
+        {/* Success hero */}
+        <div className="relative bg-gradient-to-br from-emerald-600/20 via-green-500/10 to-teal-600/15 px-6 py-10 text-center overflow-hidden">
+          {/* Animated circles */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border border-emerald-500/10 animate-ping" style={{ animationDuration: '3s' }} />
+          </div>
+
+          <div className="relative">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <CheckCircle size={44} className="text-emerald-400" />
+            </div>
+            <h2 className="text-xl font-bold text-emerald-400 mb-2">{tr('tournament.alreadyPaid')}</h2>
+            <p className="text-sm text-[var(--color-text-secondary)] max-w-xs mx-auto">{title}</p>
+
+            {/* Fee paid badge */}
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-xs font-medium text-emerald-400">
+              <PartyPopper size={12} />
+              {feeDisplay} AXM
+            </div>
+          </div>
         </div>
-        <div className="p-5">
+
+        {/* CTA */}
+        <div className="p-5 space-y-3">
           <button
-            onClick={() => router.refresh()}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-semibold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+            onClick={handleEnterTournament}
+            className="w-full flex items-center justify-center gap-2 py-4 px-4 rounded-xl font-bold text-base bg-emerald-600 hover:bg-emerald-500 text-white transition-all active:scale-[0.98]"
           >
+            <Swords size={18} />
             <span>Enter Tournament</span>
-            <ArrowRight size={16} />
+            <ArrowRight size={18} />
           </button>
+
+          <p className="text-[10px] text-center text-[var(--color-text-secondary)]">
+            {tr('tournament.scoring')} • {tr('tournament.teams')} • {tr('tournament.leaderboard')}
+          </p>
         </div>
       </div>
     );
   }
 
+  // ==================== PAYMENT STATE ====================
   return (
     <div className="rounded-2xl border border-indigo-500/30 bg-[var(--color-surface)] overflow-hidden">
       {/* Hero */}
@@ -131,7 +162,7 @@ export function TournamentPaywall({ tournament: t }: Props) {
         <button
           onClick={handlePay}
           disabled={payMutation.isPending}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {payMutation.isPending ? (
             <Loader2 size={18} className="animate-spin" />
