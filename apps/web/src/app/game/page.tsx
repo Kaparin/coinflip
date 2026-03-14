@@ -143,6 +143,41 @@ export default function GamePage() {
       addToast('error', t('balance.depositFailedWs', { reason }));
     }
 
+    // Tournament score update — personal notification (server sends only to the player)
+    if (event.type === 'tournament_score_update') {
+      if (!isStale) {
+        const points = data?.points ?? 0;
+        const reason = data?.reason === 'win' ? '🏆' : '🎯';
+        if (Number(points) > 0) {
+          addToast('success', `${reason} +${points} ${t('tournament.points')}`);
+        }
+      }
+    }
+
+    // Tournament lifecycle notifications
+    if (event.type === 'tournament_started') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: `⚔️ ${t('tournament.notifications.started')} — ${title}`, variant: 'success' });
+    }
+    if (event.type === 'tournament_ended') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: `${t('tournament.notifications.ended')} — ${title}`, variant: 'info' });
+    }
+    if (event.type === 'tournament_results') {
+      const title = data?.title ?? '';
+      setEventNotification({ message: `🏆 ${t('tournament.notifications.results')} — ${title}`, variant: 'success' });
+    }
+    if (event.type === 'tournament_notification') {
+      const notifType = data?.notificationType;
+      if (notifType === 'registration_closing') {
+        setEventNotification({ message: `⏰ ${t('tournament.notifications.registrationClosing')}`, variant: 'warning' });
+      } else if (notifType === 'ending_soon') {
+        setEventNotification({ message: `⏰ ${t('tournament.notifications.endingSoon')}`, variant: 'warning' });
+      } else if (notifType === 'last_day') {
+        setEventNotification({ message: `🔥 ${t('tournament.notifications.lastDay')}`, variant: 'warning' });
+      }
+    }
+
     // Jackpot winner — show rich overlay with tier image
     if (event.type === 'jackpot_won') {
       setJackpotWinner({

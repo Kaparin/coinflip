@@ -980,19 +980,33 @@ class TournamentService {
           betAmount: bet.amount,
         });
 
-        // Broadcast score update
-        wsService.broadcast({
-          type: 'tournament_score_update',
-          data: {
-            tournamentId: tournament.id,
-            teamId: participant.teamId,
-            userId: playerId,
-            points,
-            totalPoints: (BigInt(participant.totalPoints) + BigInt(points)).toString(),
-            reason: isWinner ? 'win' : 'loss',
-          },
-        });
+        // Send personal score notification to the player
+        const playerRows = await this.db
+          .select({ address: users.address })
+          .from(users)
+          .where(eq(users.id, playerId))
+          .limit(1);
+        const playerAddr = playerRows[0]?.address;
+        if (playerAddr) {
+          wsService.sendToAddress(playerAddr, {
+            type: 'tournament_score_update',
+            data: {
+              tournamentId: tournament.id,
+              teamId: participant.teamId,
+              userId: playerId,
+              points,
+              totalPoints: (BigInt(participant.totalPoints) + BigInt(points)).toString(),
+              reason: isWinner ? 'win' : 'loss',
+            },
+          });
+        }
       }
+
+      // Broadcast leaderboard update to all (for live leaderboard refresh)
+      wsService.broadcast({
+        type: 'tournament_team_update',
+        data: { tournamentId: tournament.id, action: 'score_changed' },
+      });
 
       // Invalidate leaderboard cache
       leaderboardCache.delete(`team_${tournament.id}`);
@@ -1361,6 +1375,173 @@ class TournamentService {
       .where(eq(tournamentNotifications.tournamentId, tournamentId))
       .orderBy(desc(tournamentNotifications.createdAt))
       .limit(limit);
+  }
+
+  // ==================== Lifecycle checks (called from background sweep every 15s) ====================
+
+  async checkTournamentLifecycle() {
+    const now = new Date();
+    const db = this.db;
+
+    // 1. Auto-transition draft → registration when registrationStartsAt is reached
+    const readyForRegistration = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'draft'),
+          sql`${tournaments.registrationStartsAt} <= ${now.toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of readyForRegistration) {
+      try {
+        await this.openRegistration(t.id);
+        logger.info({ tournamentId: t.id }, 'Tournament auto-opened registration');
+      } catch (err) {
+        logger.warn({ err, tournamentId: t.id }, 'Failed to auto-open registration');
+      }
+    }
+
+    // 2. Auto-transition registration → active when startsAt is reached
+    const readyToStart = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'registration'),
+          sql`${tournaments.startsAt} <= ${now.toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of readyToStart) {
+      try {
+        await this.startTournament(t.id);
+        logger.info({ tournamentId: t.id }, 'Tournament auto-started');
+      } catch (err) {
+        logger.warn({ err, tournamentId: t.id }, 'Failed to auto-start tournament');
+      }
+    }
+
+    // 3. Auto-transition active → calculating when endsAt is reached
+    const readyToEnd = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'active'),
+          sql`${tournaments.endsAt} <= ${now.toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of readyToEnd) {
+      try {
+        await this.endTournament(t.id);
+        logger.info({ tournamentId: t.id }, 'Tournament auto-ended');
+      } catch (err) {
+        logger.warn({ err, tournamentId: t.id }, 'Failed to auto-end tournament');
+      }
+    }
+
+    // 4. Notification: 1 hour before registration closes
+    const regClosingSoon = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'registration'),
+          sql`${tournaments.registrationEndsAt} > ${now.toISOString()}::timestamptz`,
+          sql`${tournaments.registrationEndsAt} <= ${new Date(now.getTime() + 3600_000).toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of regClosingSoon) {
+      // Check if we already sent this notification
+      const existing = await db
+        .select({ id: tournamentNotifications.id })
+        .from(tournamentNotifications)
+        .where(
+          and(
+            eq(tournamentNotifications.tournamentId, t.id),
+            eq(tournamentNotifications.type, 'registration_closing'),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        await this.createNotification(t.id, 'registration_closing', 'Регистрация закроется через час!', 'Registration closes in 1 hour!');
+        wsService.broadcast({
+          type: 'tournament_notification',
+          data: { tournamentId: t.id, notificationType: 'registration_closing', title: t.title },
+        });
+      }
+    }
+
+    // 5. Notification: last day of tournament
+    const lastDay = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'active'),
+          sql`${tournaments.endsAt} > ${now.toISOString()}::timestamptz`,
+          sql`${tournaments.endsAt} <= ${new Date(now.getTime() + 86400_000).toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of lastDay) {
+      const existing = await db
+        .select({ id: tournamentNotifications.id })
+        .from(tournamentNotifications)
+        .where(
+          and(
+            eq(tournamentNotifications.tournamentId, t.id),
+            eq(tournamentNotifications.type, 'last_day'),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        await this.createNotification(t.id, 'last_day', 'Последний день турнира!', 'Last day of the tournament!');
+        wsService.broadcast({
+          type: 'tournament_notification',
+          data: { tournamentId: t.id, notificationType: 'last_day', title: t.title },
+        });
+      }
+    }
+
+    // 6. Notification: 1 hour before tournament ends
+    const endingSoon = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.status, 'active'),
+          sql`${tournaments.endsAt} > ${now.toISOString()}::timestamptz`,
+          sql`${tournaments.endsAt} <= ${new Date(now.getTime() + 3600_000).toISOString()}::timestamptz`,
+        ),
+      );
+
+    for (const t of endingSoon) {
+      const existing = await db
+        .select({ id: tournamentNotifications.id })
+        .from(tournamentNotifications)
+        .where(
+          and(
+            eq(tournamentNotifications.tournamentId, t.id),
+            eq(tournamentNotifications.type, 'ending_soon'),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        await this.createNotification(t.id, 'ending_soon', 'Турнир закончится через час!', 'Tournament ends in 1 hour!');
+        wsService.broadcast({
+          type: 'tournament_notification',
+          data: { tournamentId: t.id, notificationType: 'ending_soon', title: t.title },
+        });
+      }
+    }
   }
 
   // ==================== Format for API response ====================

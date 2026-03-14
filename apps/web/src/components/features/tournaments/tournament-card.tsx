@@ -61,6 +61,11 @@ export function TournamentCard({ tournament: t, index = 0 }: TournamentCardProps
                 Live
               </span>
             )}
+            {t.hasPaid && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+                ✓ {tr('events.joined')}
+              </span>
+            )}
           </div>
           <h3 className="text-base font-semibold text-[var(--color-text)] truncate">{title}</h3>
         </div>

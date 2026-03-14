@@ -2013,7 +2013,15 @@ export function startBackgroundSweep(): void {
         logger.warn({ err }, 'sweep: session cleanup failed');
       }
 
-      // 12. Publish scheduled sponsored announcements
+      // 12. Tournament lifecycle checks (auto-notifications)
+      try {
+        const { tournamentService } = await import('./tournament.service.js');
+        await tournamentService.checkTournamentLifecycle();
+      } catch (err) {
+        logger.warn({ err }, 'sweep: tournament lifecycle check failed');
+      }
+
+      // 13. Publish scheduled sponsored announcements
       try {
         const { announcementService } = await import('./announcement.service.js');
         const published = await announcementService.publishScheduled();

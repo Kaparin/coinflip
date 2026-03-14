@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Puzzle, User, Trophy, Newspaper, Store } from 'lucide-react';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { useGetActiveEvents } from '@coinflip/api-client';
+import { useActiveTournaments } from '@/hooks/use-tournaments';
 import { useTranslation } from '@/lib/i18n';
 import { TREASURY_ADDRESS } from '@/lib/constants';
 
@@ -43,7 +44,11 @@ export function BottomNav() {
     query: { staleTime: 60_000, refetchInterval: 120_000 },
   });
 
-  const activeCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
+  const { data: activeTournaments } = useActiveTournaments();
+
+  const activeEventsCount = (activeEventsData as unknown as { data?: unknown[] })?.data?.length ?? 0;
+  const activeTournamentsCount = activeTournaments?.length ?? 0;
+  const activeCount = activeEventsCount + activeTournamentsCount;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur-lg pb-safe md:hidden">
@@ -72,7 +77,7 @@ export function BottomNav() {
         <Link
           href="/game/events"
           className={`relative flex flex-col items-center gap-0.5 px-4 py-2.5 text-[10px] font-medium transition-colors ${
-            pathname?.startsWith('/game/events')
+            pathname?.startsWith('/game/events') || pathname?.startsWith('/game/tournaments')
               ? 'text-[var(--color-primary)]'
               : 'text-[var(--color-text-secondary)]'
           }`}
