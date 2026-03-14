@@ -20,6 +20,8 @@ import { shopRouter } from './routes/shop.js';
 import { socialRouter } from './routes/social.js';
 import { adminEventsRouter } from './routes/admin-events.js';
 import { adminTransactionsRouter } from './routes/admin-transactions.js';
+import { tournamentsRouter } from './routes/tournaments.js';
+import { adminTournamentsRouter } from './routes/admin-tournaments.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { ipRateLimit } from './middleware/rate-limit.js';
 import { maintenanceMiddleware } from './middleware/maintenance.js';
@@ -147,6 +149,8 @@ app.route('/api/v1/news', newsRouter);
 app.route('/api/v1/announcements', announcementsRouter);
 app.route('/api/v1/shop', shopRouter);
 app.route('/api/v1/social', socialRouter);
+app.route('/api/v1/tournaments', tournamentsRouter);
+app.route('/api/v1/admin/tournaments', adminTournamentsRouter);
 
 // ---- 404 fallback ----
 app.notFound((c) =>

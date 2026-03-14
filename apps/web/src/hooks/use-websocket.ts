@@ -420,6 +420,15 @@ export function useWebSocket({
               // Forward to ticker component
               emitTickerEvent(parsed);
               break;
+            case 'tournament_score_update':
+            case 'tournament_team_update':
+            case 'tournament_started':
+            case 'tournament_ended':
+            case 'tournament_results':
+            case 'tournament_canceled':
+            case 'tournament_notification':
+              scheduleInvalidation('tournaments');
+              break;
           }
 
           onEventRef.current?.(parsed);

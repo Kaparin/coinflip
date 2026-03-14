@@ -14,6 +14,14 @@ import type {
   CreateEventRequestSchema,
   JackpotPoolResponseSchema,
   JackpotEligibilityResponseSchema,
+  TournamentResponseSchema,
+  TournamentTeamResponseSchema,
+  TournamentLeaderboardEntrySchema,
+  TournamentIndividualEntrySchema,
+  TournamentJoinRequestResponseSchema,
+  TournamentNotificationResponseSchema,
+  TournamentResultsSchema,
+  CreateTournamentRequestSchema,
 } from '../schemas/index.js';
 
 // ---- Inferred request types ----
@@ -49,6 +57,18 @@ export type EventType = 'contest' | 'raffle';
 export type EventStatus = 'draft' | 'active' | 'calculating' | 'completed' | 'archived';
 export type ContestMetric = 'turnover' | 'wins' | 'profit';
 
+// ---- Tournament types ----
+export type TournamentResponse = z.infer<typeof TournamentResponseSchema>;
+export type TournamentTeamResponse = z.infer<typeof TournamentTeamResponseSchema>;
+export type TournamentLeaderboardEntry = z.infer<typeof TournamentLeaderboardEntrySchema>;
+export type TournamentIndividualEntry = z.infer<typeof TournamentIndividualEntrySchema>;
+export type TournamentJoinRequestResponse = z.infer<typeof TournamentJoinRequestResponseSchema>;
+export type TournamentNotificationResponse = z.infer<typeof TournamentNotificationResponseSchema>;
+export type TournamentResults = z.infer<typeof TournamentResultsSchema>;
+export type CreateTournamentRequest = z.infer<typeof CreateTournamentRequestSchema>;
+export type TournamentStatus = 'draft' | 'registration' | 'active' | 'calculating' | 'completed' | 'canceled' | 'archived';
+export type TournamentNotificationType = 'registration_open' | 'registration_closing' | 'started' | 'last_day' | 'ending_soon' | 'ended' | 'results';
+
 // ---- WebSocket event types ----
 export type WsEventType =
   | 'bet_created'
@@ -83,7 +103,14 @@ export type WsEventType =
   | 'coin_drop_claimed'
   | 'coin_transfer'
   | 'online_count'
-  | 'ai_commentary';
+  | 'ai_commentary'
+  | 'tournament_score_update'
+  | 'tournament_notification'
+  | 'tournament_team_update'
+  | 'tournament_started'
+  | 'tournament_ended'
+  | 'tournament_results'
+  | 'tournament_canceled';
 
 export type WsEvent = {
   type: WsEventType;

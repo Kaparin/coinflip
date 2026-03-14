@@ -4,7 +4,9 @@ import { useGetActiveEvents, useGetCompletedEvents } from '@coinflip/api-client'
 import { EventCard } from './event-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
-import { Trophy } from 'lucide-react';
+import { Trophy, Swords } from 'lucide-react';
+import { useActiveTournaments, useCompletedTournaments } from '@/hooks/use-tournaments';
+import { TournamentCard } from '@/components/features/tournaments/tournament-card';
 
 export function EventList() {
   const { t } = useTranslation();
@@ -16,9 +18,13 @@ export function EventList() {
     { query: { staleTime: 60_000 } },
   );
 
+  // Tournaments
+  const { data: activeTournaments, isLoading: tournamentsLoading } = useActiveTournaments();
+  const { data: completedTournaments } = useCompletedTournaments(5);
+
   const allActiveEvents = activeData?.data ?? [];
   const completedEvents = completedData?.data ?? [];
-  const isLoading = activeLoading || completedLoading;
+  const isLoading = activeLoading || completedLoading || tournamentsLoading;
 
   // Split into truly active (already started) and upcoming (starts in the future)
   const now = new Date();
@@ -27,6 +33,13 @@ export function EventList() {
     (e.status === 'draft' && new Date(e.startsAt) > now) ||
     (e.status === 'active' && new Date(e.startsAt) > now),
   );
+
+  const liveTournaments = (activeTournaments ?? []).filter(t => t.status === 'active');
+  const registrationTournaments = (activeTournaments ?? []).filter(t => t.status === 'registration');
+
+  const hasAny = liveEvents.length > 0 || upcomingEvents.length > 0 || completedEvents.length > 0
+    || liveTournaments.length > 0 || registrationTournaments.length > 0
+    || (completedTournaments ?? []).length > 0;
 
   if (isLoading) {
     return (
@@ -38,7 +51,7 @@ export function EventList() {
     );
   }
 
-  if (liveEvents.length === 0 && upcomingEvents.length === 0 && completedEvents.length === 0) {
+  if (!hasAny) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Trophy size={40} className="mb-3 text-[var(--color-text-secondary)]" />
@@ -49,6 +62,36 @@ export function EventList() {
 
   return (
     <div className="space-y-6">
+      {/* Active tournaments */}
+      {liveTournaments.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+            <Swords size={12} />
+            {t('tournament.tournaments')} — Live
+          </h2>
+          <div className="space-y-3">
+            {liveTournaments.map((tournament, i) => (
+              <TournamentCard key={tournament.id} tournament={tournament} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Registration tournaments */}
+      {registrationTournaments.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+            <Swords size={12} />
+            {t('tournament.tournaments')} — {t('tournament.registration')}
+          </h2>
+          <div className="space-y-3">
+            {registrationTournaments.map((tournament, i) => (
+              <TournamentCard key={tournament.id} tournament={tournament} index={liveTournaments.length + i} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Active (live) events */}
       {liveEvents.length > 0 && (
         <section>
@@ -77,7 +120,22 @@ export function EventList() {
         </section>
       )}
 
-      {/* Recent results */}
+      {/* Completed tournaments */}
+      {(completedTournaments ?? []).length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+            <Swords size={12} />
+            {t('tournament.tournaments')} — {t('events.recentResults')}
+          </h2>
+          <div className="space-y-2">
+            {(completedTournaments ?? []).map((tournament, i) => (
+              <TournamentCard key={tournament.id} tournament={tournament} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recent results (events) */}
       {completedEvents.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">

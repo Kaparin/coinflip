@@ -25,6 +25,7 @@ import { jackpotService } from './jackpot.service.js';
 import { partnerService } from './partner.service.js';
 import { stakingService } from './staking.service.js';
 import { aiBotService } from './ai-bot.service.js';
+import { tournamentService } from './tournament.service.js';
 import { shortAddress } from '../lib/format.js';
 import { ChainWebSocketClient, rpcUrlToWsUrl } from '../lib/chain-ws.js';
 import type { CometBFTTxEvent } from '../lib/chain-ws.js';
@@ -563,6 +564,22 @@ export class IndexerService {
           await this.processStakingContribution(BigInt(betId))
             .catch(err => logger.error({ err, betId }, 'bet_revealed: staking contribution failed'));
 
+          // Tournament scoring — award points to both players if in active tournament
+          {
+            const betRow = await this.db.select().from(bets).where(eq(bets.betId, BigInt(betId))).limit(1);
+            if (betRow.length > 0) {
+              const b = betRow[0]!;
+              tournamentService.onBetResolved({
+                betId: betId.toString(),
+                makerUserId: b.makerUserId,
+                acceptorUserId: b.acceptorUserId,
+                winnerUserId: b.winnerUserId,
+                amount: b.amount,
+                resolvedTime: b.resolvedTime ?? new Date(),
+              }).catch(err => logger.error({ err, betId }, 'bet_revealed: tournament scoring failed'));
+            }
+          }
+
           // AI commentary + win streak check (fire-and-forget, non-blocking)
           this.generateAiCommentary(betId, winnerUserId).catch(err =>
             logger.error({ err, betId }, 'bet_revealed: AI commentary failed'));
@@ -677,6 +694,22 @@ export class IndexerService {
             .catch(err => logger.error({ err, betId }, 'timeout_claimed: partner commission failed'));
           await this.processStakingContribution(BigInt(betId))
             .catch(err => logger.error({ err, betId }, 'timeout_claimed: staking contribution failed'));
+
+          // Tournament scoring — same as bet_revealed
+          {
+            const betRow = await this.db.select().from(bets).where(eq(bets.betId, BigInt(betId))).limit(1);
+            if (betRow.length > 0) {
+              const b = betRow[0]!;
+              tournamentService.onBetResolved({
+                betId: betId.toString(),
+                makerUserId: b.makerUserId,
+                acceptorUserId: b.acceptorUserId,
+                winnerUserId: b.winnerUserId,
+                amount: b.amount,
+                resolvedTime: b.resolvedTime ?? new Date(),
+              }).catch(err => logger.error({ err, betId }, 'timeout_claimed: tournament scoring failed'));
+            }
+          }
 
           break;
         }

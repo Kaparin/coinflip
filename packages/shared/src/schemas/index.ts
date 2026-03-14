@@ -73,3 +73,24 @@ export {
   AdminGrantVipRequestSchema,
   AdminUpdateVipConfigRequestSchema,
 } from './vip.js';
+
+export {
+  TournamentStatusSchema,
+  TournamentNotificationTypeSchema,
+  JoinRequestStatusSchema,
+  ScoringTierSchema,
+  ScoringConfigSchema,
+  TeamConfigSchema,
+  PrizeDistributionEntrySchema,
+  CreateTournamentRequestSchema,
+  UpdateTournamentRequestSchema,
+  CreateTeamRequestSchema,
+  UpdateTeamRequestSchema,
+  TournamentResponseSchema,
+  TournamentTeamResponseSchema,
+  TournamentLeaderboardEntrySchema,
+  TournamentIndividualEntrySchema,
+  TournamentJoinRequestResponseSchema,
+  TournamentNotificationResponseSchema,
+  TournamentResultsSchema,
+} from './tournaments.js';

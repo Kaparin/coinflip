@@ -199,5 +199,32 @@ export const VIP_JACKPOT_TIERS: Partial<Record<string, VipTier>> = {
   super_mega: 'diamond',
 };
 
+// ---- Tournaments ----
+
+export const TOURNAMENT_STATUS = {
+  DRAFT: 'draft',
+  REGISTRATION: 'registration',
+  ACTIVE: 'active',
+  CALCULATING: 'calculating',
+  COMPLETED: 'completed',
+  CANCELED: 'canceled',
+  ARCHIVED: 'archived',
+} as const;
+
+/** Default scoring tiers (bet amount in uaxm → points) */
+export const DEFAULT_SCORING_TIERS = [
+  { minAmount: '1000000', maxAmount: '9999999', winPoints: 3, lossPoints: 1 },
+  { minAmount: '10000000', maxAmount: '99999999', winPoints: 6, lossPoints: 2 },
+  { minAmount: '100000000', maxAmount: '999999999', winPoints: 12, lossPoints: 4 },
+  { minAmount: '1000000000', maxAmount: '9999999999', winPoints: 24, lossPoints: 8 },
+  { minAmount: '10000000000', maxAmount: '99999999999', winPoints: 48, lossPoints: 16 },
+] as const;
+
+/** Default team config */
+export const DEFAULT_TEAM_CONFIG = { minSize: 1, maxSize: 10 } as const;
+
+/** Tournament leaderboard cache TTL (15 seconds — more frequent than events) */
+export const TOURNAMENT_LEADERBOARD_CACHE_TTL_MS = 15_000;
+
 // ---- API versions ----
 export const API_V1_PREFIX = '/api/v1';

@@ -25,3 +25,11 @@ export { stakingLedger } from './staking-ledger';
 export { coinTransfers } from './coin-transfers';
 export { vaultTransactions } from './vault-transactions';
 export { aiBotConfig, aiCommentary, aiBotMessageLog, phraseRules } from './ai-bot';
+export {
+  tournaments,
+  tournamentTeams,
+  tournamentParticipants,
+  tournamentJoinRequests,
+  tournamentPointLogs,
+  tournamentNotifications,
+} from './tournaments';
