@@ -218,6 +218,11 @@ function CreateTournamentForm({ onClose, onCreated }: { onClose: () => void; onC
   const [maxTeamSize, setMaxTeamSize] = useState(10);
   const [maxParticipants, setMaxParticipants] = useState('');
 
+  // Scoring tiers
+  const [scoringTiers, setScoringTiers] = useState<Array<{ minAmount: string; maxAmount: string; winPoints: number; lossPoints: number }>>(
+    DEFAULT_SCORING_TIERS.map(t => ({ minAmount: String(Number(t.minAmount) / 1_000_000), maxAmount: String(Number(t.maxAmount) / 1_000_000), winPoints: t.winPoints, lossPoints: t.lossPoints })),
+  );
+
   // Dates
   const [regStartDate, setRegStartDate] = useState('');
   const [regStartTime, setRegStartTime] = useState('12:00');
@@ -256,7 +261,12 @@ function CreateTournamentForm({ onClose, onCreated }: { onClose: () => void; onC
       commissionBps,
       bonusPool: bonusPoolUaxm,
       prizeDistribution: prizes,
-      scoringConfig: { tiers: DEFAULT_SCORING_TIERS.map(t => ({ ...t })) },
+      scoringConfig: { tiers: scoringTiers.map(t => ({
+        minAmount: String(Math.round(Number(t.minAmount) * 1_000_000)),
+        maxAmount: String(Math.round(Number(t.maxAmount) * 1_000_000)),
+        winPoints: t.winPoints,
+        lossPoints: t.lossPoints,
+      })) },
       teamConfig: { minSize: minTeamSize, maxSize: maxTeamSize },
       maxParticipants: maxParticipants ? parseInt(maxParticipants) : undefined,
       registrationStartsAt: new Date(`${regStartDate}T${regStartTime}`).toISOString(),
@@ -324,6 +334,40 @@ function CreateTournamentForm({ onClose, onCreated }: { onClose: () => void; onC
         </div>
       </div>
 
+      {/* Duration presets */}
+      <div>
+        <label className="text-[10px] text-[var(--color-text-secondary)] uppercase mb-1 block">Быстрая настройка дат</label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: '1 день', regHours: 12, durHours: 24 },
+            { label: '3 дня', regHours: 24, durHours: 72 },
+            { label: '7 дней', regHours: 48, durHours: 168 },
+            { label: '14 дней', regHours: 72, durHours: 336 },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const regStart = new Date(now.getTime() + 5 * 60_000); // +5min
+                const regEnd = new Date(regStart.getTime() + preset.regHours * 3600_000);
+                const start = new Date(regEnd.getTime() + 3600_000); // +1h after reg ends
+                const end = new Date(start.getTime() + preset.durHours * 3600_000);
+                const fmt = (d: Date) => d.toISOString().slice(0, 10);
+                const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
+                setRegStartDate(fmt(regStart)); setRegStartTime(fmtTime(regStart));
+                setRegEndDate(fmt(regEnd)); setRegEndTime(fmtTime(regEnd));
+                setStartDate(fmt(start)); setStartTime(fmtTime(start));
+                setEndDate(fmt(end)); setEndTime(fmtTime(end));
+              }}
+              className="px-2.5 py-1 rounded-lg border border-[var(--color-border)] text-[10px] hover:bg-[var(--color-border)]/30 transition-colors"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Dates */}
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -361,6 +405,39 @@ function CreateTournamentForm({ onClose, onCreated }: { onClose: () => void; onC
             <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
               className="w-20 px-2 py-1.5 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-xs focus:outline-none" />
           </div>
+        </div>
+      </div>
+
+      {/* Scoring Tiers */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[10px] text-[var(--color-text-secondary)] uppercase">Тиры очков</label>
+          <button
+            onClick={() => setScoringTiers([...scoringTiers, { minAmount: '0', maxAmount: '0', winPoints: 3, lossPoints: 1 }])}
+            className="text-[10px] text-[var(--color-primary)]"
+          >
+            + Добавить тир
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-[1fr_1fr_60px_60px_24px] gap-1 text-[9px] text-[var(--color-text-secondary)] uppercase px-1">
+            <span>От (AXM)</span><span>До (AXM)</span><span>Win</span><span>Loss</span><span></span>
+          </div>
+          {scoringTiers.map((tier, i) => (
+            <div key={i} className="grid grid-cols-[1fr_1fr_60px_60px_24px] gap-1">
+              <input type="number" value={tier.minAmount} onChange={(e) => { const u = [...scoringTiers]; u[i] = { ...tier, minAmount: e.target.value }; setScoringTiers(u); }}
+                className="px-2 py-1 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-xs focus:outline-none" />
+              <input type="number" value={tier.maxAmount} onChange={(e) => { const u = [...scoringTiers]; u[i] = { ...tier, maxAmount: e.target.value }; setScoringTiers(u); }}
+                className="px-2 py-1 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-xs focus:outline-none" />
+              <input type="number" value={tier.winPoints} onChange={(e) => { const u = [...scoringTiers]; u[i] = { ...tier, winPoints: Number(e.target.value) }; setScoringTiers(u); }}
+                className="px-2 py-1 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-xs focus:outline-none" min="0" />
+              <input type="number" value={tier.lossPoints} onChange={(e) => { const u = [...scoringTiers]; u[i] = { ...tier, lossPoints: Number(e.target.value) }; setScoringTiers(u); }}
+                className="px-2 py-1 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-xs focus:outline-none" min="0" />
+              {scoringTiers.length > 1 && (
+                <button onClick={() => setScoringTiers(scoringTiers.filter((_, j) => j !== i))} className="text-red-400 text-sm self-center">×</button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

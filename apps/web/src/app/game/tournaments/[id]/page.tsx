@@ -12,11 +12,12 @@ import { TournamentTeamsTab } from '@/components/features/tournaments/tabs/teams
 import { TournamentLeaderboardTab } from '@/components/features/tournaments/tabs/leaderboard-tab';
 import { TournamentMyTeamTab } from '@/components/features/tournaments/tabs/my-team-tab';
 import { TournamentPaywall } from '@/components/features/tournaments/tournament-paywall';
+import { TournamentResultsTab } from '@/components/features/tournaments/tabs/results-tab';
 import { AxmIcon } from '@/components/ui/axm-icon';
 
-type Tab = 'info' | 'news' | 'teams' | 'leaderboard' | 'myteam';
+type Tab = 'info' | 'news' | 'teams' | 'leaderboard' | 'myteam' | 'results';
 
-const TABS: Array<{ id: Tab; icon: typeof Info; labelKey: string }> = [
+const BASE_TABS: Array<{ id: Tab; icon: typeof Info; labelKey: string }> = [
   { id: 'info', icon: Info, labelKey: 'tournament.info' },
   { id: 'news', icon: Newspaper, labelKey: 'tournament.news' },
   { id: 'teams', icon: Users, labelKey: 'tournament.teams' },
@@ -41,7 +42,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   // Auto-select relevant tab based on status
   useEffect(() => {
     if (!tournament) return;
-    if (tournament.status === 'active' && tournament.hasPaid) {
+    if (['completed', 'calculating', 'archived'].includes(tournament.status)) {
+      setActiveTab('results');
+    } else if (tournament.status === 'active' && tournament.hasPaid) {
       setActiveTab('leaderboard');
     } else if (tournament.status === 'registration' && tournament.hasPaid) {
       setActiveTab('teams');
@@ -71,6 +74,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const title = pickLocalized(locale, tournament.title, tournament.titleEn, tournament.titleRu);
   const hasPaid = tournament.hasPaid;
+
+  // Build dynamic tabs list — add Results tab for completed/calculating tournaments
+  const isFinished = tournament.status === 'completed' || tournament.status === 'calculating' || tournament.status === 'archived';
+  const TABS = isFinished
+    ? [{ id: 'results' as Tab, icon: Trophy, labelKey: 'tournament.results' }, ...BASE_TABS]
+    : BASE_TABS;
 
   // Show paywall if not paid
   if (!hasPaid && tournament.status === 'registration') {
@@ -153,6 +162,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         {activeTab === 'teams' && <TournamentTeamsTab tournament={tournament} />}
         {activeTab === 'leaderboard' && <TournamentLeaderboardTab tournament={tournament} />}
         {activeTab === 'myteam' && <TournamentMyTeamTab tournament={tournament} />}
+        {activeTab === 'results' && <TournamentResultsTab tournament={tournament} />}
       </div>
     </div>
   );

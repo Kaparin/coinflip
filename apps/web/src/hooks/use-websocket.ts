@@ -422,12 +422,18 @@ export function useWebSocket({
               break;
             case 'tournament_score_update':
             case 'tournament_team_update':
+              // Granular invalidation — only the specific tournament
+              scheduleInvalidation('tournaments');
+              break;
             case 'tournament_started':
             case 'tournament_ended':
             case 'tournament_results':
             case 'tournament_canceled':
             case 'tournament_notification':
+              // Full invalidation for lifecycle events
               scheduleInvalidation('tournaments');
+              // Also invalidate event list since tournaments appear there
+              scheduleInvalidation('/api/v1/events/active');
               break;
           }
 
