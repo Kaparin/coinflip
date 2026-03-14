@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Swords, Trophy, Users, Shield, Loader2, CheckCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { usePayEntryFee } from '@/hooks/use-tournaments';
 import { AxmIcon } from '@/components/ui/axm-icon';
@@ -21,8 +22,10 @@ interface Props {
 
 export function TournamentPaywall({ tournament: t }: Props) {
   const { t: tr, locale } = useTranslation();
+  const router = useRouter();
   const payMutation = usePayEntryFee();
   const [error, setError] = useState<string | null>(null);
+  const [paid, setPaid] = useState(false);
 
   const title = pickLocalized(locale, t.title, t.titleEn, t.titleRu);
   const description = pickLocalized(locale, t.description ?? '', t.descriptionEn, t.descriptionRu);
@@ -32,16 +35,30 @@ export function TournamentPaywall({ tournament: t }: Props) {
     setError(null);
     try {
       await payMutation.mutateAsync(t.id);
+      setPaid(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
     }
   };
 
-  if (t.hasPaid) {
+  // Already paid (from server or just now)
+  if (t.hasPaid || paid) {
     return (
-      <div className="rounded-2xl border border-emerald-500/30 bg-[var(--color-surface)] p-6 text-center">
-        <CheckCircle size={48} className="text-emerald-400 mx-auto mb-3" />
-        <p className="text-emerald-400 font-medium">{tr('tournament.alreadyPaid')}</p>
+      <div className="rounded-2xl border border-emerald-500/30 bg-[var(--color-surface)] overflow-hidden animate-fade-up">
+        <div className="bg-gradient-to-br from-emerald-600/20 to-green-600/10 p-8 text-center">
+          <CheckCircle size={56} className="text-emerald-400 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-emerald-400 mb-1">{tr('tournament.alreadyPaid')}</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">{title}</p>
+        </div>
+        <div className="p-5">
+          <button
+            onClick={() => router.refresh()}
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-semibold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+          >
+            <span>Enter Tournament</span>
+            <ArrowRight size={16} />
+          </button>
+        </div>
       </div>
     );
   }

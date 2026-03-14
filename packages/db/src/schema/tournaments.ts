@@ -103,8 +103,8 @@ export const tournamentParticipants = pgTable(
     tournamentId: uuid('tournament_id')
       .notNull()
       .references(() => tournaments.id, { onDelete: 'cascade' }),
+    /** null = paid entry fee but not yet in a team */
     teamId: uuid('team_id')
-      .notNull()
       .references(() => tournamentTeams.id, { onDelete: 'cascade' }),
     userId: uuid('user_id')
       .notNull()
@@ -178,6 +178,38 @@ export const tournamentPointLogs = pgTable(
     index('tournament_point_logs_tournament_idx').on(table.tournamentId),
     index('tournament_point_logs_participant_idx').on(table.participantId),
     index('tournament_point_logs_bet_idx').on(table.betId),
+  ],
+);
+
+// ---- Tournament Invites (captain → player) ----
+
+export const tournamentInvites = pgTable(
+  'tournament_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tournamentId: uuid('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => tournamentTeams.id, { onDelete: 'cascade' }),
+    /** The user being invited */
+    targetUserId: uuid('target_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** The captain who sent the invite */
+    invitedByUserId: uuid('invited_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** pending | accepted | rejected */
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('tournament_invites_uniq').on(table.teamId, table.targetUserId),
+    index('tournament_invites_target_idx').on(table.targetUserId, table.status),
+    index('tournament_invites_team_idx').on(table.teamId),
   ],
 );
 

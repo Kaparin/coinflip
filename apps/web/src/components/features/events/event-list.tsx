@@ -8,7 +8,7 @@ import { Trophy, Swords } from 'lucide-react';
 import { useActiveTournaments, useCompletedTournaments } from '@/hooks/use-tournaments';
 import { TournamentCard } from '@/components/features/tournaments/tournament-card';
 
-export function EventList() {
+export function EventList({ filter = 'all' }: { filter?: 'all' | 'tournaments' | 'events' }) {
   const { t } = useTranslation();
   const { data: activeData, isLoading: activeLoading } = useGetActiveEvents({
     query: { staleTime: 60_000, refetchInterval: 120_000 },
@@ -37,9 +37,11 @@ export function EventList() {
   const liveTournaments = (activeTournaments ?? []).filter(t => t.status === 'active');
   const registrationTournaments = (activeTournaments ?? []).filter(t => t.status === 'registration');
 
-  const hasAny = liveEvents.length > 0 || upcomingEvents.length > 0 || completedEvents.length > 0
-    || liveTournaments.length > 0 || registrationTournaments.length > 0
-    || (completedTournaments ?? []).length > 0;
+  const showTournaments = filter === 'all' || filter === 'tournaments';
+  const showEvents = filter === 'all' || filter === 'events';
+
+  const hasAny = (showEvents && (liveEvents.length > 0 || upcomingEvents.length > 0 || completedEvents.length > 0))
+    || (showTournaments && (liveTournaments.length > 0 || registrationTournaments.length > 0 || (completedTournaments ?? []).length > 0));
 
   if (isLoading) {
     return (
@@ -63,7 +65,7 @@ export function EventList() {
   return (
     <div className="space-y-6">
       {/* Active tournaments */}
-      {liveTournaments.length > 0 && (
+      {showTournaments && liveTournaments.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
             <Swords size={12} />
@@ -78,7 +80,7 @@ export function EventList() {
       )}
 
       {/* Registration tournaments */}
-      {registrationTournaments.length > 0 && (
+      {showTournaments && registrationTournaments.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
             <Swords size={12} />
@@ -93,7 +95,7 @@ export function EventList() {
       )}
 
       {/* Active (live) events */}
-      {liveEvents.length > 0 && (
+      {showEvents && liveEvents.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
             {t('events.activeEvents')}
@@ -107,7 +109,7 @@ export function EventList() {
       )}
 
       {/* Upcoming events */}
-      {upcomingEvents.length > 0 && (
+      {showEvents && upcomingEvents.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
             {t('events.upcomingEvents')}
@@ -121,7 +123,7 @@ export function EventList() {
       )}
 
       {/* Completed tournaments */}
-      {(completedTournaments ?? []).length > 0 && (
+      {showTournaments && (completedTournaments ?? []).length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
             <Swords size={12} />
@@ -136,7 +138,7 @@ export function EventList() {
       )}
 
       {/* Recent results (events) */}
-      {completedEvents.length > 0 && (
+      {showEvents && completedEvents.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
             {t('events.recentResults')}

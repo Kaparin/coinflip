@@ -31,5 +31,6 @@ export {
   tournamentParticipants,
   tournamentJoinRequests,
   tournamentPointLogs,
+  tournamentInvites,
   tournamentNotifications,
 } from './tournaments';

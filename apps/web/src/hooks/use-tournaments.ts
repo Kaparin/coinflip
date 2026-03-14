@@ -395,3 +395,93 @@ export function useSearchUsers(query: string) {
     staleTime: 10_000,
   });
 }
+
+// ---- Point history ----
+
+export interface PointLogEntry {
+  id: string;
+  betId: string;
+  pointsEarned: number;
+  reason: string;
+  betAmount: string;
+  createdAt: string;
+}
+
+export function usePointHistory(tournamentId: string) {
+  return useQuery({
+    queryKey: [...tournamentKeys.detail(tournamentId), 'points'],
+    queryFn: () => apiFetch<PointLogEntry[]>(`/api/v1/tournaments/${tournamentId}/my-points`),
+    staleTime: 15_000,
+    enabled: !!tournamentId,
+  });
+}
+
+// ---- Captain transfer ----
+
+export function useTransferCaptain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, newCaptainUserId }: { tournamentId: string; newCaptainUserId: string }) =>
+      apiFetch<unknown>(`/api/v1/tournaments/${tournamentId}/transfer-captain`, {
+        method: 'POST',
+        body: JSON.stringify({ newCaptainUserId }),
+      }),
+    onSuccess: (_, { tournamentId }) => {
+      qc.invalidateQueries({ queryKey: tournamentKeys.teams(tournamentId) });
+      qc.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) });
+    },
+  });
+}
+
+// ---- Invite system ----
+
+export interface TournamentInvite {
+  id: string;
+  tournamentId: string;
+  teamId: string;
+  teamName: string;
+  teamAvatarUrl: string | null;
+  invitedByAddress: string;
+  invitedByNickname: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function useInvitePlayer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, targetUserId }: { tournamentId: string; targetUserId: string }) =>
+      apiFetch<{ invited: boolean }>(`/api/v1/tournaments/${tournamentId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      }),
+    onSuccess: (_, { tournamentId }) => {
+      qc.invalidateQueries({ queryKey: tournamentKeys.teams(tournamentId) });
+    },
+  });
+}
+
+export function useMyInvites(tournamentId: string) {
+  return useQuery({
+    queryKey: [...tournamentKeys.detail(tournamentId), 'invites'],
+    queryFn: () => apiFetch<TournamentInvite[]>(`/api/v1/tournaments/${tournamentId}/my-invites`),
+    staleTime: 10_000,
+    enabled: !!tournamentId,
+  });
+}
+
+export function useResolveInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, inviteId, accept }: { tournamentId: string; inviteId: string; accept: boolean }) =>
+      apiFetch<unknown>(`/api/v1/tournaments/${tournamentId}/invites/${inviteId}`, {
+        method: 'POST',
+        body: JSON.stringify({ accept }),
+      }),
+    onSuccess: (_, { tournamentId }) => {
+      qc.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) });
+      qc.invalidateQueries({ queryKey: tournamentKeys.teams(tournamentId) });
+      qc.invalidateQueries({ queryKey: ['vault'] });
+    },
+  });
+}
