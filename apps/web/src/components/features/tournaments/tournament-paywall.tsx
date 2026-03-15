@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
+import { Swords, Trophy, Users, Shield, CheckCircle, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { usePayEntryFee, tournamentKeys } from '@/hooks/use-tournaments';
 import { AxmIcon } from '@/components/ui/axm-icon';
@@ -58,14 +59,11 @@ export function TournamentPaywall({ tournament: t }: { tournament: Tournament })
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          <button
-            onClick={handleEnter}
-            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-all active:scale-[0.97]"
-          >
+          <Button variant="success" size="lg" onClick={handleEnter} className="w-full">
             <Swords size={16} />
             <span>{tr('tournament.joinTeam')}</span>
             <ArrowRight size={16} />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -132,22 +130,12 @@ export function TournamentPaywall({ tournament: t }: { tournament: Tournament })
             {tr('tournament.registrationClosed')}
           </div>
         ) : (
-        <button
-          onClick={handlePay}
-          disabled={payMutation.isPending}
-          className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all active:scale-[0.97] disabled:opacity-50"
-        >
-          {payMutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <>
-              <span>{tr('tournament.payToEnter')}</span>
-              <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/20 text-[11px]">
-                {feeDisplay} <AxmIcon size={11} />
-              </span>
-            </>
-          )}
-        </button>
+          <Button variant="primary" size="lg" onClick={handlePay} loading={payMutation.isPending} className="w-full">
+            <span>{tr('tournament.payToEnter')}</span>
+            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/20 text-[11px]">
+              {feeDisplay} <AxmIcon size={11} />
+            </span>
+          </Button>
         )}
 
         <p className="text-[9px] text-center text-[var(--color-text-secondary)]">

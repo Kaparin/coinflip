@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import {
-  Crown, UserMinus, Copy, Check, Trash2, LogOut, UserPlus, Search, Loader2, Shield,
+  Crown, UserMinus, Copy, Check, Trash2, LogOut, UserPlus, Search, Shield, Loader2,
   ArrowRightLeft, History, Flame, Send, Mail,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
+import { Button } from '@/components/ui/button';
 import {
   useTournamentTeam,
   useDeleteTeam,
@@ -63,20 +64,12 @@ export function TournamentMyTeamTab({ tournament }: { tournament: Tournament }) 
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => resolveInvite.mutate({ tournamentId: tournament.id, inviteId: inv.id, accept: true })}
-                      disabled={resolveInvite.isPending}
-                      className="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
-                    >
+                    <Button variant="success" size="xs" onClick={() => resolveInvite.mutate({ tournamentId: tournament.id, inviteId: inv.id, accept: true })} loading={resolveInvite.isPending}>
                       {t('tournament.approve')}
-                    </button>
-                    <button
-                      onClick={() => resolveInvite.mutate({ tournamentId: tournament.id, inviteId: inv.id, accept: false })}
-                      disabled={resolveInvite.isPending}
-                      className="text-[10px] px-3 py-1.5 rounded-lg bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
-                    >
+                    </Button>
+                    <Button variant="ghost" size="xs" onClick={() => resolveInvite.mutate({ tournamentId: tournament.id, inviteId: inv.id, accept: false })} disabled={resolveInvite.isPending}>
                       {t('tournament.reject')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -345,20 +338,12 @@ function MyTeamContent({ tournament, teamId }: { tournament: Tournament; teamId:
                   <span className="text-xs text-[var(--color-text)] truncate">{req.nickname || shortAddr(req.address)}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => resolveRequest.mutate({ tournamentId: tournament.id, requestId: req.id, approve: true })}
-                    disabled={resolveRequest.isPending}
-                    className="text-[10px] px-2.5 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
-                  >
+                  <Button variant="success" size="xs" onClick={() => resolveRequest.mutate({ tournamentId: tournament.id, requestId: req.id, approve: true })} loading={resolveRequest.isPending}>
                     {t('tournament.approve')}
-                  </button>
-                  <button
-                    onClick={() => resolveRequest.mutate({ tournamentId: tournament.id, requestId: req.id, approve: false })}
-                    disabled={resolveRequest.isPending}
-                    className="text-[10px] px-2.5 py-1 rounded-md bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="xs" onClick={() => resolveRequest.mutate({ tournamentId: tournament.id, requestId: req.id, approve: false })} disabled={resolveRequest.isPending}>
                     {t('tournament.reject')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -410,44 +395,30 @@ function MyTeamContent({ tournament, teamId }: { tournament: Tournament; teamId:
           {amCaptain ? (
             confirmDelete ? (
               <div className="flex gap-2">
-                <button
-                  onClick={() => { deleteTeam.mutate(tournament.id); setConfirmDelete(false); }}
-                  disabled={deleteTeam.isPending}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors"
-                >
-                  {deleteTeam.isPending ? <Loader2 size={14} className="animate-spin mx-auto" /> : t('tournament.deleteTeamConfirm')}
-                </button>
-                <button onClick={() => setConfirmDelete(false)} className="px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text-secondary)]">Cancel</button>
+                <Button variant="danger" size="sm" onClick={() => { deleteTeam.mutate(tournament.id); setConfirmDelete(false); }} loading={deleteTeam.isPending} className="flex-1">
+                  {t('tournament.deleteTeamConfirm')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>{t('events.winModal.dismiss')}</Button>
               </div>
             ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors"
-              >
+              <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} className="w-full">
                 <Trash2 size={14} />
                 {t('tournament.deleteTeam')}
-              </button>
+              </Button>
             )
           ) : (
             confirmLeave ? (
               <div className="flex gap-2">
-                <button
-                  onClick={() => { leaveTeam.mutate(tournament.id); setConfirmLeave(false); }}
-                  disabled={leaveTeam.isPending}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors"
-                >
-                  {leaveTeam.isPending ? <Loader2 size={14} className="animate-spin mx-auto" /> : t('tournament.leaveConfirm')}
-                </button>
-                <button onClick={() => setConfirmLeave(false)} className="px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text-secondary)]">Cancel</button>
+                <Button variant="warning" size="sm" onClick={() => { leaveTeam.mutate(tournament.id); setConfirmLeave(false); }} loading={leaveTeam.isPending} className="flex-1">
+                  {t('tournament.leaveConfirm')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmLeave(false)}>{t('events.winModal.dismiss')}</Button>
               </div>
             ) : (
-              <button
-                onClick={() => setConfirmLeave(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium border border-amber-500/20 text-amber-400 hover:bg-amber-500/10 transition-colors"
-              >
+              <Button variant="warning" size="sm" onClick={() => setConfirmLeave(true)} className="w-full">
                 <LogOut size={14} />
                 {t('tournament.leaveTeam')}
-              </button>
+              </Button>
             )
           )}
         </div>

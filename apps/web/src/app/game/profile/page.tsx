@@ -1284,7 +1284,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto max-w-3xl mx-auto px-4 lg:px-6 py-4 space-y-3 pb-24 md:pb-6">
+    <div className="h-full overflow-y-auto max-w-3xl mx-auto px-4 lg:px-6 py-4 space-y-3 pb-24 md:pb-6" data-section="profile">
       {/* Profile card */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex items-center gap-4">

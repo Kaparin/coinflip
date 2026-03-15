@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Users, Plus, Lock, Unlock, Crown, UserPlus, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/i18n';
 import {
   useTournamentTeams,
@@ -40,20 +41,14 @@ export function TournamentTeamsTab({ tournament: t }: { tournament: Tournament }
       {/* Actions */}
       {isRegistration && hasPaid && !hasTeam && (
         <div className="flex gap-1.5">
-          <button
-            onClick={() => { setShowCreateForm(true); setShowJoinByCode(false); }}
-            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] sm:text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors active:scale-95"
-          >
+          <Button variant="primary" size="sm" onClick={() => { setShowCreateForm(true); setShowJoinByCode(false); }} className="flex-1">
             <Plus size={13} />
             {tr('tournament.createTeam')}
-          </button>
-          <button
-            onClick={() => { setShowJoinByCode(true); setShowCreateForm(false); }}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] sm:text-xs font-medium bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] transition-colors active:scale-95"
-          >
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => { setShowJoinByCode(true); setShowCreateForm(false); }}>
             <UserPlus size={13} />
             {tr('tournament.joinByCode')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -210,16 +205,10 @@ function CreateTeamForm({ tournamentId, onClose }: { tournamentId: string; onClo
       {error && <p className="text-[10px] text-red-400">{error}</p>}
 
       <div className="flex gap-1.5">
-        <button onClick={onClose} className="flex-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--color-bg)] text-[var(--color-text-secondary)] active:scale-95">
-          {t('events.winModal.dismiss')}
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!name.trim() || createTeam.isPending}
-          className="flex-1 py-2 rounded-lg text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 active:scale-95"
-        >
-          {createTeam.isPending ? <Loader2 size={13} className="animate-spin mx-auto" /> : t('tournament.createTeam')}
-        </button>
+        <Button variant="ghost" size="sm" onClick={onClose} className="flex-1">{t('events.winModal.dismiss')}</Button>
+        <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!name.trim()} loading={createTeam.isPending} className="flex-1">
+          {t('tournament.createTeam')}
+        </Button>
       </div>
     </div>
   );
@@ -253,16 +242,10 @@ function JoinByCodeForm({ tournamentId, onClose }: { tournamentId: string; onClo
       />
       {error && <p className="text-[10px] text-red-400">{error}</p>}
       <div className="flex gap-1.5">
-        <button onClick={onClose} className="flex-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--color-bg)] text-[var(--color-text-secondary)] active:scale-95">
-          {t('events.winModal.dismiss')}
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!code.trim() || joinByCode.isPending}
-          className="flex-1 py-2 rounded-lg text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 active:scale-95"
-        >
-          {joinByCode.isPending ? <Loader2 size={13} className="animate-spin mx-auto" /> : t('tournament.joinTeam')}
-        </button>
+        <Button variant="ghost" size="sm" onClick={onClose} className="flex-1">{t('events.winModal.dismiss')}</Button>
+        <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!code.trim()} loading={joinByCode.isPending} className="flex-1">
+          {t('tournament.joinTeam')}
+        </Button>
       </div>
     </div>
   );

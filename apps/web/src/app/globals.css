@@ -354,6 +354,70 @@ body {
 .btn-glow-warning { --btn-glow-color: rgba(251, 191, 36, 0.35); }
 .btn-glow-primary { --btn-glow-color: rgba(99, 102, 241, 0.35); }
 
+/* ---- Global button animations (applies to ALL <button> elements) ---- */
+button:not(:disabled) {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), filter 0.2s ease, box-shadow 0.25s ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.96);
+  transition: transform 0.06s ease;
+}
+
+/* ============================
+   SECTION COLOR THEMES
+   Each section gets its own accent for buttons
+   ============================ */
+
+/* Tournaments — Indigo/Purple */
+[data-section="tournament"] .btn-section,
+[data-section="tournament"] button[data-action="primary"] {
+  --btn-glow-color: rgba(99, 102, 241, 0.4);
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+}
+[data-section="tournament"] .btn-section:hover:not(:disabled) {
+  background: linear-gradient(135deg, #818cf8, #8b5cf6);
+}
+
+/* Game / Play — Emerald/Cyan */
+[data-section="game"] .btn-section,
+[data-section="game"] button[data-action="primary"] {
+  --btn-glow-color: rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+[data-section="game"] .btn-section:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399, #22d3ee);
+}
+
+/* Events — Amber/Orange */
+[data-section="events"] .btn-section,
+[data-section="events"] button[data-action="primary"] {
+  --btn-glow-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+[data-section="events"] .btn-section:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fbbf24, #fb923c);
+}
+
+/* Shop — Rose/Pink */
+[data-section="shop"] .btn-section,
+[data-section="shop"] button[data-action="primary"] {
+  --btn-glow-color: rgba(244, 63, 94, 0.4);
+  background: linear-gradient(135deg, #f43f5e, #ec4899);
+}
+[data-section="shop"] .btn-section:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fb7185, #f472b6);
+}
+
+/* Profile — Sky/Blue */
+[data-section="profile"] .btn-section,
+[data-section="profile"] button[data-action="primary"] {
+  --btn-glow-color: rgba(56, 189, 248, 0.4);
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+}
+[data-section="profile"] .btn-section:hover:not(:disabled) {
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+}
+
 /* Legacy compat */
 .btn-press:active {
   transform: scale(0.97);

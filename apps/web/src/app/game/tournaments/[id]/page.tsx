@@ -88,11 +88,11 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const regStillOpen = tournament.status === 'registration' && new Date(tournament.registrationEndsAt) > new Date();
   if (!hasPaid && regStillOpen) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto" data-section="tournament">
         <div className="mx-auto max-w-lg px-3 sm:px-4 py-4 sm:py-6 pb-24 md:pb-6">
           <button
             onClick={() => router.push('/game/events')}
-            className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors active:opacity-70"
+            className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors"
           >
             <ArrowLeft size={14} />
             {t('events.backToEvents')}
@@ -104,12 +104,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto" data-section="tournament">
       <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3 sm:py-6 pb-24 md:pb-6">
         {/* Back */}
         <button
           onClick={() => router.push('/game/events')}
-          className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors active:opacity-70"
+          className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors"
         >
           <ArrowLeft size={14} />
           {t('events.backToEvents')}

@@ -252,7 +252,7 @@ export default function GamePage() {
       <GameLeftPanel />
 
       {/* ═══ Center Game Area ═══ */}
-      <div className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 py-4 pb-24 md:pb-6 space-y-4">
+      <div className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 py-4 pb-24 md:pb-6 space-y-4" data-section="game">
         <TgWelcomeBanner />
 
         {/* Banners — hidden on xl+ (shown in left panel instead) */}
