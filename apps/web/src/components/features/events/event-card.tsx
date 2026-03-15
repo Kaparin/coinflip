@@ -117,7 +117,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
     return (
       <Link
         href={`/game/events/${event.id}`}
-        className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-2xl border card-hover ${
+        className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-2xl border interactive-card ${
           isLive
             ? 'border-indigo-500/30 shimmer-overlay'
             : 'border-[var(--color-border)]'
@@ -254,7 +254,7 @@ export function EventCard({ event, size = 'medium', index = 0 }: EventCardProps)
   return (
     <Link
       href={`/game/events/${event.id}`}
-      className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-2xl border card-hover ${
+      className={`animate-fade-up ${staggerClass} relative block overflow-hidden rounded-2xl border interactive-card ${
         isLive
           ? 'border-amber-500/30 shimmer-overlay'
           : 'border-[var(--color-border)]'

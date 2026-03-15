@@ -74,7 +74,7 @@ export function CreateBetFab({ onBetSubmitted }: CreateBetFabProps) {
         <span className="absolute inset-0 rounded-full bg-[var(--color-primary)] animate-[fabPing_2s_ease-out_infinite] opacity-0" />
 
         {/* Main button */}
-        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-primary)] to-indigo-600 shadow-xl shadow-[var(--color-primary)]/30 transition-all duration-200 group-active:scale-90">
+        <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-primary)] to-indigo-600 shadow-xl shadow-[var(--color-primary)]/30 transition-all duration-200 group-active:scale-90 group-hover:shadow-[0_0_24px_rgba(99,102,241,0.4)]">
           <Plus size={26} strokeWidth={2.5} className="text-white transition-transform duration-200 group-hover:rotate-90" />
         </span>
       </button>
