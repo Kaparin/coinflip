@@ -102,8 +102,8 @@ export default function NewsPage() {
         </div>
       ) : (
         <div className="space-y-2.5">
-          {allItems.map((item) => (
-            <FeedCard key={item.id} item={item} />
+          {allItems.map((item, i) => (
+            <FeedCard key={item.id} item={item} index={i} />
           ))}
 
           {hasNextPage && (
@@ -129,7 +129,7 @@ export default function NewsPage() {
   );
 }
 
-function FeedCard({ item }: { item: NewsFeedItem }) {
+function FeedCard({ item, index = 0 }: { item: NewsFeedItem; index?: number }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -139,7 +139,7 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
   // Big win and jackpot use a special compact layout
   if (item.type === 'big_win' || item.type === 'jackpot_win') {
     return (
-      <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden ${typeConfig.borderClass}`}>
+      <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden animate-fade-up ${typeConfig.borderClass}`} style={{ animationDelay: `${index * 40}ms` }}>
         <div className="flex items-center gap-3 px-3.5 py-3">
           {/* Icon */}
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
@@ -176,7 +176,7 @@ function FeedCard({ item }: { item: NewsFeedItem }) {
 
   // News post and announcement — full card
   return (
-    <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden ${typeConfig.borderClass}`}>
+    <div className={`rounded-xl border bg-[var(--color-surface)] overflow-hidden animate-fade-up ${typeConfig.borderClass}`} style={{ animationDelay: `${index * 40}ms` }}>
       {/* Type badge row */}
       <div className={`flex items-center gap-1.5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider ${typeConfig.headerClass}`}>
         {typeConfig.icon}

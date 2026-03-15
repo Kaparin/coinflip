@@ -275,11 +275,12 @@ export default function GamePage() {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px active:scale-[0.98] ${
+                className={`tab-indicator shrink-0 px-4 py-2 text-sm font-medium transition-colors -mb-px ${
                   activeTab === tab.id
-                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                    : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                    ? 'text-[var(--color-primary)]'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
                 }`}
+                data-active={activeTab === tab.id}
               >
                 {tab.label}
               </button>

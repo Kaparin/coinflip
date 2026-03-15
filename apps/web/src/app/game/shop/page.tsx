@@ -12,6 +12,8 @@ import { API_URL, TREASURY_ADDRESS } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useTranslation } from '@/lib/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Confetti } from '@/components/ui/confetti';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { CHEST_TIERS, mergeTierConfig, type ChestTier } from './chest-config';
 import Image from 'next/image';
@@ -176,7 +178,7 @@ export default function ShopPage() {
                     setSelectedTier(tier);
                   }}
                   disabled={!isEnabled || isBuying}
-                  className="relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 pb-2 transition-all hover:border-[var(--color-primary)]/40 hover:shadow-lg active:scale-[0.96] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer touch-manipulation"
+                  className="interactive-card relative flex flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 pb-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none cursor-pointer touch-manipulation"
                 >
                   {tier.label === 'popular' && (
                     <div className="absolute -top-2 -left-2 z-10 rounded-lg bg-[var(--color-primary)] px-2 py-0.5 text-[9px] font-extrabold text-white shadow-md">
@@ -283,31 +285,27 @@ export default function ShopPage() {
 
             {/* Action buttons */}
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="lg"
                 onClick={() => handleBuy(selectedTier)}
-                disabled={isBuying}
-                className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] disabled:opacity-70 active:scale-[0.98]"
+                loading={isBuying}
+                className="flex-[2]"
               >
-                {isBuying ? (
-                  <span className="animate-pulse">{t('shop.buying')}</span>
-                ) : (
-                  t('shop.confirmBuy', { price: `${selectedTier.axmPrice} AXM` })
-                )}
-              </button>
+                {t('shop.confirmBuy', { price: `${selectedTier.axmPrice} AXM` })}
+              </Button>
               {!isBuying && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedTier(null)}
-                  className="flex-1 rounded-xl border border-[var(--color-border)] px-3 py-3.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-                >
+                <Button variant="secondary" size="lg" onClick={() => setSelectedTier(null)} className="flex-1">
                   {t('common.cancel')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
         )}
       </Modal>
+
+      {/* Confetti on purchase success */}
+      <Confetti active={!!successResult} count={40} />
 
       {/* Success Modal — animated chest + congratulations */}
       <Modal
@@ -344,13 +342,9 @@ export default function ShopPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSuccessResult(null)}
-              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-3.5 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-hover)] active:scale-[0.98]"
-            >
+            <Button variant="primary" size="lg" onClick={() => setSuccessResult(null)} className="w-full">
               {t('shop.continue')}
-            </button>
+            </Button>
           </div>
         )}
       </Modal>

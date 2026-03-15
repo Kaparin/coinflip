@@ -247,6 +247,104 @@ body {
 .stagger-9 { animation-delay: 0.36s; animation-fill-mode: both; }
 .stagger-10 { animation-delay: 0.40s; animation-fill-mode: both; }
 
+/* ============================
+   TAB TRANSITION ANIMATIONS
+   ============================ */
+@keyframes tabSlideLeft {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tabSlideRight {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-tab-enter {
+  animation: fadeUp 0.2s ease-out;
+}
+.tab-slide-left {
+  animation: tabSlideLeft 0.2s ease-out;
+}
+.tab-slide-right {
+  animation: tabSlideRight 0.2s ease-out;
+}
+
+/* ============================
+   SMOOTH COLLAPSIBLE SECTIONS
+   ============================ */
+.collapsible-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease-out;
+}
+.collapsible-content[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.collapsible-content > div {
+  overflow: hidden;
+}
+
+/* ============================
+   CONFETTI CELEBRATION
+   ============================ */
+@keyframes confetti-pop {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  50%  { opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(0); opacity: 0; }
+}
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti-pop 1s cubic-bezier(0.2, 0, 0, 1) forwards;
+  pointer-events: none;
+}
+
+/* ============================
+   EMPTY STATE ILLUSTRATIONS
+   ============================ */
+.empty-state-icon {
+  opacity: 0.15;
+  filter: grayscale(0.5);
+}
+
+/* ============================
+   INTERACTIVE CARDS
+   ============================ */
+.interactive-card {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.interactive-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.interactive-card:active {
+  transform: translateY(0) scale(0.98);
+  transition: transform 0.06s ease;
+}
+
+/* ============================
+   TAB INDICATOR
+   ============================ */
+.tab-indicator {
+  position: relative;
+}
+.tab-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px 1px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+.tab-indicator[data-active="true"]::after {
+  transform: scaleX(1);
+}
+
 /* Toast progress bar */
 .toast-progress {
   animation: progress-shrink 5s linear forwards;
