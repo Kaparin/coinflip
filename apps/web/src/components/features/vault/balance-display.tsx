@@ -9,6 +9,7 @@ import { useWalletContext } from '@/contexts/wallet-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { GameTokenIcon, AxmIcon } from '@/components/ui';
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { fromMicroLaunch, toMicroLaunch } from '@coinflip/shared/constants';
 import { signDepositTxBytes, signDeposit } from '@/lib/wallet-signer';
 import { useWalletBalance, useNativeBalance, walletBalanceQueryKey } from '@/hooks/use-wallet-balance';
@@ -779,18 +780,24 @@ export function BalanceDisplay() {
             <div className="grid gap-2 grid-cols-3 mb-3">
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.available')}</p>
-                <p className="text-lg font-bold tabular-nums text-[var(--color-success)]">{fmtNum(availableHuman)}</p>
+                <p className="text-lg font-bold text-[var(--color-success)]">
+                  <AnimatedNumber value={availableHuman} formatter={fmtNum} />
+                </p>
                 {axmRates?.axm_usd && availableHuman > 0 && (
                   <p className="text-[10px] text-[var(--color-text-secondary)] tabular-nums mt-0.5">≈${(availableHuman * axmRates.axm_usd).toFixed(2)}</p>
                 )}
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.inBets')}</p>
-                <p className="text-lg font-bold tabular-nums text-[var(--color-warning)]">{fmtNum(lockedHuman)}</p>
+                <p className="text-lg font-bold text-[var(--color-warning)]">
+                  <AnimatedNumber value={lockedHuman} formatter={fmtNum} />
+                </p>
               </div>
               <div className="rounded-xl bg-[var(--color-bg)] p-3">
                 <p className="text-[10px] uppercase text-[var(--color-text-secondary)] mb-0.5">{t('balance.total')}</p>
-                <p className="text-lg font-bold tabular-nums">{fmtNum(totalHuman)}</p>
+                <p className="text-lg font-bold">
+                  <AnimatedNumber value={totalHuman} formatter={fmtNum} />
+                </p>
               </div>
             </div>
 
@@ -821,25 +828,23 @@ export function BalanceDisplay() {
 
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeposit(true)} disabled={isOperationInFlight}
-                className="flex-1 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-xs font-bold transition-colors hover:bg-[var(--color-primary-hover)] disabled:opacity-40 btn-press">
+                className="btn-ripple btn-glow btn-glow-primary flex-1 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-40">
                 {isOperationInFlight ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={14} className="animate-spin" />
-                    {t('common.processing')}
+                    <span className="btn-dot" /><span className="btn-dot" /><span className="btn-dot" />
                   </span>
                 ) : t('balance.depositBtn')}
               </button>
               <button type="button" onClick={() => setShowWithdraw(true)} disabled={availableMicro <= 0n || isOperationInFlight}
-                className="flex-1 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-40 btn-press">
+                className="btn-ripple btn-glow flex-1 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40">
                 {isOperationInFlight ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={14} className="animate-spin" />
-                    {t('common.processing')}
+                    <span className="btn-dot" /><span className="btn-dot" /><span className="btn-dot" />
                   </span>
                 ) : t('common.withdraw')}
               </button>
               <button type="button" onClick={() => setShowTransfer(true)}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] btn-press"
+                className="btn-ripple btn-glow flex items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-bold text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
                 title={t('social.transfer')}>
                 <ArrowRightLeft size={14} />
               </button>

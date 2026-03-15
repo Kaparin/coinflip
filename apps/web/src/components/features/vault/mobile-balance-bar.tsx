@@ -8,6 +8,7 @@ import { useWalletBalance } from '@/hooks/use-wallet-balance';
 import { fromMicroLaunch } from '@coinflip/shared/constants';
 import { isWsConnected, POLL_INTERVAL_WS_CONNECTED, POLL_INTERVAL_WS_DISCONNECTED } from '@/hooks/use-websocket';
 import { GameTokenIcon } from '@/components/ui';
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { BalanceDisplay } from './balance-display';
 import { StakingRevenueBanner } from '@/components/features/staking/staking-revenue-banner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -84,8 +85,8 @@ export function MobileBalanceBar() {
           <div className="flex items-center gap-3">
             {/* Main balance — vault available */}
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <span className="text-lg font-bold tabular-nums text-[var(--color-success)]">
-                {fmtNum(availableHuman)}
+              <span className="text-lg font-bold text-[var(--color-success)]">
+                <AnimatedNumber value={availableHuman} formatter={fmtNum} />
               </span>
               <GameTokenIcon size={16} />
               {rates?.axm_usd && availableHuman > 0 && (
