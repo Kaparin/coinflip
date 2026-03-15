@@ -252,7 +252,109 @@ body {
   animation: progress-shrink 5s linear forwards;
 }
 
-/* Button active press effect */
+/* ============================
+   BUTTON ANIMATION SYSTEM
+   ============================ */
+
+/* --- Ripple effect --- */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.35) 0%, transparent 60%);
+  transform: scale(0);
+  opacity: 0;
+  transition: none;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.btn-ripple:active::after {
+  transform: scale(2.5);
+  opacity: 1;
+  transition: transform 0.5s cubic-bezier(0.2, 0, 0, 1), opacity 0.4s ease;
+}
+
+/* --- Magnetic glow on hover --- */
+.btn-glow {
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease, filter 0.3s ease;
+}
+.btn-glow:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px var(--btn-glow-color, rgba(99, 102, 241, 0.35)),
+              0 4px 16px rgba(0, 0, 0, 0.2);
+  filter: brightness(1.08);
+}
+.btn-glow:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 0 8px var(--btn-glow-color, rgba(99, 102, 241, 0.2));
+  filter: brightness(0.95);
+  transition: transform 0.08s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+/* --- Gradient shimmer sweep (loading state) --- */
+@keyframes btn-shimmer-sweep {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+.btn-loading-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-loading-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: btn-shimmer-sweep 1.5s infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* --- Pulsing dots loader --- */
+@keyframes btn-dot-pulse {
+  0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+  40%           { transform: scale(1); opacity: 1; }
+}
+.btn-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: btn-dot-pulse 1.2s ease-in-out infinite;
+}
+.btn-dot:nth-child(2) { animation-delay: 0.15s; }
+.btn-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* --- Spring press (more bouncy than scale) --- */
+@keyframes btn-spring-press {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.93); }
+  60%  { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+.btn-spring:active:not(:disabled) {
+  animation: btn-spring-press 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- Success check animation --- */
+@keyframes btn-success-check {
+  0%   { stroke-dashoffset: 20; opacity: 0; }
+  50%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* --- Danger variant glow --- */
+.btn-glow-danger { --btn-glow-color: rgba(239, 68, 68, 0.35); }
+.btn-glow-success { --btn-glow-color: rgba(34, 197, 94, 0.35); }
+.btn-glow-warning { --btn-glow-color: rgba(251, 191, 36, 0.35); }
+.btn-glow-primary { --btn-glow-color: rgba(99, 102, 241, 0.35); }
+
+/* Legacy compat */
 .btn-press:active {
   transform: scale(0.97);
   transition: transform 0.05s ease;
