@@ -89,7 +89,7 @@ export default function JackpotPage() {
             </div>
           </div>
           {closest && (
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <div className="rounded-xl border border-rose-500/30 bg-[var(--color-surface)] p-3 relative overflow-hidden animate-pulse-glow" style={{ '--btn-glow-color': 'rgba(244, 63, 94, 0.3)' } as React.CSSProperties}>
               <div className="text-[9px] uppercase tracking-wider text-[var(--color-text-secondary)] font-bold mb-1">
                 {t('jackpot.summaryClosest')}
               </div>
@@ -132,8 +132,10 @@ export default function JackpotPage() {
             </div>
           ) : pools && pools.length > 0 ? (
             <div className="space-y-3">
-              {pools.map((pool) => (
-                <JackpotTierCard key={pool.id} pool={pool} />
+              {pools.map((pool, i) => (
+                <div key={pool.id} className="animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+                  <JackpotTierCard pool={pool} />
+                </div>
               ))}
             </div>
           ) : (

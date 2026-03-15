@@ -25,6 +25,7 @@ import {
   Info, BookOpen, Users, Languages, Wallet, Copy, AlertTriangle, LogOut, Trash2, Trophy,
   Loader2, BarChart3, Gift, Target, MessageCircle, History,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
 import { HistoryList } from '@/components/features/history/history-list';
 import { TelegramLoginButton, type TelegramUser, consumeTelegramAuthData } from '@/components/features/profile/telegram-login-button';
@@ -72,11 +73,13 @@ function CollapsibleSection({
         <span className={`flex-1 font-bold ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
         <ChevronIcon open={open} />
       </button>
-      {open && (
-        <div className={`${contentPad} border-t border-[var(--color-border)]/50`}>
-          {children}
+      <div className="collapsible-content" data-open={open}>
+        <div>
+          <div className={`${contentPad} border-t border-[var(--color-border)]/50`}>
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -1219,10 +1222,10 @@ export default function ProfilePage() {
           <p className="text-sm text-[var(--color-text-secondary)] mb-6">
             {t('profile.connectToView')}
           </p>
-          <button type="button" onClick={wallet.connect}
-            className="rounded-xl bg-[var(--color-primary)] px-6 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)]">
+          <Button variant="primary" size="lg" onClick={wallet.connect}>
+            <User size={16} />
             {t('common.connectWallet')}
-          </button>
+          </Button>
         </div>
 
         {/* About is visible even without wallet */}
@@ -1467,23 +1470,21 @@ export default function ProfilePage() {
         icon={<AlertTriangle size={20} className="text-[var(--color-danger)]" />}
       >
         <div className="pt-4 space-y-2">
-          <button type="button" onClick={wallet.disconnect}
-            className="w-full flex items-center gap-3 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-medium text-[var(--color-warning)] transition-colors hover:bg-[var(--color-surface-hover)]">
-            <LogOut size={20} />
+          <Button variant="warning" size="md" onClick={wallet.disconnect} className="w-full justify-start">
+            <LogOut size={18} />
             <div className="text-left">
               <span className="block">{t('header.disconnect')}</span>
-              <span className="block text-[10px] text-[var(--color-text-secondary)] font-normal">{t('profile.disconnectDesc')}</span>
+              <span className="block text-[10px] font-normal opacity-70">{t('profile.disconnectDesc')}</span>
             </div>
-          </button>
+          </Button>
 
-          <button type="button" onClick={() => wallet.forgetWallet(wallet.address ?? undefined)}
-            className="w-full flex items-center gap-3 rounded-xl border border-[var(--color-danger)]/30 px-4 py-3 text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/5">
-            <Trash2 size={20} />
+          <Button variant="danger" size="md" onClick={() => wallet.forgetWallet(wallet.address ?? undefined)} className="w-full justify-start">
+            <Trash2 size={18} />
             <div className="text-left">
               <span className="block">{t('profile.forgetWalletBtn')}</span>
-              <span className="block text-[10px] text-[var(--color-text-secondary)] font-normal">{t('profile.forgetWalletDesc')}</span>
+              <span className="block text-[10px] font-normal opacity-70">{t('profile.forgetWalletDesc')}</span>
             </div>
-          </button>
+          </Button>
         </div>
       </CollapsibleSection>
 

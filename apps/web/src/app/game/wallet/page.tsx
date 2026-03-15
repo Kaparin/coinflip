@@ -1,8 +1,9 @@
 'use client';
 
-import { Wallet, ArrowLeft, ChevronDown } from 'lucide-react';
+import { Wallet, ArrowLeft, ChevronDown, Check, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useWalletContext } from '@/contexts/wallet-context';
+import { Button } from '@/components/ui/button';
 import { BalanceDisplay } from '@/components/features/vault/balance-display';
 import { StakingWidget } from '@/components/features/staking/staking-widget';
 import { UserAvatar } from '@/components/ui';
@@ -44,10 +45,10 @@ export default function WalletPage() {
             <p className="text-sm text-[var(--color-text-secondary)] mb-6">
               {t('walletPage.connectDesc')}
             </p>
-            <button type="button" onClick={connect}
-              className="rounded-xl bg-[var(--color-primary)] px-6 py-3 text-sm font-bold transition-colors hover:bg-[var(--color-primary-hover)]">
+            <Button variant="primary" size="lg" onClick={connect}>
+              <Wallet size={16} />
               {t('common.connectWallet')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -76,13 +77,13 @@ export default function WalletPage() {
               <span className="text-xs font-medium text-[var(--color-text-secondary)]">{t('profile.connected')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={handleCopy}
-                className="rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[10px] font-medium hover:bg-[var(--color-surface-hover)] transition-colors">
-                {copied ? t('common.copied') : t('common.copy')}
-              </button>
-              <a href={`${EXPLORER_URL}/address/${address}`} target="_blank" rel="noopener noreferrer"
-                className="rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[10px] font-medium hover:bg-[var(--color-surface-hover)] transition-colors">
-                {t('common.explorer')}
+              <Button variant="ghost" size="xs" onClick={handleCopy} success={copied}>
+                {copied ? <><Check size={12} /> {t('common.copied')}</> : <><Copy size={12} /> {t('common.copy')}</>}
+              </Button>
+              <a href={`${EXPLORER_URL}/address/${address}`} target="_blank" rel="noopener noreferrer">
+                <Button variant="ghost" size="xs" className="pointer-events-none">
+                  <ExternalLink size={12} /> {t('common.explorer')}
+                </Button>
               </a>
             </div>
           </div>
@@ -112,7 +113,7 @@ export default function WalletPage() {
               />
             </button>
 
-            {showSavedWallets && (
+            <div className="collapsible-content" data-open={showSavedWallets}>
               <div className="px-4 pb-4 space-y-2">
                 {savedWallets.map((w) => {
                   const addr = typeof w.address === 'string' ? w.address : '';
@@ -142,16 +143,12 @@ export default function WalletPage() {
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => openConnectModal()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] px-4 py-3 text-sm font-medium text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5"
-                >
-                  <Wallet size={18} />
+                <Button variant="ghost" size="md" onClick={() => openConnectModal()} className="w-full border-dashed border border-[var(--color-border)] text-[var(--color-primary)]">
+                  <Wallet size={16} />
                   {t('auth.addNewWallet')}
-                </button>
+                </Button>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
