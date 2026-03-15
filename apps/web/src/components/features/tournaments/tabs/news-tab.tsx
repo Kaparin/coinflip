@@ -7,12 +7,11 @@ import { useTournamentNotifications } from '@/hooks/use-tournaments';
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(ms / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -31,25 +30,23 @@ export function TournamentNewsTab({ tournamentId }: { tournamentId: string }) {
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 rounded-xl bg-[var(--color-surface)] animate-pulse" />
-        ))}
+      <div className="space-y-1.5">
+        {[1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-[var(--color-surface)] animate-pulse" />)}
       </div>
     );
   }
 
   if (!notifications?.length) {
     return (
-      <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-8 text-center animate-fade-up">
-        <Bell size={32} className="text-[var(--color-text-secondary)] mx-auto mb-2 opacity-40" />
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('tournament.news')}</p>
+      <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-6 text-center animate-fade-up">
+        <Bell size={24} className="text-[var(--color-text-secondary)] mx-auto mb-1.5 opacity-30" />
+        <p className="text-xs text-[var(--color-text-secondary)]">{t('tournament.news')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2 animate-fade-up">
+    <div className="space-y-1.5 animate-fade-up">
       {notifications.map((n, i) => {
         const title = pickLocalized(locale, n.title, n.titleEn, n.titleRu);
         const message = pickLocalized(locale, n.message ?? '', n.messageEn, n.messageRu);
@@ -58,21 +55,19 @@ export function TournamentNewsTab({ tournamentId }: { tournamentId: string }) {
         return (
           <div
             key={n.id}
-            className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 animate-fade-up`}
-            style={{ animationDelay: `${i * 40}ms` }}
+            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 sm:p-3 animate-fade-up"
+            style={{ animationDelay: `${i * 30}ms` }}
           >
-            <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
-                <Megaphone size={14} />
+            <div className="flex items-start gap-2">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
+                <Megaphone size={12} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-medium text-[var(--color-text)] truncate">{title}</h4>
-                  <span className="text-[10px] text-[var(--color-text-secondary)] whitespace-nowrap">{timeAgo(n.createdAt)}</span>
+                  <h4 className="text-[11px] sm:text-xs font-medium text-[var(--color-text)] truncate">{title}</h4>
+                  <span className="text-[9px] text-[var(--color-text-secondary)] shrink-0">{timeAgo(n.createdAt)}</span>
                 </div>
-                {message && (
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{message}</p>
-                )}
+                {message && <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5 line-clamp-2">{message}</p>}
               </div>
             </div>
           </div>

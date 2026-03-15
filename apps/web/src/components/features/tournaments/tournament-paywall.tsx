@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight, PartyPopper } from 'lucide-react';
+import { Swords, Trophy, Users, Shield, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
 import { useTranslation, pickLocalized } from '@/lib/i18n';
 import { usePayEntryFee, tournamentKeys } from '@/hooks/use-tournaments';
 import { AxmIcon } from '@/components/ui/axm-icon';
@@ -16,11 +16,7 @@ function formatAXM(micro: string): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
-interface Props {
-  tournament: Tournament;
-}
-
-export function TournamentPaywall({ tournament: t }: Props) {
+export function TournamentPaywall({ tournament: t }: { tournament: Tournament }) {
   const { t: tr, locale } = useTranslation();
   const qc = useQueryClient();
   const payMutation = usePayEntryFee();
@@ -41,142 +37,120 @@ export function TournamentPaywall({ tournament: t }: Props) {
     }
   };
 
-  const handleEnterTournament = () => {
-    // Force refetch tournament data so hasPaid updates, then page will re-render without paywall
+  const handleEnter = () => {
     qc.invalidateQueries({ queryKey: tournamentKeys.detail(t.id) });
     qc.invalidateQueries({ queryKey: tournamentKeys.teams(t.id) });
   };
 
-  // ==================== SUCCESS STATE ====================
+  // ===== SUCCESS =====
   if (t.hasPaid || paid) {
     return (
-      <div className="rounded-2xl border border-emerald-500/30 bg-[var(--color-surface)] overflow-hidden animate-fade-up">
-        {/* Success hero */}
-        <div className="relative bg-gradient-to-br from-emerald-600/20 via-green-500/10 to-teal-600/15 px-6 py-10 text-center overflow-hidden">
-          {/* Animated circles */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-emerald-500/20 animate-ping" style={{ animationDuration: '2s' }} />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border border-emerald-500/10 animate-ping" style={{ animationDuration: '3s' }} />
+      <div className="rounded-xl sm:rounded-2xl border border-emerald-500/25 bg-[var(--color-surface)] overflow-hidden animate-fade-up">
+        <div className="relative bg-gradient-to-br from-emerald-600/15 to-green-500/10 px-4 py-8 sm:py-10 text-center overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border border-emerald-500/15 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full border border-emerald-500/10 animate-ping" style={{ animationDuration: '3s' }} />
           </div>
-
           <div className="relative">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-              <CheckCircle size={44} className="text-emerald-400" />
-            </div>
-            <h2 className="text-xl font-bold text-emerald-400 mb-2">{tr('tournament.alreadyPaid')}</h2>
-            <p className="text-sm text-[var(--color-text-secondary)] max-w-xs mx-auto">{title}</p>
-
-            {/* Fee paid badge */}
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-xs font-medium text-emerald-400">
-              <PartyPopper size={12} />
-              {feeDisplay} AXM
-            </div>
+            <CheckCircle size={44} className="text-emerald-400 mx-auto mb-3" />
+            <h2 className="text-base sm:text-lg font-bold text-emerald-400">{tr('tournament.alreadyPaid')}</h2>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">{title}</p>
           </div>
         </div>
-
-        {/* CTA */}
-        <div className="p-5 space-y-3">
+        <div className="p-3 sm:p-4">
           <button
-            onClick={handleEnterTournament}
-            className="w-full flex items-center justify-center gap-2 py-4 px-4 rounded-xl font-bold text-base bg-emerald-600 hover:bg-emerald-500 text-white transition-all active:scale-[0.98]"
+            onClick={handleEnter}
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-all active:scale-[0.97]"
           >
-            <Swords size={18} />
-            <span>Enter Tournament</span>
-            <ArrowRight size={18} />
+            <Swords size={16} />
+            <span>{tr('tournament.joinTeam')}</span>
+            <ArrowRight size={16} />
           </button>
-
-          <p className="text-[10px] text-center text-[var(--color-text-secondary)]">
-            {tr('tournament.scoring')} • {tr('tournament.teams')} • {tr('tournament.leaderboard')}
-          </p>
         </div>
       </div>
     );
   }
 
-  // ==================== PAYMENT STATE ====================
+  // ===== PAYMENT =====
   return (
-    <div className="rounded-2xl border border-indigo-500/30 bg-[var(--color-surface)] overflow-hidden">
+    <div className="rounded-xl sm:rounded-2xl border border-indigo-500/25 bg-[var(--color-surface)] overflow-hidden">
       {/* Hero */}
-      <div className="relative bg-gradient-to-br from-indigo-600/20 to-purple-600/20 px-6 py-8 text-center">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-5" />
-        <Swords size={48} className="text-indigo-400 mx-auto mb-3 relative" />
-        <h2 className="text-xl font-bold text-[var(--color-text)] relative">{title}</h2>
+      <div className="relative bg-gradient-to-br from-indigo-600/15 to-purple-600/15 px-4 sm:px-6 py-6 sm:py-8 text-center">
+        <Swords size={40} className="text-indigo-400 mx-auto mb-2 relative" />
+        <h2 className="text-base sm:text-xl font-bold text-[var(--color-text)] relative">{title}</h2>
         {description && (
-          <p className="text-sm text-[var(--color-text-secondary)] mt-2 max-w-sm mx-auto relative">{description}</p>
+          <p className="text-[11px] sm:text-sm text-[var(--color-text-secondary)] mt-1.5 max-w-sm mx-auto relative">{description}</p>
         )}
       </div>
 
-      <div className="p-5 space-y-4">
-        {/* Progress */}
+      <div className="p-3 sm:p-5 space-y-3">
         <TournamentProgressBar tournament={t} />
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-3 rounded-xl bg-[var(--color-bg)]">
-            <Trophy size={18} className="text-[var(--color-warning)] mx-auto mb-1" />
-            <div className="text-sm font-bold text-[var(--color-text)]">{formatAXM(t.totalPrizePool)}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.prizePool')}</div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="p-2 sm:p-3 rounded-xl bg-[var(--color-bg)] text-center">
+            <Trophy size={16} className="text-[var(--color-warning)] mx-auto mb-0.5" />
+            <div className="text-xs sm:text-sm font-bold text-[var(--color-text)]">{formatAXM(t.totalPrizePool)}</div>
+            <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.prizePool')}</div>
           </div>
-          <div className="p-3 rounded-xl bg-[var(--color-bg)]">
-            <Users size={18} className="text-indigo-400 mx-auto mb-1" />
-            <div className="text-sm font-bold text-[var(--color-text)]">{t.participantCount}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.participants')}</div>
+          <div className="p-2 sm:p-3 rounded-xl bg-[var(--color-bg)] text-center">
+            <Users size={16} className="text-indigo-400 mx-auto mb-0.5" />
+            <div className="text-xs sm:text-sm font-bold text-[var(--color-text)]">{t.participantCount}</div>
+            <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.participants')}</div>
           </div>
-          <div className="p-3 rounded-xl bg-[var(--color-bg)]">
-            <Shield size={18} className="text-purple-400 mx-auto mb-1" />
-            <div className="text-sm font-bold text-[var(--color-text)]">{t.teamCount}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.teams')}</div>
+          <div className="p-2 sm:p-3 rounded-xl bg-[var(--color-bg)] text-center">
+            <Shield size={16} className="text-purple-400 mx-auto mb-0.5" />
+            <div className="text-xs sm:text-sm font-bold text-[var(--color-text)]">{t.teamCount}</div>
+            <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)]">{tr('tournament.teams')}</div>
           </div>
         </div>
 
         {/* Scoring preview */}
-        <div className="rounded-xl bg-[var(--color-bg)] p-3">
-          <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">{tr('tournament.scoring')}</h4>
-          <div className="space-y-1">
+        <div className="rounded-xl bg-[var(--color-bg)] p-2.5 sm:p-3">
+          <h4 className="text-[10px] sm:text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">{tr('tournament.scoring')}</h4>
+          <div className="space-y-0.5">
             {t.scoringConfig.tiers.slice(0, 3).map((tier, i) => (
-              <div key={i} className="flex justify-between text-xs">
-                <span className="text-[var(--color-text-secondary)]">
-                  {formatAXM(tier.minAmount)}–{formatAXM(tier.maxAmount)} AXM
-                </span>
-                <span className="text-[var(--color-text)]">
+              <div key={i} className="flex justify-between text-[10px] sm:text-xs py-0.5">
+                <span className="text-[var(--color-text-secondary)]">{formatAXM(tier.minAmount)}–{formatAXM(tier.maxAmount)}</span>
+                <span>
                   <span className="text-emerald-400">+{tier.winPoints}</span>
-                  {' / '}
+                  <span className="text-[var(--color-text-secondary)]"> / </span>
                   <span className="text-red-400">+{tier.lossPoints}</span>
                 </span>
               </div>
             ))}
-            {t.scoringConfig.tiers.length > 3 && (
-              <div className="text-[10px] text-[var(--color-text-secondary)]">
-                +{t.scoringConfig.tiers.length - 3} more tiers...
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Error */}
         {error && (
-          <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">{error}</div>
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 text-xs text-red-400">{error}</div>
         )}
 
-        {/* CTA button */}
+        {/* Hide pay button if registration has ended */}
+        {new Date(t.registrationEndsAt) < new Date() ? (
+          <div className="w-full py-3 rounded-xl text-center text-sm font-medium bg-[var(--color-bg)] text-[var(--color-text-secondary)]">
+            {tr('tournament.registrationClosed')}
+          </div>
+        ) : (
         <button
           onClick={handlePay}
           disabled={payMutation.isPending}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all active:scale-[0.97] disabled:opacity-50"
         >
           {payMutation.isPending ? (
-            <Loader2 size={18} className="animate-spin" />
+            <Loader2 size={16} className="animate-spin" />
           ) : (
             <>
               <span>{tr('tournament.payToEnter')}</span>
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">
-                {feeDisplay} <AxmIcon size={12} />
+              <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/20 text-[11px]">
+                {feeDisplay} <AxmIcon size={11} />
               </span>
             </>
           )}
         </button>
+        )}
 
-        <p className="text-[10px] text-center text-[var(--color-text-secondary)]">
+        <p className="text-[9px] text-center text-[var(--color-text-secondary)]">
           {tr('tournament.entryFee')}: {feeDisplay} AXM • {tr('tournament.commission')}: {t.commissionBps / 100}%
         </p>
       </div>

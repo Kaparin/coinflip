@@ -13,6 +13,7 @@ import { TournamentLeaderboardTab } from '@/components/features/tournaments/tabs
 import { TournamentMyTeamTab } from '@/components/features/tournaments/tabs/my-team-tab';
 import { TournamentPaywall } from '@/components/features/tournaments/tournament-paywall';
 import { TournamentResultsTab } from '@/components/features/tournaments/tabs/results-tab';
+import { AxmIcon } from '@/components/ui/axm-icon';
 
 type Tab = 'info' | 'news' | 'teams' | 'leaderboard' | 'myteam' | 'results';
 
@@ -38,7 +39,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const { data: tournament, isLoading } = useTournament(id);
   const [activeTab, setActiveTab] = useState<Tab>('info');
 
-  // Auto-select relevant tab based on status
   useEffect(() => {
     if (!tournament) return;
     if (['completed', 'calculating', 'archived'].includes(tournament.status)) {
@@ -52,11 +52,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) {
     return (
-      <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
-        <div className="mx-auto max-w-2xl space-y-4">
-          <div className="h-8 w-48 rounded-lg bg-[var(--color-surface)] animate-pulse" />
-          <div className="h-40 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
-          <div className="h-64 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-3 pb-24 md:pb-6">
+          <div className="h-6 w-32 rounded-lg bg-[var(--color-surface)] animate-pulse" />
+          <div className="h-36 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
+          <div className="h-10 rounded-xl bg-[var(--color-surface)] animate-pulse" />
+          <div className="h-48 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
         </div>
       </div>
     );
@@ -64,34 +65,36 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   if (!tournament) {
     return (
-      <div className="h-full overflow-y-auto px-4 py-12 text-center">
-        <p className="text-[var(--color-text-secondary)]">{t('events.notFound')}</p>
-        <button onClick={() => router.push('/game/events')} className="mt-4 text-indigo-400 text-sm">
-          {t('events.backToEvents')}
-        </button>
+      <div className="h-full overflow-y-auto flex items-center justify-center px-4">
+        <div className="text-center">
+          <Swords size={40} className="text-[var(--color-text-secondary)] mx-auto mb-3 opacity-30" />
+          <p className="text-sm text-[var(--color-text-secondary)]">{t('events.notFound')}</p>
+          <button onClick={() => router.push('/game/events')} className="mt-3 text-indigo-400 text-sm">
+            {t('events.backToEvents')}
+          </button>
+        </div>
       </div>
     );
   }
 
   const title = pickLocalized(locale, tournament.title, tournament.titleEn, tournament.titleRu);
   const hasPaid = tournament.hasPaid;
-
-  // Build dynamic tabs list
-  const isFinished = tournament.status === 'completed' || tournament.status === 'calculating' || tournament.status === 'archived';
+  const isFinished = ['completed', 'calculating', 'archived'].includes(tournament.status);
   const TABS = isFinished
     ? [{ id: 'results' as Tab, icon: Trophy, labelKey: 'tournament.results' }, ...BASE_TABS]
     : BASE_TABS;
 
-  // Show paywall if not paid during registration
-  if (!hasPaid && tournament.status === 'registration') {
+  // Show paywall only if registration is still open (by time) and user hasn't paid
+  const regStillOpen = tournament.status === 'registration' && new Date(tournament.registrationEndsAt) > new Date();
+  if (!hasPaid && regStillOpen) {
     return (
-      <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
-        <div className="mx-auto max-w-2xl">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-lg px-3 sm:px-4 py-4 sm:py-6 pb-24 md:pb-6">
           <button
             onClick={() => router.push('/game/events')}
-            className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-4 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors active:opacity-70"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={14} />
             {t('events.backToEvents')}
           </button>
           <TournamentPaywall tournament={tournament} />
@@ -101,68 +104,70 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-6 pb-24 md:pb-6">
-      <div className="mx-auto max-w-2xl space-y-4">
-        {/* Back button */}
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3 sm:py-6 pb-24 md:pb-6">
+        {/* Back */}
         <button
           onClick={() => router.push('/game/events')}
-          className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+          className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-3 transition-colors active:opacity-70"
         >
-          <ArrowLeft size={16} />
-          {t('tournament.backToTournament')}
+          <ArrowLeft size={14} />
+          {t('events.backToEvents')}
         </button>
 
-        {/* Header */}
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Swords size={18} className="text-indigo-400" />
-            <h1 className="text-lg font-bold text-[var(--color-text)]">{title}</h1>
+        {/* Header card */}
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:p-4 space-y-2.5 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+              <Swords size={16} className="text-indigo-400" />
+            </div>
+            <h1 className="text-base sm:text-lg font-bold text-[var(--color-text)] truncate">{title}</h1>
           </div>
 
           <TournamentProgressBar tournament={tournament} />
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-              <div className="text-lg font-bold text-[var(--color-warning)] flex items-center justify-center gap-1">
-                <Trophy size={16} />
+          {/* Stats — 3 cols on mobile, compact */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+            <div className="text-center py-2 px-1 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-sm sm:text-lg font-bold text-[var(--color-warning)] flex items-center justify-center gap-0.5">
+                <Trophy size={12} className="sm:w-4 sm:h-4" />
                 {formatAXM(tournament.totalPrizePool)}
               </div>
-              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.prizePool')}</div>
+              <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.prizePool')}</div>
             </div>
-            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-              <div className="text-lg font-bold text-[var(--color-text)]">{tournament.participantCount}</div>
-              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.participants')}</div>
+            <div className="text-center py-2 px-1 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-sm sm:text-lg font-bold text-[var(--color-text)]">{tournament.participantCount}</div>
+              <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.participants')}</div>
             </div>
-            <div className="text-center p-2 rounded-xl bg-[var(--color-bg)]">
-              <div className="text-lg font-bold text-[var(--color-text)]">{tournament.teamCount}</div>
-              <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.teams')}</div>
+            <div className="text-center py-2 px-1 rounded-xl bg-[var(--color-bg)]">
+              <div className="text-sm sm:text-lg font-bold text-[var(--color-text)]">{tournament.teamCount}</div>
+              <div className="text-[8px] sm:text-[10px] text-[var(--color-text-secondary)] mt-0.5">{t('tournament.teams')}</div>
             </div>
           </div>
         </div>
 
-        {/* Tab bar — sticky */}
-        <div className="sticky top-0 z-10 bg-[var(--color-bg)]/95 backdrop-blur-sm py-1 -mx-1 px-1">
-          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+        {/* Tab bar — scrollable horizontally on mobile */}
+        <div className="sticky top-0 z-10 bg-[var(--color-bg)]/95 backdrop-blur-sm -mx-3 sm:-mx-4 px-3 sm:px-4 py-1.5 mb-3">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none -mx-1 px-1">
             {TABS.map(({ id: tabId, icon: Icon, labelKey }) => (
               <button
                 key={tabId}
                 onClick={() => setActiveTab(tabId)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-medium whitespace-nowrap transition-all active:scale-95 ${
                   activeTab === tabId
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                    : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] border border-transparent'
+                    : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] border border-transparent'
                 }`}
               >
-                <Icon size={14} />
-                {t(labelKey)}
+                <Icon size={12} className="sm:w-3.5 sm:h-3.5" />
+                <span className="hidden xs:inline sm:inline">{t(labelKey)}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Tab content */}
-        <div className="min-h-[300px] pb-4">
+        <div className="min-h-[200px]">
           {activeTab === 'info' && <TournamentInfoTab tournament={tournament} />}
           {activeTab === 'news' && <TournamentNewsTab tournamentId={tournament.id} />}
           {activeTab === 'teams' && <TournamentTeamsTab tournament={tournament} />}
