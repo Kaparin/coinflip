@@ -408,7 +408,8 @@ export const BetCard = memo(function BetCard({
             <button
               type="button"
               onClick={() => { feedback('tap'); onAccept(id); }}
-              className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-3 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] active:scale-[0.97] min-h-[44px]"
+              className="btn-ripple btn-glow btn-glow-success btn-spring w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-3 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 hover:from-emerald-400 hover:to-emerald-500 min-h-[44px] animate-pulse-glow"
+              style={{ '--btn-glow-color': 'rgba(34, 197, 94, 0.3)' } as React.CSSProperties}
             >
               {t('bets.acceptFlip')}
             </button>
@@ -421,7 +422,7 @@ export const BetCard = memo(function BetCard({
             type="button"
             onClick={() => onCancel(id)}
             disabled={isAnyPending}
-            className="w-full rounded-xl border border-zinc-700/50 px-3 py-2.5 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-zinc-800/50 hover:text-red-400 hover:border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            className="btn-ripple btn-glow btn-glow-danger w-full rounded-xl border border-zinc-700/50 px-3 py-2.5 text-[11px] font-medium text-[var(--color-text-secondary)] hover:text-red-400 hover:border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
           >
             {isCanceling ? (
               <span className="flex items-center justify-center gap-2">

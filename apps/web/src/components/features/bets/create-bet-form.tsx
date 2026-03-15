@@ -310,15 +310,15 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
           {/* Actions */}
           <div className="flex gap-2.5">
             <button type="button" onClick={handleCancel}
-              className="flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors active:scale-[0.98]">
+              className="btn-ripple flex-1 rounded-xl border border-[var(--color-border)] px-4 py-3 text-sm font-bold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]">
               {t('common.back')}
             </button>
             <button type="button" disabled={createBet.isPending || submitted} onClick={handleSubmit}
-              className="flex-[2] rounded-xl bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 px-4 py-3 text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50 active:scale-[0.98]">
+              className="btn-ripple btn-glow btn-glow-primary flex-[2] rounded-xl bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
               {createBet.isPending || submitted ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  {t('common.submitting')}
+                  <span className="btn-dot" /><span className="btn-dot" /><span className="btn-dot" />
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-1.5">
@@ -341,7 +341,7 @@ export function CreateBetForm({ onBetSubmitted, controlledAmount, onAmountChange
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {BET_PRESETS.map((preset, idx) => (
                 <button key={preset} type="button" onClick={() => setAmount(String(preset))}
-                  className={`rounded-lg px-2 py-2.5 text-xs font-bold transition-all active:scale-[0.96] ${
+                  className={`btn-ripple rounded-lg px-2 py-2.5 text-xs font-bold ${
                     amount === String(preset)
                       ? 'bg-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20'
                       : 'bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-primary)]/30'
