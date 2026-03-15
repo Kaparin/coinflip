@@ -6,7 +6,7 @@ import { formatLaunch } from '@coinflip/shared/constants';
 import { useWalletContext } from '@/contexts/wallet-context';
 import { GameTokenIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame, getVipNameClass } from '@/components/ui/vip-avatar-frame';
-import { Trophy } from 'lucide-react';
+import { Trophy, Flame } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslation } from '@/lib/i18n';
 import Link from 'next/link';
@@ -21,15 +21,21 @@ function shortAddr(addr: string): string {
 }
 
 function RankBadge({ rank }: { rank: number }) {
-  const { t } = useTranslation();
-  if (rank === 1)
-    return <span className="text-base" title={t('leaderboard.firstPlace')}>&#129351;</span>;
-  if (rank === 2)
-    return <span className="text-base" title={t('leaderboard.secondPlace')}>&#129352;</span>;
-  if (rank === 3)
-    return <span className="text-base" title={t('leaderboard.thirdPlace')}>&#129353;</span>;
+  if (rank <= 3) {
+    const medals = ['🥇', '🥈', '🥉'];
+    const glowColors = [
+      'shadow-[0_0_12px_rgba(251,191,36,0.3)]',
+      'shadow-[0_0_10px_rgba(156,163,175,0.25)]',
+      'shadow-[0_0_10px_rgba(251,146,60,0.25)]',
+    ];
+    return (
+      <span className={`text-lg w-7 h-7 flex items-center justify-center rounded-full ${glowColors[rank - 1]}`}>
+        {medals[rank - 1]}
+      </span>
+    );
+  }
   return (
-    <span className="text-xs font-bold text-[var(--color-text-secondary)] w-5 text-center">
+    <span className="text-xs font-bold text-[var(--color-text-secondary)] w-7 h-7 flex items-center justify-center">
       {rank}
     </span>
   );
@@ -39,21 +45,27 @@ function LeaderboardRow({
   entry,
   isCurrentUser,
   sortBy,
+  index,
 }: {
   entry: LeaderboardEntry;
   isCurrentUser: boolean;
   sortBy: SortBy;
+  index: number;
 }) {
   const { t } = useTranslation();
+  const isTop3 = entry.rank <= 3;
 
   return (
     <Link
       href={`/game/profile/${entry.address}`}
-      className={`grid grid-cols-[2rem_1fr_auto] items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+      className={`interactive-card grid grid-cols-[2rem_1fr_auto] items-center gap-3 px-3 py-2.5 rounded-xl animate-fade-up ${
         isCurrentUser
           ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20'
-          : 'hover:bg-[var(--color-surface)]/50'
+          : isTop3
+            ? 'bg-[var(--color-warning)]/[0.03] border border-[var(--color-warning)]/10'
+            : 'border border-transparent hover:bg-[var(--color-surface)]'
       }`}
+      style={{ animationDelay: `${index * 30}ms` }}
     >
       {/* Rank */}
       <div className="flex justify-center">
@@ -66,7 +78,7 @@ function LeaderboardRow({
           <UserAvatar address={entry.address} size={28} />
         </VipAvatarFrame>
         <div className="min-w-0">
-          <p className={`text-sm font-medium truncate group-hover:text-[var(--color-primary)] transition-colors ${getVipNameClass(entry.vip_tier, entry.vip_customization?.nameGradient)}`}>
+          <p className={`text-sm font-medium truncate ${getVipNameClass(entry.vip_tier, entry.vip_customization?.nameGradient)}`}>
             {entry.nickname || shortAddr(entry.address)}
             {isCurrentUser && (
               <span className="ml-1.5 text-[10px] text-[var(--color-primary)] font-bold">{t('leaderboard.you')}</span>
@@ -79,10 +91,13 @@ function LeaderboardRow({
       </div>
 
       {/* Main stat */}
-      <div className="text-right">
+      <div className="text-right shrink-0">
         {sortBy === 'wins' && (
           <>
-            <p className="text-sm font-bold tabular-nums">{entry.wins} W</p>
+            <p className="text-sm font-bold tabular-nums flex items-center justify-end gap-1">
+              {entry.wins}
+              <span className="text-emerald-400 text-xs">W</span>
+            </p>
             <p className="text-[10px] text-[var(--color-text-secondary)]">
               {(entry.win_rate * 100).toFixed(0)}%
             </p>
@@ -91,13 +106,14 @@ function LeaderboardRow({
         {sortBy === 'wagered' && (
           <div className="flex items-center gap-1.5 justify-end">
             <span className="text-sm font-bold tabular-nums">{formatLaunch(entry.total_wagered)}</span>
-            <GameTokenIcon size={18} />
+            <GameTokenIcon size={16} />
           </div>
         )}
         {sortBy === 'win_rate' && (
           <>
-            <p className="text-sm font-bold tabular-nums">
+            <p className="text-sm font-bold tabular-nums flex items-center justify-end gap-1">
               {(entry.win_rate * 100).toFixed(1)}%
+              {entry.win_rate >= 0.6 && <Flame size={12} className="text-orange-400" />}
             </p>
             <p className="text-[10px] text-[var(--color-text-secondary)]">
               {t('leaderboard.winsGames', { wins: entry.wins, total: entry.total_bets })}
@@ -129,11 +145,12 @@ export function Leaderboard() {
           <button
             key={id}
             onClick={() => setSortBy(id)}
-            className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.98] ${
+            className={`tab-indicator shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg ${
               sortBy === id
                 ? 'bg-[var(--color-primary)] text-white'
                 : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/30'
             }`}
+            data-active={sortBy === id}
           >
             {sortLabels[id]}
           </button>
@@ -144,7 +161,7 @@ export function Leaderboard() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 rounded-lg" />
+            <Skeleton key={i} className="h-14 rounded-xl" />
           ))}
         </div>
       ) : error ? (
@@ -152,7 +169,7 @@ export function Leaderboard() {
           {t('leaderboard.failedToLoad')}
         </p>
       ) : !data?.length ? (
-        <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center">
+        <div className="rounded-2xl border border-dashed border-[var(--color-border)] py-12 text-center animate-fade-up">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] mx-auto mb-3">
             <Trophy size={32} strokeWidth={1.5} />
           </div>
@@ -163,12 +180,13 @@ export function Leaderboard() {
         </div>
       ) : (
         <div className="space-y-1">
-          {data.map((entry) => (
+          {data.map((entry, i) => (
             <LeaderboardRow
               key={entry.address}
               entry={entry}
               isCurrentUser={!!address && entry.address.toLowerCase() === address.toLowerCase()}
               sortBy={sortBy}
+              index={i}
             />
           ))}
         </div>

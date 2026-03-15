@@ -227,10 +227,11 @@ export function StakingWidget() {
                 type="button"
                 onClick={handleClaim}
                 disabled={!canClaim}
-                className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-ripple btn-glow btn-glow-success flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse-glow"
+                style={{ '--btn-glow-color': 'rgba(34, 197, 94, 0.25)' } as React.CSSProperties}
               >
                 {isProcessing ? (
-                  <Loader2 size={12} className="animate-spin" />
+                  <span className="flex gap-0.5"><span className="btn-dot" /><span className="btn-dot" /><span className="btn-dot" /></span>
                 ) : (
                   <Gift size={12} />
                 )}
@@ -264,11 +265,12 @@ export function StakingWidget() {
           <button
             type="button"
             onClick={() => { setActiveTab('stake'); setAmount(''); setLastTx(null); }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
+            className={`tab-indicator flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold ${
               activeTab === 'stake'
-                ? 'text-violet-400 border-violet-400 bg-violet-500/5'
-                : 'text-[var(--color-text-secondary)] border-transparent hover:text-[var(--color-text)]'
+                ? 'text-violet-400 bg-violet-500/5'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
             }`}
+            data-active={activeTab === 'stake'}
           >
             <ArrowDown size={14} />
             {t('staking.stake')}
@@ -276,11 +278,12 @@ export function StakingWidget() {
           <button
             type="button"
             onClick={() => { setActiveTab('unstake'); setAmount(''); setLastTx(null); }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors border-b-2 ${
+            className={`tab-indicator flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold ${
               activeTab === 'unstake'
-                ? 'text-rose-400 border-rose-400 bg-rose-500/5'
-                : 'text-[var(--color-text-secondary)] border-transparent hover:text-[var(--color-text)]'
+                ? 'text-rose-400 bg-rose-500/5'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
             }`}
+            data-active={activeTab === 'unstake'}
           >
             <ArrowUp size={14} />
             {t('staking.unstake')}
@@ -325,16 +328,15 @@ export function StakingWidget() {
             type="button"
             onClick={activeTab === 'stake' ? handleStake : handleUnstake}
             disabled={!canSubmit}
-            className={`w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`btn-ripple btn-glow w-full rounded-xl py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed ${
               activeTab === 'stake'
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white'
-                : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white'
+                ? 'btn-glow-primary bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white'
+                : 'btn-glow-danger bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white'
             }`}
           >
             {isProcessing ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 size={16} className="animate-spin" />
-                {t('staking.signing')}
+              <span className="flex items-center justify-center gap-1">
+                <span className="btn-dot" /><span className="btn-dot" /><span className="btn-dot" />
               </span>
             ) : activeTab === 'stake' ? (
               t('staking.stakeLaunch')
