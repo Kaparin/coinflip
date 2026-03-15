@@ -7,6 +7,7 @@ import { WalletProvider, useWalletContext } from '@/contexts/wallet-context';
 import { TelegramProvider, useTelegramContext } from '@/contexts/telegram-context';
 import { ConnectWalletModal } from '@/components/features/auth/connect-wallet-modal';
 import { I18nProvider } from '@/lib/i18n';
+import { ThemeProvider } from '@/lib/theme';
 import { NotificationProvider } from '@/components/features/notifications/notification-provider';
 import { captureRefCode, registerCapturedRef } from '@/hooks/use-referral';
 import { parseTelegramHashResult, saveTelegramAuthData } from '@/components/features/profile/telegram-login-button';
@@ -104,19 +105,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <I18nProvider>
-      <RefCodeCapture />
-      <QueryClientProvider client={queryClient}>
-        <TelegramProvider>
-          <WalletProvider>
-            <ToastProvider>
-              <NotificationProvider>
-                <WalletModalBridge>{children}</WalletModalBridge>
-              </NotificationProvider>
-            </ToastProvider>
-          </WalletProvider>
-        </TelegramProvider>
-      </QueryClientProvider>
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <RefCodeCapture />
+        <QueryClientProvider client={queryClient}>
+          <TelegramProvider>
+            <WalletProvider>
+              <ToastProvider>
+                <NotificationProvider>
+                  <WalletModalBridge>{children}</WalletModalBridge>
+                </NotificationProvider>
+              </ToastProvider>
+            </WalletProvider>
+          </TelegramProvider>
+        </QueryClientProvider>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }

@@ -160,8 +160,8 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         className={[
-          'w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-[var(--color-border)]',
-          'bg-[var(--color-surface)] shadow-2xl flex flex-col overflow-hidden',
+          'w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl',
+          'glass-strong shadow-2xl flex flex-col overflow-hidden',
           'transition-all duration-200',
           // Fallback max-h for browsers without dvh support
           Object.keys(viewportStyles).length > 0 ? 'max-h-[90%]' : 'max-h-[85vh] sm:max-h-[85vh]',

@@ -51,7 +51,7 @@ export function BottomNav() {
   const activeCount = activeEventsCount + activeTournamentsCount;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur-lg pb-safe md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 glass-strong pb-safe md:hidden">
       <div className="flex items-center justify-around px-2">
         {NAV_ITEMS.map((item) => {
           const isActive = item.href === '/game'

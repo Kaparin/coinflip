@@ -26,6 +26,8 @@ import {
   Loader2, BarChart3, Gift, Target, MessageCircle, History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTheme } from '@/lib/theme';
+import { Sun, Moon } from 'lucide-react';
 import { GameStatsSection } from '@/components/features/profile/game-stats-section';
 import { HistoryList } from '@/components/features/history/history-list';
 import { TelegramLoginButton, type TelegramUser, consumeTelegramAuthData } from '@/components/features/profile/telegram-login-button';
@@ -1194,6 +1196,7 @@ function TelegramSection({ telegram }: { telegram: { id: number; username: strin
 export default function ProfilePage() {
   const wallet = useWalletContext();
   const { t, locale, setLocale } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [copied, setCopied] = useState(false);
   const { data: profileData, isLoading: profileLoading } = useGetCurrentUser({ query: { enabled: !!wallet.address, staleTime: 30_000 } });
   const { data: vipStatus } = useVipStatus(!!wallet.address);
@@ -1429,6 +1432,42 @@ export default function ProfilePage() {
           >
             <span className="text-base">🇷🇺</span>
             {t('profile.langRu')}
+          </button>
+        </div>
+      </div>
+
+      {/* Theme switcher */}
+      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
+            {theme === 'dark' ? <Moon size={16} className="text-[var(--color-primary)]" /> : <Sun size={16} className="text-[var(--color-primary)]" />}
+          </div>
+          <p className="text-sm font-bold">{t('settings.theme') || 'Theme'}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => toggleTheme()}
+            className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+              theme === 'dark'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            <Moon size={16} />
+            Dark
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleTheme()}
+            className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+              theme === 'light'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            <Sun size={16} />
+            Light
           </button>
         </div>
       </div>

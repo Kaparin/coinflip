@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus } from 'lucide-react';
+import { Puzzle, User, ShieldCheck, ChevronDown, Copy, ExternalLink, Languages, LogOut, Trash2, X, Menu, Wallet, Trophy, Crown, Newspaper, Store, Volume2, VolumeX, Vibrate, SmartphoneNfc, UserPlus, Sun, Moon } from 'lucide-react';
 import { GameTokenIcon, LaunchTokenIcon, AxmIcon, UserAvatar } from '@/components/ui';
 import { VipAvatarFrame } from '@/components/ui/vip-avatar-frame';
 import { useWalletContext } from '@/contexts/wallet-context';
@@ -24,6 +24,7 @@ import { API_URL } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/auth-headers';
 import { useToast } from '@/components/ui/toast';
 import { getCachedNickname, setCachedNickname } from '@/lib/wallet-nicknames';
+import { useTheme } from '@/lib/theme';
 
 export function Header() {
   const { t, locale, setLocale } = useTranslation();
@@ -67,6 +68,7 @@ export function Header() {
   const [hapticsOn, setHapticsOn] = useState(() => haptics.isEnabled());
   const [refCode, setRefCode] = useState<string | null>(null);
   const { addToast } = useToast();
+  const { theme, toggleTheme } = useTheme();
 
   // Fetch referral code when connected
   useEffect(() => {
@@ -152,7 +154,7 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 glass-strong">
         <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 lg:px-6">
           <Link href="/game" className="flex items-center group">
             <Image
@@ -246,6 +248,16 @@ export function Header() {
                       {isLowAxm && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] animate-pulse" />}
                     </span>
                   </div>
+
+                  {/* Theme toggle */}
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-all hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] active:scale-95"
+                    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  >
+                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  </button>
 
                   <button
                     type="button"
@@ -506,6 +518,16 @@ export function Header() {
                     {fmtBal(availableHuman)} <GameTokenIcon size={18} />
                   </span>
                   <ChevronDown size={10} className={`transition-transform ${balanceOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Theme toggle (mobile) */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-surface)] active:scale-95"
+                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
 
                 {/* VIP button — always visible in header */}

@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
-/* Prevent Chrome Android from auto-inflating text/elements on narrow viewports.
-   Chrome applies "font boosting" which distorts paddings, borders, and icon sizes —
-   the root cause of VIP badges and other elements rendering as large circles on
-   mobile. text-size-adjust:100% is ignored by Chrome in many cases.
-   The max-height trick is the only reliable fix: Chrome's font boosting algorithm
-   skips any element with an explicit max-height constraint.
-   See: https://nicolasbouliane.com/blog/disabling-font-zooming-chrome-android */
+/* Enable class-based dark mode (Tailwind v4) — matches html.dark/html.light toggling */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Font: Inter is loaded via next/font/google in layout.tsx (self-hosted, no CLS) */
+
+/* Prevent Chrome Android font boosting */
 html {
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
@@ -16,10 +15,15 @@ html * {
   max-height: 1000000px;
 }
 
-html {
+/* ============================
+   DARK THEME (default)
+   ============================ */
+html.dark {
   background: #08090d;
+  color-scheme: dark;
 }
 
+html.dark,
 :root {
   --color-bg: #0a0a0a;
   --color-surface: #141414;
@@ -32,12 +36,113 @@ html {
   --color-warning: #f59e0b;
   --color-text: #fafafa;
   --color-text-secondary: #a1a1aa;
+  /* Liquid glass */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+}
+
+/* ============================
+   LIGHT THEME
+   ============================ */
+html.light {
+  background: #f8f9fa;
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+  --color-surface: #f5f5f7;
+  --color-surface-hover: #ebebed;
+  --color-border: #d1d5db;
+  --color-primary: #6366f1;
+  --color-primary-hover: #4f46e5;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-text: #0f172a;
+  --color-text-secondary: #64748b;
+  /* Liquid glass */
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-blur: 20px;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.8);
+}
+
+/* Smooth theme transition */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
 }
 
 body {
   background: transparent;
   color: var(--color-text);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.011em;
+}
+
+/* ============================
+   LIQUID GLASS
+   Frosted glass effect — works in both themes
+   ============================ */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-subtle {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-strong {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Glass card with inner highlight */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+.glass-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-border);
+}
+
+/* Light theme: scrollbar adapts */
+html.light ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(99,102,241,0.25), rgba(99,102,241,0.15));
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(99,102,241,0.4), rgba(99,102,241,0.25));
+}
+html.light * {
+  scrollbar-color: rgba(99,102,241,0.2) transparent;
+}
+
+/* Light theme: win/loss glows softer */
+html.light .win-glow {
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.15);
+}
+html.light .loss-glow {
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.1);
 }
 
 /* ============================
